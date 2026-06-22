@@ -1,0 +1,5 @@
+[checks.agda]
+cmd = "agda --safe {target}"
+
+[checks.pytest]
+cmd = "pytest -k {target}"

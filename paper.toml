@@ -1,0 +1,8 @@
+[paper]
+title = "paperkit"
+subtitle = "A paper is a projection of a verified claim-DAG — write claims, not prose."
+warrants = ["warrants.bib"]
+rubric = "rubric.tsv"
+out = "README.md"
+numbered = false      # README sections read better unnumbered
+references = false    # a README has no bibliography section

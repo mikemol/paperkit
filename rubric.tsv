@@ -1,0 +1,9 @@
+# rubric.tsv — README sections, in document order.  The coverage gate requires
+# each heading to appear and each section-tagged warrant to be cited within it.
+pitch	What paperkit is
+model	The model: a claim is a bibliography entry
+commands	The two commands
+resolver	The check-resolver
+adequacy	Grading check adequacy (Δ)
+layout	Layout
+status	Status

@@ -1,0 +1,126 @@
+% warrants.bib — the claims of paperkit's front-door doc.  This README is itself
+% a paperkit projection of THIS file (root paper.toml: out = README.md).  Every
+% example is a CITED claim that also emits its on-disk asset (emit = …): the prose
+% introduces and cites it [@key], the block renders below it.  An emit with no
+% claim would be an UNCITED placement — a postulate — so there are none here.
+
+% ── pitch ────────────────────────────────────────────────────────────────────
+@misc{rm-pitch,
+  section = {pitch},
+  claim   = {paperkit treats a document as the projection of a verified claim-DAG: you write claims, not prose},
+  check   = {file:paperkit/project.py}
+}
+@misc{rm-verifier,
+  section = {pitch}, from = {rm-pitch}, join = {, and },
+  claim   = {each claim carries a machine-checkable verifier},
+  check   = {file:paperkit/gate.py}
+}
+@misc{rm-noship,
+  section = {pitch}, from = {rm-verifier}, join = {; },
+  claim   = {an unverified sentence does not project, so the document cannot overclaim},
+  check   = {file:paperkit/gate.py}
+}
+@misc{rm-selfhost,
+  section = {pitch}, from = {rm-noship}, join = {. },
+  claim   = {this README is itself such a projection --- its claims are the root warrant set, and its examples are gated assets},
+  check   = {file:warrants.bib}
+}
+
+% ── model ────────────────────────────────────────────────────────────────────
+@misc{rm-model,
+  section = {model},
+  claim   = {a claim is one bibliography entry --- a statement, the rubric section it belongs to, the claims it depends on (which set prose order and connective glue), and its check},
+  check   = {file:paperkit/project.py}
+}
+@misc{rm-model-eg,
+  section = {model}, from = {rm-model}, join = {. },
+  claim   = {one entry reads like this},
+  emit    = {assets/claim.bib},
+  check   = {cmd:grep -q check assets/claim.bib}
+}
+
+% ── commands ─────────────────────────────────────────────────────────────────
+@misc{rm-cmds,
+  section = {commands},
+  claim   = {two commands do the work --- project turns the claims into the document, and gate verifies it},
+  check   = {file:paperkit/project.py}
+}
+@misc{rm-cmds-eg,
+  section = {commands}, from = {rm-cmds}, join = {. },
+  claim   = {you run them like this},
+  emit    = {assets/commands.sh},
+  check   = {cmd:sh -n assets/commands.sh}
+}
+@misc{rm-cmds-inv,
+  section = {commands}, from = {rm-cmds-eg},
+  claim   = {the gate enforces three invariants: the committed prose equals its projection, every cited claim's check passes, and every section is covered both ways},
+  check   = {file:paperkit/gate.py}
+}
+
+% ── resolver ─────────────────────────────────────────────────────────────────
+@misc{rm-resolver,
+  section = {resolver},
+  claim   = {a verifier is named type:target, and two types ship built in},
+  check   = {file:paperkit/gate.py}
+}
+@misc{rm-resolver-tbl,
+  section = {resolver}, from = {rm-resolver}, join = { --- },
+  claim   = {the two built-ins are},
+  emit    = {assets/resolver.md},
+  check   = {cmd:grep -q file: assets/resolver.md}
+}
+@misc{rm-resolver-cmd,
+  section = {resolver}, from = {rm-resolver-tbl},
+  claim   = {cmd is the universal escape hatch every check reduces to, and a new domain adds named types in paper.toml without touching the engine},
+  check   = {file:paperkit/gate.py}
+}
+@misc{rm-resolver-eg,
+  section = {resolver}, from = {rm-resolver-cmd}, join = {. },
+  claim   = {a new domain declares them like this},
+  emit    = {assets/resolver.toml},
+  check   = {cmd:python3 -c "import tomllib; tomllib.load(open('assets/resolver.toml','rb'))"}
+}
+
+% ── adequacy ─────────────────────────────────────────────────────────────────
+@misc{rm-delta,
+  section = {adequacy},
+  claim   = {a passing check only proves a sentence named a verifier, not that the verifier entails it --- so discriminate.py grades how much each check can actually fail},
+  check   = {file:paperkit/discriminate.py}
+}
+@misc{rm-delta-tbl,
+  section = {adequacy}, from = {rm-delta}, join = { --- },
+  claim   = {the grades are},
+  emit    = {assets/grades.md},
+  check   = {cmd:sh scripts/check-grades.sh}
+}
+@misc{rm-delta-cmds,
+  section = {adequacy}, from = {rm-delta-tbl}, join = {. },
+  claim   = {you run it as a report or as a gate, like this},
+  emit    = {assets/delta-cmds.sh},
+  check   = {cmd:sh -n assets/delta-cmds.sh}
+}
+@misc{rm-boundaries,
+  section = {adequacy}, from = {rm-delta-cmds},
+  claim   = {every tool ships its behavioral boundaries as the triple ⟨P, F, δ⟩ --- a minimal pass, a minimal flag, and the minimum delta that flips the verdict},
+  check   = {cmd:python3 paperkit/tests/boundaries_discriminate.py}
+}
+
+% ── layout ───────────────────────────────────────────────────────────────────
+@misc{rm-layout,
+  section = {layout},
+  claim   = {the repository is the engine, the self-hosting paper, and this generated README},
+  emit    = {assets/layout.txt},
+  check   = {cmd:grep -q project.py assets/layout.txt}
+}
+
+% ── status ───────────────────────────────────────────────────────────────────
+@misc{rm-status,
+  section = {status},
+  claim   = {a working spike --- the engine projects and gates, the self-hosting paper is green, discriminate.py grades check adequacy, and this README is itself a projection},
+  check   = {cmd:python3 paperkit/gate.py paper}
+}
+@misc{rm-next,
+  section = {status}, from = {rm-status}, join = {. },
+  claim   = {next are render-to-PDF (pandoc/docx) and a packaged CLI (paperkit init/project/gate/build)},
+  check   = {file:README.md}
+}

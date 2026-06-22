@@ -1,0 +1,5 @@
+paperkit/        the engine — project.py, gate.py, discriminate.py (domain-free)
+  tests/         behavioral-boundary examples ⟨P, F, δ⟩ per tool
+paper/           the self-hosting paper (warrants.bib, rubric.tsv, paper.toml, checks/)
+assets/          README example assets — emitted verbatim and gated
+README.md        this file — itself a paperkit projection of the root warrant set

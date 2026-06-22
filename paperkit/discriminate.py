@@ -197,6 +197,7 @@ def main(argv: list) -> int:
         g = dict(graded[chk])
         g.update(key=k, check=chk, cited=k in cited, section=F[k].get("section"),
                  shared_with=[o for o in share[chk] if o != k])
+        g["from"] = F[k].get("from", [])
         records.append(g)
 
     # content inputs = the files a check must touch to discriminate the paper's

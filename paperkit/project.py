@@ -137,10 +137,16 @@ def is_placed(f: dict) -> bool:
     return bool(f.get("emit")) or f.get("check", "").startswith("figure:")
 
 
+IMAGE_EXTS = {".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".emf"}
+
+
 def emit_block(pdir: Path, f: dict) -> list:
-    """The lines for an `emit:` warrant: the asset file's contents, fenced by the
-    language its extension implies (raw if none)."""
+    """The lines for an `emit:` warrant.  An image asset is placed as a markdown
+    image (the claim is its caption/alt); any other asset is included verbatim,
+    fenced by the language its extension implies (raw if none)."""
     p = pdir / f["emit"]
+    if p.suffix.lower() in IMAGE_EXTS:
+        return [f"![{clean(f.get('claim', 'figure'))}]({f['emit']})"]
     if not p.exists():
         return [f"<!-- emit: missing {f['emit']} -->"]
     content = p.read_text().rstrip("\n")

@@ -40,6 +40,11 @@ def main() -> int:
     check("additive: the example is CITED ([@p] in prose)", "[@p]" in proj_sh)
     check(".md asset is a raw include (no code fence)",
           "| a | b |" in proj_md and "```" not in proj_md)
+    proj_svg = project_text([entry("a", claim="a cited claim"),
+                             entry("p", claim="a figure", emit="fig.svg", frm="a", check="file:fig.svg")],
+                            assets={"fig.svg": "<svg/>\n"})
+    check("image asset renders as a markdown image, not a fenced block",
+          "![a figure](fig.svg)" in proj_svg and "```" not in proj_svg)
     check("uncited placement passes by default but raises a postulate advisory",
           rc_default == 0 and "postulate" in err_default)
     print()
@@ -67,7 +72,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (4 behaviors, 3 deltas)")
+    print("BOUNDARIES: PASS (5 behaviors, 3 deltas)")
     return 0
 
 

@@ -22,6 +22,7 @@ every check reduces to; the registry just gives recurring ones a name.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -62,7 +63,12 @@ def main(argv: list) -> int:
     args = [a for a in argv if not a.startswith("-")]
     safe = "--safe" in argv      # zero-postulate: uncited placements FAIL, not advise
     without_k = "--without-K" in argv or "--without-k" in argv   # forbid shared witnesses
+    as_json = "--json" in argv   # emit structured results to stdout (human lines suppressed)
     project_dir = Path(args[0]).resolve() if args else Path.cwd()
+
+    def info(msg):              # human success lines — suppressed under --json
+        if not as_json:
+            print(msg)
     cfg = P.load_config(project_dir)
     custom = tomllib.loads((project_dir / "paper.toml").read_text()).get("checks", {})
 
@@ -79,11 +85,12 @@ def main(argv: list) -> int:
     rc = 0
 
     # PROJECT — committed prose is the projection
-    if prose != P.project(cfg):
+    proj_ok = prose == P.project(cfg)
+    if not proj_ok:
         print(f"paperkit-gate: {out.name} ≠ projection — regenerate (paperkit-project)", file=sys.stderr)
         rc = 1
     else:
-        print(f"paperkit-gate: {out.name} ≡ projection")
+        info(f"paperkit-gate: {out.name} ≡ projection")
 
     # RESOLVE — every cited claim's check passes; references at least defined.
     # Placed warrants (emit:/figure) carry no citation but ARE in the document by
@@ -108,24 +115,25 @@ def main(argv: list) -> int:
             print(f"paperkit-gate: check FAILED for [@{k}]: {F[k]['check']}", file=sys.stderr)
         rc = 1
     if not undefined and not bad:
-        print(f"paperkit-gate: {len(to_verify)} cited/placed claim(s) all resolve to passing checks")
+        info(f"paperkit-gate: {len(to_verify)} cited/placed claim(s) all resolve to passing checks")
 
     # WITHOUT-K — proof-relevance.  The gate reduces each check to a boolean, so it
     # silently identifies distinct cited claims that share one witness (Axiom K /
     # UIP).  --without-K drops that: every cited claim must carry a DISTINCT witness.
+    # (collapses are computed always, for --json; they only FAIL the gate under --without-K.)
+    by_check: dict = {}
+    for k in sorted(cited & warrants):
+        by_check.setdefault(F[k]["check"], []).append(k)
+    collapses = {c: ks for c, ks in by_check.items() if len(ks) > 1}
     if without_k:
-        by_check: dict = {}
-        for k in sorted(cited & warrants):
-            by_check.setdefault(F[k]["check"], []).append(k)
-        collapsed = {c: ks for c, ks in by_check.items() if len(ks) > 1}
-        if collapsed:
-            for c, ks in sorted(collapsed.items()):
+        if collapses:
+            for c, ks in sorted(collapses.items()):
                 print(f"paperkit-gate: --without-K — {len(ks)} cited claims collapse onto "
                       f"one witness {c}: {', '.join(ks)}", file=sys.stderr)
             rc = 1
         else:
-            print(f"paperkit-gate: --without-K — {len(cited & warrants)} cited claim(s) "
-                  f"each carry a distinct witness")
+            info(f"paperkit-gate: --without-K — {len(cited & warrants)} cited claim(s) "
+                 f"each carry a distinct witness")
 
     # COVERAGE — sections present, section-tagged claims cited
     headings = "\n".join(ln for ln in prose.splitlines() if ln.startswith("## "))
@@ -146,16 +154,25 @@ def main(argv: list) -> int:
                 (gaps if safe else advisories).append(msg)
             else:
                 gaps.append(f"claim [@{k}] tagged section={f['section']} but not cited")
+    secs = len(P.rubric(cfg["rubric"]))
     if gaps:
         for g in gaps:
             print(f"paperkit-gate: coverage — {g}", file=sys.stderr)
         rc = 1
     else:
-        secs = len(P.rubric(cfg["rubric"]))
-        print(f"paperkit-gate: coverage complete — {secs} sections, all tagged claims cited")
+        info(f"paperkit-gate: coverage complete — {secs} sections, all tagged claims cited")
     for a in advisories:
         print(f"paperkit-gate: advisory — {a}", file=sys.stderr)
 
+    if as_json:
+        print(json.dumps({
+            "document": out.name, "pass": rc == 0, "project_ok": proj_ok,
+            "verified": len(to_verify), "undefined": undefined, "bad": bad,
+            "sections": secs, "gaps": gaps,
+            "postulates": sorted(k for k, f in F.items()
+                                 if f.get("section") and k not in cited and P.is_placed(f)),
+            "collapses": collapses,
+        }, indent=2))
     print("paperkit-gate: PASS" if rc == 0 else "paperkit-gate: FAIL", file=sys.stderr)
     return rc
 

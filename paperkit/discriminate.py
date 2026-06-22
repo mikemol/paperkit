@@ -186,7 +186,7 @@ def main(argv: list) -> int:
     for k in keys:
         chk = F[k]["check"]
         g = dict(graded[chk])
-        g.update(key=k, check=chk, cited=k in cited,
+        g.update(key=k, check=chk, cited=k in cited, section=F[k].get("section"),
                  shared_with=[o for o in share[chk] if o != k])
         records.append(g)
 

@@ -48,16 +48,19 @@ def svg(records):
     W, H = L + plotW + R, T + B + BH * len(bands)
     band_y = {g: T + i * BH + BH // 2 for i, g in enumerate(bands)}
 
-    def x_of(k):
-        return L + (round(plotW * depth[k] / maxd) if maxd else plotW // 2)
+    depended = {d for r in records for d in r.get("rests-on", [])}
 
-    # filled (effective) position; nodes sharing a (depth, effective-grade) cell spread
+    def x_of(k):                                      # terminal theses are right-aligned
+        d = maxd if k not in depended else depth[k]
+        return L + (round(plotW * d / maxd) if maxd else plotW // 2)
+
+    # nodes sharing an (x-column, effective-grade) cell spread vertically within the band
     groups, pos = {}, {}
     for r in records:
-        groups.setdefault((depth[r["key"]], eff(r)), []).append(r["key"])
-    for (_d, g), keys in groups.items():
+        groups.setdefault((x_of(r["key"]), eff(r)), []).append(r["key"])
+    for (xc, g), keys in groups.items():
         for i, k in enumerate(keys):
-            pos[k] = (x_of(k), round(band_y[g] + (i - (len(keys) - 1) / 2) * 13))
+            pos[k] = (xc, round(band_y[g] + (i - (len(keys) - 1) / 2) * 13))
 
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
            f'font-family="sans-serif" font-size="11">',
@@ -83,7 +86,6 @@ def svg(records):
                        f'stroke-width="0.9" stroke-dasharray="2,2"/>')
             out.append(f'<circle cx="{x}" cy="{ys}" r="3.2" fill="white" '
                        f'stroke="{COLOR[r["grade"]]}" stroke-width="1.4"/>')
-    depended = {d for r in records for d in r.get("rests-on", [])}
     for r in records:                                 # nodes, at effective grade (filled)
         x, y = pos[r["key"]]
         out.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{COLOR[eff(r)]}"/>')

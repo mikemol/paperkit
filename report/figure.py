@@ -83,15 +83,21 @@ def svg(records):
                        f'stroke-width="0.9" stroke-dasharray="2,2"/>')
             out.append(f'<circle cx="{x}" cy="{ys}" r="3.2" fill="white" '
                        f'stroke="{COLOR[r["grade"]]}" stroke-width="1.4"/>')
+    depended = {d for r in records for d in r.get("rests-on", [])}
     for r in records:                                 # nodes, at effective grade (filled)
         x, y = pos[r["key"]]
         out.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{COLOR[eff(r)]}"/>')
+        if r["key"] not in depended:                  # terminal thesis — nothing rests on it
+            out.append(f'<circle cx="{x}" cy="{y}" r="7.5" fill="none" stroke="{INK}" stroke-width="1.3"/>')
     # legend + axis label
-    lx = L + 6
+    lx = L + 4
     out.append(f'<circle cx="{lx}" cy="{T - 16}" r="4" fill="{INK}"/>'
-               f'<text x="{lx + 9}" y="{T - 12}" fill="{INK}">effective grade</text>')
-    out.append(f'<circle cx="{lx + 120}" cy="{T - 16}" r="3.2" fill="white" stroke="{INK}" stroke-width="1.4"/>'
-               f'<text x="{lx + 130}" y="{T - 12}" fill="{INK}">self-check grade (when clamped)</text>')
+               f'<text x="{lx + 8}" y="{T - 12}" fill="{INK}">effective</text>')
+    out.append(f'<circle cx="{lx + 74}" cy="{T - 16}" r="3.2" fill="white" stroke="{INK}" stroke-width="1.4"/>'
+               f'<text x="{lx + 83}" y="{T - 12}" fill="{INK}">self (if clamped)</text>')
+    out.append(f'<circle cx="{lx + 196}" cy="{T - 16}" r="6.5" fill="none" stroke="{INK}" stroke-width="1.3"/>'
+               f'<circle cx="{lx + 196}" cy="{T - 16}" r="3" fill="{INK}"/>'
+               f'<text x="{lx + 207}" y="{T - 12}" fill="{INK}">terminal (nothing rests on it)</text>')
     out.append(f'<text x="{L + plotW // 2}" y="{H - 14}" text-anchor="middle" fill="{INK}">'
                f'grounding depth  (foundations → theses)</text>')
     out.append('</svg>')

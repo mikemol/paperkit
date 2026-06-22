@@ -69,30 +69,39 @@
 <circle cx="179" cy="44" r="4" fill="#009E73"/>
 <circle cx="179" cy="58" r="4" fill="#009E73"/>
 <circle cx="225" cy="70" r="4" fill="#009E73"/>
+<circle cx="225" cy="70" r="7.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/>
 <circle cx="132" cy="38" r="4" fill="#009E73"/>
 <circle cx="272" cy="64" r="4" fill="#009E73"/>
 <circle cx="319" cy="58" r="4" fill="#009E73"/>
 <circle cx="365" cy="70" r="4" fill="#009E73"/>
+<circle cx="365" cy="70" r="7.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/>
 <circle cx="179" cy="70" r="4" fill="#009E73"/>
+<circle cx="179" cy="70" r="7.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/>
 <circle cx="132" cy="51" r="4" fill="#009E73"/>
 <circle cx="132" cy="64" r="4" fill="#009E73"/>
 <circle cx="132" cy="77" r="4" fill="#009E73"/>
 <circle cx="179" cy="84" r="4" fill="#009E73"/>
 <circle cx="225" cy="84" r="4" fill="#009E73"/>
 <circle cx="179" cy="96" r="4" fill="#009E73"/>
+<circle cx="179" cy="96" r="7.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/>
 <circle cx="132" cy="90" r="4" fill="#009E73"/>
 <circle cx="132" cy="103" r="4" fill="#009E73"/>
 <circle cx="272" cy="77" r="4" fill="#009E73"/>
+<circle cx="272" cy="77" r="7.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/>
 <circle cx="459" cy="64" r="4" fill="#009E73"/>
 <circle cx="319" cy="70" r="4" fill="#009E73"/>
+<circle cx="319" cy="70" r="7.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/>
 <circle cx="505" cy="58" r="4" fill="#009E73"/>
 <circle cx="505" cy="70" r="4" fill="#009E73"/>
 <circle cx="552" cy="124" r="4" fill="#0072B2"/>
 <circle cx="599" cy="124" r="4" fill="#0072B2"/>
 <circle cx="645" cy="124" r="4" fill="#0072B2"/>
 <circle cx="692" cy="124" r="4" fill="#0072B2"/>
+<circle cx="692" cy="124" r="7.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/>
 <circle cx="412" cy="70" r="4" fill="#009E73"/>
-<circle cx="138" cy="18" r="4" fill="#1a1a1a"/><text x="147" y="22" fill="#1a1a1a">effective grade</text>
-<circle cx="258" cy="18" r="3.2" fill="white" stroke="#1a1a1a" stroke-width="1.4"/><text x="268" y="22" fill="#1a1a1a">self-check grade (when clamped)</text>
+<circle cx="412" cy="70" r="7.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/>
+<circle cx="136" cy="18" r="4" fill="#1a1a1a"/><text x="144" y="22" fill="#1a1a1a">effective</text>
+<circle cx="210" cy="18" r="3.2" fill="white" stroke="#1a1a1a" stroke-width="1.4"/><text x="219" y="22" fill="#1a1a1a">self (if clamped)</text>
+<circle cx="332" cy="18" r="6.5" fill="none" stroke="#1a1a1a" stroke-width="1.3"/><circle cx="332" cy="18" r="3" fill="#1a1a1a"/><text x="343" y="22" fill="#1a1a1a">terminal (nothing rests on it)</text>
 <text x="412" y="188" text-anchor="middle" fill="#1a1a1a">grounding depth  (foundations → theses)</text>
 </svg>

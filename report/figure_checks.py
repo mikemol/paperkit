@@ -17,7 +17,7 @@ SVG = (HERE / "assets" / "dag.svg").read_text()
 OKABE_ITO = {"#E69F00", "#56B4E9", "#009E73", "#F0E442",
              "#0072B2", "#D55E00", "#CC79A7", "#000000"}
 INK = "#1a1a1a"
-NEUTRALS = {"white", "#ffffff", "#eeeeee", "#cccccc"}   # background + gridlines/edges
+NEUTRALS = {"white", "#ffffff", "#eeeeee", "#cccccc", "#999999", "none"}   # bg/gridlines/rings
 
 
 def _fills():
@@ -47,14 +47,20 @@ def well_formed():
 
 
 def shows_clamp():
-    # the figure shows effective-vs-self grade: a clamp legend, and (since the paper
-    # is clamped by its vacuous roots) at least one drop-line from self to effective
-    assert "self-check grade" in SVG, "the figure has no clamp legend"
+    # the figure shows effective-vs-self grade: a clamp legend, and (while any claim
+    # is clamped) at least one drop-line from self to effective
+    assert "self (if clamped)" in SVG, "the figure has no clamp legend"
     assert "stroke-dasharray" in SVG, "no clamp drop-lines drawn (effective == self everywhere?)"
 
 
-CHECKS = {"okabe-ito": okabe_ito, "dark-on-light": dark_on_light,
-          "well-formed": well_formed, "shows-clamp": shows_clamp}
+def shows_terminal():
+    # terminal theses (nothing rests on them) are ringed, with a legend entry
+    assert "terminal (nothing rests on it)" in SVG, "no terminal legend in the figure"
+    assert 'r="7.5"' in SVG, "no terminal rings drawn (every claim has a dependent?)"
+
+
+CHECKS = {"okabe-ito": okabe_ito, "dark-on-light": dark_on_light, "well-formed": well_formed,
+          "shows-clamp": shows_clamp, "shows-terminal": shows_terminal}
 
 
 def main(argv):

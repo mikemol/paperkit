@@ -1,0 +1,5 @@
+# rubric.tsv — the sections of the tool-boundaries page, in document order.
+# key <TAB> heading title
+delta	The Δ Grader and --without-K
+engine	Projector and Gate
+runtime	Driver and Μ Cache

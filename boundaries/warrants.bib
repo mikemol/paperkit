@@ -1,0 +1,45 @@
+% warrants.bib — paperkit's tools and their behavioral boundaries.  Each claim is a
+% tool's ⟨P, F, δ⟩ lint suite (the boundary practice): the prose states what the tool
+% flags and what it passes; the `check` RUNS that suite.  This file is a makefile —
+% the gate runs every check below in parallel — and BOUNDARIES.md is its projection.
+
+% ── Δ grader + --without-K ───────────────────────────────────────────────────
+@misc{bnd-delta,
+  section = {delta},
+  claim   = {the Δ grader's boundary --- it flags a check that provably cannot fail (vacuous) and passes one a mutation can break (behavioral)},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_discriminate.py}
+}
+@misc{bnd-witness,
+  section = {delta}, from = {bnd-delta}, join = {. },
+  claim   = {the --without-K boundary --- it flags two cited claims that share a single witness and passes claims that carry distinct witnesses},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_without_k.py}
+}
+
+% ── projector + gate ─────────────────────────────────────────────────────────
+@misc{bnd-emit,
+  section = {engine},
+  claim   = {the projector's boundary --- it emits a cited example verbatim, and --safe rejects an uncited placement (a postulate)},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_emit.py}
+}
+@misc{bnd-json,
+  section = {engine}, from = {bnd-emit}, join = {. },
+  claim   = {the gate --json boundary --- the structured fields track the gate's actual verdict, the pass flag and witness collapses included},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_gate_json.py}
+}
+@misc{bnd-parallel,
+  section = {engine}, from = {bnd-json}, join = {. },
+  claim   = {the parallel gate's boundary --- the verdict tracks the checks, never the worker count, so parallel equals serial},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_jobs.py}
+}
+
+% ── driver + cache ───────────────────────────────────────────────────────────
+@misc{bnd-driver,
+  section = {runtime},
+  claim   = {the driver's boundary --- a witness pumps and serializes resumably, so a slow check is interruptible, not broken},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_driver.py}
+}
+@misc{bnd-cache,
+  section = {runtime}, from = {bnd-driver}, join = {. },
+  claim   = {the memoization boundary --- a grade is reused only when the content key matches, so a changed engine never serves a stale grade},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_memoize.py}
+}

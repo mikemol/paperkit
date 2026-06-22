@@ -1,7 +1,12 @@
 #!/bin/sh
-# paperkit local CI — every commit must leave the repository green: both documents
-# project-stable, every check passing, zero postulates (--safe), and the tool
-# boundaries intact.  This hook IS our CI; add every new check here.
+# paperkit local CI — every check lives in a bib, and the gate runs each project's
+# checks IN PARALLEL (the bib is the makefile).  A commit must leave every project
+# green: prose ≡ projection, every cited check passing, zero postulates (--safe),
+# distinct witnesses (--without-K), and the paper behaviorally adequate (Δ).
+#
+# The tool boundary suites (⟨P,F,δ⟩) are CLAIMS in the `boundaries` project, so a new
+# tool's suite is gated the moment its claim lands — there is no suite list here to
+# forget.  To gate a new document, add its project dir to the loop below.
 #
 # Enable once per clone:   git config core.hooksPath .githooks
 set -eu
@@ -17,13 +22,8 @@ run() {                       # run "label" cmd...; show output only on failure
   echo "[pre-commit] ok: $desc"
 }
 
-run "gate paper/ (--safe, --without-K)"       python3 paperkit/gate.py --safe --without-K paper
-run "Δ adequacy: paper all-behavioral"        python3 paperkit/discriminate.py --min-strength behavioral paper
-run "gate README (--safe, --without-K)"       python3 paperkit/gate.py --safe --without-K .
-run "Δ behavioral boundaries"                python3 paperkit/tests/boundaries_discriminate.py
-run "engine boundaries (emit / --safe)"      python3 paperkit/tests/boundaries_emit.py
-run "witness boundaries (--without-K)"       python3 paperkit/tests/boundaries_without_k.py
-run "gate --json boundaries"                 python3 paperkit/tests/boundaries_gate_json.py
-run "driver boundaries (pump/parse)"         python3 paperkit/tests/boundaries_driver.py
-run "Μ cache boundaries"                      python3 paperkit/tests/boundaries_memoize.py
+run "gate paper (--safe --without-K)"       python3 paperkit/gate.py --safe --without-K paper
+run "gate README (--safe --without-K)"      python3 paperkit/gate.py --safe --without-K .
+run "gate boundaries (--safe --without-K)"  python3 paperkit/gate.py --safe --without-K boundaries
+run "Δ adequacy: paper all-behavioral"      python3 paperkit/discriminate.py --min-strength behavioral paper
 echo "[pre-commit] all checks passed"

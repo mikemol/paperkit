@@ -1,0 +1,8 @@
+[paper]
+title = "paperkit Tool Boundaries"
+subtitle = "Each tool's ⟨P, F, δ⟩ lint suite, as a claim — this bib is a makefile, and the gate runs its checks in parallel."
+rubric = "rubric.tsv"
+warrants = ["warrants.bib"]
+out = "BOUNDARIES.md"
+numbered = false       # a reference page reads better unnumbered
+references = false     # no bibliography section

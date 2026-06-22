@@ -15,9 +15,12 @@ from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[2] / "paperkit"
 sys.path.insert(0, str(ENGINE))
+sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
+import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
+PROJECT_SRC = (ENGINE / "project.py").read_text()
 
 
 def verifier_named():
@@ -63,6 +66,55 @@ def cmd_escape():
     assert 'run_ok(custom[typ]["cmd"]' in GATE_SRC, "custom types no longer reduce to a cmd"
 
 
+# ── engine section ───────────────────────────────────────────────────────────
+def projector_emits():
+    # "the projector emits the whole document from the warrant set" — project a
+    # two-section fixture; the whole document (title + every section + the claim) appears
+    text = fx.project_text([fx.entry("x", claim="anchor phrase")],
+                           rubric=(("s", "Sec One"), ("t", "Sec Two")), title="Doc")
+    for needle in ("# Doc", "## Sec One", "## Sec Two", "anchor phrase"):
+        assert needle.lower() in text.lower(), f"projection is missing {needle!r}"
+
+
+def prose_is_artifact():
+    # "the committed prose is a build artifact, not a source" — the projector has a
+    # --check mode that compares the committed file against a fresh projection
+    assert "--check" in PROJECT_SRC and "read_text() != out" in PROJECT_SRC, \
+        "projector can no longer detect a hand-edit against its projection"
+
+
+def gate_rejects_drift():
+    # "the gate rejects prose that has drifted" — counter-fixture: canonical passes, drift fails
+    w = [fx.entry("x", claim="anchored")]
+    canonical = fx.project_text(w)
+    assert fx.gate(w, out=canonical)[0] == 0, "gate rejected the exact projection"
+    assert fx.gate(w, out=canonical + "\nHAND-EDITED DRIFT\n")[0] != 0, "gate accepted drifted prose"
+
+
+def edit_cant_survive():
+    # "a hand-edit cannot survive a build" — only the exact projection passes the gate
+    w = [fx.entry("x", claim="anchored")]
+    canonical = fx.project_text(w)
+    assert fx.gate(w, out=canonical)[0] == 0
+    for edit in ("PREPENDED\n" + canonical, canonical + "\nAPPENDED\n", canonical + "x"):
+        assert edit != canonical and fx.gate(w, out=edit)[0] != 0, "a hand-edit survived the build"
+
+
+def coverage_both_sides():
+    # "coverage is enforced from both sides" — section-present AND claim-cited branches
+    assert "absent" in GATE_SRC and "not cited" in GATE_SRC, "coverage no longer checks both directions"
+
+
+def every_section_appears():
+    # "every required section must appear"
+    assert "not in headings" in GATE_SRC, "gate no longer checks each section appears"
+
+
+def every_claim_cited():
+    # "every claim tagged for a section must be cited within it"
+    assert "k not in cited" in GATE_SRC, "gate no longer checks each tagged claim is cited"
+
+
 CLAIMS = {
     "verifier-named": verifier_named,
     "gate-dispatches": gate_dispatches,
@@ -71,6 +123,13 @@ CLAIMS = {
     "file-builtin": file_builtin,
     "cmd-builtin": cmd_builtin,
     "cmd-escape": cmd_escape,
+    "projector-emits": projector_emits,
+    "prose-is-artifact": prose_is_artifact,
+    "gate-rejects-drift": gate_rejects_drift,
+    "edit-cant-survive": edit_cant_survive,
+    "coverage-both-sides": coverage_both_sides,
+    "every-section-appears": every_section_appears,
+    "every-claim-cited": every_claim_cited,
 }
 
 

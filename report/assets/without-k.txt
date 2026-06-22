@@ -1,8 +1,0 @@
-$ paperkit-gate --without-K paper
-paperkit-gate: paper.md ≡ projection
-paperkit-gate: 33 cited/placed claim(s) all resolve to passing checks
-paperkit-gate: coverage complete — 7 sections, all tagged claims cited
-paperkit-gate: --without-K — 2 cited claims collapse onto one witness cmd:sh checks/drift-caught.sh: one-green-check, paperkit-on-paperkit
-paperkit-gate: --without-K — 6 cited claims collapse onto one witness cmd:sh checks/projection-stable.sh: closes-gap, fail-omits, not-project, paper-is-paperkit, prose-is-projection, unverified-cant-ship
-paperkit-gate: --without-K — 3 cited claims collapse onto one witness file:warrants.bib: claim-bears-check, claims-are-warrants, node-is-claim
-paperkit-gate: FAIL

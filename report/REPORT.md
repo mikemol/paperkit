@@ -4,45 +4,30 @@
 
 ## Gate status
 
-Both the paper and the README pass the gate with zero postulates [@rpt-status]. The gate reports [@rpt-status-out].
+Both the paper and the README pass the gate with zero postulates [@rpt-status] — the verdict per document [@rpt-status-out].
 
-```text
-$ paperkit-gate --safe paper
-paperkit-gate: paper.md ≡ projection
-paperkit-gate: 33 cited/placed claim(s) all resolve to passing checks
-paperkit-gate: coverage complete — 7 sections, all tagged claims cited
-paperkit-gate: PASS
-
-$ paperkit-gate --safe .   (the README project)
-paperkit-gate: README.md ≡ projection
-paperkit-gate: 22 cited/placed claim(s) all resolve to passing checks
-paperkit-gate: coverage complete — 8 sections, all tagged claims cited
-paperkit-gate: PASS
-```
+| document | gate (--safe, zero postulates) |
+| --- | --- |
+| paper | PASS |
+| README | PASS |
 
 ## Check adequacy (Δ)
 
-Δ grades each cited claim's check by whether it can actually fail [@rpt-delta]. The current grades are [@rpt-delta-out].
+Δ grades each cited claim's check by whether it can actually fail [@rpt-delta] — the current grade distribution [@rpt-delta-out].
 
-```text
-$ paperkit-discriminate paper
-paperkit-discriminate (Δ): 33 of 36 cited warrant(s) carry a check, 25 distinct check(s)
-  summary: 26 behavioral, 2 indeterminate, 5 vacuous
-  ⚠ 5 cited claim(s) rest on a check that PROVABLY cannot fail.
-```
+| Δ grade | cited claims |
+| --- | --- |
+| behavioral | 26 |
+| indeterminate | 2 |
+| vacuous | 5 |
 
 ## Proof-relevance (--without-K)
 
---without-K lists the cited claims that still share a witness [@rpt-proof]. They are [@rpt-proof-out].
+Some cited claims still share a witness, so --without-K does not yet pass [@rpt-proof] — the shared witnesses [@rpt-proof-out].
 
-```text
-$ paperkit-gate --without-K paper
-paperkit-gate: paper.md ≡ projection
-paperkit-gate: 33 cited/placed claim(s) all resolve to passing checks
-paperkit-gate: coverage complete — 7 sections, all tagged claims cited
-paperkit-gate: --without-K — 2 cited claims collapse onto one witness cmd:sh checks/drift-caught.sh: one-green-check, paperkit-on-paperkit
-paperkit-gate: --without-K — 6 cited claims collapse onto one witness cmd:sh checks/projection-stable.sh: closes-gap, fail-omits, not-project, paper-is-paperkit, prose-is-projection, unverified-cant-ship
-paperkit-gate: --without-K — 3 cited claims collapse onto one witness file:warrants.bib: claim-bears-check, claims-are-warrants, node-is-claim
-paperkit-gate: FAIL
-```
+| shared witness | claims | collapsed onto it |
+| --- | --- | --- |
+| `cmd:sh checks/drift-caught.sh` | 2 | one-green-check, paperkit-on-paperkit |
+| `cmd:sh checks/projection-stable.sh` | 6 | closes-gap, fail-omits, not-project, paper-is-paperkit, prose-is-projection, unverified-cant-ship |
+| `file:warrants.bib` | 3 | claim-bears-check, claims-are-warrants, node-is-claim |
 

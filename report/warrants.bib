@@ -1,7 +1,9 @@
-% warrants.bib — the verification REPORT's claims.  Each section pairs a claim
-% about the pipeline (checked by RUNNING it) with the live captured output, emitted
-% as a gated asset and kept fresh-by-construction (check = fresh:<asset>, i.e.
-% report/gen.py --check <asset>).  Run `python3 report/gen.py` to refresh.
+% warrants.bib — the verification REPORT's claims.  Each figure is a markdown table
+% RENDERED from machine-readable pipeline data (discriminate --json + gate exit
+% codes), not scraped from human output.  The tables are emitted assets, kept
+% fresh-by-construction (check = fresh:all, i.e. report/gen.py --check, which
+% re-derives every figure and fails if the committed copy has drifted).  Refresh
+% with `python3 report/gen.py`.
 
 % ── status ───────────────────────────────────────────────────────────────────
 @misc{rpt-status,
@@ -10,34 +12,34 @@
   check   = {cmd:python3 ../paperkit/gate.py --safe ../paper >/dev/null 2>&1 && python3 ../paperkit/gate.py --safe .. >/dev/null 2>&1}
 }
 @misc{rpt-status-out,
-  section = {status}, from = {rpt-status}, join = {. },
-  claim   = {the gate reports},
-  emit    = {assets/gate.txt},
-  check   = {fresh:gate.txt}
+  section = {status}, from = {rpt-status}, join = { — },
+  claim   = {the verdict per document},
+  emit    = {assets/gate.md},
+  check   = {fresh:all}
 }
 
 % ── adequacy ─────────────────────────────────────────────────────────────────
 @misc{rpt-delta,
   section = {adequacy},
   claim   = {Δ grades each cited claim's check by whether it can actually fail},
-  check   = {cmd:python3 ../paperkit/discriminate.py ../paper >/dev/null}
+  check   = {fresh:all}
 }
 @misc{rpt-delta-out,
-  section = {adequacy}, from = {rpt-delta}, join = {. },
-  claim   = {the current grades are},
-  emit    = {assets/delta.txt},
-  check   = {fresh:delta.txt}
+  section = {adequacy}, from = {rpt-delta}, join = { — },
+  claim   = {the current grade distribution},
+  emit    = {assets/delta.md},
+  check   = {fresh:all}
 }
 
 % ── proof ────────────────────────────────────────────────────────────────────
 @misc{rpt-proof,
   section = {proof},
-  claim   = {--without-K lists the cited claims that still share a witness},
-  check   = {fresh:without-k.txt}
+  claim   = {some cited claims still share a witness, so --without-K does not yet pass},
+  check   = {fresh:all}
 }
 @misc{rpt-proof-out,
-  section = {proof}, from = {rpt-proof}, join = {. },
-  claim   = {they are},
-  emit    = {assets/without-k.txt},
-  check   = {fresh:without-k.txt}
+  section = {proof}, from = {rpt-proof}, join = { — },
+  claim   = {the shared witnesses},
+  emit    = {assets/without-k.md},
+  check   = {fresh:all}
 }

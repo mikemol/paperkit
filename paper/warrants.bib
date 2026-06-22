@@ -26,14 +26,14 @@
   check   = {file:warrants.bib}
 }
 @misc{fail-omits,
-  section = {intro}, from = {claim-bears-check}, join = {; and },
+  section = {intro}, from = {claim-bears-check, paper-is-projection}, join = {; and },
   claim   = {a claim whose verifier fails simply does not appear in the prose},
   check   = {cmd:sh checks/projection-stable.sh}
 }
 
 % ── 2. model ────────────────────────────────────────────────────────────────
 @misc{claim-is-record,
-  section = {model}, from = {fail-omits},
+  section = {model}, from = {node-is-claim, claim-bears-check},
   claim   = {a claim is a single record --- a statement, the rubric section it belongs to, its dependencies, and its verifier},
   check   = {claim:claim-is-record}
 }
@@ -43,7 +43,7 @@
   check   = {claim:record-is-bibentry}
 }
 @misc{prose-projected,
-  section = {model}, from = {record-is-bibentry}, join = {. },
+  section = {model}, from = {paper-is-projection}, join = {. },
   claim   = {the prose is projected, not authored},
   check   = {claim:prose-projected}
 }
@@ -58,14 +58,14 @@
   check   = {claim:joined-by-glue}
 }
 @misc{deterministic,
-  section = {model}, from = {joined-by-glue}, join = {, },
+  section = {model}, from = {ordered-by-deps, joined-by-glue}, join = {, },
   claim   = {the same warrant set always giving the same document},
   check   = {claim:deterministic}
 }
 
 % ── 3. engine ───────────────────────────────────────────────────────────────
 @misc{projector-emits,
-  section = {engine}, from = {deterministic},
+  section = {engine}, from = {prose-projected},
   claim   = {the projector emits the whole document from the warrant set},
   check   = {claim:projector-emits}
 }
@@ -80,12 +80,12 @@
   check   = {claim:gate-rejects-drift}
 }
 @misc{edit-cant-survive,
-  section = {engine}, from = {gate-rejects-drift}, join = {, so },
+  section = {engine}, from = {gate-rejects-drift, projector-emits}, join = {, so },
   claim   = {a hand-edit cannot survive a build},
   check   = {claim:edit-cant-survive}
 }
 @misc{coverage-both-sides,
-  section = {engine}, from = {edit-cant-survive}, join = {. },
+  section = {engine}, from = {gate-rejects-drift}, join = {. },
   claim   = {coverage is enforced from both sides},
   check   = {claim:coverage-both-sides}
 }
@@ -95,14 +95,14 @@
   check   = {claim:every-section-appears}
 }
 @misc{every-claim-cited,
-  section = {engine}, from = {every-section-appears}, join = {, and },
+  section = {engine}, from = {coverage-both-sides}, join = {, and },
   claim   = {every claim tagged for a section must be cited within it},
   check   = {claim:every-claim-cited}
 }
 
 % ── 4. resolver ─────────────────────────────────────────────────────────────
 @misc{verifier-named,
-  section = {resolver}, from = {every-claim-cited},
+  section = {resolver}, from = {claim-bears-check},
   claim   = {a claim's verifier is named type:target},
   check   = {claim:verifier-named}
 }
@@ -117,7 +117,7 @@
   check   = {claim:new-domain-adds}
 }
 @misc{two-builtins,
-  section = {resolver}, from = {new-domain-adds}, join = {. },
+  section = {resolver}, from = {gate-dispatches}, join = {. },
   claim   = {two verifiers ship built in},
   check   = {claim:two-builtins}
 }
@@ -127,61 +127,61 @@
   check   = {claim:file-builtin}
 }
 @misc{cmd-builtin,
-  section = {resolver}, from = {file-builtin}, join = {, and },
+  section = {resolver}, from = {two-builtins}, join = {, and },
   claim   = {cmd, that a script exits zero},
   check   = {claim:cmd-builtin}
 }
 @misc{cmd-escape,
-  section = {resolver}, from = {cmd-builtin}, join = {; and },
+  section = {resolver}, from = {cmd-builtin, new-domain-adds}, join = {; and },
   claim   = {cmd is the universal escape hatch every other check reduces to},
   check   = {claim:cmd-escape}
 }
 
 % ── 5. selfhost ─────────────────────────────────────────────────────────────
 @misc{paper-is-paperkit,
-  section = {selfhost}, from = {cmd-escape},
+  section = {selfhost}, from = {paper-is-projection},
   claim   = {this paper is itself a paperkit project},
   check   = {cmd:sh checks/projection-stable.sh}
 }
 @misc{claims-are-warrants,
-  section = {selfhost}, from = {paper-is-paperkit}, join = { — },
+  section = {selfhost}, from = {paper-is-paperkit, record-is-bibentry}, join = { — },
   claim   = {its claims are these warrants},
   check   = {file:warrants.bib}
 }
 @misc{prose-is-projection,
-  section = {selfhost}, from = {claims-are-warrants}, join = {, },
+  section = {selfhost}, from = {paper-is-paperkit, prose-projected}, join = {, },
   claim   = {its prose is their projection},
   check   = {cmd:sh checks/projection-stable.sh}
 }
 @misc{gate-is-subject,
-  section = {selfhost}, from = {prose-is-projection}, join = {, and },
+  section = {selfhost}, from = {paper-is-paperkit, gate-rejects-drift}, join = {, and },
   claim   = {the gate that accepts it is the very subject it describes},
   check   = {file:../paperkit/gate.py}
 }
 @misc{paperkit-on-paperkit,
-  section = {selfhost}, from = {gate-is-subject}, join = {. },
+  section = {selfhost}, from = {gate-is-subject, gate-rejects-drift}, join = {. },
   claim   = {the verifiers behind this section run paperkit on paperkit --- projecting a fixture, drifting it, and confirming the gate rejects the drift},
   check   = {cmd:sh checks/drift-caught.sh}
 }
 @misc{one-green-check,
-  section = {selfhost}, from = {paperkit-on-paperkit}, join = {, so },
+  section = {selfhost}, from = {paperkit-on-paperkit, gate-is-subject}, join = {, so },
   claim   = {the document's correctness and the tool's are one green check},
   check   = {cmd:sh checks/drift-caught.sh}
 }
 
 % ── 7. conclusion ───────────────────────────────────────────────────────────
 @misc{closes-gap,
-  section = {conclusion}, from = {one-green-check},
+  section = {conclusion}, from = {fail-omits, one-green-check},
   claim   = {by making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked},
   check   = {cmd:sh checks/projection-stable.sh}
 }
 @misc{unverified-cant-ship,
-  section = {conclusion}, from = {closes-gap}, join = {: },
+  section = {conclusion}, from = {closes-gap, fail-omits}, join = {: },
   claim   = {an unverified sentence cannot ship},
   check   = {cmd:sh checks/projection-stable.sh}
 }
 @misc{not-project,
-  section = {conclusion}, from = {unverified-cant-ship}, join = {, },
+  section = {conclusion}, from = {unverified-cant-ship, prose-projected}, join = {, },
   claim   = {because it does not project},
   check   = {cmd:sh checks/projection-stable.sh}
 }

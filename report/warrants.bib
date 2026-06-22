@@ -47,12 +47,12 @@
 % ── dag ──────────────────────────────────────────────────────────────────────
 @misc{rpt-dag,
   section = {dag},
-  claim   = {walking the claim DAG from premises to conclusions, each claim's adequacy grade plots against its dependency depth},
+  claim   = {walking the GROUNDING DAG (rests-on, distinct from prose order) from foundational atoms to the theses they support, each claim's adequacy grade plots against its grounding depth},
   check   = {fresh:all}
 }
 @misc{rpt-dag-fig,
   section = {dag}, from = {rpt-dag}, join = { — },
-  claim   = {premises (depended upon) on the left, terminal conclusions on the right, the effective grade on the vertical axis},
+  claim   = {the foundational atoms on the left, the theses they ground on the right, the effective grade on the vertical axis},
   emit    = {assets/dag.svg},
   check   = {fresh:all}
 }

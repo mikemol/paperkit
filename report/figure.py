@@ -23,7 +23,7 @@ def _depths(nodes):
         if k in depth:
             return depth[k]
         depth[k] = 0  # cycle guard
-        deps = [x for x in nodes[k].get("from", []) if x in nodes]
+        deps = [x for x in nodes[k].get("rests-on", []) if x in nodes]
         depth[k] = 1 + max((d(x) for x in deps), default=-1) if deps else 0
         return depth[k]
 
@@ -70,7 +70,7 @@ def svg(records):
     for r in records:                                 # entailment edges (premise → claim)
         if r["key"] in pos:
             x2, y2 = pos[r["key"]]
-            for dep in r.get("from", []):
+            for dep in r.get("rests-on", []):
                 if dep in pos:
                     x1, y1 = pos[dep]
                     out.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
@@ -93,6 +93,6 @@ def svg(records):
     out.append(f'<circle cx="{lx + 120}" cy="{T - 16}" r="3.2" fill="white" stroke="{INK}" stroke-width="1.4"/>'
                f'<text x="{lx + 130}" y="{T - 12}" fill="{INK}">self-check grade (when clamped)</text>')
     out.append(f'<text x="{L + plotW // 2}" y="{H - 14}" text-anchor="middle" fill="{INK}">'
-               f'dependency depth  (premises → conclusions)</text>')
+               f'grounding depth  (foundations → theses)</text>')
     out.append('</svg>')
     return "\n".join(out) + "\n"

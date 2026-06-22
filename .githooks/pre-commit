@@ -18,6 +18,7 @@ run() {                       # run "label" cmd...; show output only on failure
 }
 
 run "gate paper/ (--safe, --without-K)"       python3 paperkit/gate.py --safe --without-K paper
+run "Δ adequacy: paper all-behavioral"        python3 paperkit/discriminate.py --min-strength behavioral paper
 run "gate README (--safe, zero postulates)"  python3 paperkit/gate.py --safe .
 run "Δ behavioral boundaries"                python3 paperkit/tests/boundaries_discriminate.py
 run "engine boundaries (emit / --safe)"      python3 paperkit/tests/boundaries_emit.py

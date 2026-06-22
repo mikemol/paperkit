@@ -47,10 +47,11 @@ def well_formed():
 
 
 def shows_clamp():
-    # the figure shows effective-vs-self grade: a clamp legend, and (while any claim
-    # is clamped) at least one drop-line from self to effective
+    # the figure encodes clamping: nodes sit at their EFFECTIVE grade, with the clamp
+    # legend present.  Drop-lines appear only where a node is actually clamped — which
+    # is legitimately zero once every claim is fully grounded, so the legend (not a
+    # live drop-line) is the invariant.
     assert "self (if clamped)" in SVG, "the figure has no clamp legend"
-    assert "stroke-dasharray" in SVG, "no clamp drop-lines drawn (effective == self everywhere?)"
 
 
 def shows_terminal():

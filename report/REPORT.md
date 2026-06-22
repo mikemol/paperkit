@@ -15,7 +15,7 @@ Both the paper and the README pass the gate with zero postulates [@rpt-status] �
 
 Δ grades each cited claim's check by whether it can actually fail [@rpt-delta] — the grade of every cited claim, with why this grade and why not a higher or lower one [@rpt-delta-out].
 
-_33 cited claims — self-grade: 31 behavioral, 2 indeterminate; effective (clamped by entailment): 29 behavioral, 4 indeterminate; 2 clamped below self._
+_33 cited claims — self-grade: 33 behavioral; effective (clamped by entailment): 33 behavioral; 0 clamped below self._
 
 | claim | self → effective | witness | why this grade | why not higher | why not lower |
 | --- | --- | --- | --- | --- | --- |
@@ -47,10 +47,10 @@ _33 cited claims — self-grade: 31 behavioral, 2 indeterminate; effective (clam
 | `claims-are-warrants` | behavioral | `claim:claims-are-warrants` | falsifiable — corrupting 2 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 2 input(s)) |
 | `prose-is-projection` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
 | `gate-is-subject` | behavioral | `claim:gate-is-subject` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
-| `paperkit-on-paperkit` | indeterminate | `cmd:sh checks/drift-caught.sh` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
-| `one-green-check` | indeterminate | `cmd:sh checks/drift-caught.sh` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
-| `closes-gap` | behavioral → **indeterminate** | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
-| `unverified-cant-ship` | behavioral → **indeterminate** | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
+| `paperkit-on-paperkit` | behavioral | `claim:paperkit-on-paperkit` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `one-green-check` | behavioral | `claim:one-green-check` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `closes-gap` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
+| `unverified-cant-ship` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
 | `not-project` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
 
 ## Proof-relevance (--without-K)
@@ -59,7 +59,6 @@ Some cited claims still share a witness, so --without-K does not yet pass [@rpt-
 
 | shared witness | claims | collapsed onto it |
 | --- | --- | --- |
-| `cmd:sh checks/drift-caught.sh` | 2 | one-green-check, paperkit-on-paperkit |
 | `cmd:sh checks/projection-stable.sh` | 6 | closes-gap, fail-omits, not-project, paper-is-paperkit, prose-is-projection, unverified-cant-ship |
 
 ## Adequacy along the entailment DAG

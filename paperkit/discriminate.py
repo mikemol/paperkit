@@ -43,6 +43,10 @@ signal split N ways.
     paperkit-discriminate --all [DIR]            grade every checked warrant, not
                                                  just those cited in the prose
     paperkit-discriminate --json [DIR]           machine output (feeds Γ / Π)
+    paperkit-discriminate --state F --budget S [DIR]   resumable grading (pump-witness):
+                                                 grade under an S-second budget, persist the
+                                                 token to F, exit 2 if not done — re-run to
+                                                 resume.  A slow grade resumes, never dies.
 
 DIR defaults to the current directory and must contain paper.toml.
 """
@@ -58,6 +62,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import project as P  # noqa: E402
 import gate as G  # noqa: E402
+import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grading)
 
 CORRUPT = b"\x00\x00DELTA-CORRUPTION\x00\x00\n"
 MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py"}
@@ -151,18 +156,63 @@ def grade_check(chk: str, project_dir: Path, presupposed: set,
             "not_lower": "not provably vacuous: it runs a cmd:, not a presupposed file:"}
 
 
+class GradeWitness:
+    """Δ's grading sweep as a pump()/parse() witness: one distinct check graded per
+    pump(), state = {cursor, graded}.  The heavy per-check sandbox is rebuilt INSIDE
+    pump and never crosses the serialization boundary — only the cheap cursor and the
+    scalar grade results are persisted, so a long grade is resumable (driver.py)."""
+
+    def __init__(self, project_dir, checks, custom, presupposed):
+        self.project_dir, self.checks = project_dir, checks
+        self.custom, self.presupposed = custom, presupposed
+
+    def initial(self):
+        return {"cursor": 0, "graded": {}}
+
+    def pump(self, state):
+        i = state["cursor"]
+        if i >= len(self.checks):
+            return state
+        chk = self.checks[i]
+        tmp = Path(tempfile.mkdtemp(prefix="paperkit-delta-"))
+        try:
+            shutil.copytree(self.project_dir.parent, tmp / self.project_dir.parent.name,
+                            ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
+            sandbox = tmp / self.project_dir.parent.name / self.project_dir.name
+            g = grade_check(chk, self.project_dir, self.presupposed, self.custom, sandbox)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        return {"cursor": i + 1, "graded": {**state["graded"], chk: g}}
+
+    def parse(self, state):
+        return {"done": state["cursor"] >= len(self.checks), "graded": state["graded"],
+                "progress": f'{state["cursor"]}/{len(self.checks)}'}
+
+    def serialize(self, state):
+        return json.dumps(state, sort_keys=True)
+
+    def deserialize(self, s):
+        return json.loads(s)
+
+
 def main(argv: list) -> int:
     flags = [a for a in argv if a.startswith("-")]
     args = [a for a in argv if not a.startswith("-")]
-    min_strength = None
-    if "--min-strength" in argv:
-        min_strength = argv[argv.index("--min-strength") + 1]
-        if min_strength not in ORDER:
-            sys.exit(f"paperkit-discriminate: --min-strength must be one of {sorted(ORDER)}")
+
+    def optval(name):
+        return argv[argv.index(name) + 1] if name in argv else None
+
+    min_strength = optval("--min-strength")
+    if min_strength is not None and min_strength not in ORDER:
+        sys.exit(f"paperkit-discriminate: --min-strength must be one of {sorted(ORDER)}")
+    state_file = optval("--state")          # resumable grading: persist the token here
+    budget_str = optval("--budget")         # seconds per invocation (<=0 = run to done)
+    budget = float(budget_str) if budget_str else 0.0
     consider_all = "--all" in flags
     as_json = "--json" in flags
 
-    pos = [a for a in args if a != min_strength]
+    consumed = {x for x in (min_strength, state_file, budget_str) if x is not None}
+    pos = [a for a in args if a not in consumed]
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     cfg = P.load_config(project_dir)
     custom = tomllib.loads((project_dir / "paper.toml").read_text()).get("checks", {})
@@ -184,18 +234,17 @@ def main(argv: list) -> int:
     for k in keys:
         share.setdefault(F[k]["check"], []).append(k)
 
-    # one sandbox, reused (checks never mutate it; each probe restores its file)
-    tmp = Path(tempfile.mkdtemp(prefix="paperkit-delta-"))
-    graded: dict[str, dict] = {}
-    try:
-        shutil.copytree(project_dir.parent, tmp / project_dir.parent.name,
-                        ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"),
-                        dirs_exist_ok=True)
-        sandbox_project = tmp / project_dir.parent.name / project_dir.name
-        for chk in share:
-            graded[chk] = grade_check(chk, project_dir, presupposed, custom, sandbox_project)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    # Grade the distinct checks as a resumable pump-witness: one check per increment,
+    # driven under an optional budget.  Without --state/--budget this runs to
+    # completion in one call (the cold fallback); with them, a long grade resumes
+    # across short calls instead of dying with nothing (the pump-ask liveness rule).
+    witness = GradeWitness(project_dir, list(share), custom, presupposed)
+    meaning, steps, done = D.drive(witness, state_path=state_file, budget=budget)
+    if not done:
+        print(f"paperkit-discriminate: graded {meaning['progress']} in {steps} increment(s) — "
+              f"not done; state persisted to {state_file}, re-run to resume", file=sys.stderr)
+        return 2
+    graded = meaning["graded"]
 
     records = []
     for k in keys:

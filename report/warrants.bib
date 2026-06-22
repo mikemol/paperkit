@@ -34,12 +34,12 @@
 % ── proof ────────────────────────────────────────────────────────────────────
 @misc{rpt-proof,
   section = {proof},
-  claim   = {some cited claims still share a witness, so --without-K does not yet pass},
+  claim   = {every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another)},
   check   = {fresh:all}
 }
 @misc{rpt-proof-out,
   section = {proof}, from = {rpt-proof}, join = { — },
-  claim   = {the shared witnesses},
+  claim   = {as the proof-relevance check reports},
   emit    = {assets/without-k.md},
   check   = {fresh:all}
 }

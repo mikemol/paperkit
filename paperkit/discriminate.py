@@ -73,6 +73,15 @@ import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grad
 CORRUPT = b"\x00\x00DELTA-CORRUPTION\x00\x00\n"
 MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py"}
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out"}
+_ENGINE = Path(__file__).resolve().parent
+
+
+def _sandbox_root(project_dir):
+    """The dir to copy into the mutation sandbox: project_dir itself when the engine
+    lives INSIDE it (a self-contained project — the README at the repo root, whose
+    deps are paperkit/), else its parent (a project whose deps are a sibling — the
+    paper's ../paperkit — or a self-contained fixture whose engine is elsewhere)."""
+    return project_dir if _ENGINE.is_relative_to(project_dir) else project_dir.parent
 
 STRENGTH = {"vacuous": 0, "existence": 1, "indeterminate": 1, "behavioral": 2}
 ORDER = {"existence": 1, "behavioral": 2}  # valid --min-strength thresholds
@@ -204,9 +213,11 @@ class GradeWitness:
         chk = self.checks[i]
         tmp = Path(tempfile.mkdtemp(prefix="paperkit-delta-"))
         try:
-            shutil.copytree(self.project_dir.parent, tmp / self.project_dir.parent.name,
+            root = _sandbox_root(self.project_dir)
+            shutil.copytree(root, tmp / root.name,
                             ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
-            sandbox = tmp / self.project_dir.parent.name / self.project_dir.name
+            rel = self.project_dir.relative_to(root)
+            sandbox = tmp / root.name if rel == Path(".") else tmp / root.name / rel
             g = grade_check(chk, self.project_dir, self.presupposed, self.custom, sandbox)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

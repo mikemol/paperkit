@@ -8,29 +8,29 @@
 @misc{rm-pitch,
   section = {pitch},
   claim   = {paperkit treats a document as the projection of a verified claim-DAG: you write claims, not prose},
-  check   = {file:paperkit/project.py}
+  check   = {claim:rm-pitch}
 }
 @misc{rm-verifier,
   section = {pitch}, from = {rm-pitch}, join = {, and },
   claim   = {each claim carries a machine-checkable verifier},
-  check   = {file:paperkit/gate.py}
+  check   = {claim:rm-verifier}
 }
 @misc{rm-noship,
   section = {pitch}, from = {rm-verifier}, join = {; },
   claim   = {an unverified sentence does not project, so the document cannot overclaim},
-  check   = {file:paperkit/gate.py}
+  check   = {claim:rm-noship}
 }
 @misc{rm-selfhost,
   section = {pitch}, from = {rm-noship}, join = {. },
   claim   = {this README is itself such a projection --- its claims are the root warrant set, and its examples are gated assets},
-  check   = {file:warrants.bib}
+  check   = {claim:rm-selfhost}
 }
 
 % ── model ────────────────────────────────────────────────────────────────────
 @misc{rm-model,
   section = {model},
   claim   = {a claim is one bibliography entry --- a statement, the rubric section it belongs to, the claims it depends on (which set prose order and connective glue), and its check},
-  check   = {file:paperkit/project.py}
+  check   = {claim:rm-model}
 }
 @misc{rm-model-eg,
   section = {model}, from = {rm-model}, join = {. },
@@ -43,7 +43,7 @@
 @misc{rm-cmds,
   section = {commands},
   claim   = {two commands do the work --- project turns the claims into the document, and gate verifies it},
-  check   = {file:paperkit/project.py}
+  check   = {claim:rm-cmds}
 }
 @misc{rm-cmds-eg,
   section = {commands}, from = {rm-cmds}, join = {. },
@@ -54,14 +54,14 @@
 @misc{rm-cmds-inv,
   section = {commands}, from = {rm-cmds-eg},
   claim   = {the gate enforces three invariants: the committed prose equals its projection, every cited claim's check passes, and every section is covered both ways},
-  check   = {file:paperkit/gate.py}
+  check   = {claim:rm-cmds-inv}
 }
 
 % ── resolver ─────────────────────────────────────────────────────────────────
 @misc{rm-resolver,
   section = {resolver},
   claim   = {a verifier is named type:target, and two types ship built in},
-  check   = {file:paperkit/gate.py}
+  check   = {claim:rm-resolver}
 }
 @misc{rm-resolver-tbl,
   section = {resolver}, from = {rm-resolver}, join = { --- },
@@ -72,7 +72,7 @@
 @misc{rm-resolver-cmd,
   section = {resolver}, from = {rm-resolver-tbl},
   claim   = {cmd is the universal escape hatch every check reduces to, and a new domain adds named types in paper.toml without touching the engine},
-  check   = {file:paperkit/gate.py}
+  check   = {claim:rm-resolver-cmd}
 }
 @misc{rm-resolver-eg,
   section = {resolver}, from = {rm-resolver-cmd}, join = {. },
@@ -85,7 +85,7 @@
 @misc{rm-delta,
   section = {adequacy},
   claim   = {a passing check only proves a sentence named a verifier, not that the verifier entails it --- so discriminate.py grades how much each check can actually fail},
-  check   = {file:paperkit/discriminate.py}
+  check   = {claim:rm-delta}
 }
 @misc{rm-delta-tbl,
   section = {adequacy}, from = {rm-delta}, join = { --- },
@@ -135,5 +135,5 @@
 @misc{rm-next,
   section = {status}, from = {rm-status}, join = {. },
   claim   = {next are render-to-PDF (pandoc/docx) and a packaged CLI (paperkit init/project/gate/build)},
-  check   = {file:README.md}
+  check   = {claim:rm-next}
 }

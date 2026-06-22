@@ -6,3 +6,9 @@ rubric = "rubric.tsv"
 out = "README.md"
 numbered = false      # README sections read better unnumbered
 references = false    # a README has no bibliography section
+
+# Custom check type: claim:<key> runs the per-claim witness in checks/readme.py —
+# a distinct, discriminating verifier per README claim (so --without-K and
+# --min-strength behavioral hold), just as paper/ does.
+[checks.claim]
+cmd = "python3 checks/readme.py {target}"

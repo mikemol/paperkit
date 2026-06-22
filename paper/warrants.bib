@@ -104,37 +104,37 @@
 @misc{verifier-named,
   section = {resolver}, from = {every-claim-cited},
   claim   = {a claim's verifier is named type:target},
-  check   = {file:../paperkit/gate.py}
+  check   = {claim:verifier-named}
 }
 @misc{gate-dispatches,
   section = {resolver}, from = {verifier-named}, join = {, and },
   claim   = {the gate dispatches it through a small registry of check types},
-  check   = {file:../paperkit/gate.py}
+  check   = {claim:gate-dispatches}
 }
 @misc{new-domain-adds,
   section = {resolver}, from = {gate-dispatches}, join = {, so },
   claim   = {supporting a new domain means adding verifiers, not editing the engine},
-  check   = {file:../paperkit/gate.py}
+  check   = {claim:new-domain-adds}
 }
 @misc{two-builtins,
   section = {resolver}, from = {new-domain-adds}, join = {. },
   claim   = {two verifiers ship built in},
-  check   = {file:../paperkit/gate.py}
+  check   = {claim:two-builtins}
 }
 @misc{file-builtin,
   section = {resolver}, from = {two-builtins}, join = { — },
   claim   = {file, that an artifact exists},
-  check   = {file:../paperkit/gate.py}
+  check   = {claim:file-builtin}
 }
 @misc{cmd-builtin,
   section = {resolver}, from = {file-builtin}, join = {, and },
   claim   = {cmd, that a script exits zero},
-  check   = {cmd:sh checks/projection-stable.sh}
+  check   = {claim:cmd-builtin}
 }
 @misc{cmd-escape,
   section = {resolver}, from = {cmd-builtin}, join = {; and },
   claim   = {cmd is the universal escape hatch every other check reduces to},
-  check   = {cmd:sh checks/projection-stable.sh}
+  check   = {claim:cmd-escape}
 }
 
 % ── 5. selfhost ─────────────────────────────────────────────────────────────

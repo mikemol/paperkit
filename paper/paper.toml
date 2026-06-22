@@ -5,8 +5,10 @@ rubric = "rubric.tsv"
 warrants = ["warrants.bib", "references.bib"]
 out = "paper.md"
 
-# No custom check types are needed: every claim below resolves through the two
-# built-in verifiers, file: and cmd:.  A domain that needs more (agda:, pytest:,
-# …) would declare them here, e.g.:
-#   [checks.agda]
-#   cmd = "agda --safe {target}"
+# Custom check type: `claim:<key>` runs the per-claim witness in checks/claims.py,
+# which asserts the specific proposition that claim makes about the engine — a
+# distinct, discriminating verifier per claim (so Δ grades it behavioral and the
+# gate's --without-K is satisfied for these claims).  Declaring it here — not in the
+# engine — is itself the witness for the resolver section's [@new-domain-adds].
+[checks.claim]
+cmd = "python3 checks/claims.py {target}"

@@ -1,0 +1,23 @@
+#!/bin/sh
+# paperkit local CI — every commit must leave the repository green: both documents
+# project-stable, every check passing, zero postulates (--safe), and the tool
+# boundaries intact.  This hook IS our CI; add every new check here.
+#
+# Enable once per clone:   git config core.hooksPath .githooks
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+
+run() {                       # run "label" cmd...; show output only on failure
+  desc=$1; shift
+  if ! out=$("$@" 2>&1); then
+    echo "[pre-commit] FAIL: $desc" >&2
+    echo "$out" >&2
+    exit 1
+  fi
+  echo "[pre-commit] ok: $desc"
+}
+
+run "gate paper/ (--safe, zero postulates)"  python3 paperkit/gate.py --safe paper
+run "gate README (--safe, zero postulates)"  python3 paperkit/gate.py --safe .
+run "Δ behavioral boundaries"                python3 paperkit/tests/boundaries_discriminate.py
+echo "[pre-commit] all checks passed"

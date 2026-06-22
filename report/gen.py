@@ -59,11 +59,12 @@ def delta_md():
         counts[r["grade"]] = counts.get(r["grade"], 0) + 1
     order = ["behavioral", "existence", "indeterminate", "vacuous", "broken"]
     summary = ", ".join(f"{counts[g]} {g}" for g in order if counts.get(g))
-    rows = [f"| `{r['key']}` | {r.get('section', '')} | {r['grade']} | `{r['check']}` |"
+    rows = [f"| `{r['key']}` | {r['grade']} | `{r['check']}` | "
+            f"{r.get('why', '')} | {r.get('not_higher', '')} | {r.get('not_lower', '')} |"
             for r in recs]
     return (f"_{len(recs)} cited claims: {summary}._\n\n"
-            "| claim | section | Δ grade | witness |\n| --- | --- | --- | --- |\n"
-            + "\n".join(rows) + "\n")
+            "| claim | Δ grade | witness | why this grade | why not higher | why not lower |\n"
+            "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
 
 
 def without_k_md():

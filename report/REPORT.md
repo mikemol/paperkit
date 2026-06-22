@@ -13,45 +13,45 @@ Both the paper and the README pass the gate with zero postulates [@rpt-status] �
 
 ## Check adequacy (Δ)
 
-Δ grades each cited claim's check by whether it can actually fail [@rpt-delta] — the grade and witness of every cited claim [@rpt-delta-out].
+Δ grades each cited claim's check by whether it can actually fail [@rpt-delta] — the grade of every cited claim, with why this grade and why not a higher or lower one [@rpt-delta-out].
 
 _33 cited claims: 26 behavioral, 2 indeterminate, 5 vacuous._
 
-| claim | section | Δ grade | witness |
-| --- | --- | --- | --- |
-| `paper-is-projection` | intro | vacuous | `file:../paperkit/project.py` |
-| `node-is-claim` | intro | vacuous | `file:warrants.bib` |
-| `claim-bears-check` | intro | vacuous | `file:warrants.bib` |
-| `fail-omits` | intro | behavioral | `cmd:sh checks/projection-stable.sh` |
-| `claim-is-record` | model | behavioral | `claim:claim-is-record` |
-| `record-is-bibentry` | model | behavioral | `claim:record-is-bibentry` |
-| `prose-projected` | model | behavioral | `claim:prose-projected` |
-| `ordered-by-deps` | model | behavioral | `claim:ordered-by-deps` |
-| `joined-by-glue` | model | behavioral | `claim:joined-by-glue` |
-| `deterministic` | model | behavioral | `claim:deterministic` |
-| `projector-emits` | engine | behavioral | `claim:projector-emits` |
-| `prose-is-artifact` | engine | behavioral | `claim:prose-is-artifact` |
-| `gate-rejects-drift` | engine | behavioral | `claim:gate-rejects-drift` |
-| `edit-cant-survive` | engine | behavioral | `claim:edit-cant-survive` |
-| `coverage-both-sides` | engine | behavioral | `claim:coverage-both-sides` |
-| `every-section-appears` | engine | behavioral | `claim:every-section-appears` |
-| `every-claim-cited` | engine | behavioral | `claim:every-claim-cited` |
-| `verifier-named` | resolver | behavioral | `claim:verifier-named` |
-| `gate-dispatches` | resolver | behavioral | `claim:gate-dispatches` |
-| `new-domain-adds` | resolver | behavioral | `claim:new-domain-adds` |
-| `two-builtins` | resolver | behavioral | `claim:two-builtins` |
-| `file-builtin` | resolver | behavioral | `claim:file-builtin` |
-| `cmd-builtin` | resolver | behavioral | `claim:cmd-builtin` |
-| `cmd-escape` | resolver | behavioral | `claim:cmd-escape` |
-| `paper-is-paperkit` | selfhost | behavioral | `cmd:sh checks/projection-stable.sh` |
-| `claims-are-warrants` | selfhost | vacuous | `file:warrants.bib` |
-| `prose-is-projection` | selfhost | behavioral | `cmd:sh checks/projection-stable.sh` |
-| `gate-is-subject` | selfhost | vacuous | `file:../paperkit/gate.py` |
-| `paperkit-on-paperkit` | selfhost | indeterminate | `cmd:sh checks/drift-caught.sh` |
-| `one-green-check` | selfhost | indeterminate | `cmd:sh checks/drift-caught.sh` |
-| `closes-gap` | conclusion | behavioral | `cmd:sh checks/projection-stable.sh` |
-| `unverified-cant-ship` | conclusion | behavioral | `cmd:sh checks/projection-stable.sh` |
-| `not-project` | conclusion | behavioral | `cmd:sh checks/projection-stable.sh` |
+| claim | Δ grade | witness | why this grade | why not higher | why not lower |
+| --- | --- | --- | --- | --- | --- |
+| `paper-is-projection` | vacuous | `file:../paperkit/project.py` | existence of a required project/engine source — presupposed by the build | to rise: give it a check that can FAIL — a file: of a presupposed input is removed by no real change | vacuous is the floor |
+| `node-is-claim` | vacuous | `file:warrants.bib` | existence of a required project/engine source — presupposed by the build | to rise: give it a check that can FAIL — a file: of a presupposed input is removed by no real change | vacuous is the floor |
+| `claim-bears-check` | vacuous | `file:warrants.bib` | existence of a required project/engine source — presupposed by the build | to rise: give it a check that can FAIL — a file: of a presupposed input is removed by no real change | vacuous is the floor |
+| `fail-omits` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
+| `claim-is-record` | behavioral | `claim:claim-is-record` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `record-is-bibentry` | behavioral | `claim:record-is-bibentry` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `prose-projected` | behavioral | `claim:prose-projected` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `ordered-by-deps` | behavioral | `claim:ordered-by-deps` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `joined-by-glue` | behavioral | `claim:joined-by-glue` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `deterministic` | behavioral | `claim:deterministic` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `projector-emits` | behavioral | `claim:projector-emits` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `prose-is-artifact` | behavioral | `claim:prose-is-artifact` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `gate-rejects-drift` | behavioral | `claim:gate-rejects-drift` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `edit-cant-survive` | behavioral | `claim:edit-cant-survive` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `coverage-both-sides` | behavioral | `claim:coverage-both-sides` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `every-section-appears` | behavioral | `claim:every-section-appears` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `every-claim-cited` | behavioral | `claim:every-claim-cited` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `verifier-named` | behavioral | `claim:verifier-named` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `gate-dispatches` | behavioral | `claim:gate-dispatches` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `new-domain-adds` | behavioral | `claim:new-domain-adds` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `two-builtins` | behavioral | `claim:two-builtins` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `file-builtin` | behavioral | `claim:file-builtin` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `cmd-builtin` | behavioral | `claim:cmd-builtin` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `cmd-escape` | behavioral | `claim:cmd-escape` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `paper-is-paperkit` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
+| `claims-are-warrants` | vacuous | `file:warrants.bib` | existence of a required project/engine source — presupposed by the build | to rise: give it a check that can FAIL — a file: of a presupposed input is removed by no real change | vacuous is the floor |
+| `prose-is-projection` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
+| `gate-is-subject` | vacuous | `file:../paperkit/gate.py` | existence of a required project/engine source — presupposed by the build | to rise: give it a check that can FAIL — a file: of a presupposed input is removed by no real change | vacuous is the floor |
+| `paperkit-on-paperkit` | indeterminate | `cmd:sh checks/drift-caught.sh` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+| `one-green-check` | indeterminate | `cmd:sh checks/drift-caught.sh` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+| `closes-gap` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
+| `unverified-cant-ship` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
+| `not-project` | behavioral | `cmd:sh checks/projection-stable.sh` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
 
 ## Proof-relevance (--without-K)
 

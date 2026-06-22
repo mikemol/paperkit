@@ -14,18 +14,18 @@
   section = {intro},
   claim   = {paperkit treats a scholarly paper as the projection of a claim-DAG},
   rests-on = {fail-omits, gate-rejects-drift, prose-projected},
-  check   = {file:../paperkit/project.py}
+  check   = {claim:paper-is-projection}
 }
 @misc{node-is-claim,
   section = {intro}, from = {paper-is-projection}, join = { — },
   claim   = {each node a single claim},
-  check   = {file:warrants.bib}
+  check   = {claim:node-is-claim}
 }
 @misc{claim-bears-check,
   section = {intro}, from = {node-is-claim}, join = {, },
   claim   = {each claim carrying a machine-checkable verifier},
   rests-on = {node-is-claim},
-  check   = {file:warrants.bib}
+  check   = {claim:claim-bears-check}
 }
 @misc{fail-omits,
   section = {intro}, from = {claim-bears-check, paper-is-projection}, join = {; and },
@@ -165,7 +165,7 @@
   section = {selfhost}, from = {paper-is-paperkit, record-is-bibentry}, join = { — },
   claim   = {its claims are these warrants},
   rests-on = {claim-is-record, record-is-bibentry},
-  check   = {file:warrants.bib}
+  check   = {claim:claims-are-warrants}
 }
 @misc{prose-is-projection,
   section = {selfhost}, from = {paper-is-paperkit, prose-projected}, join = {, },
@@ -177,7 +177,7 @@
   section = {selfhost}, from = {paper-is-paperkit, gate-rejects-drift}, join = {, and },
   claim   = {the gate that accepts it is the very subject it describes},
   rests-on = {gate-rejects-drift, paper-is-paperkit},
-  check   = {file:../paperkit/gate.py}
+  check   = {claim:gate-is-subject}
 }
 @misc{paperkit-on-paperkit,
   section = {selfhost}, from = {gate-is-subject, gate-rejects-drift}, join = {. },

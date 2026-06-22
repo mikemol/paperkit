@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[2] / "paperkit"
+PAPER_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
@@ -178,7 +179,49 @@ def deterministic():
     assert "zzalpha" in fx.project_text(w1).lower()
 
 
+# ── Π·foundations: the vacuous atoms the grounding DAG rests on ───────────────
+def node_is_claim():
+    # each node of the claim-DAG is a single claim record
+    recs = _parse("@misc{n,\n  section = {s},\n  claim = {a single statement},\n  check = {file:x}\n}\n")
+    assert len(recs) == 1 and recs["n"].get("claim") == "a single statement", \
+        "a warrant node is not a single claim"
+
+
+def claim_bears_check():
+    # each claim carries a verifier, and the verifier is machine-checkable (the gate runs it)
+    rec = _parse("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")["c"]
+    assert rec.get("check") == "cmd:true", "the claim carries no check"
+    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("cmd:false", ENGINE, {}) is False, \
+        "the verifier is not machine-checkable"
+
+
+def paper_is_projection():
+    # a paper IS the projection of its claim-DAG: project emits the claims as the document
+    t = fx.project_text([fx.entry("a", claim="alpha thesis"),
+                         fx.entry("b", claim="beta point", frm="a")], title="Doc").lower()
+    for needle in ("# doc", "alpha thesis", "beta point"):
+        assert needle in t, f"the paper is not the projection of its claim-DAG ({needle!r} missing)"
+
+
+def claims_are_warrants():
+    # this paper's claims ARE its warrants: warrants.bib parses to the cited claim records
+    recs = P.entries(PAPER_DIR / "warrants.bib")
+    assert recs.get("paper-is-projection", {}).get("claim"), "the paper's claims are not its warrants"
+
+
+def gate_is_subject():
+    # the gate that accepts this paper is its subject: gate.py implements the very invariants
+    # the paper describes (projection-equality, check-resolution, coverage)
+    for inv in ("PROJECT", "RESOLVE", "COVERAGE"):
+        assert inv in GATE_SRC, f"gate.py does not implement the {inv} invariant the paper describes"
+
+
 CLAIMS = {
+    "node-is-claim": node_is_claim,
+    "claim-bears-check": claim_bears_check,
+    "paper-is-projection": paper_is_projection,
+    "claims-are-warrants": claims_are_warrants,
+    "gate-is-subject": gate_is_subject,
     "verifier-named": verifier_named,
     "gate-dispatches": gate_dispatches,
     "new-domain-adds": new_domain_adds,

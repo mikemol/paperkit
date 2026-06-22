@@ -80,6 +80,14 @@ assets/          README example assets — emitted verbatim and gated
 README.md        this file — itself a paperkit projection of the root warrant set
 ```
 
+## Local CI
+
+Checks run locally as a pre-commit githook — every commit must leave both documents green under --safe and the tool boundaries intact [@rm-ci]. A fresh clone enables it once, since git cannot auto-enable a hook from a commit [@rm-ci-enable].
+
+```sh
+git config core.hooksPath .githooks   # enable the local-CI pre-commit hook (once per clone)
+```
+
 ## Status
 
 A working spike — the engine projects and gates, the self-hosting paper is green, discriminate.py grades check adequacy, and this README is itself a projection [@rm-status]. Next are render-to-PDF (pandoc/docx) and a packaged CLI (paperkit init/project/gate/build) [@rm-next].

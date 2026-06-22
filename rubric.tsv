@@ -6,4 +6,5 @@ commands	The two commands
 resolver	The check-resolver
 adequacy	Grading check adequacy (Δ)
 layout	Layout
+ci	Local CI
 status	Status

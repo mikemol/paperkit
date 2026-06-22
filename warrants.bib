@@ -113,6 +113,19 @@
   check   = {cmd:grep -q project.py assets/layout.txt}
 }
 
+% ── ci ───────────────────────────────────────────────────────────────────────
+@misc{rm-ci,
+  section = {ci},
+  claim   = {checks run locally as a pre-commit githook --- every commit must leave both documents green under --safe and the tool boundaries intact},
+  check   = {cmd:sh -n .githooks/pre-commit}
+}
+@misc{rm-ci-enable,
+  section = {ci}, from = {rm-ci}, join = {. },
+  claim   = {a fresh clone enables it once, since git cannot auto-enable a hook from a commit},
+  emit    = {assets/enable-hooks.sh},
+  check   = {cmd:grep -q core.hooksPath assets/enable-hooks.sh}
+}
+
 % ── status ───────────────────────────────────────────────────────────────────
 @misc{rm-status,
   section = {status},

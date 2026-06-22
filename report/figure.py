@@ -17,6 +17,9 @@ INK = "#1a1a1a"   # all text is dark-on-light
 
 
 def _depths(nodes):
+    """Longest path from a foundation to each node, following rests-on (its premises).
+    Used as x = depth, so a node sits one column to the right of its rightmost premise:
+    right of everything it depends on, and no further right than just past it."""
     depth = {}
 
     def d(k):
@@ -50,9 +53,8 @@ def svg(records):
 
     depended = {d for r in records for d in r.get("rests-on", [])}
 
-    def x_of(k):                                      # terminal theses are right-aligned
-        d = maxd if k not in depended else depth[k]
-        return L + (round(plotW * d / maxd) if maxd else plotW // 2)
+    def x_of(k):                                      # premise-anchored: one right of rightmost premise
+        return L + (round(plotW * depth[k] / maxd) if maxd else plotW // 2)
 
     # nodes sharing an (x-column, effective-grade) cell spread vertically within the band
     groups, pos = {}, {}

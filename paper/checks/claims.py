@@ -10,17 +10,31 @@ distinct witness per claim, not one shared `file:` standing for many).
     python3 checks/claims.py <claim-key>      # run from paper/; exit 0 = claim holds
 """
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[2] / "paperkit"
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
+import project as P  # noqa: E402
 import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
 PROJECT_SRC = (ENGINE / "project.py").read_text()
+
+
+def _parse(bib_text):
+    """Parse one .bib through the real engine parser; return its record fields."""
+    d = tempfile.mkdtemp()
+    try:
+        p = Path(d) / "t.bib"
+        p.write_text(bib_text)
+        return P.entries(p)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def verifier_named():
@@ -115,6 +129,55 @@ def every_claim_cited():
     assert "k not in cited" in GATE_SRC, "gate no longer checks each tagged claim is cited"
 
 
+# ── model section ────────────────────────────────────────────────────────────
+def claim_is_record():
+    # "a claim is a single record — a statement, its section, its dependencies, its verifier"
+    rec = _parse("@misc{k,\n  section = {s},\n  from = {d},\n"
+                 "  claim = {a statement},\n  check = {file:x}\n}\n")["k"]
+    for field in ("claim", "section", "from", "check"):
+        assert rec.get(field), f"a claim record is missing its {field}"
+
+
+def record_is_bibentry():
+    # "which is exactly the shape of a bibliography entry" — a standard reference
+    # entry parses through the very same record parser
+    recs = _parse("@misc{ref,\n  author = {Knuth},\n  year = {1984},\n"
+                  "  title = {Literate Programming}\n}\n")
+    assert recs.get("ref", {}).get("title") and recs["ref"].get("author"), \
+        "a standard bibliography entry no longer parses as a record"
+
+
+def prose_projected():
+    # "the prose is projected, not authored" — the prose tracks the warrants
+    a = fx.project_text([fx.entry("x", claim="zzfirst wording")]).lower()
+    b = fx.project_text([fx.entry("x", claim="zzsecond wording")]).lower()
+    assert "zzfirst" in a and "zzsecond" in b and a != b, \
+        "prose does not track the warrants (it is authored, not projected)"
+
+
+def ordered_by_deps():
+    # "within each section the claims are ordered by their dependency edges"
+    t = fx.project_text([fx.entry("b", claim="zzbeta", frm="a"),
+                         fx.entry("a", claim="zzalpha")]).lower()
+    assert t.index("zzalpha") < t.index("zzbeta"), "claims are not ordered by dependency edges"
+
+
+def joined_by_glue():
+    # "joined by connective glue" — an explicit glue connector is woven between edges
+    t = fx.project_text([fx.entry("a", claim="zzalpha"),
+                         fx.entry("b", claim="zzbeta", frm="a", glue="BECAUSE")]).lower()
+    assert "because zzbeta" in t, "explicit glue is not woven between dependent claims"
+
+
+def deterministic():
+    # "the same warrant set always giving the same document"
+    w1 = [fx.entry("a", claim="zzalpha")]
+    w2 = [fx.entry("a", claim="zzomega")]
+    assert fx.project_text(w1) == fx.project_text(w1), "same warrants gave different documents"
+    assert fx.project_text(w1) != fx.project_text(w2), "the document is independent of its warrants"
+    assert "zzalpha" in fx.project_text(w1).lower()
+
+
 CLAIMS = {
     "verifier-named": verifier_named,
     "gate-dispatches": gate_dispatches,
@@ -130,6 +193,12 @@ CLAIMS = {
     "coverage-both-sides": coverage_both_sides,
     "every-section-appears": every_section_appears,
     "every-claim-cited": every_claim_cited,
+    "claim-is-record": claim_is_record,
+    "record-is-bibentry": record_is_bibentry,
+    "prose-projected": prose_projected,
+    "ordered-by-deps": ordered_by_deps,
+    "joined-by-glue": joined_by_glue,
+    "deterministic": deterministic,
 }
 
 

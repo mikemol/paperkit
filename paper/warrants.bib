@@ -35,32 +35,32 @@
 @misc{claim-is-record,
   section = {model}, from = {fail-omits},
   claim   = {a claim is a single record --- a statement, the rubric section it belongs to, its dependencies, and its verifier},
-  check   = {file:warrants.bib}
+  check   = {claim:claim-is-record}
 }
 @misc{record-is-bibentry,
   section = {model}, from = {claim-is-record}, join = { — },
   claim   = {which is exactly the shape of a bibliography entry},
-  check   = {file:warrants.bib}
+  check   = {claim:record-is-bibentry}
 }
 @misc{prose-projected,
   section = {model}, from = {record-is-bibentry}, join = {. },
   claim   = {the prose is projected, not authored},
-  check   = {file:../paperkit/project.py}
+  check   = {claim:prose-projected}
 }
 @misc{ordered-by-deps,
   section = {model}, from = {prose-projected}, join = {: },
   claim   = {within each section the claims are ordered by their dependency edges},
-  check   = {file:../paperkit/project.py}
+  check   = {claim:ordered-by-deps}
 }
 @misc{joined-by-glue,
   section = {model}, from = {ordered-by-deps}, join = { and },
   claim   = {joined by connective glue},
-  check   = {file:../paperkit/project.py}
+  check   = {claim:joined-by-glue}
 }
 @misc{deterministic,
   section = {model}, from = {joined-by-glue}, join = {, },
   claim   = {the same warrant set always giving the same document},
-  check   = {cmd:sh checks/project-deterministic.sh}
+  check   = {claim:deterministic}
 }
 
 % ── 3. engine ───────────────────────────────────────────────────────────────

@@ -78,7 +78,14 @@ def main(argv: list) -> int:
     # RESOLVE — every cited claim's check passes; references at least defined
     warrants = {k for k, f in F.items() if f.get("check")}
     undefined = sorted(cited - set(F))
-    bad = sorted(k for k in cited & warrants if not resolves(F[k]["check"], project_dir, custom))
+    cache: dict = {}
+
+    def ok(chk: str) -> bool:
+        if chk not in cache:        # each distinct check runs once, not per-citation
+            cache[chk] = resolves(chk, project_dir, custom)
+        return cache[chk]
+
+    bad = sorted(k for k in cited & warrants if not ok(F[k]["check"]))
     if undefined:
         print(f"paperkit-gate: undefined citations: {', '.join(undefined)}", file=sys.stderr)
         rc = 1

@@ -61,7 +61,7 @@ def entries(path: Path) -> dict:
         for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", path.read_text(), re.S):
             key, body = m.group(1), m.group(2)
             f = {"_src": path.name}
-            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue"):
+            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue", "join"):
                 fm = re.search(r"\b" + name + r"\s*=\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", body)
                 if fm:
                     f[name] = fm.group(1)
@@ -146,6 +146,17 @@ def project(cfg: dict) -> str:
             parts, woven = [clauses[0]], 0
             for i in range(1, len(text)):
                 f = F[text[i]]
+                clause = clauses[i]
+                # `join` is the FULL connector to the previous clause — the grammatical
+                # attachment of a sentence-diagram constituent: "— " apposition, ", and "
+                # conjunction, ", which " relative, ": " list-intro, ". " new sentence.
+                # Default is the legacy "; " + `glue` weave.
+                if f.get("join") is not None:
+                    j = f["join"] if f["join"].endswith(" ") else f["join"] + " "
+                    if j.strip().endswith((".", "!", "?")):   # sentence boundary → capitalize
+                        clause = clause[:1].upper() + clause[1:]
+                    parts.append(j + clause)
+                    continue
                 edge = text[i - 1] in f.get("from", [])
                 if edge and f.get("glue"):
                     g = f["glue"]
@@ -155,7 +166,7 @@ def project(cfg: dict) -> str:
                     woven += 1
                 else:
                     conn = ""
-                parts.append("; " + conn + clauses[i])
+                parts.append("; " + conn + clause)
             lines += ["".join(parts) + ".", ""]
         if not keys:
             lines += ["<!-- structural section: connective prose, no required claim atom -->", ""]

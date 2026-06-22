@@ -66,6 +66,12 @@ SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out"}
 STRENGTH = {"vacuous": 0, "existence": 1, "indeterminate": 1, "behavioral": 2}
 ORDER = {"existence": 1, "behavioral": 2}  # valid --min-strength thresholds
 
+# Total order for clamping (effective grade = min over self + premises).  Conservative:
+# vacuous < indeterminate (runs, falsifiability unproven) < existence (presence proven)
+# < behavioral (falsifiability proven).
+RANK_C = {"broken": -1, "vacuous": 0, "indeterminate": 1, "existence": 2, "behavioral": 3}
+GRADE_C = {v: k for k, v in RANK_C.items()}
+
 
 def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
     """Resolved paths whose existence the build already presupposes — a file:
@@ -208,6 +214,33 @@ def main(argv: list) -> int:
         if r["grade"] == "behavioral":
             r["content_sensitive"] = any(Path(t).name in content for t in r["tests"])
 
+    # EFFECTIVE grade — clamp by entailment: a claim is no better grounded than the
+    # weakest premise it (transitively) depends on.  `clamp` = rungs dropped from the
+    # self-contained grade; `clamped_by` = the premise that pins it.
+    rby = {r["key"]: r for r in records}
+    effc: dict = {}
+
+    def eff(k, stack=()):
+        if k in effc:
+            return effc[k]
+        r = rby.get(k)
+        if r is None:
+            return (RANK_C["behavioral"], None)   # not in scope: impose no constraint
+        best, by = RANK_C.get(r["grade"], 0), None
+        for d in r.get("from", []):
+            if d in rby and d not in stack and d != k:
+                de, _ = eff(d, stack + (k,))
+                if de < best:
+                    best, by = de, d
+        effc[k] = (best, by)
+        return effc[k]
+
+    for r in records:
+        e, by = eff(r["key"])
+        r["effective_grade"] = GRADE_C[e]
+        r["clamp"] = RANK_C.get(r["grade"], 0) - e
+        r["clamped_by"] = by
+
     if as_json:
         print(json.dumps(records, indent=2))
     else:
@@ -252,10 +285,19 @@ def report(records, share, graded, n_cited, n_checked, consider_all):
     for r in records:
         counts[r["grade"]] = counts.get(r["grade"], 0) + 1
     summary = ", ".join(f"{n} {g}" for g, n in sorted(counts.items()))
-    print(f"  summary: {summary}")
+    print(f"  summary (self-grade): {summary}")
+    eff_counts: dict[str, int] = {}
+    for r in records:
+        eff_counts[r.get("effective_grade", r["grade"])] = \
+            eff_counts.get(r.get("effective_grade", r["grade"]), 0) + 1
+    print(f"  summary (effective):  {', '.join(f'{n} {g}' for g, n in sorted(eff_counts.items()))}")
+    clamped = [r for r in records if r.get("clamp", 0) > 0]
     vac = counts.get("vacuous", 0)
     if vac:
         print(f"  ⚠ {vac} cited claim(s) rest on a check that PROVABLY cannot fail.")
+    if clamped:
+        print(f"  ⚠ {len(clamped)} cited claim(s) are CLAMPED below their self grade by "
+              f"weaker premises (effective < self).")
 
 
 if __name__ == "__main__":

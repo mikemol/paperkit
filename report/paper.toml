@@ -11,3 +11,9 @@ references = false
 # asset from the live pipeline and fails if the committed copy has drifted.
 [checks.fresh]
 cmd = "python3 gen.py --check {target}"
+
+# `fig:<property>` is satisfied by report/figure_checks.py: it asserts a data /
+# accessibility property of the generated figure (so the figure's guarantees are
+# gated claims, not prose bullet-points).
+[checks.fig]
+cmd = "python3 figure_checks.py {target}"

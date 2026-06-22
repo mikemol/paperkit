@@ -56,3 +56,23 @@
   emit    = {assets/dag.svg},
   check   = {fresh:all}
 }
+@misc{rpt-fig-data,
+  section = {dag}, from = {rpt-dag-fig}, join = {. },
+  claim   = {the figure is rendered from the pipeline data and gated fresh, never placed by hand},
+  check   = {fresh:dag.svg}
+}
+@misc{rpt-fig-palette,
+  section = {dag}, from = {rpt-fig-data}, join = {, and is mechanically accessible: },
+  claim   = {its colours are the Okabe-Ito colour-blind-safe palette},
+  check   = {fig:okabe-ito}
+}
+@misc{rpt-fig-contrast,
+  section = {dag}, from = {rpt-fig-palette}, join = {, },
+  claim   = {all its text is dark on a light ground},
+  check   = {fig:dark-on-light}
+}
+@misc{rpt-fig-svg,
+  section = {dag}, from = {rpt-fig-contrast}, join = {, and },
+  claim   = {it is well-formed vector SVG},
+  check   = {fig:well-formed}
+}

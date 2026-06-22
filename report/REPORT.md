@@ -69,3 +69,5 @@ Walking the claim DAG from premises to conclusions, each claim's adequacy grade 
 
 ![premises (depended upon) on the left, terminal conclusions on the right, the Δ grade on the vertical axis](assets/dag.svg)
 
+The figure is rendered from the pipeline data and gated fresh, never placed by hand [@rpt-fig-data], and is mechanically accessible: its colours are the Okabe-Ito colour-blind-safe palette [@rpt-fig-palette], all its text is dark on a light ground [@rpt-fig-contrast], and it is well-formed vector SVG [@rpt-fig-svg].
+

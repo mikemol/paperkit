@@ -74,5 +74,5 @@
 <circle cx="657" cy="52" r="4" fill="#009E73"/>
 <circle cx="674" cy="52" r="4" fill="#009E73"/>
 <circle cx="692" cy="52" r="4" fill="#009E73"/>
-<text x="412" y="236" text-anchor="middle" fill="#333">dependency depth  (premises → conclusions)</text>
+<text x="412" y="236" text-anchor="middle" fill="#1a1a1a">dependency depth  (premises → conclusions)</text>
 </svg>

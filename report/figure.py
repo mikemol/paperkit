@@ -72,7 +72,7 @@ def svg(records):
         if r["key"] in pos:
             x, y = pos[r["key"]]
             out.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{COLOR[r["grade"]]}"/>')
-    out.append(f'<text x="{L + plotW // 2}" y="{H - 14}" text-anchor="middle" fill="#333">'
+    out.append(f'<text x="{L + plotW // 2}" y="{H - 14}" text-anchor="middle" fill="{INK}">'
                f'dependency depth  (premises → conclusions)</text>')
     out.append('</svg>')
     return "\n".join(out) + "\n"

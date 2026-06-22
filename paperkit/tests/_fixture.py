@@ -16,6 +16,7 @@ All three manage their own tempdir and return plain values.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -90,3 +91,13 @@ def discriminate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),)
         _projected(proj, out)
         r = _run([sys.executable, str(DISCRIMINATE), *flags, str(proj)])
         return r.returncode, r.stdout
+
+
+def gate_json(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
+              title="t", numbered=False, references=False):
+    """(returncode, parsed gate --json dict).  Projects out.md first (or writes `out`)."""
+    with tempfile.TemporaryDirectory() as d:
+        proj = _write(d, warrants, assets, rubric, title, numbered, references)
+        _projected(proj, out)
+        r = _run([sys.executable, str(GATE), "--json", *flags, str(proj)])
+        return r.returncode, json.loads(r.stdout or "{}")

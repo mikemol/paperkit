@@ -22,4 +22,5 @@ run "gate README (--safe, zero postulates)"  python3 paperkit/gate.py --safe .
 run "Δ behavioral boundaries"                python3 paperkit/tests/boundaries_discriminate.py
 run "engine boundaries (emit / --safe)"      python3 paperkit/tests/boundaries_emit.py
 run "witness boundaries (--without-K)"       python3 paperkit/tests/boundaries_without_k.py
+run "gate --json boundaries"                 python3 paperkit/tests/boundaries_gate_json.py
 echo "[pre-commit] all checks passed"

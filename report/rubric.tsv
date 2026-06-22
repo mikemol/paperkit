@@ -1,0 +1,4 @@
+# report sections, in document order.
+status	Gate status
+adequacy	Check adequacy (Δ)
+proof	Proof-relevance (--without-K)

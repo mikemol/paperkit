@@ -1,0 +1,43 @@
+% warrants.bib — the verification REPORT's claims.  Each section pairs a claim
+% about the pipeline (checked by RUNNING it) with the live captured output, emitted
+% as a gated asset and kept fresh-by-construction (check = fresh:<asset>, i.e.
+% report/gen.py --check <asset>).  Run `python3 report/gen.py` to refresh.
+
+% ── status ───────────────────────────────────────────────────────────────────
+@misc{rpt-status,
+  section = {status},
+  claim   = {both the paper and the README pass the gate with zero postulates},
+  check   = {cmd:python3 ../paperkit/gate.py --safe ../paper >/dev/null 2>&1 && python3 ../paperkit/gate.py --safe .. >/dev/null 2>&1}
+}
+@misc{rpt-status-out,
+  section = {status}, from = {rpt-status}, join = {. },
+  claim   = {the gate reports},
+  emit    = {assets/gate.txt},
+  check   = {fresh:gate.txt}
+}
+
+% ── adequacy ─────────────────────────────────────────────────────────────────
+@misc{rpt-delta,
+  section = {adequacy},
+  claim   = {Δ grades each cited claim's check by whether it can actually fail},
+  check   = {cmd:python3 ../paperkit/discriminate.py ../paper >/dev/null}
+}
+@misc{rpt-delta-out,
+  section = {adequacy}, from = {rpt-delta}, join = {. },
+  claim   = {the current grades are},
+  emit    = {assets/delta.txt},
+  check   = {fresh:delta.txt}
+}
+
+% ── proof ────────────────────────────────────────────────────────────────────
+@misc{rpt-proof,
+  section = {proof},
+  claim   = {--without-K lists the cited claims that still share a witness},
+  check   = {fresh:without-k.txt}
+}
+@misc{rpt-proof-out,
+  section = {proof}, from = {rpt-proof}, join = {. },
+  claim   = {they are},
+  emit    = {assets/without-k.txt},
+  check   = {fresh:without-k.txt}
+}

@@ -1,0 +1,4 @@
+$ paperkit-discriminate paper
+paperkit-discriminate (Δ): 33 of 36 cited warrant(s) carry a check, 25 distinct check(s)
+  summary: 26 behavioral, 2 indeterminate, 5 vacuous
+  ⚠ 5 cited claim(s) rest on a check that PROVABLY cannot fail.

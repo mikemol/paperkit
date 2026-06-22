@@ -47,11 +47,17 @@ signal split N ways.
                                                  grade under an S-second budget, persist the
                                                  token to F, exit 2 if not done — re-run to
                                                  resume.  A slow grade resumes, never dies.
+    paperkit-discriminate --no-cache [DIR]       ignore the content-addressed cache
+
+Grades are memoized by content_key (the project's files + the engine): an unchanged
+project re-grades in milliseconds (.delta-cache.json, git-ignored), recomputed only
+when something a check could read changes.
 
 DIR defaults to the current directory and must contain paper.toml.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import sys
@@ -76,6 +82,28 @@ ORDER = {"existence": 1, "behavioral": 2}  # valid --min-strength thresholds
 # < behavioral (falsifiability proven).
 RANK_C = {"broken": -1, "vacuous": 0, "indeterminate": 1, "existence": 2, "behavioral": 3}
 GRADE_C = {v: k for k, v in RANK_C.items()}
+
+
+def content_key(project_dir: Path) -> str:
+    """A hash of every file a check in this project could read — the project's own
+    files plus the engine.  A Δ grade is a pure function of these (the mutation probe
+    only ever reads them), so a cached grade is valid exactly while this key holds."""
+    engine = Path(__file__).resolve().parent
+    parts = []
+    for tag, base in (("proj", project_dir), ("engine", engine)):
+        for f in sorted(base.rglob("*")):
+            if (f.is_file() and f.suffix in MUTABLE_SUFFIXES
+                    and not any(p in SKIP_DIRS for p in f.parts)):
+                parts.append(f"{tag}/{f.relative_to(base)}:{hashlib.sha256(f.read_bytes()).hexdigest()}")
+    return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
+
+
+def _load_cache(project_dir: Path) -> dict:
+    p = project_dir / ".delta-cache.json"
+    try:
+        return json.loads(p.read_text()) if p.exists() else {}
+    except Exception:
+        return {}
 
 
 def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
@@ -234,17 +262,27 @@ def main(argv: list) -> int:
     for k in keys:
         share.setdefault(F[k]["check"], []).append(k)
 
-    # Grade the distinct checks as a resumable pump-witness: one check per increment,
-    # driven under an optional budget.  Without --state/--budget this runs to
-    # completion in one call (the cold fallback); with them, a long grade resumes
-    # across short calls instead of dying with nothing (the pump-ask liveness rule).
-    witness = GradeWitness(project_dir, list(share), custom, presupposed)
-    meaning, steps, done = D.drive(witness, state_path=state_file, budget=budget)
-    if not done:
-        print(f"paperkit-discriminate: graded {meaning['progress']} in {steps} increment(s) — "
-              f"not done; state persisted to {state_file}, re-run to resume", file=sys.stderr)
-        return 2
-    graded = meaning["graded"]
+    # Memoize: a Δ grade is a pure function of content_key(project), so a cached
+    # graded-set is reused verbatim while nothing the checks read has changed — the
+    # expensive mutation sweep runs only when the project or engine actually changes.
+    no_cache = "--no-cache" in flags
+    key = content_key(project_dir)
+    cached = {} if no_cache else _load_cache(project_dir)
+    if cached.get("key") == key and all(c in cached.get("graded", {}) for c in share):
+        graded = cached["graded"]
+    else:
+        # Grade the distinct checks as a resumable pump-witness: one check per increment,
+        # under an optional budget (--state/--budget make a long grade resume across short
+        # calls instead of dying with nothing — the pump-ask liveness rule).
+        witness = GradeWitness(project_dir, list(share), custom, presupposed)
+        meaning, steps, done = D.drive(witness, state_path=state_file, budget=budget)
+        if not done:
+            print(f"paperkit-discriminate: graded {meaning['progress']} in {steps} increment(s) — "
+                  f"not done; state persisted to {state_file}, re-run to resume", file=sys.stderr)
+            return 2
+        graded = meaning["graded"]
+        if not no_cache:
+            (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded}))
 
     records = []
     for k in keys:

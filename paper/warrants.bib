@@ -183,13 +183,13 @@
   section = {selfhost}, from = {gate-is-subject, gate-rejects-drift}, join = {. },
   claim   = {the verifiers behind this section run paperkit on paperkit --- projecting a fixture, drifting it, and confirming the gate rejects the drift},
   rests-on = {gate-is-subject, gate-rejects-drift, prose-is-projection},
-  check   = {cmd:sh checks/drift-caught.sh}
+  check   = {claim:paperkit-on-paperkit}
 }
 @misc{one-green-check,
   section = {selfhost}, from = {paperkit-on-paperkit, gate-is-subject}, join = {, so },
   claim   = {the document's correctness and the tool's are one green check},
   rests-on = {paperkit-on-paperkit, gate-is-subject},
-  check   = {cmd:sh checks/drift-caught.sh}
+  check   = {claim:one-green-check}
 }
 
 % ── 7. conclusion ───────────────────────────────────────────────────────────

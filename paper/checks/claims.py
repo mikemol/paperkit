@@ -216,7 +216,31 @@ def gate_is_subject():
         assert inv in GATE_SRC, f"gate.py does not implement the {inv} invariant the paper describes"
 
 
+# ── Π·selfhost: the drift-caught negative-assertions, as Φ counter-fixtures ───
+def paperkit_on_paperkit():
+    # run paperkit on paperkit: project a fixture, confirm the gate ACCEPTS the
+    # faithful projection and REJECTS a drift of it
+    w = [fx.entry("x", claim="self applied")]
+    good = fx.project_text(w)
+    assert fx.gate(w, out=good)[0] == 0, "the gate rejected paperkit's own faithful projection"
+    assert fx.gate(w, out=good + "\nHAND-EDITED DRIFT\n")[0] != 0, "the gate accepted a drifted projection"
+
+
+def one_green_check():
+    # the document's correctness and the tool's are ONE green check: a single gate
+    # invocation verifies the projection (document) AND runs the verifier (tool) —
+    # breaking either side fails the same gate
+    w = [fx.entry("x", claim="one check", check="cmd:true")]
+    good = fx.project_text(w)
+    assert fx.gate(w, out=good)[0] == 0, "the single gate check did not pass"
+    assert fx.gate(w, out=good + "\nx\n")[0] != 0, "drift (document side) did not fail the gate"
+    bad_check = [fx.entry("x", claim="one check", check="cmd:false")]
+    assert fx.gate(bad_check, out=good)[0] != 0, "check failure (tool side) did not fail the gate"
+
+
 CLAIMS = {
+    "paperkit-on-paperkit": paperkit_on_paperkit,
+    "one-green-check": one_green_check,
     "node-is-claim": node_is_claim,
     "claim-bears-check": claim_bears_check,
     "paper-is-projection": paper_is_projection,

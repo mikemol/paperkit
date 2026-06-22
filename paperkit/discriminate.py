@@ -204,6 +204,7 @@ def main(argv: list) -> int:
         g.update(key=k, check=chk, cited=k in cited, section=F[k].get("section"),
                  shared_with=[o for o in share[chk] if o != k])
         g["from"] = F[k].get("from", [])
+        g["rests-on"] = F[k].get("rests-on", [])     # grounding edges (for clamping)
         records.append(g)
 
     # content inputs = the files a check must touch to discriminate the paper's
@@ -227,7 +228,7 @@ def main(argv: list) -> int:
         if r is None:
             return (RANK_C["behavioral"], None)   # not in scope: impose no constraint
         best, by = RANK_C.get(r["grade"], 0), None
-        for d in r.get("from", []):
+        for d in r.get("rests-on", []):              # clamp over GROUNDING edges
             if d in rby and d not in stack and d != k:
                 de, _ = eff(d, stack + (k,))
                 if de < best:

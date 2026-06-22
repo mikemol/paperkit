@@ -67,8 +67,13 @@ def entries(path: Path) -> dict:
                 fm = re.search(r"\b" + name + r"\s*=\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", body)
                 if fm:
                     f[name] = fm.group(1)
-            fr = re.search(r"\bfrom\s*=\s*\{([^}]*)\}", body)
-            f["from"] = [a for a in re.split(r"[,\s]+", fr.group(1)) if a] if fr else []
+            # `from` = prose-order edge (sets dep_order + glue).  `rests-on` =
+            # grounding/entailment edge (what the claim's credibility rests on);
+            # used for adequacy clamping, NOT for prose.  They are often reversed:
+            # prose runs general→specific, grounding runs specific→general.
+            for field in ("from", "rests-on"):
+                fr = re.search(r"\b" + field + r"\s*=\s*\{([^}]*)\}", body)
+                f[field] = [a for a in re.split(r"[,\s]+", fr.group(1)) if a] if fr else []
             out[key] = f
     return out
 

@@ -238,7 +238,59 @@ def one_green_check():
     assert fx.gate(bad_check, out=good)[0] != 0, "check failure (tool side) did not fail the gate"
 
 
+# ── Π·distinct-witnesses: split the shared projection-stable group (--without-K) ──
+def fail_omits():
+    # a claim whose verifier FAILS cannot ship: the gate refuses the document
+    ok = [fx.entry("x", claim="present", check="cmd:true")]
+    bad = [fx.entry("x", claim="present", check="cmd:false")]
+    good = fx.project_text(ok)
+    assert fx.gate(ok, out=good)[0] == 0, "a claim with a passing verifier did not ship"
+    assert fx.gate(bad, out=good)[0] != 0, "a claim with a FAILING verifier still shipped"
+
+
+def paper_is_paperkit():
+    # this paper is itself a paperkit project: a well-formed config projecting to paper.md
+    cfg = P.load_config(PAPER_DIR)
+    assert (PAPER_DIR / "paper.toml").exists() and cfg["bibs"] and cfg["rubric"].exists(), \
+        "the paper is not a well-formed paperkit project"
+    assert cfg["out"].name == "paper.md", "the paper does not project to paper.md"
+
+
+def prose_is_projection():
+    # the paper's prose IS the projection of its warrants
+    cfg = P.load_config(PAPER_DIR)
+    assert P.project(cfg) == cfg["out"].read_text(), "paper.md is not the projection of its warrants"
+
+
+def closes_gap():
+    # closes the say/check gap: every claim in the ledger carries a verifier
+    F = P.entries(PAPER_DIR / "warrants.bib")
+    missing = [k for k, f in F.items() if f.get("section") and f.get("claim") and not f.get("check")]
+    assert not missing, f"claims without a verifier (the gap is open): {missing}"
+
+
+def unverified_cant_ship():
+    # an unverified sentence cannot ship: one failing verifier blocks the whole document
+    w = [fx.entry("a", claim="verified", check="cmd:true"),
+         fx.entry("b", claim="unverified", frm="a", check="cmd:false")]
+    assert fx.gate(w, out=fx.project_text(w))[0] != 0, "a document with an unverified sentence shipped"
+
+
+def not_project():
+    # ...because it does not project: only the exact projection ships
+    w = [fx.entry("x", claim="canonical")]
+    good = fx.project_text(w)
+    assert fx.gate(w, out=good)[0] == 0, "the canonical projection was rejected"
+    assert fx.gate(w, out="not the projection\n")[0] != 0, "a non-projection shipped"
+
+
 CLAIMS = {
+    "fail-omits": fail_omits,
+    "paper-is-paperkit": paper_is_paperkit,
+    "prose-is-projection": prose_is_projection,
+    "closes-gap": closes_gap,
+    "unverified-cant-ship": unverified_cant_ship,
+    "not-project": not_project,
     "paperkit-on-paperkit": paperkit_on_paperkit,
     "one-green-check": one_green_check,
     "node-is-claim": node_is_claim,

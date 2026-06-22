@@ -31,7 +31,7 @@
   section = {intro}, from = {claim-bears-check, paper-is-projection}, join = {; and },
   claim   = {a claim whose verifier fails simply does not appear in the prose},
   rests-on = {claim-bears-check, prose-projected, gate-rejects-drift},
-  check   = {cmd:sh checks/projection-stable.sh}
+  check   = {claim:fail-omits}
 }
 
 % ── 2. model ────────────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@
   section = {selfhost}, from = {paper-is-projection},
   claim   = {this paper is itself a paperkit project},
   rests-on = {paper-is-projection},
-  check   = {cmd:sh checks/projection-stable.sh}
+  check   = {claim:paper-is-paperkit}
 }
 @misc{claims-are-warrants,
   section = {selfhost}, from = {paper-is-paperkit, record-is-bibentry}, join = { — },
@@ -171,7 +171,7 @@
   section = {selfhost}, from = {paper-is-paperkit, prose-projected}, join = {, },
   claim   = {its prose is their projection},
   rests-on = {prose-projected, paper-is-paperkit},
-  check   = {cmd:sh checks/projection-stable.sh}
+  check   = {claim:prose-is-projection}
 }
 @misc{gate-is-subject,
   section = {selfhost}, from = {paper-is-paperkit, gate-rejects-drift}, join = {, and },
@@ -197,17 +197,17 @@
   section = {conclusion}, from = {fail-omits, one-green-check},
   claim   = {by making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked},
   rests-on = {fail-omits, one-green-check, paper-is-projection},
-  check   = {cmd:sh checks/projection-stable.sh}
+  check   = {claim:closes-gap}
 }
 @misc{unverified-cant-ship,
   section = {conclusion}, from = {closes-gap, fail-omits}, join = {: },
   claim   = {an unverified sentence cannot ship},
   rests-on = {fail-omits, closes-gap},
-  check   = {cmd:sh checks/projection-stable.sh}
+  check   = {claim:unverified-cant-ship}
 }
 @misc{not-project,
   section = {conclusion}, from = {unverified-cant-ship, prose-projected}, join = {, },
   claim   = {because it does not project},
   rests-on = {prose-projected, fail-omits},
-  check   = {cmd:sh checks/projection-stable.sh}
+  check   = {claim:not-project}
 }

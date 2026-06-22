@@ -19,11 +19,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 ASSETS = HERE / "assets"
-_DELTA = {}
+_DELTA, _GATE = {}, {}
 
 
 def _delta(project):
-    """discriminate --json for a project (cached — the data source for the report)."""
+    """discriminate --json — per-cited-claim records (key, section, check, grade)."""
     if project not in _DELTA:
         r = subprocess.run([sys.executable, "paperkit/discriminate.py", "--json", project],
                            cwd=ROOT, capture_output=True, text=True)
@@ -31,31 +31,43 @@ def _delta(project):
     return _DELTA[project]
 
 
-def _passes(*args):
-    return subprocess.run([sys.executable, "paperkit/gate.py", *args],
-                          cwd=ROOT, capture_output=True).returncode == 0
+def _gate(project, *flags):
+    """gate --json — structured result (pass, project_ok, verified, sections, collapses)."""
+    key = (project, flags)
+    if key not in _GATE:
+        r = subprocess.run([sys.executable, "paperkit/gate.py", "--json", *flags, project],
+                           cwd=ROOT, capture_output=True, text=True)
+        _GATE[key] = json.loads(r.stdout or "{}")
+    return _GATE[key]
 
 
 def gate_md():
-    rows = [f"| {doc} | {'PASS' if _passes('--safe', proj) else 'FAIL'} |"
-            for doc, proj in (("paper", "paper"), ("README", "."))]
-    return "| document | gate (--safe, zero postulates) |\n| --- | --- |\n" + "\n".join(rows) + "\n"
+    rows = []
+    for doc, proj in (("paper", "paper"), ("README", ".")):
+        g = _gate(proj, "--safe")
+        rows.append(f"| {doc} | {'PASS' if g.get('pass') else 'FAIL'} | "
+                    f"{'yes' if g.get('project_ok') else 'NO'} | "
+                    f"{g.get('verified', 0)} | {g.get('sections', 0)} |")
+    return ("| document | gate (--safe) | prose ≡ projection | checks verified | sections |\n"
+            "| --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
 
 
 def delta_md():
+    recs = _delta("paper")
     counts = {}
-    for r in _delta("paper"):
+    for r in recs:
         counts[r["grade"]] = counts.get(r["grade"], 0) + 1
     order = ["behavioral", "existence", "indeterminate", "vacuous", "broken"]
-    rows = [f"| {g} | {counts[g]} |" for g in order if counts.get(g)]
-    return "| Δ grade | cited claims |\n| --- | --- |\n" + "\n".join(rows) + "\n"
+    summary = ", ".join(f"{counts[g]} {g}" for g in order if counts.get(g))
+    rows = [f"| `{r['key']}` | {r.get('section', '')} | {r['grade']} | `{r['check']}` |"
+            for r in recs]
+    return (f"_{len(recs)} cited claims: {summary}._\n\n"
+            "| claim | section | Δ grade | witness |\n| --- | --- | --- | --- |\n"
+            + "\n".join(rows) + "\n")
 
 
 def without_k_md():
-    by_check = {}
-    for r in _delta("paper"):
-        by_check.setdefault(r["check"], []).append(r["key"])
-    groups = {c: sorted(k) for c, k in by_check.items() if len(k) > 1}
+    groups = _gate("paper").get("collapses", {})
     if not groups:
         return "Every cited claim carries a distinct witness — `--without-K` is clean.\n"
     rows = [f"| `{c}` | {len(k)} | {', '.join(k)} |" for c, k in sorted(groups.items())]

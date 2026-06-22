@@ -20,4 +20,5 @@ run() {                       # run "label" cmd...; show output only on failure
 run "gate paper/ (--safe, zero postulates)"  python3 paperkit/gate.py --safe paper
 run "gate README (--safe, zero postulates)"  python3 paperkit/gate.py --safe .
 run "Δ behavioral boundaries"                python3 paperkit/tests/boundaries_discriminate.py
+run "engine boundaries (emit / --safe)"      python3 paperkit/tests/boundaries_emit.py
 echo "[pre-commit] all checks passed"

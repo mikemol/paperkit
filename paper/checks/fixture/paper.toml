@@ -1,0 +1,5 @@
+[paper]
+title = "Fixture"
+rubric = "rubric.tsv"
+warrants = ["warrants.bib"]
+out = "paper.md"

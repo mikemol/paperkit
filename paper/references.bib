@@ -1,0 +1,27 @@
+% references.bib — external sources.  No `check`: a reference resolves by being
+% defined.  A `claim` + `section` projects it into the prose like any other clause.
+
+@article{knuth-lit,
+  section = {related},
+  claim   = {literate programming interleaves a program with the prose that explains it, so code and explanation are kept in one source and cannot drift apart},
+  author  = {Donald E. Knuth},
+  title   = {Literate Programming},
+  journal = {The Computer Journal}, volume = {27}, number = {2}, pages = {97--111}, year = {1984}
+}
+@article{buckheit-donoho,
+  glue    = {in a parallel spirit,},
+  section = {related}, from = {knuth-lit},
+  claim   = {reproducible-research practice ships the code and data that regenerate every figure and number, so a published result can be re-run rather than trusted},
+  author  = {Jonathan B. Buckheit and David L. Donoho},
+  title   = {WaveLab and Reproducible Research},
+  journal = {Lecture Notes in Statistics}, volume = {103}, pages = {55--81}, year = {1995}
+}
+@inproceedings{mokhov-build,
+  glue    = {and on the engine side,},
+  section = {related}, from = {buckheit-donoho},
+  claim   = {build-systems theory frames a build as the demand-driven computation of verified targets from their dependencies --- the same shape paperkit gives to a claim-DAG},
+  author  = {Andrey Mokhov and Neil Mitchell and Simon Peyton Jones},
+  title   = {Build Systems {\`a} la Carte},
+  booktitle = {Proc. ACM on Programming Languages (ICFP)}, year = {2018},
+  doi     = {10.1145/3236774}
+}

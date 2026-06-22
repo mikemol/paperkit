@@ -1,0 +1,10 @@
+# rubric.tsv — the sections of this paper, in document order.  The coverage gate
+# requires each heading to appear and each section-tagged claim to be cited in it.
+# key <TAB> heading title
+intro	The Problem: Papers Assert, Nothing Checks
+model	The Model: A Paper as a Projected Claim-DAG
+engine	The Engine: Projection and Gate
+resolver	The Check-Resolver: One Pluggable Seam
+selfhost	Self-Hosting: This Paper Verifies Itself
+related	Related Work
+conclusion	Conclusion

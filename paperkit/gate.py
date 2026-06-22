@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""paperkit gate — verify the paper.
+
+Three invariants, all from the warrant set:
+  RESOLVE   every [@key] cited in the prose resolves — a claim whose `check`
+            passes, or a reference (no `check`) that is at least defined.
+  COVERAGE  every rubric section appears in the prose, and every claim tagged
+            for a section is cited within it.
+  PROJECT   the committed prose equals the projection (paperkit-project --check).
+
+A claim's verifier is `<type>:<target>`.  Built-in types (no config needed):
+  file:<path>   the artifact exists, relative to the project
+  cmd:<script>  run `<target>` from the project dir; exit 0 = pass
+Custom types come from paper.toml as `[checks.<type>] cmd = "... {target} ..."`,
+run from the project dir, exit 0 = pass.  `cmd:` is the universal escape hatch
+every check reduces to; the registry just gives recurring ones a name.
+"""
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import project as P  # noqa: E402
+
+
+def run_ok(cmd: str, cwd: Path) -> bool:
+    try:
+        return subprocess.run(cmd, shell=True, cwd=cwd,
+                              capture_output=True).returncode == 0
+    except Exception:
+        return False
+
+
+def resolves(check: str, project_dir: Path, custom: dict) -> bool:
+    typ, _, target = check.partition(":")
+    if typ == "file":
+        return (project_dir / target).exists()
+    if typ == "cmd":
+        return run_ok(target, project_dir)
+    if typ in custom:
+        return run_ok(custom[typ]["cmd"].replace("{target}", target), project_dir)
+    return False
+
+
+def cited_keys(prose: str) -> set:
+    return set(re.findall(r"@([A-Za-z0-9][\w.:-]*)", prose))
+
+
+def main(argv: list) -> int:
+    args = [a for a in argv if not a.startswith("-")]
+    project_dir = Path(args[0]).resolve() if args else Path.cwd()
+    cfg = P.load_config(project_dir)
+    custom = tomllib.loads((project_dir / "paper.toml").read_text()).get("checks", {})
+
+    F, primary = {}, cfg["bibs"][0].name
+    for b in cfg["bibs"]:
+        F.update(P.entries(b))
+
+    out = cfg["out"]
+    if not out.exists():
+        print(f"paperkit-gate: {out.name} not built — run paperkit-project", file=sys.stderr)
+        return 1
+    prose = out.read_text()
+    cited = cited_keys(prose)
+    rc = 0
+
+    # PROJECT — committed prose is the projection
+    if prose != P.project(cfg):
+        print(f"paperkit-gate: {out.name} ≠ projection — regenerate (paperkit-project)", file=sys.stderr)
+        rc = 1
+    else:
+        print(f"paperkit-gate: {out.name} ≡ projection")
+
+    # RESOLVE — every cited claim's check passes; references at least defined
+    warrants = {k for k, f in F.items() if f.get("check")}
+    undefined = sorted(cited - set(F))
+    bad = sorted(k for k in cited & warrants if not resolves(F[k]["check"], project_dir, custom))
+    if undefined:
+        print(f"paperkit-gate: undefined citations: {', '.join(undefined)}", file=sys.stderr)
+        rc = 1
+    if bad:
+        for k in bad:
+            print(f"paperkit-gate: check FAILED for [@{k}]: {F[k]['check']}", file=sys.stderr)
+        rc = 1
+    if not undefined and not bad:
+        print(f"paperkit-gate: {len(cited)} cited claim(s) all resolve to passing checks")
+
+    # COVERAGE — sections present, section-tagged claims cited
+    headings = "\n".join(ln for ln in prose.splitlines() if ln.startswith("## "))
+    gaps = []
+    for sk, title in P.rubric(cfg["rubric"]):
+        if title.lower() not in headings.lower():
+            gaps.append(f"section '{title}' absent")
+    for k, f in F.items():
+        if f.get("section") and k not in cited:
+            gaps.append(f"claim [@{k}] tagged section={f['section']} but not cited")
+    if gaps:
+        for g in gaps:
+            print(f"paperkit-gate: coverage — {g}", file=sys.stderr)
+        rc = 1
+    else:
+        secs = len(P.rubric(cfg["rubric"]))
+        print(f"paperkit-gate: coverage complete — {secs} sections, all tagged claims cited")
+
+    print("paperkit-gate: PASS" if rc == 0 else "paperkit-gate: FAIL", file=sys.stderr)
+    return rc
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

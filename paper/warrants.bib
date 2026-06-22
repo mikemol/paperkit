@@ -1,0 +1,67 @@
+% warrants.bib — the claims of this paper.  Each entry is one claim: a statement
+% (claim), the rubric section it belongs to, its dependencies (from), and its
+% verifier (check).  The prose is PROJECTED from these; the gate passes iff every
+% cited claim's check passes.  check grammar:
+%   file:<path>   the artifact exists, relative to the project (paper/)
+%   cmd:<script>  run it from the project dir; exit 0 = pass
+% The cmd: checks here run paperkit on paperkit — projecting, drifting, re-gating —
+% so this document's claims about the tool are checked BY the tool.
+
+@misc{thesis,
+  section = {intro},
+  claim   = {paperkit treats a scholarly paper as the projection of a claim-DAG --- each sentence is a claim carrying a machine-checkable verifier, and a claim whose verifier fails simply does not appear in the prose},
+  check   = {cmd:sh checks/projection-stable.sh}
+}
+@misc{claim-rec,
+  glue    = {concretely,},
+  section = {model}, from = {thesis},
+  claim   = {a claim is a single record --- a statement, the rubric section it belongs to, its dependencies, and its verifier --- which is exactly the shape of a bibliography entry},
+  check   = {file:warrants.bib}
+}
+@misc{projection,
+  section = {model}, from = {claim-rec},
+  claim   = {the prose is projected, not authored: within each section the claims are ordered by their dependency edges and joined with connective glue, the same input always giving the same document},
+  check   = {cmd:sh checks/project-deterministic.sh}
+}
+@misc{projector,
+  section = {engine}, from = {projection},
+  claim   = {the projector emits the whole document from the warrant set, so the committed prose is a build artifact rather than a source any hand should edit},
+  check   = {file:../paperkit/project.py}
+}
+@misc{drift,
+  section = {engine}, from = {projector},
+  claim   = {the gate rejects any prose that has drifted from its projection, so a hand-edit cannot survive a build},
+  check   = {cmd:sh checks/drift-caught.sh}
+}
+@misc{coverage,
+  section = {engine}, from = {drift},
+  claim   = {coverage is enforced from both sides --- every required section must appear, and every claim tagged for a section must be cited within it},
+  check   = {file:../paperkit/gate.py}
+}
+@misc{resolver,
+  section = {resolver},
+  claim   = {a claim's verifier is named type:target, and the gate dispatches it through a small registry of check types, so supporting a new domain means adding verifiers rather than editing the engine},
+  check   = {file:../paperkit/gate.py}
+}
+@misc{builtins,
+  glue    = {out of the box,},
+  section = {resolver}, from = {resolver},
+  claim   = {two verifiers ship built in --- file, that an artifact exists, and cmd, that a script exits zero --- and cmd is the universal escape hatch every other check reduces to},
+  check   = {cmd:sh checks/projection-stable.sh}
+}
+@misc{selfhost,
+  section = {selfhost},
+  claim   = {this paper is itself a paperkit project --- its claims are these warrants, its prose is their projection, and the gate that accepts it is the very subject it describes},
+  check   = {cmd:sh checks/projection-stable.sh}
+}
+@misc{bootstrap,
+  glue    = {underneath,},
+  section = {selfhost}, from = {selfhost},
+  claim   = {the verifiers behind this section run paperkit on paperkit --- projecting a fixture, drifting it, and confirming the gate rejects the drift --- so the document's correctness and the tool's are one green check},
+  check   = {cmd:sh checks/drift-caught.sh}
+}
+@misc{synthesis,
+  section = {conclusion}, from = {bootstrap},
+  claim   = {by making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked: an unverified sentence cannot ship, because it does not project},
+  check   = {cmd:sh checks/projection-stable.sh}
+}

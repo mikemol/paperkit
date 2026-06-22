@@ -1,0 +1,7 @@
+% Minimal fixture for drift-caught.sh.  Its one claim uses a trivial check (cmd:true)
+% so gating the fixture never recurses back into a full gate.
+@misc{demo-claim,
+  section = {demo},
+  claim   = {a fixture claim that always verifies},
+  check   = {cmd:true}
+}

@@ -121,19 +121,28 @@ def grade_check(chk: str, project_dir: Path, presupposed: set,
         resolved = (project_dir / target).resolve()
         if resolved in presupposed:
             return {"grade": "vacuous", "tests": [target],
-                    "why": "existence of a required project/engine source — presupposed by the build"}
+                    "why": "existence of a required project/engine source — presupposed by the build",
+                    "not_higher": "to rise: give it a check that can FAIL — a file: of a presupposed input is removed by no real change",
+                    "not_lower": "vacuous is the floor"}
         return {"grade": "existence", "tests": [target],
-                "why": "existence of a contingent artifact — presence only, not content"}
+                "why": "existence of a contingent artifact — presence only, not content",
+                "not_higher": "to rise: test the artifact's CONTENT, not just its presence (a content-sensitive cmd:)",
+                "not_lower": "not vacuous: the artifact is contingent, not a presupposed build input, so its absence is a real failure"}
     # cmd: / custom — empirically probe falsifiability
     baseline, sens = sensitivity(chk, sandbox_project, custom)
     if not baseline:
         return {"grade": "broken", "tests": [],
-                "why": "check does not pass in a pristine sandbox — repo is not green"}
+                "why": "check does not pass in a pristine sandbox — repo is not green",
+                "not_higher": "—", "not_lower": "—"}
     if sens:
         return {"grade": "behavioral", "tests": sens,
-                "why": f"falsifiable — corrupting {len(sens)} input(s) flips it red"}
+                "why": f"falsifiable — corrupting {len(sens)} input(s) flips it red",
+                "not_higher": "behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined",
+                "not_lower": f"not indeterminate/vacuous: a mutation DOES flip it (sensitive to {len(sens)} input(s))"}
     return {"grade": "indeterminate", "tests": [],
-            "why": "no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π)"}
+            "why": "no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π)",
+            "not_higher": "to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral",
+            "not_lower": "not provably vacuous: it runs a cmd:, not a presupposed file:"}
 
 
 def main(argv: list) -> int:

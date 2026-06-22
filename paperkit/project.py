@@ -51,6 +51,8 @@ def load_config(project: Path) -> dict:
         "rubric": project / p.get("rubric", "rubric.tsv"),
         "bibs": [project / b for b in p.get("warrants", ["warrants.bib"])],
         "out": project / p.get("out", "paper.md"),
+        "numbered": p.get("numbered", True),
+        "references": p.get("references", True),
     }
 
 
@@ -61,7 +63,7 @@ def entries(path: Path) -> dict:
         for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", path.read_text(), re.S):
             key, body = m.group(1), m.group(2)
             f = {"_src": path.name}
-            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue", "join"):
+            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue", "join", "emit"):
                 fm = re.search(r"\b" + name + r"\s*=\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", body)
                 if fm:
                     f[name] = fm.group(1)
@@ -121,11 +123,69 @@ def sentence(key: str, f: dict, primary: str) -> str:
 
 GLUE = ["and from that, ", "so "]
 
+# A placed (not woven) warrant emits a verbatim asset instead of a sentence; the
+# fence language is inferred from the asset's extension (empty = raw include, for
+# markdown tables and prose snippets).
+FENCE = {".sh": "sh", ".bash": "sh", ".py": "python", ".toml": "toml",
+         ".bib": "bibtex", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
+         ".txt": "text", ".tsv": "text", ".md": ""}   # .md = raw include (tables)
+
+
+def is_placed(f: dict) -> bool:
+    """A warrant projected as a block (emit:) or a figure — placed verbatim, not
+    woven into prose, and so covered by its placement rather than a citation."""
+    return bool(f.get("emit")) or f.get("check", "").startswith("figure:")
+
+
+def emit_block(pdir: Path, f: dict) -> list:
+    """The lines for an `emit:` warrant: the asset file's contents, fenced by the
+    language its extension implies (raw if none)."""
+    p = pdir / f["emit"]
+    if not p.exists():
+        return [f"<!-- emit: missing {f['emit']} -->"]
+    content = p.read_text().rstrip("\n")
+    lang = FENCE.get(p.suffix, "")
+    return [f"```{lang}", content, "```"] if lang else [content]
+
+
+def weave(text: list, F: dict, primary: str) -> str:
+    """Weave a run of prose-claim keys into one sentence-diagrammed paragraph."""
+    clauses = [sentence(k, F[k], primary) for k in text]
+    clauses[0] = clauses[0][:1].upper() + clauses[0][1:]
+    clauses[1:] = [re.sub(r"^(The|A|An) ", lambda m: m.group(1).lower() + " ", c)
+                   for c in clauses[1:]]
+    parts, woven = [clauses[0]], 0
+    for i in range(1, len(text)):
+        f = F[text[i]]
+        clause = clauses[i]
+        # `join` is the FULL connector to the previous clause — the grammatical
+        # attachment of a sentence-diagram constituent: "— " apposition, ", and "
+        # conjunction, ", which " relative, ": " list-intro, ". " new sentence.
+        # Default is the legacy "; " + `glue` weave.
+        if f.get("join") is not None:
+            j = f["join"] if f["join"].endswith(" ") else f["join"] + " "
+            if j.strip().endswith((".", "!", "?")):   # sentence boundary → capitalize
+                clause = clause[:1].upper() + clause[1:]
+            parts.append(j + clause)
+            continue
+        edge = text[i - 1] in f.get("from", [])
+        if edge and f.get("glue"):
+            g = f["glue"]
+            conn = g if g.endswith(" ") else g + " "
+        elif edge and f["_src"] == primary and F[text[i - 1]]["_src"] == primary:
+            conn = GLUE[woven % len(GLUE)]
+            woven += 1
+        else:
+            conn = ""
+        parts.append("; " + conn + clause)
+    return "".join(parts) + "."
+
 
 def project(cfg: dict) -> str:
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
         F.update(entries(b))
+    pdir = cfg["out"].parent
     by_sec = {}
     for k, f in F.items():
         if f.get("section"):
@@ -135,42 +195,35 @@ def project(cfg: dict) -> str:
     if cfg["subtitle"]:
         lines += [f"*{cfg['subtitle']}*", ""]
     for n, (sk, title) in enumerate(rubric(cfg["rubric"]), 1):
-        lines += [f"## {n}. {title}", ""]
+        lines += [f"## {n}. {title}" if cfg["numbered"] else f"## {title}", ""]
         keys = dep_order(by_sec.get(sk, []), F)
-        text = [k for k in keys if not F[k].get("check", "").startswith("figure:")]
-        if text:
-            clauses = [sentence(k, F[k], primary) for k in text]
-            clauses[0] = clauses[0][:1].upper() + clauses[0][1:]
-            clauses[1:] = [re.sub(r"^(The|A|An) ", lambda m: m.group(1).lower() + " ", c)
-                           for c in clauses[1:]]
-            parts, woven = [clauses[0]], 0
-            for i in range(1, len(text)):
-                f = F[text[i]]
-                clause = clauses[i]
-                # `join` is the FULL connector to the previous clause — the grammatical
-                # attachment of a sentence-diagram constituent: "— " apposition, ", and "
-                # conjunction, ", which " relative, ": " list-intro, ". " new sentence.
-                # Default is the legacy "; " + `glue` weave.
-                if f.get("join") is not None:
-                    j = f["join"] if f["join"].endswith(" ") else f["join"] + " "
-                    if j.strip().endswith((".", "!", "?")):   # sentence boundary → capitalize
-                        clause = clause[:1].upper() + clause[1:]
-                    parts.append(j + clause)
-                    continue
-                edge = text[i - 1] in f.get("from", [])
-                if edge and f.get("glue"):
-                    g = f["glue"]
-                    conn = g if g.endswith(" ") else g + " "
-                elif edge and f["_src"] == primary and F[text[i - 1]]["_src"] == primary:
-                    conn = GLUE[woven % len(GLUE)]
-                    woven += 1
-                else:
-                    conn = ""
-                parts.append("; " + conn + clause)
-            lines += ["".join(parts) + ".", ""]
         if not keys:
             lines += ["<!-- structural section: connective prose, no required claim atom -->", ""]
-    lines += ["## References", ""]
+            continue
+        # Walk the section in dependency order, interleaving woven-prose runs with
+        # placed asset blocks: a run of claims weaves into one paragraph; an emit:
+        # warrant flushes that paragraph then drops its verbatim block in place.
+        run: list = []
+        for k in keys:
+            f = F[k]
+            if f.get("emit"):
+                # A healthy example is CITED: if the warrant also carries a claim,
+                # its sentence (with its [@key]) closes the current paragraph and
+                # introduces the block, so the placement is referenced, not orphaned.
+                if f.get("claim") or f.get("title"):
+                    run.append(k)
+                if run:
+                    lines += [weave(run, F, primary), ""]
+                    run = []
+                lines += emit_block(pdir, f) + [""]
+            elif f.get("check", "").startswith("figure:"):
+                continue
+            else:
+                run.append(k)
+        if run:
+            lines += [weave(run, F, primary), ""]
+    if cfg["references"]:
+        lines += ["## References", ""]
     return "\n".join(lines) + "\n"
 
 

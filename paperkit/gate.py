@@ -23,10 +23,12 @@ every check reduces to; the registry just gives recurring ones a name.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -64,6 +66,10 @@ def main(argv: list) -> int:
     safe = "--safe" in argv      # zero-postulate: uncited placements FAIL, not advise
     without_k = "--without-K" in argv or "--without-k" in argv   # forbid shared witnesses
     as_json = "--json" in argv   # emit structured results to stdout (human lines suppressed)
+    # The bib IS the makefile: a project's distinct checks are independent targets,
+    # so the gate runs them concurrently (default = all cores; --jobs=1 forces serial).
+    jobs = next((int(a.split("=", 1)[1]) for a in argv if a.startswith("--jobs=")),
+                os.cpu_count() or 4)
     project_dir = Path(args[0]).resolve() if args else Path.cwd()
 
     def info(msg):              # human success lines — suppressed under --json
@@ -99,14 +105,18 @@ def main(argv: list) -> int:
     placed = {k for k, f in F.items() if P.is_placed(f)}
     to_verify = (cited | placed) & warrants
     undefined = sorted(cited - set(F))
-    cache: dict = {}
+    # Resolve each DISTINCT check exactly once (shared witnesses run one time), the
+    # set of them fanned out across `jobs` workers — checks are subprocess-bound, so
+    # threads suffice and the GIL is released during the run.
+    distinct = sorted({F[k]["check"] for k in to_verify})
+    if jobs > 1 and len(distinct) > 1:
+        with ThreadPoolExecutor(max_workers=jobs) as ex:
+            results = list(ex.map(lambda c: resolves(c, project_dir, custom), distinct))
+    else:
+        results = [resolves(c, project_dir, custom) for c in distinct]
+    cache = dict(zip(distinct, results))
 
-    def ok(chk: str) -> bool:
-        if chk not in cache:        # each distinct check runs once, not per-citation
-            cache[chk] = resolves(chk, project_dir, custom)
-        return cache[chk]
-
-    bad = sorted(k for k in to_verify if not ok(F[k]["check"]))
+    bad = sorted(k for k in to_verify if not cache[F[k]["check"]])
     if undefined:
         print(f"paperkit-gate: undefined citations: {', '.join(undefined)}", file=sys.stderr)
         rc = 1

@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Behavioral-boundary examples for the parallel gate (--jobs).
+
+⟨P, F, δ⟩ per the boundary practice.  The gate runs a project's distinct checks
+concurrently (the bib IS the makefile: independent checks are independent targets).
+The load-bearing invariant is DETERMINISM — the verdict is a property of the checks,
+never of the worker count: parallel ≡ serial.  This bounds that --jobs is a speed
+knob with no semantic effect.
+
+    python3 paperkit/tests/boundaries_jobs.py
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _fixture import entry, gate  # noqa: E402
+
+# A multi-check project, so parallelism actually fans out (3 distinct checks).
+PASS = [entry("a", claim="alpha", check="cmd:true"),
+        entry("b", claim="beta", check="cmd:true", frm="a"),
+        entry("c", claim="gamma", check="cmd:true", frm="b")]
+# Same shape, but one check fails — the verdict must flip regardless of --jobs.
+FAIL = [entry("a", claim="alpha", check="cmd:true"),
+        entry("b", claim="beta", check="cmd:false", frm="a"),
+        entry("c", claim="gamma", check="cmd:true", frm="b")]
+
+
+def main() -> int:
+    fails = []
+
+    def check(desc, cond):
+        fails.append(desc) if not cond else None
+        print(f"  {'ok ' if cond else 'XX '}{desc}")
+
+    rc_pass_serial, _ = gate(PASS, "--jobs=1")
+    rc_pass_par, _ = gate(PASS, "--jobs=8")
+    rc_fail_serial, _ = gate(FAIL, "--jobs=1")
+    rc_fail_par, _ = gate(FAIL, "--jobs=8")
+
+    print("parallel-gate behaviors\n")
+    check("a clean project passes serial (--jobs=1 → exit 0)", rc_pass_serial == 0)
+    check("a failing check fails serial (--jobs=1 → exit 1)", rc_fail_serial == 1)
+    check("parallel agrees with serial on PASS (--jobs=8 → exit 0)", rc_pass_par == 0)
+    check("parallel agrees with serial on FAIL (--jobs=8 → exit 1)", rc_fail_par == 1)
+    print()
+
+    print("⟨P, F, δ⟩ minimum-delta pairs\n")
+    pairs = [
+        ("verdict tracks the checks, not the worker count",
+         "one of three checks (cmd:true → cmd:false)",
+         "all pass → exit 0", rc_pass_serial == 0 and rc_pass_par == 0,
+         "one fails → exit 1", rc_fail_serial == 1 and rc_fail_par == 1),
+        ("--jobs is semantically inert (parallel ≡ serial)",
+         "the worker count (1 → 8)",
+         "serial verdicts", (rc_pass_serial, rc_fail_serial) == (0, 1),
+         "parallel verdicts (identical)", (rc_pass_par, rc_fail_par) == (rc_pass_serial, rc_fail_serial)),
+    ]
+    for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
+        ok = p_ok and f_ok
+        fails.append(name) if not ok else None
+        print(f"  {'ok ' if ok else 'XX '}{name}")
+        print(f"      P (pass side): {p_lbl}")
+        print(f"      F (flag side): {f_lbl}")
+        print(f"      δ (min delta): {axis}\n")
+
+    if fails:
+        print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
+        return 1
+    print("BOUNDARIES: PASS (4 behaviors, 2 deltas)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

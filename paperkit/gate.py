@@ -8,6 +8,9 @@ Three invariants, all from the warrant set:
             for a section is cited within it.  A PLACEMENT (emit:/figure) tagged
             to a section but cited by no prose is a postulate — advised against by
             default, and rejected under --safe (a zero-postulate document).
+  --without-K  opt-in proof-relevance: every cited claim must carry a DISTINCT
+            witness.  The gate's check→bool is proof-irrelevant (Axiom K / UIP), so
+            it would otherwise identify distinct claims that share one check.
   PROJECT   the committed prose equals the projection (paperkit-project --check).
 
 A claim's verifier is `<type>:<target>`.  Built-in types (no config needed):
@@ -58,6 +61,7 @@ def cited_keys(prose: str) -> set:
 def main(argv: list) -> int:
     args = [a for a in argv if not a.startswith("-")]
     safe = "--safe" in argv      # zero-postulate: uncited placements FAIL, not advise
+    without_k = "--without-K" in argv or "--without-k" in argv   # forbid shared witnesses
     project_dir = Path(args[0]).resolve() if args else Path.cwd()
     cfg = P.load_config(project_dir)
     custom = tomllib.loads((project_dir / "paper.toml").read_text()).get("checks", {})
@@ -105,6 +109,23 @@ def main(argv: list) -> int:
         rc = 1
     if not undefined and not bad:
         print(f"paperkit-gate: {len(to_verify)} cited/placed claim(s) all resolve to passing checks")
+
+    # WITHOUT-K — proof-relevance.  The gate reduces each check to a boolean, so it
+    # silently identifies distinct cited claims that share one witness (Axiom K /
+    # UIP).  --without-K drops that: every cited claim must carry a DISTINCT witness.
+    if without_k:
+        by_check: dict = {}
+        for k in sorted(cited & warrants):
+            by_check.setdefault(F[k]["check"], []).append(k)
+        collapsed = {c: ks for c, ks in by_check.items() if len(ks) > 1}
+        if collapsed:
+            for c, ks in sorted(collapsed.items()):
+                print(f"paperkit-gate: --without-K — {len(ks)} cited claims collapse onto "
+                      f"one witness {c}: {', '.join(ks)}", file=sys.stderr)
+            rc = 1
+        else:
+            print(f"paperkit-gate: --without-K — {len(cited & warrants)} cited claim(s) "
+                  f"each carry a distinct witness")
 
     # COVERAGE — sections present, section-tagged claims cited
     headings = "\n".join(ln for ln in prose.splitlines() if ln.startswith("## "))

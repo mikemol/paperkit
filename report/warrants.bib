@@ -52,9 +52,14 @@
 }
 @misc{rpt-dag-fig,
   section = {dag}, from = {rpt-dag}, join = { — },
-  claim   = {premises (depended upon) on the left, terminal conclusions on the right, the Δ grade on the vertical axis},
+  claim   = {premises (depended upon) on the left, terminal conclusions on the right, the effective grade on the vertical axis},
   emit    = {assets/dag.svg},
   check   = {fresh:all}
+}
+@misc{rpt-clamp,
+  section = {dag}, from = {rpt-dag-fig}, join = {. },
+  claim   = {a claim is no better grounded than its weakest premise, so each node sits at its effective (clamped) grade, with a ghost rising to its self-check grade wherever premises drag it down},
+  check   = {fig:shows-clamp}
 }
 @misc{rpt-fig-data,
   section = {dag}, from = {rpt-dag-fig}, join = {. },

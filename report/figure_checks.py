@@ -46,7 +46,15 @@ def well_formed():
     assert "<circle" in SVG or "<line" in SVG, "no vector primitives drawn"
 
 
-CHECKS = {"okabe-ito": okabe_ito, "dark-on-light": dark_on_light, "well-formed": well_formed}
+def shows_clamp():
+    # the figure shows effective-vs-self grade: a clamp legend, and (since the paper
+    # is clamped by its vacuous roots) at least one drop-line from self to effective
+    assert "self-check grade" in SVG, "the figure has no clamp legend"
+    assert "stroke-dasharray" in SVG, "no clamp drop-lines drawn (effective == self everywhere?)"
+
+
+CHECKS = {"okabe-ito": okabe_ito, "dark-on-light": dark_on_light,
+          "well-formed": well_formed, "shows-clamp": shows_clamp}
 
 
 def main(argv):

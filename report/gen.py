@@ -56,16 +56,26 @@ def gate_md():
 
 def delta_md():
     recs = _delta("paper")
-    counts = {}
+    order = ["behavioral", "existence", "indeterminate", "vacuous", "broken"]
+    counts, eff_counts, clamped = {}, {}, 0
     for r in recs:
         counts[r["grade"]] = counts.get(r["grade"], 0) + 1
-    order = ["behavioral", "existence", "indeterminate", "vacuous", "broken"]
-    summary = ", ".join(f"{counts[g]} {g}" for g in order if counts.get(g))
-    rows = [f"| `{r['key']}` | {r['grade']} | `{r['check']}` | "
+        e = r.get("effective_grade", r["grade"])
+        eff_counts[e] = eff_counts.get(e, 0) + 1
+        clamped += 1 if r.get("clamp", 0) > 0 else 0
+    selfs = ", ".join(f"{counts[g]} {g}" for g in order if counts.get(g))
+    effs = ", ".join(f"{eff_counts[g]} {g}" for g in order if eff_counts.get(g))
+
+    def cell(r):
+        e = r.get("effective_grade", r["grade"])
+        return r["grade"] if r.get("clamp", 0) == 0 else f"{r['grade']} → **{e}**"
+
+    rows = [f"| `{r['key']}` | {cell(r)} | `{r['check']}` | "
             f"{r.get('why', '')} | {r.get('not_higher', '')} | {r.get('not_lower', '')} |"
             for r in recs]
-    return (f"_{len(recs)} cited claims: {summary}._\n\n"
-            "| claim | Δ grade | witness | why this grade | why not higher | why not lower |\n"
+    return (f"_{len(recs)} cited claims — self-grade: {selfs}; effective (clamped by entailment): "
+            f"{effs}; {clamped} clamped below self._\n\n"
+            "| claim | self → effective | witness | why this grade | why not higher | why not lower |\n"
             "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
 
 

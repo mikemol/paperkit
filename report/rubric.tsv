@@ -2,3 +2,4 @@
 status	Gate status
 adequacy	Check adequacy (Δ)
 proof	Proof-relevance (--without-K)
+dag	Adequacy along the entailment DAG

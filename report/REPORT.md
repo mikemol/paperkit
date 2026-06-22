@@ -63,3 +63,9 @@ Some cited claims still share a witness, so --without-K does not yet pass [@rpt-
 | `cmd:sh checks/projection-stable.sh` | 6 | closes-gap, fail-omits, not-project, paper-is-paperkit, prose-is-projection, unverified-cant-ship |
 | `file:warrants.bib` | 3 | claim-bears-check, claims-are-warrants, node-is-claim |
 
+## Adequacy along the entailment DAG
+
+Walking the claim DAG from premises to conclusions, each claim's adequacy grade plots against its dependency depth [@rpt-dag] — premises (depended upon) on the left, terminal conclusions on the right, the Δ grade on the vertical axis [@rpt-dag-fig].
+
+![premises (depended upon) on the left, terminal conclusions on the right, the Δ grade on the vertical axis](assets/dag.svg)
+

@@ -43,3 +43,16 @@
   emit    = {assets/without-k.md},
   check   = {fresh:all}
 }
+
+% ── dag ──────────────────────────────────────────────────────────────────────
+@misc{rpt-dag,
+  section = {dag},
+  claim   = {walking the claim DAG from premises to conclusions, each claim's adequacy grade plots against its dependency depth},
+  check   = {fresh:all}
+}
+@misc{rpt-dag-fig,
+  section = {dag}, from = {rpt-dag}, join = { — },
+  claim   = {premises (depended upon) on the left, terminal conclusions on the right, the Δ grade on the vertical axis},
+  emit    = {assets/dag.svg},
+  check   = {fresh:all}
+}

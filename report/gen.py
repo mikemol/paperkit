@@ -16,6 +16,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import figure  # report/figure.py — the claim-DAG adequacy plot
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 ASSETS = HERE / "assets"
@@ -76,7 +78,12 @@ def without_k_md():
             + "\n".join(rows) + "\n")
 
 
-GENERATORS = {"gate.md": gate_md, "delta.md": delta_md, "without-k.md": without_k_md}
+def dag_svg():
+    return figure.svg(_delta("paper"))
+
+
+GENERATORS = {"gate.md": gate_md, "delta.md": delta_md, "without-k.md": without_k_md,
+              "dag.svg": dag_svg}
 
 
 def main(argv):

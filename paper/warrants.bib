@@ -268,6 +268,33 @@
   check   = {claim:mem-lease}
 }
 
+% ── adequacy: how Δ grades a check ───────────────────────────────────────────
+@misc{grade-ladder,
+  section = {adequacy},
+  claim   = {a passing check only proves a sentence named a verifier, not that the verifier entails it --- so Δ grades each check on a ladder by how much it can fail: a presupposed file is vacuous, a contingent one existence, and a content-sensitive command behavioral},
+  check   = {claim:grade-ladder}
+}
+@misc{mutation-probes,
+  section = {adequacy}, from = {grade-ladder}, join = {. },
+  claim   = {the grade is empirical, not declared --- Δ corrupts each input in turn and watches whether the check flips from pass to fail, and the inputs whose corruption flips it are its sensitivity set},
+  check   = {claim:mutation-probes}
+}
+@misc{content-cache,
+  section = {adequacy}, from = {mutation-probes}, join = {. },
+  claim   = {a grade is a pure function of a content key --- the hash of every project and engine file a check could read --- so it is cached and the expensive mutation sweep reruns only when that key changes},
+  check   = {claim:content-cache}
+}
+@misc{sandbox-grade,
+  section = {adequacy}, from = {content-cache}, join = {. },
+  claim   = {the sweep runs in a sandbox copy whose mutation surface excludes sibling projects (a nested directory with its own paper.toml), so each project grades independently of the others},
+  check   = {claim:sandbox-grade}
+}
+@misc{min-strength,
+  section = {adequacy}, from = {sandbox-grade}, join = {, and },
+  claim   = {--min-strength turns the grades into a gate --- a project fails if any cited claim's check grades below the threshold, which is how this paper enforces its own proof-relevance in CI},
+  check   = {claim:min-strength}
+}
+
 % ── 7. conclusion ───────────────────────────────────────────────────────────
 @misc{closes-gap,
   section = {conclusion}, from = {fail-omits, one-green-check},

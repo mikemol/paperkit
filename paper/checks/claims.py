@@ -22,6 +22,7 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
 import project as P  # noqa: E402
+import discriminate  # noqa: E402  (Δ: the adequacy grader)
 import rhetoric  # noqa: E402  (the move/scheme vocabulary)
 import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
 
@@ -445,7 +446,79 @@ def mem_lease():
     assert fx.gate(leased)[0] == fx.gate(plain)[0] != 0, "a mem lease changed the verdict"
 
 
+# ── adequacy: how Δ grades a check ───────────────────────────────────────────
+def grade_ladder():
+    # Δ grades each check on a ladder by how much it can fail: a presupposed file: is
+    # vacuous (no change removes it), a content-sensitive cmd: is behavioral
+    recs = json.loads(fx.discriminate(
+        [fx.entry("vac", claim="v", check="file:w.bib"),
+         fx.entry("beh", claim="b", check="cmd:grep -q TOKEN a.txt", frm="vac")],
+        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    g = {r["key"]: r["grade"] for r in recs}
+    assert g["vac"] == "vacuous" and g["beh"] == "behavioral", f"grade ladder wrong: {g}"
+
+
+def mutation_probes():
+    # the grade is empirical: Δ corrupts each input and sees if the check flips from
+    # pass to fail; the inputs whose corruption flips it are its sensitivity set
+    recs = json.loads(fx.discriminate(
+        [fx.entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],
+        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    r = recs[0]
+    assert r["grade"] == "behavioral" and "a.txt" in r.get("tests", []), \
+        f"corrupting a.txt should flip the check (tests={r.get('tests')})"
+
+
+def content_cache():
+    # a Δ grade is a pure function of a CONTENT KEY (the project + engine files a check
+    # could read), so it can be cached and recomputed only when that key changes
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "paper.toml").write_text('[paper]\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n')
+        (d / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")
+        (d / "r.tsv").write_text("s\tSec\n")
+        k1 = discriminate.content_key(d)
+        assert k1 == discriminate.content_key(d), "content key not stable for unchanged inputs"
+        (d / "w.bib").write_text((d / "w.bib").read_text() + "\n% changed\n")
+        assert discriminate.content_key(d) != k1, "content key did not change when an input changed"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def sandbox_grade():
+    # grading runs in a sandbox copy whose mutation surface excludes SIBLING projects
+    # (a nested dir with its own paper.toml), so a project grades independently of them
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "paper.toml").write_text("[paper]\n")
+        (d / "main.py").write_text("own\n")
+        (d / "sub").mkdir()
+        (d / "sub" / "paper.toml").write_text("[paper]\n")          # a nested sibling project
+        (d / "sub" / "inner.py").write_text("theirs\n")
+        assert (d / "sub") in discriminate._nested_roots(d), "nested project not detected"
+        names = [f.name for f in discriminate.sandbox_files(d, set())]
+        assert "main.py" in names and "inner.py" not in names, \
+            f"surface should keep own files, drop the sibling's (got {names})"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def min_strength():
+    # --min-strength gates the grades: a project fails if any cited claim's check grades
+    # BELOW the threshold — this is how the paper enforces its own proof-relevance
+    strong = [fx.entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")]   # behavioral
+    weak = [fx.entry("c", claim="c", check="file:w.bib")]                  # vacuous
+    rc_ok, _ = fx.discriminate(strong, "--min-strength", "behavioral", assets={"a.txt": "TOKEN\n"})
+    rc_bad, _ = fx.discriminate(weak, "--min-strength", "behavioral")
+    assert rc_ok == 0 and rc_bad != 0, f"--min-strength did not gate on grade (ok={rc_ok}, bad={rc_bad})"
+
+
 CLAIMS = {
+    "grade-ladder": grade_ladder,
+    "mutation-probes": mutation_probes,
+    "content-cache": content_cache,
+    "sandbox-grade": sandbox_grade,
+    "min-strength": min_strength,
     "resolve-passes": resolve_passes,
     "safe-rejects-postulates": safe_rejects_postulates,
     "without-k-distinct": without_k_distinct,

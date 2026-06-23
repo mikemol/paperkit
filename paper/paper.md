@@ -34,11 +34,15 @@ Within a section the projector weaves the claims into one paragraph rather than 
 
 RESOLVE is the gate's second invariant — a cited claim whose check fails blocks the gate, so the verdict is the conjunction of every cited claim's check [@resolve-passes]. An uncited placement — a block the document carries but no prose cites — is a postulate: advised against by default and rejected under --safe, the zero-postulate mode [@safe-rejects-postulates]. Because the gate reduces each check to a boolean it cannot tell two cited claims that share one witness apart (proof-irrelevance, Axiom K) — so --without-K forbids the collapse, demanding a distinct witness per claim [@without-k-distinct]. The gate resolves a project's distinct checks concurrently (the bib is its makefile), and the verdict is independent of the worker count — parallel equals serial [@jobs-parallel], and a check may declare a memory lease that routes it through the vendored membudget semaphore so a heavy fleet self-throttles to fit RAM, a lease that never changes the verdict [@mem-lease].
 
-## 9. Related Work
+## 9. Adequacy: How Δ Grades a Check
+
+A passing check only proves a sentence named a verifier, not that the verifier entails it — so Δ grades each check on a ladder by how much it can fail: a presupposed file is vacuous, a contingent one existence, and a content-sensitive command behavioral [@grade-ladder]. The grade is empirical, not declared — Δ corrupts each input in turn and watches whether the check flips from pass to fail, and the inputs whose corruption flips it are its sensitivity set [@mutation-probes]. A grade is a pure function of a content key — the hash of every project and engine file a check could read — so it is cached and the expensive mutation sweep reruns only when that key changes [@content-cache]. The sweep runs in a sandbox copy whose mutation surface excludes sibling projects (a nested directory with its own paper.toml), so each project grades independently of the others [@sandbox-grade], and --min-strength turns the grades into a gate — a project fails if any cited claim's check grades below the threshold, which is how this paper enforces its own proof-relevance in CI [@min-strength].
+
+## 10. Related Work
 
 Literate programming interleaves a program with the prose that explains it, so code and explanation are kept in one source and cannot drift apart [@knuth-lit]; in a parallel spirit, reproducible-research practice ships the code and data that regenerate every figure and number, so a published result can be re-run rather than trusted [@buckheit-donoho]; and on the engine side, build-systems theory frames a build as the demand-driven computation of verified targets from their dependencies — the same shape paperkit gives to a claim-DAG [@mokhov-build].
 
-## 10. Conclusion
+## 11. Conclusion
 
 By making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked [@closes-gap]: an unverified sentence cannot ship [@unverified-cant-ship], because it does not project [@not-project].
 

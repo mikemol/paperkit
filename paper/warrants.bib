@@ -214,6 +214,33 @@
   check   = {claim:one-green-check}
 }
 
+% ── projection: the projector's mechanics ───────────────────────────────────
+@misc{weave-sentence,
+  section = {projection},
+  claim   = {within a section the projector weaves the claims into one paragraph rather than a list --- the first clause is capitalized, each carries its own citation tag, and the rest attach inline},
+  check   = {claim:weave-sentence}
+}
+@misc{connector-resolution,
+  section = {projection}, from = {weave-sentence}, join = {. },
+  claim   = {adjacent clauses are joined by a connector resolved in priority order --- an explicit join wins, else the typed move supplies its default connector, else a legacy glue},
+  check   = {claim:connector-resolution}
+}
+@misc{emit-placement,
+  section = {projection}, from = {connector-resolution}, join = {. },
+  claim   = {a warrant that names an emit asset is placed verbatim rather than woven --- fenced by the language its extension implies, or rendered as a markdown image when the asset is one},
+  check   = {claim:emit-placement}
+}
+@misc{config-flags,
+  section = {projection}, from = {emit-placement}, join = {. },
+  claim   = {projection structure is configured, not hard-coded --- the numbered flag toggles section numbers and the references flag toggles the bibliography heading},
+  check   = {claim:config-flags}
+}
+@misc{latex-clean,
+  section = {projection}, from = {config-flags}, join = {, and },
+  claim   = {claim text is normalized on the way out --- a triple dash becomes an em dash, an inter-word double dash an en dash, LaTeX escapes resolve, braces strip, and a trailing period drops},
+  check   = {claim:latex-clean}
+}
+
 % ── 7. conclusion ───────────────────────────────────────────────────────────
 @misc{closes-gap,
   section = {conclusion}, from = {fail-omits, one-green-check},

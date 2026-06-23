@@ -26,7 +26,8 @@ ENGINE = Path(__file__).resolve().parent.parent
 PROJECT, GATE, DISCRIMINATE = ENGINE / "project.py", ENGINE / "gate.py", ENGINE / "discriminate.py"
 
 
-def entry(key, *, claim=None, emit=None, frm=None, rests=None, glue=None, check="file:w.bib", section="s", mem=None):
+def entry(key, *, claim=None, emit=None, frm=None, rests=None, glue=None, join=None,
+          move=None, check="file:w.bib", section="s", mem=None):
     """A valid multi-line bibliography entry.  The parser requires the closing
     brace on its own line, so this never silently fails to parse."""
     fs = [f"  section = {{{section}}}"]
@@ -36,6 +37,10 @@ def entry(key, *, claim=None, emit=None, frm=None, rests=None, glue=None, check=
         fs.append(f"  rests-on = {{{rests}}}")
     if glue:
         fs.append(f"  glue = {{{glue}}}")
+    if join is not None:
+        fs.append(f"  join = {{{join}}}")
+    if move:
+        fs.append(f"  move = {{{move}}}")
     if claim:
         fs.append(f"  claim = {{{claim}}}")
     if emit:

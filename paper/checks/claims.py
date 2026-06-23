@@ -340,7 +340,64 @@ def edge_move_types():
     assert ok == [] and bad, "a ladder must admit consequence (entail) and reject antithesis (turn)"
 
 
+# ── projection: the projector's mechanics ────────────────────────────────────
+def weave_sentence():
+    # a section's claims weave into ONE paragraph: first clause capitalized, each
+    # carries its own citation tag, the rest attach inline (not one bullet per claim)
+    t = fx.project_text([fx.entry("a", claim="alpha beat"),
+                         fx.entry("b", claim="beta beat", frm="a")])
+    para = next(ln for ln in t.splitlines() if "@a]" in ln)
+    assert "@b]" in para, "claims were not woven into one paragraph"
+    assert para.lstrip()[:5] == "Alpha", "first clause was not capitalized"
+
+
+def connector_resolution():
+    # the connector between adjacent clauses resolves by priority: an explicit `join`
+    # overrides a `move`'s default connector
+    won = fx.project_text([fx.entry("a", claim="alpha"),
+                           fx.entry("b", claim="beta", frm="a", join="; therefore, ", move="apposition")])
+    assert "therefore" in won and "that is" not in won, "explicit join did not override the move connector"
+    # a `move` with no `join` falls back to the move's typed connector (apposition → " — that is, ")
+    fell = fx.project_text([fx.entry("a", claim="alpha"),
+                            fx.entry("b", claim="beta", frm="a", move="apposition")])
+    assert "that is" in fell, "the move's connector was not used as the fallback"
+
+
+def emit_placement():
+    # an `emit` warrant is placed VERBATIM (not woven), fenced by the asset's
+    # extension; an image asset is placed as a markdown image instead
+    code = fx.project_text([fx.entry("e", claim="example", emit="ex.sh")],
+                           assets={"ex.sh": "echo hi\n"})
+    assert "```sh" in code and "echo hi" in code, "shell asset not placed, fenced as sh"
+    img = fx.project_text([fx.entry("g", claim="a figure", emit="fig.svg")],
+                          assets={"fig.svg": "<svg></svg>\n"})
+    assert "![a figure](fig.svg)" in img, "image asset not placed as a markdown image"
+
+
+def config_flags():
+    # projection structure is configured, not hard-coded: `numbered` toggles section
+    # numbers, `references` toggles the bibliography heading
+    on = fx.project_text([fx.entry("a", claim="x")], numbered=True, references=True)
+    off = fx.project_text([fx.entry("a", claim="x")], numbered=False, references=False)
+    assert "## 1." in on and "## References" in on, "flags not honored when on"
+    assert "## 1." not in off and "References" not in off, "flags not honored when off"
+
+
+def latex_clean():
+    # claim text is normalized on the way out: --- → em-dash, an inter-word -- →
+    # en-dash, LaTeX escapes resolved, braces stripped, trailing period dropped
+    t = fx.project_text([fx.entry("a", claim=r"alpha --- beta, a\_b, and x--y")]).lower()
+    assert "alpha — beta" in t, "--- not converted to an em-dash"
+    assert "a_b" in t, "the \\_ escape was not resolved"
+    assert "x–y" in t, "inter-word -- not converted to an en-dash"
+
+
 CLAIMS = {
+    "weave-sentence": weave_sentence,
+    "connector-resolution": connector_resolution,
+    "emit-placement": emit_placement,
+    "config-flags": config_flags,
+    "latex-clean": latex_clean,
     "edge-from-orders": edge_from_orders,
     "edge-rests-grounds": edge_rests_grounds,
     "edge-chiral": edge_chiral,

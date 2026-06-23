@@ -8,12 +8,12 @@
 % ── status ───────────────────────────────────────────────────────────────────
 @misc{rpt-status,
   section = {status},
-  claim   = {both the paper and the README pass the gate with zero postulates},
-  check   = {cmd:python3 ../paperkit/gate.py --safe ../paper >/dev/null 2>&1 && python3 ../paperkit/gate.py --safe .. >/dev/null 2>&1}
+  claim   = {every document in the repository passes the gate with zero postulates},
+  check   = {cmd:for d in ../paper .. ../boundaries; do python3 ../paperkit/gate.py --safe "$d" >/dev/null 2>&1 || exit 1; done}
 }
 @misc{rpt-status-out,
   section = {status}, from = {rpt-status}, join = { — },
-  claim   = {the verdict per document},
+  claim   = {the verdict per document, each project discovered, not hand-listed},
   emit    = {assets/gate.md},
   check   = {fresh:all}
 }
@@ -26,7 +26,7 @@
 }
 @misc{rpt-delta-out,
   section = {adequacy}, from = {rpt-delta}, join = { — },
-  claim   = {the grade of every cited claim, with why this grade and why not a higher or lower one},
+  claim   = {the grade of every cited claim in every document, with why this grade and why not a higher or lower one},
   emit    = {assets/delta.md},
   check   = {fresh:all}
 }
@@ -34,7 +34,7 @@
 % ── proof ────────────────────────────────────────────────────────────────────
 @misc{rpt-proof,
   section = {proof},
-  claim   = {every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another)},
+  claim   = {in every document, every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another)},
   check   = {fresh:all}
 }
 @misc{rpt-proof-out,
@@ -47,7 +47,7 @@
 % ── dag ──────────────────────────────────────────────────────────────────────
 @misc{rpt-dag,
   section = {dag},
-  claim   = {walking the GROUNDING DAG (rests-on, distinct from prose order) from foundational atoms to the theses they support, each claim's adequacy grade plots against its grounding depth},
+  claim   = {walking the paper's GROUNDING DAG (rests-on, distinct from prose order; the paper is the one document with grounding edges) from foundational atoms to the theses they support, each claim's adequacy grade plots against its grounding depth},
   check   = {fresh:all}
 }
 @misc{rpt-dag-fig,

@@ -2,3 +2,4 @@
 | --- | --- | --- | --- | --- |
 | paper | PASS | yes | 33 | 7 |
 | README | PASS | yes | 22 | 8 |
+| boundaries | PASS | yes | 7 | 3 |

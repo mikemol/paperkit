@@ -4,16 +4,19 @@
 
 ## Gate status
 
-Both the paper and the README pass the gate with zero postulates [@rpt-status] — the verdict per document [@rpt-status-out].
+Every document in the repository passes the gate with zero postulates [@rpt-status] — the verdict per document, each project discovered, not hand-listed [@rpt-status-out].
 
 | document | gate (--safe) | prose ≡ projection | checks verified | sections |
 | --- | --- | --- | --- | --- |
 | paper | PASS | yes | 33 | 7 |
 | README | PASS | yes | 22 | 8 |
+| boundaries | PASS | yes | 7 | 3 |
 
 ## Check adequacy (Δ)
 
-Δ grades each cited claim's check by whether it can actually fail [@rpt-delta] — the grade of every cited claim, with why this grade and why not a higher or lower one [@rpt-delta-out].
+Δ grades each cited claim's check by whether it can actually fail [@rpt-delta] — the grade of every cited claim in every document, with why this grade and why not a higher or lower one [@rpt-delta-out].
+
+### paper
 
 _33 cited claims — self-grade: 33 behavioral; effective (clamped by entailment): 33 behavioral; 0 clamped below self._
 
@@ -53,15 +56,62 @@ _33 cited claims — self-grade: 33 behavioral; effective (clamped by entailment
 | `unverified-cant-ship` | behavioral | `claim:unverified-cant-ship` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
 | `not-project` | behavioral | `claim:not-project` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
 
+### README
+
+_22 cited claims — self-grade: 22 behavioral; effective (clamped by entailment): 22 behavioral; 0 clamped below self._
+
+| claim | self → effective | witness | why this grade | why not higher | why not lower |
+| --- | --- | --- | --- | --- | --- |
+| `rm-pitch` | behavioral | `claim:rm-pitch` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `rm-verifier` | behavioral | `claim:rm-verifier` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `rm-noship` | behavioral | `claim:rm-noship` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `rm-selfhost` | behavioral | `claim:rm-selfhost` | falsifiable — corrupting 16 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 16 input(s)) |
+| `rm-model` | behavioral | `claim:rm-model` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `rm-model-eg` | behavioral | `cmd:grep -q check assets/claim.bib` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `rm-cmds` | behavioral | `claim:rm-cmds` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `rm-cmds-eg` | behavioral | `cmd:grep -q project.py assets/commands.sh` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `rm-cmds-inv` | behavioral | `claim:rm-cmds-inv` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `rm-resolver` | behavioral | `claim:rm-resolver` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `rm-resolver-tbl` | behavioral | `cmd:grep -q file: assets/resolver.md` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `rm-resolver-cmd` | behavioral | `claim:rm-resolver-cmd` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `rm-resolver-eg` | behavioral | `cmd:python3 -c "import tomllib; tomllib.load(open('assets/resolver.toml','rb'))"` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `rm-delta` | behavioral | `claim:rm-delta` | falsifiable — corrupting 5 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 5 input(s)) |
+| `rm-delta-tbl` | behavioral | `cmd:sh scripts/check-grades.sh` | falsifiable — corrupting 3 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 3 input(s)) |
+| `rm-delta-cmds` | behavioral | `cmd:grep -q discriminate.py assets/delta-cmds.sh` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `rm-boundaries` | behavioral | `cmd:python3 paperkit/tests/boundaries_discriminate.py` | falsifiable — corrupting 6 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 6 input(s)) |
+| `rm-layout` | behavioral | `cmd:grep -q project.py assets/layout.txt` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `rm-ci` | behavioral | `cmd:grep -q gate.py .githooks/pre-commit` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `rm-ci-enable` | behavioral | `cmd:grep -q core.hooksPath assets/enable-hooks.sh` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `rm-status` | behavioral | `cmd:python3 paperkit/gate.py paper` | falsifiable — corrupting 3 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 3 input(s)) |
+| `rm-next` | behavioral | `claim:rm-next` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+
+### boundaries
+
+_7 cited claims — self-grade: 7 indeterminate; effective (clamped by entailment): 7 indeterminate; 0 clamped below self._
+
+| claim | self → effective | witness | why this grade | why not higher | why not lower |
+| --- | --- | --- | --- | --- | --- |
+| `bnd-delta` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_discriminate.py` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+| `bnd-witness` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_without_k.py` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+| `bnd-emit` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_emit.py` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+| `bnd-json` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_gate_json.py` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+| `bnd-parallel` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_jobs.py` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+| `bnd-driver` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_driver.py` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+| `bnd-cache` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_memoize.py` | no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π) | to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral | not provably vacuous: it runs a cmd:, not a presupposed file: |
+
 ## Proof-relevance (--without-K)
 
-Every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another) [@rpt-proof] — as the proof-relevance check reports [@rpt-proof-out].
+In every document, every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another) [@rpt-proof] — as the proof-relevance check reports [@rpt-proof-out].
 
-Every cited claim carries a distinct witness — `--without-K` is clean.
+**paper** — every cited claim carries a distinct witness; `--without-K` is clean.
+
+**README** — every cited claim carries a distinct witness; `--without-K` is clean.
+
+**boundaries** — every cited claim carries a distinct witness; `--without-K` is clean.
 
 ## Adequacy along the entailment DAG
 
-Walking the GROUNDING DAG (rests-on, distinct from prose order) from foundational atoms to the theses they support, each claim's adequacy grade plots against its grounding depth [@rpt-dag] — the foundational atoms on the left, the theses they ground on the right, the effective grade on the vertical axis [@rpt-dag-fig].
+Walking the paper's GROUNDING DAG (rests-on, distinct from prose order; the paper is the one document with grounding edges) from foundational atoms to the theses they support, each claim's adequacy grade plots against its grounding depth [@rpt-dag] — the foundational atoms on the left, the theses they ground on the right, the effective grade on the vertical axis [@rpt-dag-fig].
 
 ![the foundational atoms on the left, the theses they ground on the right, the effective grade on the vertical axis](assets/dag.svg)
 

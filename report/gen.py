@@ -43,19 +43,38 @@ def _gate(project, *flags):
     return _GATE[key]
 
 
+def _projects():
+    """The paperkit projects this report covers: every dir with a paper.toml,
+    EXCLUDING nested fixtures (a paper.toml inside another project's subtree) and
+    the report itself (its own checks regenerate this report, so gating/grading it
+    here would recurse).  Discovered, not hard-coded — new projects join the report
+    automatically.  Paper first (the flagship), then the rest by name."""
+    tomls = sorted(p.parent for p in ROOT.rglob("paper.toml") if ".git" not in p.parts)
+    out = []
+    for d in tomls:
+        # skip the report itself, and any project nested inside ANOTHER NON-ROOT
+        # project (a fixture — every project is trivially under the root project, so
+        # the root must not count as the container).
+        if d == HERE or any(o not in (d, ROOT) and o in d.parents for o in tomls):
+            continue
+        name = "README" if d == ROOT else d.name
+        out.append((name, "." if d == ROOT else str(d.relative_to(ROOT))))
+    out.sort(key=lambda nr: (nr[0] != "paper", nr[0]))
+    return out
+
+
 def gate_md():
     rows = []
-    for doc, proj in (("paper", "paper"), ("README", ".")):
+    for name, proj in _projects():
         g = _gate(proj, "--safe")
-        rows.append(f"| {doc} | {'PASS' if g.get('pass') else 'FAIL'} | "
+        rows.append(f"| {name} | {'PASS' if g.get('pass') else 'FAIL'} | "
                     f"{'yes' if g.get('project_ok') else 'NO'} | "
                     f"{g.get('verified', 0)} | {g.get('sections', 0)} |")
     return ("| document | gate (--safe) | prose ≡ projection | checks verified | sections |\n"
             "| --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
 
 
-def delta_md():
-    recs = _delta("paper")
+def _delta_section(name, recs):
     order = ["behavioral", "existence", "indeterminate", "vacuous", "broken"]
     counts, eff_counts, clamped = {}, {}, 0
     for r in recs:
@@ -73,22 +92,33 @@ def delta_md():
     rows = [f"| `{r['key']}` | {cell(r)} | `{r['check']}` | "
             f"{r.get('why', '')} | {r.get('not_higher', '')} | {r.get('not_lower', '')} |"
             for r in recs]
-    return (f"_{len(recs)} cited claims — self-grade: {selfs}; effective (clamped by entailment): "
-            f"{effs}; {clamped} clamped below self._\n\n"
+    return (f"### {name}\n\n_{len(recs)} cited claims — self-grade: {selfs}; effective "
+            f"(clamped by entailment): {effs}; {clamped} clamped below self._\n\n"
             "| claim | self → effective | witness | why this grade | why not higher | why not lower |\n"
             "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
 
 
+def delta_md():
+    return "\n".join(_delta_section(name, _delta(proj)) for name, proj in _projects())
+
+
 def without_k_md():
-    groups = _gate("paper").get("collapses", {})
-    if not groups:
-        return "Every cited claim carries a distinct witness — `--without-K` is clean.\n"
-    rows = [f"| `{c}` | {len(k)} | {', '.join(k)} |" for c, k in sorted(groups.items())]
-    return ("| shared witness | claims | collapsed onto it |\n| --- | --- | --- |\n"
-            + "\n".join(rows) + "\n")
+    parts = []
+    for name, proj in _projects():
+        groups = _gate(proj).get("collapses", {})
+        if not groups:
+            parts.append(f"**{name}** — every cited claim carries a distinct witness; "
+                         "`--without-K` is clean.")
+        else:
+            rows = [f"| `{c}` | {len(k)} | {', '.join(k)} |" for c, k in sorted(groups.items())]
+            parts.append(f"**{name}**\n\n| shared witness | claims | collapsed onto it |\n"
+                         "| --- | --- | --- |\n" + "\n".join(rows))
+    return "\n\n".join(parts) + "\n"
 
 
 def dag_svg():
+    # The figure is the PAPER's grounding DAG — it is the only project with rests-on
+    # (grounding) edges; the others have flat claim sets, nothing to plot.
     return figure.svg(_delta("paper"))
 
 

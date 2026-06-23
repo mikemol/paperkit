@@ -61,12 +61,34 @@ def membudget_ok() -> bool:
     return _MB_OK
 
 
+# A check is arbitrary code (cmd: is the universal escape hatch), so it must not run in
+# whatever ambient environment the gate happened to inherit — that is both an injection
+# surface (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH, …) and a reproducibility leak (the
+# verdict would depend on the caller's shell).  Like sshd, we DON'T inherit: we build a
+# controlled environment, default-deny, keeping only what a check (and the membudget
+# semaphore + a nested gate) legitimately need.  PATH is kept so tools resolve; pinning
+# WHICH tools (e.g. GNU vs uutils coreutils) is a further step.
+_ENV_KEEP = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TZ", "TMPDIR",
+             "LANG", "LANGUAGE",
+             "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}  # membudget's systemd --user
+_ENV_KEEP_PREFIX = ("LC_", "MEMBUDGET_", "PAPERKIT_")        # locale + paperkit's own knobs
+
+
+def clean_env(env: dict | None = None) -> dict:
+    """A sanitized environment for running a check: the controlled allow-list only, so
+    no LD_PRELOAD/IFS/BASH_ENV/PYTHONPATH and the like reach the command."""
+    src = os.environ if env is None else env
+    return {k: v for k, v in src.items()
+            if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)}
+
+
 def run_ok(cmd: str, cwd: Path, lease: int | None = None, label: str = "check") -> bool:
     try:
+        e = clean_env()
         if lease:   # run under a memory lease; membudget admits it when RAM fits
             argv = [str(_MB_SCRIPT), "run", str(lease), label, "--", "sh", "-c", cmd]
-            return subprocess.run(argv, cwd=cwd, capture_output=True).returncode == 0
-        return subprocess.run(cmd, shell=True, cwd=cwd,
+            return subprocess.run(argv, cwd=cwd, env=e, capture_output=True).returncode == 0
+        return subprocess.run(cmd, shell=True, cwd=cwd, env=e,
                               capture_output=True).returncode == 0
     except Exception:
         return False

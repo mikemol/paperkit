@@ -8,7 +8,7 @@ The Δ grader's boundary — it flags a check that provably cannot fail (vacuous
 
 ## Projector and Gate
 
-The projector's boundary — it emits a cited example verbatim, and --safe rejects an uncited placement (a postulate) [@bnd-emit]. The gate --json boundary — the structured fields track the gate's actual verdict, the pass flag and witness collapses included [@bnd-json]. The parallel gate's boundary — the verdict tracks the checks, never the worker count or a check's memory lease, so fanning out (and routing heavy checks through the membudget semaphore) equals running serially [@bnd-parallel].
+The projector's boundary — it emits a cited example verbatim, and --safe rejects an uncited placement (a postulate) [@bnd-emit]. The gate --json boundary — the structured fields track the gate's actual verdict, the pass flag and witness collapses included [@bnd-json]. The parallel gate's boundary — the verdict tracks the checks, never the worker count or a check's memory lease, so fanning out (and routing heavy checks through the membudget semaphore) equals running serially [@bnd-parallel]. The environment boundary — a check runs in a controlled, default-deny environment (sshd's defence against env injection), keeping PATH, locale, and paperkit's own knobs but dropping LD_PRELOAD, IFS, BASH_ENV, and the like [@bnd-env].
 
 ## Driver and Μ Cache
 

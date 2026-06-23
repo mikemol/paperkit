@@ -4,11 +4,11 @@
 
 ## 1. The Problem: Papers Assert, Nothing Checks
 
-Paperkit treats a scholarly paper as the projection of a claim-DAG [@paper-is-projection] (developed below at [@fail-omits], [@gate-rejects-drift], [@prose-projected]) — each node a single claim [@node-is-claim], each claim carrying a machine-checkable verifier [@claim-bears-check]; and a claim whose verifier fails simply does not appear in the prose [@fail-omits] (developed below at [@prose-projected], [@gate-rejects-drift]).
+Paperkit treats a scholarly paper as the projection of a claim-DAG [@paper-is-projection] (developed below at [@fail-omits]) — each node a single claim [@node-is-claim], each claim carrying a machine-checkable verifier [@claim-bears-check]; and a claim whose verifier fails simply does not appear in the prose [@fail-omits] (developed below at [@gate-rejects-drift]).
 
 ## 2. The Model: A Paper as a Projected Claim-DAG
 
-A claim is a single record — a statement, the rubric section it belongs to, its dependencies, and its verifier [@claim-is-record] (grounded above in [@node-is-claim], [@claim-bears-check]) — which is exactly the shape of a bibliography entry [@record-is-bibentry]. The prose is projected, not authored [@prose-projected] (developed below at [@projector-emits], [@ordered-by-deps], [@joined-by-glue]): within each section the claims are ordered by their dependency edges [@ordered-by-deps] (developed below at [@projector-emits]) and joined by connective glue [@joined-by-glue] (developed below at [@projector-emits]), the same warrant set always giving the same document [@deterministic] (grounded above in [@ordered-by-deps]).
+A claim is a single record — a statement, the rubric section it belongs to, its dependencies, and its verifier [@claim-is-record] (grounded above in [@claim-bears-check]) — which is exactly the shape of a bibliography entry [@record-is-bibentry]. The prose is projected, not authored [@prose-projected] (developed below at [@ordered-by-deps], [@joined-by-glue]): within each section the claims are ordered by their dependency edges [@ordered-by-deps] (developed below at [@projector-emits]) and joined by connective glue [@joined-by-glue] (developed below at [@projector-emits]), the same warrant set always giving the same document [@deterministic] (grounded above in [@ordered-by-deps]).
 
 ## 3. The Dependency Graphs: Prose Order, Grounding, and the Typed Move
 
@@ -16,7 +16,7 @@ A claim's from-edges fix its place in the prose — the projector emits a claim 
 
 ## 4. The Engine: Projection and Gate
 
-The projector emits the whole document from the warrant set [@projector-emits], so the committed prose is a build artifact, not a source any hand should edit [@prose-is-artifact] (grounded above in [@prose-projected]). The gate rejects any prose that has drifted from its projection [@gate-rejects-drift], so a hand-edit cannot survive a build [@edit-cant-survive] (grounded above in [@projector-emits]). Coverage is enforced from both sides [@coverage-both-sides] (developed below at [@every-section-appears], [@every-claim-cited]) — every required section must appear [@every-section-appears], and every claim tagged for a section must be cited within it [@every-claim-cited].
+The projector emits the whole document from the warrant set [@projector-emits], so the committed prose is a build artifact, not a source any hand should edit [@prose-is-artifact] (grounded above in [@prose-projected]). The gate rejects any prose that has drifted from its projection [@gate-rejects-drift], so a hand-edit cannot survive a build [@edit-cant-survive]. Coverage is enforced from both sides [@coverage-both-sides] (developed below at [@every-section-appears], [@every-claim-cited]) — every required section must appear [@every-section-appears], and every claim tagged for a section must be cited within it [@every-claim-cited].
 
 ## 5. The Check-Resolver: One Pluggable Seam
 
@@ -24,7 +24,7 @@ A claim's verifier is named type:target [@verifier-named], and the gate dispatch
 
 ## 6. Self-Hosting: This Paper Verifies Itself
 
-This paper is itself a paperkit project [@paper-is-paperkit] (grounded above in [@paper-is-projection]) — its claims are these warrants [@claims-are-warrants] (grounded above in [@claim-is-record], [@record-is-bibentry]), its prose is their projection [@prose-is-projection] (grounded above in [@prose-projected], [@paper-is-paperkit]), and the gate that accepts it is the very subject it describes [@gate-is-subject] (grounded above in [@gate-rejects-drift], [@paper-is-paperkit]). The verifiers behind this section run paperkit on paperkit — projecting a fixture, drifting it, and confirming the gate rejects the drift [@paperkit-on-paperkit] (grounded above in [@gate-rejects-drift], [@prose-is-projection]), so the document's correctness and the tool's are one green check [@one-green-check] (grounded above in [@gate-is-subject]).
+This paper is itself a paperkit project [@paper-is-paperkit] (grounded above in [@paper-is-projection]) — its claims are these warrants [@claims-are-warrants] (grounded above in [@record-is-bibentry]), its prose is their projection [@prose-is-projection] (grounded above in [@paper-is-paperkit]), and the gate that accepts it is the very subject it describes [@gate-is-subject] (grounded above in [@paper-is-paperkit]). The verifiers behind this section run paperkit on paperkit — projecting a fixture, drifting it, and confirming the gate rejects the drift [@paperkit-on-paperkit] (grounded above in [@prose-is-projection]), so the document's correctness and the tool's are one green check [@one-green-check].
 
 ## 7. The Projector: Weave, Connectors, and Placement
 
@@ -60,7 +60,7 @@ Literate programming interleaves a program with the prose that explains it, so c
 
 ## 15. Conclusion
 
-By making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked [@closes-gap] (grounded above in [@fail-omits], [@one-green-check], [@paper-is-projection]): an unverified sentence cannot ship [@unverified-cant-ship] (grounded above in [@fail-omits]), because it does not project [@not-project] (grounded above in [@prose-projected], [@fail-omits]).
+By making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked [@closes-gap] (grounded above in [@one-green-check]): an unverified sentence cannot ship [@unverified-cant-ship], because it does not project [@not-project] (grounded above in [@fail-omits]).
 
 ## References
 

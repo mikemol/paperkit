@@ -41,6 +41,11 @@
   claim   = {the environment boundary --- a check runs in a controlled, default-deny environment (sshd's defence against env injection), keeping PATH, locale, and paperkit's own knobs but dropping LD_PRELOAD, IFS, BASH_ENV, and the like},
   check   = {cmd:python3 ../paperkit/tests/boundaries_env.py}
 }
+@misc{bnd-references,
+  section = {engine}, from = {bnd-env}, join = {. },
+  claim   = {the reference projector's boundary --- a non-adjacent grounding edge projects as a direction-aware cross-reference, an adjacent one is carried by the connective, and a target reachable by a longer grounding path is dropped as redundant},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_references.py}
+}
 
 % ── driver + cache ───────────────────────────────────────────────────────────
 @misc{bnd-driver,

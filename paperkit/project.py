@@ -163,17 +163,35 @@ def emit_block(pdir: Path, f: dict) -> list:
     return [f"```{lang}", content, "```"] if lang else [content]
 
 
-def references(k: str, f: dict, pos: dict) -> str:
-    """Project a claim's NON-ADJACENT grounding (`rests-on`) edges as cross-references —
-    the long edges the prose connective cannot carry by adjacency.  A connective IS a
-    reference at distance 0; this is the same edge-projection at distance > 0, the
-    direction read off the sign of the prose-distance (a back-reference to ground already
-    laid, a forward-reference to ground laid below).  Citation is the floor materialization;
-    richer forms (expound, figure) are opt-in.  Returns the trailing parenthetical or ''."""
+def transitive_reduction(rests: dict) -> dict:
+    """Drop a grounding edge X→Y when Y is already reachable from X by a LONGER `rests-on`
+    path (the reader reaches Y through the intermediate, so re-citing Y is redundant
+    clutter, not new grounding).  The `drop` rung — the zero of the reference's
+    materialization ladder (drop < cite < expound < figure), need-proportioned."""
+    def reaches(a, b):
+        seen, stk = set(), [x for x in rests.get(a, ()) if x != b]
+        while stk:
+            n = stk.pop()
+            if n == b:
+                return True
+            if n not in seen:
+                seen.add(n)
+                stk += list(rests.get(n, ()))
+        return False
+    return {k: [y for y in ys if not reaches(k, y)] for k, ys in rests.items()}
+
+
+def references(k: str, targets: list, pos: dict) -> str:
+    """Project a claim's NON-ADJACENT grounding edges (after transitive reduction) as
+    cross-references — the long edges the prose connective cannot carry by adjacency.  A
+    connective IS a reference at distance 0; this is the same edge-projection at distance
+    > 0, the direction read off the sign of the prose-distance (a back-reference to ground
+    already laid, a forward-reference to ground laid below).  Citation is the floor
+    materialization; richer forms (expound, figure) are opt-in.  Returns the parenthetical."""
     if not pos or k not in pos:
         return ""
     back, fwd = [], []
-    for y in f.get("rests-on", []):
+    for y in targets:
         yp = pos.get(y)
         if yp is None or yp == pos[k] - 1:        # cross-scope, or carried by the connective
             continue
@@ -186,9 +204,12 @@ def references(k: str, f: dict, pos: dict) -> str:
     return f" ({'; '.join(parts)})" if parts else ""
 
 
-def weave(text: list, F: dict, primary: str, pos: dict | None = None) -> str:
+def weave(text: list, F: dict, primary: str, pos: dict | None = None,
+          reduced: dict | None = None) -> str:
     """Weave a run of prose-claim keys into one sentence-diagrammed paragraph."""
-    clauses = [sentence(k, F[k], primary) + references(k, F[k], pos or {}) for k in text]
+    clauses = [sentence(k, F[k], primary)
+               + references(k, (reduced or {}).get(k, F[k].get("rests-on", [])), pos or {})
+               for k in text]
     clauses[0] = clauses[0][:1].upper() + clauses[0][1:]
     clauses[1:] = [re.sub(r"^(The|A|An) ", lambda m: m.group(1).lower() + " ", c)
                    for c in clauses[1:]]
@@ -245,6 +266,9 @@ def project(cfg: dict) -> str:
         for k in dep_order(by_sec.get(sk, []), F):
             pos[k] = _i
             _i += 1
+    # transitive reduction of the grounding DAG — project only references the reader
+    # cannot already reach through a shorter rests-on path (drop redundant clutter).
+    reduced = transitive_reduction({k: f.get("rests-on", []) for k, f in F.items()})
 
     lines = [f"# {cfg['title']}", ""]
     if cfg["subtitle"]:
@@ -268,7 +292,7 @@ def project(cfg: dict) -> str:
                 if f.get("claim") or f.get("title"):
                     run.append(k)
                 if run:
-                    lines += [weave(run, F, primary, pos), ""]
+                    lines += [weave(run, F, primary, pos, reduced), ""]
                     run = []
                 lines += emit_block(pdir, f) + [""]
             elif f.get("check", "").startswith("figure:"):
@@ -276,7 +300,7 @@ def project(cfg: dict) -> str:
             else:
                 run.append(k)
         if run:
-            lines += [weave(run, F, primary, pos), ""]
+            lines += [weave(run, F, primary, pos, reduced), ""]
     if cfg["references"]:
         lines += ["## References", ""]
     return "\n".join(lines) + "\n"

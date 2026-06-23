@@ -30,11 +30,15 @@ This paper is itself a paperkit project [@paper-is-paperkit] — its claims are 
 
 Within a section the projector weaves the claims into one paragraph rather than a list — the first clause is capitalized, each carries its own citation tag, and the rest attach inline [@weave-sentence]. Adjacent clauses are joined by a connector resolved in priority order — an explicit join wins, else the typed move supplies its default connector, else a legacy glue [@connector-resolution]. A warrant that names an emit asset is placed verbatim rather than woven — fenced by the language its extension implies, or rendered as a markdown image when the asset is one [@emit-placement]. Projection structure is configured, not hard-coded — the numbered flag toggles section numbers and the references flag toggles the bibliography heading [@config-flags], and claim text is normalized on the way out — a triple dash becomes an em dash, an inter-word double dash an en dash, LaTeX escapes resolve, braces strip, and a trailing period drops [@latex-clean].
 
-## 8. Related Work
+## 8. The Gate: Resolution and Its Strict Modes
+
+RESOLVE is the gate's second invariant — a cited claim whose check fails blocks the gate, so the verdict is the conjunction of every cited claim's check [@resolve-passes]. An uncited placement — a block the document carries but no prose cites — is a postulate: advised against by default and rejected under --safe, the zero-postulate mode [@safe-rejects-postulates]. Because the gate reduces each check to a boolean it cannot tell two cited claims that share one witness apart (proof-irrelevance, Axiom K) — so --without-K forbids the collapse, demanding a distinct witness per claim [@without-k-distinct]. The gate resolves a project's distinct checks concurrently (the bib is its makefile), and the verdict is independent of the worker count — parallel equals serial [@jobs-parallel], and a check may declare a memory lease that routes it through the vendored membudget semaphore so a heavy fleet self-throttles to fit RAM, a lease that never changes the verdict [@mem-lease].
+
+## 9. Related Work
 
 Literate programming interleaves a program with the prose that explains it, so code and explanation are kept in one source and cannot drift apart [@knuth-lit]; in a parallel spirit, reproducible-research practice ships the code and data that regenerate every figure and number, so a published result can be re-run rather than trusted [@buckheit-donoho]; and on the engine side, build-systems theory frames a build as the demand-driven computation of verified targets from their dependencies — the same shape paperkit gives to a claim-DAG [@mokhov-build].
 
-## 9. Conclusion
+## 10. Conclusion
 
 By making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked [@closes-gap]: an unverified sentence cannot ship [@unverified-cant-ship], because it does not project [@not-project].
 

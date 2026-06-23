@@ -392,7 +392,65 @@ def latex_clean():
     assert "x–y" in t, "inter-word -- not converted to an en-dash"
 
 
+# ── gate: resolution and the strict modes ────────────────────────────────────
+def resolve_passes():
+    # RESOLVE: a cited claim whose check FAILS blocks the gate (the verdict is the
+    # conjunction of every cited claim's check)
+    assert fx.gate([fx.entry("c", claim="present", check="cmd:true")])[0] == 0, \
+        "a passing cited check did not gate green"
+    assert fx.gate([fx.entry("c", claim="present", check="cmd:false")])[0] != 0, \
+        "a failing cited check did not block the gate"
+
+
+def safe_rejects_postulates():
+    # --safe: an uncited placement (a block no prose cites) is a postulate — advised
+    # against by default, REJECTED under --safe
+    w = [fx.entry("p", claim="cited prose", check="cmd:true"),
+         fx.entry("ph", emit="ph.txt", check="cmd:true")]            # placed, cited by nothing
+    assert fx.gate(w, assets={"ph.txt": "block\n"})[0] == 0, "an uncited placement was not tolerated by default"
+    assert fx.gate(w, "--safe", assets={"ph.txt": "block\n"})[0] != 0, "--safe did not reject the postulate"
+
+
+def without_k_distinct():
+    # --without-K: two cited claims sharing ONE witness collapse (proof-irrelevance,
+    # Axiom K); the flag forbids it, demanding a distinct witness per claim
+    shared = [fx.entry("a", claim="alpha", check="cmd:true"),
+              fx.entry("b", claim="beta", check="cmd:true", frm="a")]
+    distinct = [fx.entry("a", claim="alpha", check="cmd:true"),
+                fx.entry("b", claim="beta", check="file:w.bib", frm="a")]
+    assert fx.gate(shared)[0] == 0, "a shared witness is intolerable even without the flag"
+    assert fx.gate(shared, "--without-K")[0] != 0, "--without-K did not flag the collapse"
+    assert fx.gate(distinct, "--without-K")[0] == 0, "--without-K rejected distinct witnesses"
+
+
+def jobs_parallel():
+    # --jobs: checks resolve concurrently (default all cores) and the verdict is
+    # independent of the worker count — parallel ≡ serial
+    ok = [fx.entry("a", claim="alpha", check="cmd:true"),
+          fx.entry("b", claim="beta", check="cmd:true", frm="a")]
+    bad = [fx.entry("a", claim="alpha", check="cmd:true"),
+           fx.entry("b", claim="beta", check="cmd:false", frm="a")]
+    assert fx.gate(ok, "--jobs=1")[0] == 0 and fx.gate(ok, "--jobs=8")[0] == 0, "parallel disagreed on a pass"
+    assert fx.gate(bad, "--jobs=1")[0] != 0 and fx.gate(bad, "--jobs=8")[0] != 0, "parallel disagreed on a fail"
+
+
+def mem_lease():
+    # mem: a check may declare a memory lease, routed through the vendored membudget
+    # semaphore when a user scope is available — the lease never changes the verdict
+    assert gate._MB_SCRIPT.exists(), "membudget is not vendored beside the engine"
+    leased = [fx.entry("a", claim="alpha", check="cmd:true", mem="256"),
+              fx.entry("b", claim="beta", check="cmd:false", frm="a", mem="256")]
+    plain = [fx.entry("a", claim="alpha", check="cmd:true"),
+             fx.entry("b", claim="beta", check="cmd:false", frm="a")]
+    assert fx.gate(leased)[0] == fx.gate(plain)[0] != 0, "a mem lease changed the verdict"
+
+
 CLAIMS = {
+    "resolve-passes": resolve_passes,
+    "safe-rejects-postulates": safe_rejects_postulates,
+    "without-k-distinct": without_k_distinct,
+    "jobs-parallel": jobs_parallel,
+    "mem-lease": mem_lease,
     "weave-sentence": weave_sentence,
     "connector-resolution": connector_resolution,
     "emit-placement": emit_placement,

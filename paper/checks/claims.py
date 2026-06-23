@@ -664,7 +664,54 @@ def report_live():
     assert P.load_config(root / "report")["out"].name == "REPORT.md", "the report does not project to REPORT.md"
 
 
+# ── implications: what follows, and the honest limits ────────────────────────
+def fresh_by_construction():
+    # because the document IS the projection, regeneration is idempotent and any
+    # hand-edit is rejected — the prose cannot drift from its claims
+    w = [fx.entry("a", claim="alpha")]
+    once, twice = fx.project_text(w), fx.project_text(w)
+    assert once == twice, "projection is not idempotent"
+    assert fx.gate(w, out=once)[0] == 0 and fx.gate(w, out=once + "\nedit\n")[0] != 0, \
+        "a hand-edited (drifted) copy was not rejected"
+
+
+def adequacy_gap():
+    # the honest limit: a passing check proves a sentence NAMED a verifier, not that the
+    # verifier ENTAILS the claim — a false claim with a behavioral-but-irrelevant check
+    # still passes the gate and even grades behavioral
+    w = [fx.entry("c", claim="the sky is green", check="cmd:grep -q TOKEN a.txt")]
+    assert fx.gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
+    recs = json.loads(fx.discriminate(w, "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    assert recs[0]["grade"] == "behavioral", "the irrelevant check even grades behavioral"
+
+
+def crash_sensitive_limit():
+    # Δ FLAGS but does not forbid the gap: a check can be behavioral yet sensitive only
+    # to inputs OTHER than the document's content (its bib/rubric/out) — content_sensitive
+    # marks that, so "behavioral" is necessary but not sufficient for relevance
+    recs = json.loads(fx.discriminate(
+        [fx.entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],   # sensitive to an asset, not content
+        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    r = recs[0]
+    assert r["grade"] == "behavioral" and r.get("content_sensitive") is False, \
+        f"a non-content-sensitive behavioral check should be flagged (content_sensitive={r.get('content_sensitive')})"
+
+
+def forward_direction():
+    # the designed-not-built direction: `move` could subsume from/rests-on as one chiral
+    # edge, and a ∂² coherence grade could check declared grounding against measured
+    # sensitivity — neither is built, so this fails (and the roadmap updates) when one lands
+    assert '("from", "rests-on")' in PROJECT_SRC, \
+        "from/rests-on no longer parsed separately — move-unification may have landed; update the roadmap"
+    assert "coherence" not in (ENGINE / "discriminate.py").read_text(), \
+        "a ∂² coherence grade may have landed — update the roadmap"
+
+
 CLAIMS = {
+    "fresh-by-construction": fresh_by_construction,
+    "adequacy-gap": adequacy_gap,
+    "crash-sensitive-limit": crash_sensitive_limit,
+    "forward-direction": forward_direction,
     "multi-project": multi_project,
     "project-dag": project_dag,
     "local-ci": local_ci,

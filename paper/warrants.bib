@@ -361,6 +361,28 @@
   check   = {claim:report-live}
 }
 
+% ── implications: what follows, and the honest limits ────────────────────────
+@misc{fresh-by-construction,
+  section = {implications},
+  claim   = {because the document IS the projection, regenerating it is idempotent and any hand-edit is rejected --- the prose cannot drift from its claims, so what you read is always what was checked},
+  check   = {claim:fresh-by-construction}
+}
+@misc{adequacy-gap,
+  section = {implications}, from = {fresh-by-construction}, join = {. },
+  claim   = {but a passing check only proves a sentence NAMED a verifier, not that the verifier ENTAILS the claim --- a false sentence with a behavioral yet irrelevant check still passes the gate, so verification here is adequacy, not proof of meaning},
+  check   = {claim:adequacy-gap}
+}
+@misc{crash-sensitive-limit,
+  section = {implications}, from = {adequacy-gap}, join = {. },
+  claim   = {Δ flags this gap without yet closing it: a check can grade behavioral while sensitive only to inputs other than the document's content, and content-sensitivity marks the difference --- so behavioral is necessary but not sufficient for relevance},
+  check   = {claim:crash-sensitive-limit}
+}
+@misc{forward-direction,
+  section = {implications}, from = {crash-sensitive-limit}, join = {. },
+  claim   = {two directions follow and are not yet built --- the typed move could subsume the from and rests-on edges as one chiral relation, and a boundary-of-a-boundary coherence grade could check declared grounding against measured sensitivity, closing the relevance gap},
+  check   = {claim:forward-direction}
+}
+
 % ── 7. conclusion ───────────────────────────────────────────────────────────
 @misc{closes-gap,
   section = {conclusion}, from = {fail-omits, one-green-check},

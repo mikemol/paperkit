@@ -50,11 +50,15 @@ The layer that attaches one clause to the next is not glue but prosody — a typ
 
 The engine is domain-free, so the repository is several paperkit projects at once — each a directory with a paper.toml that projects its own document — discovered by that file, never hard-coded [@multi-project]. The projects form a dependency DAG over the shared engine: the paper and the tool boundaries rest on the engine alone, while the README's gate runs the paper's and the report ingests the paper's machine-readable grades [@project-dag]. A pre-commit githook is the local CI — every commit must leave each document green under --safe --without-K and the paper behaviorally adequate under --min-strength, so the repository is never committed in a broken state [@local-ci]. Every engine tool ships its behavioral boundaries as a ⟨P, F, δ⟩ suite, and those suites are themselves gathered into a gated project that projects to BOUNDARIES.md [@boundaries-project], and the verification report is a fourth project whose figures are live pipeline output — rendered from the gate and Δ --json data, never scraped — so a stale report fails its own freshness gate [@report-live].
 
-## 13. Related Work
+## 13. Implications: What Follows, and the Honest Limits
+
+Because the document IS the projection, regenerating it is idempotent and any hand-edit is rejected — the prose cannot drift from its claims, so what you read is always what was checked [@fresh-by-construction]. But a passing check only proves a sentence NAMED a verifier, not that the verifier ENTAILS the claim — a false sentence with a behavioral yet irrelevant check still passes the gate, so verification here is adequacy, not proof of meaning [@adequacy-gap]. Δ flags this gap without yet closing it: a check can grade behavioral while sensitive only to inputs other than the document's content, and content-sensitivity marks the difference — so behavioral is necessary but not sufficient for relevance [@crash-sensitive-limit]. Two directions follow and are not yet built — the typed move could subsume the from and rests-on edges as one chiral relation, and a boundary-of-a-boundary coherence grade could check declared grounding against measured sensitivity, closing the relevance gap [@forward-direction].
+
+## 14. Related Work
 
 Literate programming interleaves a program with the prose that explains it, so code and explanation are kept in one source and cannot drift apart [@knuth-lit]; in a parallel spirit, reproducible-research practice ships the code and data that regenerate every figure and number, so a published result can be re-run rather than trusted [@buckheit-donoho]; and on the engine side, build-systems theory frames a build as the demand-driven computation of verified targets from their dependencies — the same shape paperkit gives to a claim-DAG [@mokhov-build].
 
-## 14. Conclusion
+## 15. Conclusion
 
 By making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked [@closes-gap]: an unverified sentence cannot ship [@unverified-cant-ship], because it does not project [@not-project].
 

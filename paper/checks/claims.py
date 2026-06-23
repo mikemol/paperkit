@@ -697,6 +697,31 @@ def crash_sensitive_limit():
         f"a non-content-sensitive behavioral check should be flagged (content_sensitive={r.get('content_sensitive')})"
 
 
+def trust_boundary():
+    # a check is arbitrary code (cmd: is the universal escape hatch), so gating a
+    # document EXECUTES its checks — the warrant set is trusted code, like a Makefile.
+    # Demonstrate: a cmd: check with a side effect runs when the document is gated.
+    d = tempfile.mkdtemp()
+    try:
+        marker = os.path.join(d, "ran")
+        fx.gate([fx.entry("c", claim="x", check=f"cmd:touch {marker}")])
+        assert os.path.exists(marker), "gating did not execute the check — arbitrary code runs"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def env_sanitized():
+    # to bound that, a check runs in a controlled, default-deny environment: an ambient
+    # variable that is not on the allow-list does NOT reach it, so a verdict cannot be
+    # injected through the caller's environment (sshd's defence against env injection)
+    os.environ["INJECTED_XYZ"] = "leaked"
+    try:
+        w = [fx.entry("c", claim="x", check='cmd:test -z "$INJECTED_XYZ"')]
+        assert fx.gate(w)[0] == 0, "an un-allow-listed ambient var leaked into the check"
+    finally:
+        os.environ.pop("INJECTED_XYZ", None)
+
+
 def forward_direction():
     # the designed-not-built direction: `move` could subsume from/rests-on as one chiral
     # edge, and a ∂² coherence grade could check declared grounding against measured
@@ -711,6 +736,8 @@ CLAIMS = {
     "fresh-by-construction": fresh_by_construction,
     "adequacy-gap": adequacy_gap,
     "crash-sensitive-limit": crash_sensitive_limit,
+    "trust-boundary": trust_boundary,
+    "env-sanitized": env_sanitized,
     "forward-direction": forward_direction,
     "multi-project": multi_project,
     "project-dag": project_dag,

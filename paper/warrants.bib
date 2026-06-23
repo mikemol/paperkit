@@ -380,8 +380,18 @@
   claim   = {Δ flags this gap without yet closing it: a check can grade behavioral while sensitive only to inputs other than the document's content, and content-sensitivity marks the difference --- so behavioral is necessary but not sufficient for relevance},
   check   = {claim:crash-sensitive-limit}
 }
-@misc{forward-direction,
+@misc{trust-boundary,
   section = {implications}, from = {crash-sensitive-limit}, join = {. },
+  claim   = {a check is arbitrary code --- cmd is the universal escape hatch every check reduces to --- so gating a document EXECUTES its checks: the warrant set is trusted code, like a makefile, and verifying an untrusted document would be running it},
+  check   = {claim:trust-boundary}
+}
+@misc{env-sanitized,
+  section = {implications}, from = {trust-boundary}, join = {, so },
+  claim   = {a check runs in a controlled, default-deny environment after sshd's defence against injection --- no inherited LD_PRELOAD, IFS, or BASH_ENV --- so a verdict cannot be injected through the caller's environment, though which tools the PATH resolves remains the host's, leaving reproducibility resting on the host toolchain},
+  check   = {claim:env-sanitized}
+}
+@misc{forward-direction,
+  section = {implications}, from = {env-sanitized}, join = {. },
   claim   = {two directions follow and are not yet built --- the typed move could subsume the from and rests-on edges as one chiral relation, and a boundary-of-a-boundary coherence grade could check declared grounding against measured sensitivity, closing the relevance gap},
   check   = {claim:forward-direction}
 }

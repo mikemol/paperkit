@@ -565,7 +565,58 @@ def roundtrip_obligation():
     raise AssertionError("the driver did not enforce the round-trip obligation")
 
 
+# ── rhetoric: typed moves and checkable schemes ──────────────────────────────
+def prosody():
+    # the clause-attachment layer is PROSODY, not glue: a typed move whose KIND and
+    # default connector are a data-driven vocabulary (a new device is a new row)
+    kinds = {rhetoric.kind_of(m) for m in rhetoric.MOVES}
+    assert {"entail", "extend", "turn", "parallel", "restate"} <= kinds, f"missing move kinds ({kinds})"
+    assert rhetoric.MOVES["consequence"][1] == "so ", "the consequence connector is not 'so '"
+    assert rhetoric.kind_of("not-a-move") is None, "an unknown move was given a kind"
+
+
+def scheme_count():
+    # a section's scheme constrains its claim COUNT (a period is one beat, a tricolon three)
+    assert rhetoric.check_scheme("period", ["a", "b"], ["addition"]), "period must reject two claims"
+    assert rhetoric.check_scheme("tricolon", ["a", "b"], ["addition"]), "tricolon must reject two claims"
+    assert rhetoric.check_scheme("tricolon", ["a", "b", "c"], ["addition", "addition"]) == [], \
+        "tricolon must accept three parallel claims"
+
+
+def scheme_opt_in():
+    # schemes are OPT-IN: only a section that declares one in the rubric's 3rd column is
+    # checked; a two-column row is unconstrained
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "r.tsv").write_text("a\tAlpha\nb\tBeta\tladder\n")     # only b declares a scheme
+        sch = rhetoric.schemes_from_rubric(d / "r.tsv")
+        assert sch == {"b": "ladder"}, f"only a declaring section should carry a scheme ({sch})"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def form_gate():
+    # rhetoric makes FORM checkable like content: a section that declares a scheme is
+    # gated — analyze flags a violation when its realized moves break it, none when they honor it
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "paper.toml").write_text('[paper]\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n')
+        (d / "r.tsv").write_text("s\tSec\tladder\n")               # section s declares a ladder (entail-only)
+        base = ("@misc{a,\n  section = {s},\n  claim = {alpha}\n}\n"
+                "@misc{b,\n  section = {s}, from = {a}, move = {%s},\n  claim = {beta}\n}\n")
+        (d / "w.bib").write_text(base % "antithesis")             # a turn beat breaks the ladder
+        assert next(r[4] for r in rhetoric.analyze(d) if r[0] == "s"), "a turn beat should violate a ladder"
+        (d / "w.bib").write_text(base % "consequence")            # an entail beat honors it
+        assert next(r[4] for r in rhetoric.analyze(d) if r[0] == "s") == [], "an all-entail ladder should be clean"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 CLAIMS = {
+    "prosody": prosody,
+    "scheme-count": scheme_count,
+    "scheme-opt-in": scheme_opt_in,
+    "form-gate": form_gate,
     "pump-parse-witness": pump_parse_witness,
     "resumable": resumable,
     "roundtrip-obligation": roundtrip_obligation,

@@ -42,11 +42,15 @@ A passing check only proves a sentence named a verifier, not that the verifier e
 
 A slow but sound check need not block — it is structured as a pump/parse witness, where pump advances opaque state one increment with no verdict and parse reads the meaning (done, progress), and the driver only ever loads, pumps, serializes, and persists [@pump-parse-witness]. Under a budget the driver stops after an increment and persists the resumption token, exiting with a resume code rather than a failure — so a slow witness reads as resume me, not as a falsified claim, and resuming completes exactly the run an uninterrupted one would [@resumable], on the strength of a single soundness obligation — that deserializing a serialized state returns that same state — which the driver asserts on every run, so a witness whose token loses information is rejected outright [@roundtrip-obligation].
 
-## 11. Related Work
+## 11. Rhetoric: Typed Moves and Checkable Schemes
+
+The layer that attaches one clause to the next is not glue but prosody — a typed move whose kind (entail, extend, turn, parallel, restate) and default connector form a data-driven vocabulary, so a new rhetorical device is a new row, not new code [@prosody]. A section may declare a scheme that constrains its claim count — a period is one balanced beat, a distich two, a tricolon exactly three, while an enumeration or a ladder takes two or more [@scheme-count]. Schemes are opt-in: a scheme lives in the rubric's third column and only a section that declares one is checked, so existing prose is never retroactively constrained [@scheme-opt-in], and so form becomes checkable the way the claim-DAG made content checkable — a declared section whose realized moves break its scheme fails the rhetoric gate, so intentional use of language stops being prose you hope for and becomes structure you specify and verify [@form-gate].
+
+## 12. Related Work
 
 Literate programming interleaves a program with the prose that explains it, so code and explanation are kept in one source and cannot drift apart [@knuth-lit]; in a parallel spirit, reproducible-research practice ships the code and data that regenerate every figure and number, so a published result can be re-run rather than trusted [@buckheit-donoho]; and on the engine side, build-systems theory frames a build as the demand-driven computation of verified targets from their dependencies — the same shape paperkit gives to a claim-DAG [@mokhov-build].
 
-## 12. Conclusion
+## 13. Conclusion
 
 By making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked [@closes-gap]: an unverified sentence cannot ship [@unverified-cant-ship], because it does not project [@not-project].
 

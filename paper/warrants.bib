@@ -312,6 +312,28 @@
   check   = {claim:roundtrip-obligation}
 }
 
+% ── rhetoric: typed moves and checkable schemes ──────────────────────────────
+@misc{prosody,
+  section = {rhetoric},
+  claim   = {the layer that attaches one clause to the next is not glue but prosody --- a typed move whose kind (entail, extend, turn, parallel, restate) and default connector form a data-driven vocabulary, so a new rhetorical device is a new row, not new code},
+  check   = {claim:prosody}
+}
+@misc{scheme-count,
+  section = {rhetoric}, from = {prosody}, join = {. },
+  claim   = {a section may declare a scheme that constrains its claim count --- a period is one balanced beat, a distich two, a tricolon exactly three, while an enumeration or a ladder takes two or more},
+  check   = {claim:scheme-count}
+}
+@misc{scheme-opt-in,
+  section = {rhetoric}, from = {scheme-count}, join = {. },
+  claim   = {schemes are opt-in: a scheme lives in the rubric's third column and only a section that declares one is checked, so existing prose is never retroactively constrained},
+  check   = {claim:scheme-opt-in}
+}
+@misc{form-gate,
+  section = {rhetoric}, from = {scheme-opt-in}, join = {, and so },
+  claim   = {form becomes checkable the way the claim-DAG made content checkable --- a declared section whose realized moves break its scheme fails the rhetoric gate, so intentional use of language stops being prose you hope for and becomes structure you specify and verify},
+  check   = {claim:form-gate}
+}
+
 % ── 7. conclusion ───────────────────────────────────────────────────────────
 @misc{closes-gap,
   section = {conclusion}, from = {fail-omits, one-green-check},

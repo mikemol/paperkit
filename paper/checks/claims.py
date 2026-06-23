@@ -77,8 +77,12 @@ def cmd_builtin():
 
 
 def cmd_escape():
-    # "cmd is the hatch every other check reduces to" — custom types run via cmd
-    assert 'run_ok(custom[typ]["cmd"]' in GATE_SRC, "custom types no longer reduce to a cmd"
+    # "cmd is the hatch every other check reduces to" — a custom type resolves by
+    # running its cmd template; a type with no cmd behind it does not resolve
+    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
+        "a custom type did not reduce to its cmd"
+    assert gate.resolves("demo:x", ENGINE, {}) is False, \
+        "an unregistered type resolved with nothing behind it"
 
 
 # ── engine section ───────────────────────────────────────────────────────────

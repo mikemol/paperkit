@@ -97,7 +97,6 @@ def rm_resolver():
 
 def rm_resolver_cmd():
     # cmd is the escape hatch every check reduces to; a new domain adds types via config
-    assert 'run_ok(custom[typ]["cmd"]' in GATE_SRC, "custom types do not reduce to cmd"
     assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, "a config-supplied type does not resolve"
     assert gate.resolves("demo:x", ENGINE, {}) is False, "an unregistered type resolved"
 

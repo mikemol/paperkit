@@ -612,7 +612,64 @@ def form_gate():
         shutil.rmtree(d, ignore_errors=True)
 
 
+# ── projects: the repository as a family of verified documents ───────────────
+def multi_project():
+    # the repository is several paperkit projects — each a paper.toml directory that
+    # projects a document — discovered by their paper.toml, not hard-coded
+    root = Path(__file__).resolve().parents[2]
+    tomls = [p for p in root.rglob("paper.toml") if ".git" not in p.parts]
+    assert len(tomls) >= 4, f"expected several projects, found {len(tomls)}"
+    for d in (root / "paper", root / "boundaries"):
+        cfg = P.load_config(d)
+        assert P.project(cfg) == cfg["out"].read_text(), f"{cfg['out'].name} is not its own projection"
+
+
+def project_dag():
+    # the projects form a DAG over the shared engine: the README's gate runs the paper's
+    # gate, and the report ingests the paper's machine-readable grades
+    root = Path(__file__).resolve().parents[2]
+    assert "gate.py paper" in (root / "warrants.bib").read_text(), \
+        "the README's status check does not gate the paper"
+    gen = (root / "report" / "gen.py").read_text()
+    assert '_delta("paper")' in gen and "--json" in gen, \
+        "the report does not ingest the paper's --json pipeline data"
+
+
+def local_ci():
+    # a pre-commit githook is the local CI: every commit must leave each document green
+    # (--safe --without-K) and the paper behaviorally adequate (--min-strength behavioral)
+    hook = (Path(__file__).resolve().parents[2] / ".githooks" / "pre-commit").read_text()
+    for needle in ("--safe --without-K", "--min-strength behavioral", "gate.py"):
+        assert needle in hook, f"the pre-commit hook does not run {needle!r}"
+
+
+def boundaries_project():
+    # every engine tool ships a ⟨P, F, δ⟩ boundary suite, and those suites are gathered
+    # as their own gated project (BOUNDARIES.md)
+    root = Path(__file__).resolve().parents[2]
+    suites = list((root / "paperkit" / "tests").glob("boundaries_*.py"))
+    assert len(suites) >= 6, f"expected the tool boundary suites, found {len(suites)}"
+    cfg = P.load_config(root / "boundaries")
+    assert cfg["out"].name == "BOUNDARIES.md" and P.project(cfg) == cfg["out"].read_text(), \
+        "the boundaries project does not project to BOUNDARIES.md"
+
+
+def report_live():
+    # the report's figures are live pipeline output — rendered from gate/Δ --json, not
+    # scraped from human text — and the report projects to its own document
+    root = Path(__file__).resolve().parents[2]
+    gen = (root / "report" / "gen.py").read_text()
+    assert "discriminate.py" in gen and "gate.py" in gen and "--json" in gen, \
+        "the report does not render from machine-readable pipeline data"
+    assert P.load_config(root / "report")["out"].name == "REPORT.md", "the report does not project to REPORT.md"
+
+
 CLAIMS = {
+    "multi-project": multi_project,
+    "project-dag": project_dag,
+    "local-ci": local_ci,
+    "boundaries-project": boundaries_project,
+    "report-live": report_live,
     "prosody": prosody,
     "scheme-count": scheme_count,
     "scheme-opt-in": scheme_opt_in,

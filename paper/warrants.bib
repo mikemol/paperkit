@@ -334,6 +334,33 @@
   check   = {claim:form-gate}
 }
 
+% ── projects: the repository as a family of verified documents ───────────────
+@misc{multi-project,
+  section = {projects},
+  claim   = {the engine is domain-free, so the repository is several paperkit projects at once --- each a directory with a paper.toml that projects its own document --- discovered by that file, never hard-coded},
+  check   = {claim:multi-project}
+}
+@misc{project-dag,
+  section = {projects}, from = {multi-project}, join = {. },
+  claim   = {the projects form a dependency DAG over the shared engine: the paper and the tool boundaries rest on the engine alone, while the README's gate runs the paper's and the report ingests the paper's machine-readable grades},
+  check   = {claim:project-dag}
+}
+@misc{local-ci,
+  section = {projects}, from = {project-dag}, join = {. },
+  claim   = {a pre-commit githook is the local CI --- every commit must leave each document green under --safe --without-K and the paper behaviorally adequate under --min-strength, so the repository is never committed in a broken state},
+  check   = {claim:local-ci}
+}
+@misc{boundaries-project,
+  section = {projects}, from = {local-ci}, join = {. },
+  claim   = {every engine tool ships its behavioral boundaries as a ⟨P, F, δ⟩ suite, and those suites are themselves gathered into a gated project that projects to BOUNDARIES.md},
+  check   = {claim:boundaries-project}
+}
+@misc{report-live,
+  section = {projects}, from = {boundaries-project}, join = {, and },
+  claim   = {the verification report is a fourth project whose figures are live pipeline output --- rendered from the gate and Δ --json data, never scraped --- so a stale report fails its own freshness gate},
+  check   = {claim:report-live}
+}
+
 % ── 7. conclusion ───────────────────────────────────────────────────────────
 @misc{closes-gap,
   section = {conclusion}, from = {fail-omits, one-green-check},

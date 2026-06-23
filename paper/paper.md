@@ -46,11 +46,15 @@ A slow but sound check need not block — it is structured as a pump/parse witne
 
 The layer that attaches one clause to the next is not glue but prosody — a typed move whose kind (entail, extend, turn, parallel, restate) and default connector form a data-driven vocabulary, so a new rhetorical device is a new row, not new code [@prosody]. A section may declare a scheme that constrains its claim count — a period is one balanced beat, a distich two, a tricolon exactly three, while an enumeration or a ladder takes two or more [@scheme-count]. Schemes are opt-in: a scheme lives in the rubric's third column and only a section that declares one is checked, so existing prose is never retroactively constrained [@scheme-opt-in], and so form becomes checkable the way the claim-DAG made content checkable — a declared section whose realized moves break its scheme fails the rhetoric gate, so intentional use of language stops being prose you hope for and becomes structure you specify and verify [@form-gate].
 
-## 12. Related Work
+## 12. The Repository: A Family of Verified Projects
+
+The engine is domain-free, so the repository is several paperkit projects at once — each a directory with a paper.toml that projects its own document — discovered by that file, never hard-coded [@multi-project]. The projects form a dependency DAG over the shared engine: the paper and the tool boundaries rest on the engine alone, while the README's gate runs the paper's and the report ingests the paper's machine-readable grades [@project-dag]. A pre-commit githook is the local CI — every commit must leave each document green under --safe --without-K and the paper behaviorally adequate under --min-strength, so the repository is never committed in a broken state [@local-ci]. Every engine tool ships its behavioral boundaries as a ⟨P, F, δ⟩ suite, and those suites are themselves gathered into a gated project that projects to BOUNDARIES.md [@boundaries-project], and the verification report is a fourth project whose figures are live pipeline output — rendered from the gate and Δ --json data, never scraped — so a stale report fails its own freshness gate [@report-live].
+
+## 13. Related Work
 
 Literate programming interleaves a program with the prose that explains it, so code and explanation are kept in one source and cannot drift apart [@knuth-lit]; in a parallel spirit, reproducible-research practice ships the code and data that regenerate every figure and number, so a published result can be re-run rather than trusted [@buckheit-donoho]; and on the engine side, build-systems theory frames a build as the demand-driven computation of verified targets from their dependencies — the same shape paperkit gives to a claim-DAG [@mokhov-build].
 
-## 13. Conclusion
+## 14. Conclusion
 
 By making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked [@closes-gap]: an unverified sentence cannot ship [@unverified-cant-ship], because it does not project [@not-project].
 

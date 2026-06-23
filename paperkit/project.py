@@ -63,7 +63,7 @@ def entries(path: Path) -> dict:
         for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", path.read_text(), re.S):
             key, body = m.group(1), m.group(2)
             f = {"_src": path.name}
-            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue", "join", "emit", "mem"):
+            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue", "join", "move", "emit", "mem"):
                 fm = re.search(r"\b" + name + r"\s*=\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", body)
                 if fm:
                     f[name] = fm.group(1)
@@ -83,8 +83,10 @@ def rubric(path: Path) -> list:
     for ln in path.read_text().splitlines():
         ln = ln.strip()
         if ln and not ln.startswith("#") and "\t" in ln:
-            k, t = ln.split("\t", 1)
-            out.append((k.strip(), t.strip()))
+            # key <TAB> title [<TAB> scheme …]; the title is the 2nd column only.
+            # A 3rd column (rhetorical scheme) is read by rhetoric.py, not here.
+            parts = ln.split("\t")
+            out.append((parts[0].strip(), parts[1].strip()))
     return out
 
 
@@ -179,6 +181,16 @@ def weave(text: list, F: dict, primary: str) -> str:
                 clause = clause[:1].upper() + clause[1:]
             parts.append(j + clause)
             continue
+        mv = f.get("move")
+        if mv:                                    # a typed `move` with no explicit `join`:
+            from rhetoric import MOVES            # realize its default connector (lazy: cycle)
+            if mv in MOVES:
+                conn = MOVES[mv][1]
+                if conn.strip().endswith((".", "!", "?")):
+                    parts.append(conn + clause[:1].upper() + clause[1:])
+                else:
+                    parts.append("; " + conn + clause)
+                continue
         edge = text[i - 1] in f.get("from", [])
         if edge and f.get("glue"):
             g = f["glue"]

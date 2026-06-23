@@ -27,6 +27,7 @@ import project as P  # noqa: E402
 import discriminate  # noqa: E402  (Δ: the adequacy grader)
 import driver  # noqa: E402  (the pump/parse liveness driver)
 import rhetoric  # noqa: E402  (the move/scheme vocabulary)
+import coherence  # noqa: E402  (∂²: declared grounding vs measured sensitivity)
 import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
@@ -722,17 +723,41 @@ def env_sanitized():
         os.environ.pop("INJECTED_XYZ", None)
 
 
+def grounding_reflected():
+    # ∂²'s grounding face — the comparison definition-resolution made possible: each
+    # DECLARED rests-on edge is checked against MEASURED engine sensitivity.  An
+    # overlapping engine-capability fingerprint is reflected; a disjoint one is flagged;
+    # shared test scaffolding (claims.py / _fixture) does NOT count as engine grounding.
+    recs = [
+        {"key": "y", "grade": "behavioral", "rests-on": [],
+         "tests": ["paperkit/gate.py::resolves"]},
+        {"key": "x", "grade": "behavioral", "rests-on": ["y"],
+         "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
+        {"key": "z", "grade": "behavioral", "rests-on": ["y"],
+         "tests": ["paperkit/rhetoric.py::kind_of"]},
+    ]
+    g = coherence.grounding_residual(recs)
+    assert g["grounding_edges"] == 2, g                                 # x→y and z→y
+    assert g["reflected"] == 1 and ["x", "y"] not in g["misses"], g     # x overlaps y
+    assert g["unreflected"] == 1 and ["z", "y"] in g["misses"], g       # z disjoint from y
+    scaffold = [
+        {"key": "y", "grade": "behavioral", "rests-on": [], "tests": ["checks/claims.py::y"]},
+        {"key": "x", "grade": "behavioral", "rests-on": ["y"], "tests": ["checks/claims.py::x"]},
+    ]
+    assert coherence.grounding_residual(scaffold)["grounding_edges"] == 0, \
+        "shared scaffolding counted as engine grounding — the engine restriction failed"
+
+
 def forward_direction():
-    # the designed-not-built direction: `move` could subsume from/rests-on as one chiral
-    # edge, and a ∂² coherence grade could check declared grounding against measured
-    # sensitivity — neither is built, so this fails (and the roadmap updates) when one lands
+    # the one designed-not-built direction left: `move` could subsume from/rests-on as
+    # one chiral edge (the grounding-vs-sensitivity coherence grade landed — see
+    # grounding_reflected).  Trips when move-unification lands, so the roadmap updates.
     assert '("from", "rests-on")' in PROJECT_SRC, \
         "from/rests-on no longer parsed separately — move-unification may have landed; update the roadmap"
-    assert "coherence" not in (ENGINE / "discriminate.py").read_text(), \
-        "a ∂² coherence grade may have landed — update the roadmap"
 
 
 CLAIMS = {
+    "grounding-reflected": grounding_reflected,
     "fresh-by-construction": fresh_by_construction,
     "adequacy-gap": adequacy_gap,
     "crash-sensitive-limit": crash_sensitive_limit,

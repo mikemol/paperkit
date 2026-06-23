@@ -390,9 +390,15 @@
   claim   = {a check runs in a controlled, default-deny environment after sshd's defence against injection --- no inherited LD_PRELOAD, IFS, or BASH_ENV --- so a verdict cannot be injected through the caller's environment, though which tools the PATH resolves remains the host's, leaving reproducibility resting on the host toolchain},
   check   = {claim:env-sanitized}
 }
+@misc{grounding-reflected,
+  section = {implications}, from = {env-sanitized}, rests-on = {crash-sensitive-limit}, join = {. },
+  link    = {grounded by the relevance gap it narrows (crash-sensitive-limit), stated several claims earlier --- a grounding link counter to prose order},
+  claim   = {definition resolution turns each claim's sensitivity into a distinct engine-capability fingerprint, and the coherence grade checks declared grounding against it --- a rests-on edge whose fingerprint is disjoint from its premise's is grounding the measurement cannot see, narrowing the relevance gap by measurement rather than leaving it asserted},
+  check   = {claim:grounding-reflected}
+}
 @misc{forward-direction,
-  section = {implications}, from = {env-sanitized}, join = {. },
-  claim   = {two directions follow and are not yet built --- the typed move could subsume the from and rests-on edges as one chiral relation, and a boundary-of-a-boundary coherence grade could check declared grounding against measured sensitivity, closing the relevance gap},
+  section = {implications}, from = {grounding-reflected}, join = {. },
+  claim   = {one direction still follows and is not yet built --- the typed move could subsume the from and rests-on edges as one chiral relation, collapsing the structure residual the way definition resolution collapsed the sensitivity one},
   check   = {claim:forward-direction}
 }
 

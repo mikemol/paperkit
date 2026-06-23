@@ -57,6 +57,7 @@ DIR defaults to the current directory and must contain paper.toml.
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -142,47 +143,170 @@ def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
     return {p.resolve() for p in req}
 
 
-def sandbox_files(sandbox_project: Path, exclude_scripts: set) -> list:
-    """Mutable text inputs under the sandboxed project (the verifier scripts
-    themselves are excluded — corrupting a check's own script is a trivial,
-    uninformative self-break)."""
-    out = []
-    nested = _nested_roots(sandbox_project)
-    for f in sorted(sandbox_project.rglob("*")):
-        if not _mutable(f):
-            continue
-        if any(part in SKIP_DIRS for part in f.parts):
-            continue
-        if any(nr in f.parents for nr in nested):
-            continue  # a sibling project's file — not this project's to mutate
-        if f.suffix == ".sh" and "checks" in f.parts:
-            continue  # a verifier script; its corruption tests itself, not the claim
-        out.append(f)
+def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path | None = None) -> list:
+    """Mutable text inputs Δ may corrupt: the sandboxed project's own files PLUS the
+    engine the checks run through (`engine_dir`) — so an engine-claim's witness is
+    sensitive to the engine source it tests, not only to its own script.  The verifier
+    scripts and sibling projects are excluded; the engine is deduped if already inside."""
+    out, seen = [], set()
+
+    def collect(base: Path, skip_nested: bool):
+        nested = _nested_roots(base) if skip_nested else []
+        for f in sorted(base.rglob("*")):
+            if not _mutable(f) or any(part in SKIP_DIRS for part in f.parts):
+                continue
+            if any(nr in f.parents for nr in nested):
+                continue  # a sibling project's file — not this project's to mutate
+            if f.suffix == ".sh" and "checks" in f.parts:
+                continue  # a verifier script; its corruption tests itself, not the claim
+            r = f.resolve()
+            if r not in seen:
+                seen.add(r)
+                out.append(f)
+
+    collect(sandbox_project, skip_nested=True)
+    if engine_dir is not None:
+        collect(engine_dir, skip_nested=False)   # the engine the checks run through
     return out
 
 
-def sensitivity(chk: str, sandbox_project: Path, custom: dict) -> tuple[bool, list]:
-    """Run chk against single-file corruptions of the sandbox; return
-    (baseline_passes, sensitivity_set) where the set is the relative paths whose
-    corruption flips chk from pass to fail."""
+def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None) -> str:
+    """Label a corrupted file: relative to the project, or tagged engine/<…> when it is
+    the engine (outside the project, e.g. the paper's ../paperkit)."""
+    try:
+        return str(f.relative_to(sandbox_project))
+    except ValueError:
+        return f"{engine_dir.name}/{f.relative_to(engine_dir)}"
+
+
+# Mutation resolution (the granularity knob g, set by main() from --resolution):
+#   "file"  whole-file corruption, project surface only — fast, coarse, the gate's
+#           pass/fail falsifiability question (the default, the pre-commit hook).
+#   "def"   definition-resolution group testing over project + ENGINE — the precise
+#           per-claim capability fingerprint that closes ∂²'s sensitivity face, but
+#           ~an order of magnitude costlier (the on-demand coherence pass).
+_RESOLUTION = "file"
+
+
+def _def_sites(text: str) -> list:
+    """Every def/method in a .py source as (qualname, node).  Mutation resolution
+    for code is the DEFINITION, not the file: corrupting a whole engine file breaks
+    its `import` and flips EVERY witness identically (the import-crash flood, one
+    collapsed signature); breaking one function's BODY leaves the module importable,
+    so a witness flips only if it actually exercises that function — the sensitivity
+    set becomes the measured fingerprint of the engine capabilities the claim rests on."""
+    out: list = []
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return out
+
+    def rec(node, prefix):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                # a one-liner (`def f(): return 1`) shares its signature line with the
+                # body, so a line-span replacement can't isolate the body — skip it.
+                if child.body[0].lineno > child.lineno:
+                    out.append((prefix + child.name, child))
+                rec(child, prefix + child.name + ".")
+            elif isinstance(child, ast.ClassDef):
+                rec(child, prefix + child.name + ".")
+            else:
+                rec(child, prefix)
+
+    rec(tree, "")
+    return out
+
+
+def _mutate_lines(text: str, nodes: list) -> str:
+    """Replace each given def's body line-span with an UNCATCHABLE raise, leaving the
+    rest of the file byte-identical (so a source-grep witness flips only when ITS
+    grepped text lived in a mutated body, not because the file was reformatted).
+    BaseException — not Exception — so a witness's own `except Exception` cannot
+    swallow the mutation; that makes group testing MONOTONE BY CONSTRUCTION (a group
+    fails iff some member fails alone) rather than resting on an assumption that no
+    witness catches the raise."""
+    lines = text.splitlines(keepends=True)
+    for node in sorted(nodes, key=lambda n: n.body[0].lineno, reverse=True):
+        s, e = node.body[0].lineno, node.end_lineno
+        col = node.body[0].col_offset
+        lines[s - 1:e] = [" " * col + "raise BaseException('PAPERKIT_MUT')\n"]
+    return "".join(lines)
+
+
+def sensitivity(chk: str, sandbox_project: Path, custom: dict,
+                engine_dir: Path | None = None) -> tuple[bool, list]:
+    """The sensitivity set — the mutations that flip chk red — found by BINARY-SPLIT
+    GROUP TESTING, not a linear scan over every site.  Mutate a whole group of sites
+    at once: if it does NOT flip, the entire group is proven clear in ONE run (the
+    sparse non-flippers cost nothing); if it flips, bisect.  O(k·log n) runs for k
+    flips, against O(n) for the scan — and the bisection's size-1 leaves ARE the
+    individual confirmations, so each reported site is a confirmed single-mutation
+    flip, never assumed.  A .py file's sites are its DEFINITIONS (label
+    `path::qualname`, body→raise); any other file is one whole-file site (label
+    `path`, corrupted).  Monotonicity (a cleared group truly holds no flipper) is by
+    construction — the uncatchable raise in _mutate_lines."""
     baseline = G.resolves(chk, sandbox_project, custom)
-    sens: list[str] = []
     if not baseline:
-        return False, sens
-    for f in sandbox_files(sandbox_project, set()):
-        orig = f.read_bytes()
-        f.write_bytes(CORRUPT)
+        return False, []
+    if _RESOLUTION == "file":
+        # coarse, fast: corrupt each whole file, label by path
+        sens = []
+        for f in sandbox_files(sandbox_project, set(), engine_dir):
+            orig = f.read_bytes()
+            f.write_bytes(CORRUPT)
+            try:
+                flipped = not G.resolves(chk, sandbox_project, custom)
+            finally:
+                f.write_bytes(orig)
+            if flipped:
+                sens.append(_rel(f, sandbox_project, engine_dir))
+        return True, sorted(sens)
+    sites = []   # (file, node | None, label) — node None ⇒ whole-file corruption
+    for f in sandbox_files(sandbox_project, set(), engine_dir):
+        label = _rel(f, sandbox_project, engine_dir)
+        if f.suffix == ".py":
+            for qn, node in _def_sites(f.read_text()):
+                sites.append((f, node, f"{label}::{qn}"))
+        else:
+            sites.append((f, None, label))
+
+    def apply(group) -> bool:
+        saved: dict = {}
+        pyfiles: dict = {}
         try:
-            flipped = not G.resolves(chk, sandbox_project, custom)
+            for f, node, _ in group:
+                saved.setdefault(f, f.read_bytes())
+                if node is not None:
+                    pyfiles.setdefault(f, []).append(node)
+            for f, nodes in pyfiles.items():
+                f.write_text(_mutate_lines(saved[f].decode(), nodes))
+            for f, node, _ in group:
+                if node is None:
+                    f.write_bytes(CORRUPT)
+            return not G.resolves(chk, sandbox_project, custom)
         finally:
-            f.write_bytes(orig)
-        if flipped:
-            sens.append(str(f.relative_to(sandbox_project)))
-    return True, sens
+            for f, b in saved.items():
+                f.write_bytes(b)
+
+    flips: list[str] = []
+
+    def split(group):
+        if not group or not apply(group):
+            return                       # cleared in one run: no flipper here
+        if len(group) == 1:
+            flips.append(group[0][2])    # a confirmed single-mutation flip
+            return
+        m = len(group) // 2
+        split(group[:m])
+        split(group[m:])
+
+    split(sites)
+    return True, sorted(flips)
 
 
 def grade_check(chk: str, project_dir: Path, presupposed: set,
-                custom: dict, sandbox_project: Path) -> dict:
+                custom: dict, sandbox_project: Path, engine_dir: Path | None = None) -> dict:
     typ, _, target = chk.partition(":")
     if typ == "file":
         resolved = (project_dir / target).resolve()
@@ -196,7 +320,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set,
                 "not_higher": "to rise: test the artifact's CONTENT, not just its presence (a content-sensitive cmd:)",
                 "not_lower": "not vacuous: the artifact is contingent, not a presupposed build input, so its absence is a real failure"}
     # cmd: / custom — empirically probe falsifiability
-    baseline, sens = sensitivity(chk, sandbox_project, custom)
+    baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir)
     if not baseline:
         return {"grade": "broken", "tests": [],
                 "why": "check does not pass in a pristine sandbox — repo is not green",
@@ -222,7 +346,13 @@ def _grade_one(project_dir, chk, custom, presupposed):
                         ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
         rel = project_dir.relative_to(root)
         sandbox = tmp / root.name if rel == Path(".") else tmp / root.name / rel
-        return grade_check(chk, project_dir, presupposed, custom, sandbox)
+        # the engine in the sandbox copy — included in the mutation surface (def
+        # resolution only) so the witnesses are sensitive to the engine they test, not
+        # only to their own script.  At file resolution the engine would only add the
+        # import-crash flood (one collapsed signature), so it is left out.
+        engine = ((tmp / root.name / _ENGINE.relative_to(root))
+                  if _RESOLUTION == "def" and _ENGINE.is_relative_to(root) else None)
+        return grade_check(chk, project_dir, presupposed, custom, sandbox, engine)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -287,7 +417,13 @@ def main(argv: list) -> int:
     consider_all = "--all" in flags
     as_json = "--json" in flags
 
-    consumed = {x for x in (min_strength, state_file, budget_str) if x is not None}
+    global _RESOLUTION
+    _RESOLUTION = optval("--resolution") or "file"
+    if _RESOLUTION not in ("file", "def"):
+        sys.exit("paperkit-discriminate: --resolution must be 'file' or 'def'")
+
+    consumed = {x for x in (min_strength, state_file, budget_str, optval("--resolution"))
+                if x is not None}
     pos = [a for a in args if a not in consumed]
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     cfg = P.load_config(project_dir)
@@ -314,7 +450,7 @@ def main(argv: list) -> int:
     # graded-set is reused verbatim while nothing the checks read has changed — the
     # expensive mutation sweep runs only when the project or engine actually changes.
     no_cache = "--no-cache" in flags
-    key = content_key(project_dir)
+    key = f"{content_key(project_dir)}:{_RESOLUTION}"   # resolution is part of the grade
     cached = {} if no_cache else _load_cache(project_dir)
     if cached.get("key") == key and all(c in cached.get("graded", {}) for c in share):
         graded = cached["graded"]

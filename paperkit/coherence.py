@@ -3,8 +3,8 @@
 its MEASURED sensitivity: the boundary-of-a-boundary residual.
 
 Δ grades whether each check CAN fail; ∂² asks whether the structure the claims declare
-actually shows up in what makes them fail.  Two faces, both read from the existing
-pipeline (`discriminate --json`), so nothing new is measured — only re-read:
+actually shows up in what makes them fail.  Three faces, all read from the existing
+pipeline (`discriminate --resolution def --json`), so nothing new is measured — re-read:
 
   STRUCTURE   each claim carries a `from` edge (prose order) and a `rests-on` edge
               (grounding).  Where the two graphs diverge they do not reflect; until a
@@ -14,12 +14,18 @@ pipeline (`discriminate --json`), so nothing new is measured — only re-read:
   SENSITIVITY each claim's measured sensitivity set is its Δ `tests` (the inputs whose
               corruption flips it).  --without-K makes the witnesses NAME-distinct, but
               they may still COLLAPSE to one sensitivity signature — name-distinct yet
-              measuring the same thing.  A document whose N witnesses share K << N
-              signatures is non-closed: distinctness that the measurement does not see.
+              measuring the same thing.  At definition resolution every witness carries a
+              distinct engine-capability fingerprint, so the collapse closes.
+
+  GROUNDING   each DECLARED grounding edge (rests-on) should be REFLECTED in measured
+              sensitivity: a claim that rests-on Y should exercise some of the engine Y
+              tests (their fingerprints overlap).  A declared-but-disjoint edge is
+              grounding the measurement does not see — the comparison the definition-
+              resolution fingerprint makes possible.
 
 A high residual is not a failure to hide — it is the gap between what a document SAYS
 grounds it and what DEMONSTRABLY does, surfaced so it can be closed (move-unification
-for structure; a wider mutation surface / real per-claim witnesses for sensitivity).
+for structure; definition-resolution fingerprints for sensitivity and grounding).
 
     coherence.py [DIR]            # the residual report
     coherence.py --json [DIR]     # structured
@@ -75,15 +81,58 @@ def sensitivity_residual(records: list) -> dict:
     }
 
 
+def _engine_cap(tests) -> set:
+    """The engine-capability fingerprint: the def-resolution sites under `paperkit/`,
+    EXCLUDING the shared witness scaffolding (`paperkit/tests/` — the fixture builder)
+    and the claim's own `checks/` script.  Two witnesses always co-flip on the helpers
+    they share, so grounding overlap measured on the FULL fingerprint is trivially
+    satisfied by scaffolding; restricting to engine capability is what makes it test
+    real grounding."""
+    return {t for t in tests
+            if t.startswith("paperkit/") and not t.startswith("paperkit/tests/")}
+
+
+def grounding_residual(records: list) -> dict:
+    """Face three (the comparison the roadmap reserved): does each DECLARED grounding
+    edge (`rests-on`) show up in MEASURED sensitivity?  A claim X that rests-on Y should
+    exercise some of the engine Y tests — their engine-capability fingerprints should
+    OVERLAP.  A rests-on edge X→Y whose fingerprints are DISJOINT is declared grounding
+    the measurement does not see: X says it stands on Y yet flips on nothing Y flips on
+    (often because X itself measurably tests no engine capability — a thesis/meta claim
+    grounded rhetorically, not behaviourally).  Advisory, like the other two faces."""
+    S = {r["key"]: _engine_cap(r.get("tests", [])) for r in records}
+    edges = reflected = unreflected = 0
+    misses = []
+    for r in records:
+        sx = S.get(r["key"], set())
+        for y in r.get("rests-on", []):
+            sy = S.get(y)
+            if not sy:                          # Y measures no engine capability — no claim to test
+                continue
+            edges += 1
+            if sx & sy:
+                reflected += 1
+            else:
+                unreflected += 1
+                misses.append([r["key"], y])
+    return {"grounding_edges": edges, "reflected": reflected,
+            "unreflected": unreflected, "misses": misses}
+
+
 def report(records: list, discharged=frozenset()) -> dict:
     cited = [r for r in records if r.get("cited", True)]
     return {"claims": len(cited),
             "structure": structure_residual(cited, discharged),
-            "sensitivity": sensitivity_residual(cited)}
+            "sensitivity": sensitivity_residual(cited),
+            "grounding": grounding_residual(cited)}
 
 
 def _records(project_dir: Path) -> list:
-    r = subprocess.run([sys.executable, str(_ENGINE / "discriminate.py"), "--json", str(project_dir)],
+    # def resolution: the sensitivity face is only meaningful at the per-definition
+    # fingerprint — at file resolution every witness collapses to the import-crash
+    # signature.  This is the costly grade (the on-demand precision pass), not the hook's.
+    r = subprocess.run([sys.executable, str(_ENGINE / "discriminate.py"),
+                        "--resolution", "def", "--json", str(project_dir)],
                        capture_output=True, text=True)
     return json.loads(r.stdout or "[]")
 
@@ -106,7 +155,7 @@ def main(argv: list) -> int:
     if as_json:
         print(json.dumps({"document": project_dir.name or str(project_dir), **rep}, indent=2))
         return 0
-    s, se = rep["structure"], rep["sensitivity"]
+    s, se, g = rep["structure"], rep["sensitivity"], rep["grounding"]
     print(f"coherence (∂²): {project_dir.name or project_dir} — {rep['claims']} cited claims")
     print(f"  structure  : {s['divergent_claims']} claims diverge between from and rests-on "
           f"({s['divergent_edges']} edges); {s['undischarged']} un-acknowledged "
@@ -114,6 +163,11 @@ def main(argv: list) -> int:
     print(f"  sensitivity: {se['behavioral']} behavioral witnesses → {se['signatures']} distinct "
           f"sensitivity signatures ({se['collapse']} collapse); the largest {se['largest_class']} "
           f"share {se['largest_signature']}")
+    print(f"  grounding  : {g['reflected']}/{g['grounding_edges']} rests-on edges reflected in "
+          f"measured engine sensitivity; {g['unreflected']} declared-but-disjoint "
+          f"(advisory — a claim grounded rhetorically, not behaviourally)")
+    for x, y in g["misses"]:
+        print(f"               [@{x}] rests-on [@{y}] — engine fingerprints disjoint")
     return 0
 
 

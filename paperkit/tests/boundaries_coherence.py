@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Behavioral-boundary examples for coherence (∂²) — paperkit/coherence.py.
 
-⟨P, F, δ⟩ per the boundary practice.  ∂² re-reads Δ records and reports two residuals:
-STRUCTURE (where a claim's `from` and `rests-on` edges diverge) and SENSITIVITY (where
-name-distinct witnesses collapse to one sensitivity signature).  Bounds: a coherent
-record set shows zero residual, an incoherent one surfaces it, and the minimum delta is
-a single diverging edge / a single shared signature.
+⟨P, F, δ⟩ per the boundary practice.  ∂² re-reads Δ records and reports three residuals:
+STRUCTURE (where a claim's `from` and `rests-on` edges diverge), SENSITIVITY (where
+name-distinct witnesses collapse to one sensitivity signature), and GROUNDING (where a
+declared `rests-on` edge is disjoint from its premise's measured engine fingerprint).
+Bounds: a coherent record set shows zero residual, an incoherent one surfaces it, and the
+minimum delta is a single diverging edge / a single shared signature / a single disjoint
+grounding edge.
 
     python3 paperkit/tests/boundaries_coherence.py
 """
@@ -27,6 +29,13 @@ COHERENT = [rec("a"), rec("b", frm=["a"], rests=["a"])]          # from == rests
 DIVERGED = [rec("a"), rec("b", frm=["a"], rests=["x"])]          # from ≠ rests-on
 DISTINCT = [rec("a", tests=["x.py"]), rec("b", tests=["y.py"])]  # different sensitivity
 COLLAPSED = [rec("a", tests=["w.py"]), rec("b", tests=["w.py"])]  # same sensitivity
+# grounding: b rests-on a; engine-capability fingerprints overlap / disjoint / scaffold-only
+GROUNDED = [rec("a", tests=["paperkit/gate.py::resolves"]),
+            rec("b", rests=["a"], tests=["paperkit/gate.py::resolves", "paperkit/project.py::weave"])]
+UNGROUNDED = [rec("a", tests=["paperkit/gate.py::resolves"]),
+              rec("b", rests=["a"], tests=["paperkit/rhetoric.py::kind_of"])]
+SCAFFOLD = [rec("a", tests=["checks/claims.py::a"]),
+            rec("b", rests=["a"], tests=["checks/claims.py::b"])]
 
 
 def main() -> int:
@@ -50,6 +59,12 @@ def main() -> int:
           C.sensitivity_residual(DISTINCT)["signatures"] == 2 and C.sensitivity_residual(DISTINCT)["collapse"] == 0)
     check("sensitivity: shared tests → 1 signature, 1 collapse (name-distinct, sensitivity-same)",
           C.sensitivity_residual(COLLAPSED)["signatures"] == 1 and C.sensitivity_residual(COLLAPSED)["collapse"] == 1)
+    check("grounding: overlapping engine fingerprint → edge reflected, 0 unreflected",
+          C.grounding_residual(GROUNDED)["reflected"] == 1 and C.grounding_residual(GROUNDED)["unreflected"] == 0)
+    check("grounding: disjoint engine fingerprint → edge unreflected (declared, not measured)",
+          C.grounding_residual(UNGROUNDED)["unreflected"] == 1)
+    check("grounding: shared scaffolding is not engine grounding (no edge counted)",
+          C.grounding_residual(SCAFFOLD)["grounding_edges"] == 0)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -66,6 +81,10 @@ def main() -> int:
          "acknowledging claim b's link",
          "un-acknowledged → 1", C.structure_residual(DIVERGED)["undischarged"] == 1,
          "footnoted → 0", C.structure_residual(DIVERGED, discharged={"b"})["undischarged"] == 0),
+        ("grounding tracks declared-vs-measured engine overlap",
+         "the dependent claim's tests (gate.resolves → rhetoric.kind_of)",
+         "overlap → reflected", C.grounding_residual(GROUNDED)["unreflected"] == 0,
+         "disjoint → unreflected", C.grounding_residual(UNGROUNDED)["unreflected"] == 1),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -78,7 +97,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (6 behaviors, 3 deltas)")
+    print("BOUNDARIES: PASS (9 behaviors, 4 deltas)")
     return 0
 
 

@@ -3,6 +3,7 @@
 # key <TAB> heading title
 intro	The Problem: Papers Assert, Nothing Checks
 model	The Model: A Paper as a Projected Claim-DAG
+edges	The Dependency Graphs: Prose Order, Grounding, and the Typed Move
 engine	The Engine: Projection and Gate
 resolver	The Check-Resolver: One Pluggable Seam
 selfhost	Self-Hosting: This Paper Verifies Itself

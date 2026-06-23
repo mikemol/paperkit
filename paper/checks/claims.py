@@ -9,6 +9,7 @@ distinct witness per claim, not one shared `file:` standing for many).
 
     python3 checks/claims.py <claim-key>      # run from paper/; exit 0 = claim holds
 """
+import json
 import re
 import shutil
 import sys
@@ -21,6 +22,7 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
 import project as P  # noqa: E402
+import rhetoric  # noqa: E402  (the move/scheme vocabulary)
 import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
@@ -288,7 +290,61 @@ def not_project():
     assert fx.gate(w, out="not the projection\n")[0] != 0, "a non-projection shipped"
 
 
+# ── edges: the three dependency graphs (from / rests-on / move) ───────────────
+def edge_from_orders():
+    # `from` fixes prose order — a claim is projected only AFTER the claims it lists,
+    # so document order is a topological sort of the from-graph (keys given scrambled)
+    t = fx.project_text([fx.entry("c", claim="gamma", frm="b"),
+                         fx.entry("a", claim="alpha"),
+                         fx.entry("b", claim="beta", frm="a")]).lower()
+    ia, ib, ic = (t.find(x) for x in ("alpha", "beta", "gamma"))
+    assert -1 < ia < ib < ic, "from did not order the prose alpha→beta→gamma"
+
+
+def edge_rests_grounds():
+    # rests-on is a SEPARATE grounding edge: effective grade clamps to the weakest
+    # premise along it.  A behavioral thesis resting on a vacuous atom clamps to vacuous.
+    recs = json.loads(fx.discriminate(
+        [fx.entry("atom", claim="atom", check="file:w.bib"),                  # vacuous (presupposed)
+         fx.entry("thesis", claim="thesis", check="cmd:grep -q TOKEN a.txt",  # behavioral
+                  frm="atom", rests="atom")],
+        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    th = next(r for r in recs if r["key"] == "thesis")
+    assert th["grade"] == "behavioral" and th["effective_grade"] == "vacuous", \
+        f"rests-on did not clamp the thesis (self={th['grade']}, eff={th['effective_grade']})"
+
+
+def edge_chiral():
+    # grounding is independent of prose adjacency: rests-on clamps even when the
+    # premise is NOT a from-neighbor (the two graphs diverge / reverse)
+    recs = json.loads(fx.discriminate(
+        [fx.entry("atom", claim="atom", check="file:w.bib"),                  # vacuous
+         fx.entry("mid", claim="mid", check="cmd:grep -q TOKEN a.txt"),       # the prose neighbor
+         fx.entry("thesis", claim="thesis", check="cmd:grep -q TOKEN a.txt",
+                  frm="mid", rests="atom")],                                  # prose←mid, grounding←atom
+        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    th = next(r for r in recs if r["key"] == "thesis")
+    assert "atom" in th.get("rests-on", []) and "atom" not in th.get("from", []), \
+        "fixture should ground on a non-prose-neighbor"
+    assert th["effective_grade"] == "vacuous", \
+        "rests-on did not clamp despite atom not being a from-neighbor"
+
+
+def edge_move_types():
+    # the `move` field names a typed relation; its KIND decides its role, and a
+    # section's scheme admits only certain kinds
+    assert rhetoric.kind_of("consequence") == "entail", "consequence is not an entail move"
+    assert rhetoric.kind_of("antithesis") == "turn", "antithesis is not a turn move"
+    ok = rhetoric.check_scheme("ladder", ["a", "b"], ["consequence"])
+    bad = rhetoric.check_scheme("ladder", ["a", "b"], ["antithesis"])
+    assert ok == [] and bad, "a ladder must admit consequence (entail) and reject antithesis (turn)"
+
+
 CLAIMS = {
+    "edge-from-orders": edge_from_orders,
+    "edge-rests-grounds": edge_rests_grounds,
+    "edge-chiral": edge_chiral,
+    "edge-move-types": edge_move_types,
     "fail-omits": fail_omits,
     "paper-is-paperkit": paper_is_paperkit,
     "prose-is-projection": prose_is_projection,

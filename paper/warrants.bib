@@ -72,6 +72,28 @@
   check   = {claim:deterministic}
 }
 
+% ── edges: the three dependency graphs ──────────────────────────────────────
+@misc{edge-from-orders,
+  section = {edges},
+  claim   = {a claim's from-edges fix its place in the prose --- the projector emits a claim only after the claims it lists, so document order is a topological sort of the from-graph},
+  check   = {claim:edge-from-orders}
+}
+@misc{edge-rests-grounds,
+  section = {edges}, from = {edge-from-orders}, join = {. },
+  claim   = {rests-on is a separate grounding edge --- a claim's effective grade is clamped to the weakest grade along it, regardless of prose order},
+  check   = {claim:edge-rests-grounds}
+}
+@misc{edge-chiral,
+  section = {edges}, from = {edge-rests-grounds}, join = {, and },
+  claim   = {the two graphs are independent and often reversed: prose runs general to specific while grounding runs specific to general, so one pair of claims is at once a forward prose edge and a backward grounding edge},
+  check   = {claim:edge-chiral}
+}
+@misc{edge-move-types,
+  section = {edges}, from = {edge-chiral}, join = {. },
+  claim   = {the move field names the typed rhetorical relation binding a claim to the prior beat --- its kind decides its role (an entail move also grounds; turn, extend, parallel, and restate moves are prose only) and a section's declared scheme admits only certain move-kinds},
+  check   = {claim:edge-move-types}
+}
+
 % ── 3. engine ───────────────────────────────────────────────────────────────
 @misc{projector-emits,
   section = {engine}, from = {prose-projected},

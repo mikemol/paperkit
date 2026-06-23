@@ -4,7 +4,7 @@
 
 ## The Δ Grader and --without-K
 
-The Δ grader's boundary — it flags a check that provably cannot fail (vacuous) and passes one a mutation can break (behavioral) [@bnd-delta]. The --without-K boundary — it flags two cited claims that share a single witness and passes claims that carry distinct witnesses [@bnd-witness].
+The Δ grader's boundary — it flags a check that provably cannot fail (vacuous) and passes one a mutation can break (behavioral) [@bnd-delta]. The --without-K boundary — it flags two cited claims that share a single witness and passes claims that carry distinct witnesses [@bnd-witness]. The ∂² coherence residual — it reports zero when a claim's from and rests-on edges agree and when witnesses carry distinct sensitivities, and surfaces the divergence and the collapse otherwise [@bnd-coherence].
 
 ## Projector and Gate
 

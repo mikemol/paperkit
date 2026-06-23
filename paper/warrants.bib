@@ -14,6 +14,7 @@
   section = {intro},
   claim   = {paperkit treats a scholarly paper as the projection of a claim-DAG},
   rests-on = {fail-omits, gate-rejects-drift, prose-projected},
+  link    = {the thesis is stated first, but it rests on the projector and gate mechanisms proved in the sections that follow --- grounding runs counter to prose order here},
   check   = {claim:paper-is-projection}
 }
 @misc{node-is-claim,
@@ -122,6 +123,7 @@
   section = {engine}, from = {gate-rejects-drift}, join = {. },
   claim   = {coverage is enforced from both sides},
   rests-on = {every-section-appears, every-claim-cited},
+  link    = {grounded by its two halves (every section appears, every claim is cited), which the prose states just after --- a grounding link counter to prose order},
   check   = {claim:coverage-both-sides}
 }
 @misc{every-section-appears,
@@ -157,6 +159,7 @@
   section = {resolver}, from = {gate-dispatches}, join = {. },
   claim   = {two verifiers ship built in},
   rests-on = {file-builtin, cmd-builtin},
+  link    = {grounded by the two builtins it names, which the prose introduces just after --- the grounding link runs counter to prose order},
   check   = {claim:two-builtins}
 }
 @misc{file-builtin,

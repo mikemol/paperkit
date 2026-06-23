@@ -41,6 +41,11 @@ def main() -> int:
           C.structure_residual(COHERENT)["divergent_claims"] == 0)
     check("structure residual flags a from/rests-on mismatch",
           C.structure_residual(DIVERGED)["divergent_claims"] == 1)
+    check("a divergence is un-acknowledged by default (advisory)",
+          C.structure_residual(DIVERGED)["undischarged"] == 1)
+    check("a `link` footnote discharges the divergence (still drawn, not flagged)",
+          C.structure_residual(DIVERGED, discharged={"b"})["undischarged"] == 0
+          and C.structure_residual(DIVERGED, discharged={"b"})["divergent_claims"] == 1)
     check("sensitivity: distinct tests → 2 signatures, 0 collapse",
           C.sensitivity_residual(DISTINCT)["signatures"] == 2 and C.sensitivity_residual(DISTINCT)["collapse"] == 0)
     check("sensitivity: shared tests → 1 signature, 1 collapse (name-distinct, sensitivity-same)",
@@ -57,6 +62,10 @@ def main() -> int:
          "the second witness's tests (y.py → w.py)",
          "distinct → 0 collapse", C.sensitivity_residual(DISTINCT)["collapse"] == 0,
          "shared   → 1 collapse", C.sensitivity_residual(COLLAPSED)["collapse"] == 1),
+        ("a `link` footnote discharges a divergence (advisory, not a gate)",
+         "acknowledging claim b's link",
+         "un-acknowledged → 1", C.structure_residual(DIVERGED)["undischarged"] == 1,
+         "footnoted → 0", C.structure_residual(DIVERGED, discharged={"b"})["undischarged"] == 0),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -69,7 +78,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (4 behaviors, 2 deltas)")
+    print("BOUNDARIES: PASS (6 behaviors, 3 deltas)")
     return 0
 
 

@@ -63,7 +63,7 @@ def entries(path: Path) -> dict:
         for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", path.read_text(), re.S):
             key, body = m.group(1), m.group(2)
             f = {"_src": path.name}
-            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue", "join", "move", "emit", "mem"):
+            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue", "join", "move", "emit", "mem", "link"):
                 fm = re.search(r"\b" + name + r"\s*=\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", body)
                 if fm:
                     f[name] = fm.group(1)

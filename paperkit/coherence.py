@@ -31,19 +31,27 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import project as P  # noqa: E402  (read the declared `link` acknowledgments)
+
 _ENGINE = Path(__file__).resolve().parent
 
 
-def structure_residual(records: list) -> dict:
+def structure_residual(records: list, discharged=frozenset()) -> dict:
     """Face one: where `from` (prose) and `rests-on` (grounding) disagree.  A pure
-    function of the records, so it is independent of how they were graded."""
-    divergent, edges = 0, 0
+    function of the records.  Divergence is not a defect — prose and grounding are
+    chiral (one edge, two readings), so an author DISCHARGES a divergence with a `link`
+    footnote acknowledging the link's strength (graphviz's constraint=false, made
+    human).  The residual is ADVISORY: how many divergences remain un-acknowledged."""
+    divergent, edges, undischarged = 0, 0, 0
     for r in records:
         d = set(r.get("from", [])) ^ set(r.get("rests-on", []))
         if d:
             divergent += 1
             edges += len(d)
-    return {"divergent_claims": divergent, "divergent_edges": edges}
+            if r["key"] not in discharged:
+                undischarged += 1
+    return {"divergent_claims": divergent, "divergent_edges": edges, "undischarged": undischarged}
 
 
 def sensitivity_residual(records: list) -> dict:
@@ -67,10 +75,10 @@ def sensitivity_residual(records: list) -> dict:
     }
 
 
-def report(records: list) -> dict:
+def report(records: list, discharged=frozenset()) -> dict:
     cited = [r for r in records if r.get("cited", True)]
     return {"claims": len(cited),
-            "structure": structure_residual(cited),
+            "structure": structure_residual(cited, discharged),
             "sensitivity": sensitivity_residual(cited)}
 
 
@@ -80,18 +88,29 @@ def _records(project_dir: Path) -> list:
     return json.loads(r.stdout or "[]")
 
 
+def _discharged(project_dir: Path) -> set:
+    """Claims carrying a `link` footnote — the author has acknowledged that this claim's
+    prose and grounding edges diverge, and why; that discharges the advisory."""
+    cfg = P.load_config(project_dir)
+    F = {}
+    for b in cfg["bibs"]:
+        F.update(P.entries(b))
+    return {k for k, f in F.items() if f.get("link")}
+
+
 def main(argv: list) -> int:
     as_json = "--json" in argv
     pos = [a for a in argv if not a.startswith("-")]
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
-    rep = report(_records(project_dir))
+    rep = report(_records(project_dir), _discharged(project_dir))
     if as_json:
         print(json.dumps({"document": project_dir.name or str(project_dir), **rep}, indent=2))
         return 0
     s, se = rep["structure"], rep["sensitivity"]
     print(f"coherence (∂²): {project_dir.name or project_dir} — {rep['claims']} cited claims")
     print(f"  structure  : {s['divergent_claims']} claims diverge between from and rests-on "
-          f"({s['divergent_edges']} edges) — prose and grounding graphs do not yet reflect")
+          f"({s['divergent_edges']} edges); {s['undischarged']} un-acknowledged "
+          f"(advisory — discharge with a `link` footnote)")
     print(f"  sensitivity: {se['behavioral']} behavioral witnesses → {se['signatures']} distinct "
           f"sensitivity signatures ({se['collapse']} collapse); the largest {se['largest_class']} "
           f"share {se['largest_signature']}")

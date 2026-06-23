@@ -20,13 +20,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import coherence as C  # noqa: E402
 
 
-def rec(key, frm=(), rests=(), grade="behavioral", tests=()):
+def rec(key, frm=(), rests=(), grade="behavioral", tests=(), section=None):
     return {"key": key, "from": list(frm), "rests-on": list(rests),
-            "grade": grade, "tests": list(tests), "cited": True}
+            "grade": grade, "tests": list(tests), "cited": True, "section": section}
 
 
-COHERENT = [rec("a"), rec("b", frm=["a"], rests=["a"])]          # from == rests-on
-DIVERGED = [rec("a"), rec("b", frm=["a"], rests=["x"])]          # from ≠ rests-on
+# structure: a grounding edge to the immediate prose predecessor is CARRIED; to a
+# non-adjacent claim it is a LONG edge owed a projected reference.
+CARRIED = [rec("a", section="s"), rec("b", section="s", frm=["a"], rests=["a"])]   # b grounds on its predecessor
+LONG = [rec("a", section="s"), rec("b", section="s", frm=["a"]),
+        rec("c", section="s", frm=["b"], rests=["a"])]                              # c grounds on a, two back
 DISTINCT = [rec("a", tests=["x.py"]), rec("b", tests=["y.py"])]  # different sensitivity
 COLLAPSED = [rec("a", tests=["w.py"]), rec("b", tests=["w.py"])]  # same sensitivity
 # grounding: b rests-on a; engine-capability fingerprints overlap / disjoint / scaffold-only
@@ -46,15 +49,15 @@ def main() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     print("∂² residual behaviors\n")
-    check("structure residual is 0 when from == rests-on",
-          C.structure_residual(COHERENT)["divergent_claims"] == 0)
-    check("structure residual flags a from/rests-on mismatch",
-          C.structure_residual(DIVERGED)["divergent_claims"] == 1)
-    check("a divergence is un-acknowledged by default (advisory)",
-          C.structure_residual(DIVERGED)["undischarged"] == 1)
-    check("a `link` footnote discharges the divergence (still drawn, not flagged)",
-          C.structure_residual(DIVERGED, discharged={"b"})["undischarged"] == 0
-          and C.structure_residual(DIVERGED, discharged={"b"})["divergent_claims"] == 1)
+    check("structure: a grounding edge to the immediate predecessor is CARRIED (0 owed)",
+          C.structure_residual(CARRIED)["carried"] == 1 and C.structure_residual(CARRIED)["owed"] == 0)
+    check("structure: a grounding edge two-back is a LONG edge owed a reference",
+          C.structure_residual(LONG)["owed"] == 1 and C.structure_residual(LONG)["carried"] == 0)
+    check("a long edge is un-acknowledged by default (advisory)",
+          C.structure_residual(LONG)["undischarged"] == 1)
+    check("a `link` footnote discharges the long edge (still drawn, not flagged)",
+          C.structure_residual(LONG, discharged={"c"})["undischarged"] == 0
+          and C.structure_residual(LONG, discharged={"c"})["owed"] == 1)
     check("sensitivity: distinct tests → 2 signatures, 0 collapse",
           C.sensitivity_residual(DISTINCT)["signatures"] == 2 and C.sensitivity_residual(DISTINCT)["collapse"] == 0)
     check("sensitivity: shared tests → 1 signature, 1 collapse (name-distinct, sensitivity-same)",
@@ -69,18 +72,18 @@ def main() -> int:
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
     pairs = [
-        ("structure residual tracks from/rests-on agreement",
-         "the second claim's rests-on edge (a → x)",
-         "from == rests-on → 0", C.structure_residual(COHERENT)["divergent_claims"] == 0,
-         "from ≠ rests-on → 1", C.structure_residual(DIVERGED)["divergent_claims"] == 1),
+        ("structure residual tracks the grounding edge's prose distance",
+         "the dependent claim's grounding target (predecessor → two-back)",
+         "adjacent → 0 owed", C.structure_residual(CARRIED)["owed"] == 0,
+         "non-adjacent → 1 owed", C.structure_residual(LONG)["owed"] == 1),
         ("sensitivity collapse tracks signature sharing",
          "the second witness's tests (y.py → w.py)",
          "distinct → 0 collapse", C.sensitivity_residual(DISTINCT)["collapse"] == 0,
          "shared   → 1 collapse", C.sensitivity_residual(COLLAPSED)["collapse"] == 1),
-        ("a `link` footnote discharges a divergence (advisory, not a gate)",
-         "acknowledging claim b's link",
-         "un-acknowledged → 1", C.structure_residual(DIVERGED)["undischarged"] == 1,
-         "footnoted → 0", C.structure_residual(DIVERGED, discharged={"b"})["undischarged"] == 0),
+        ("a `link` footnote discharges a long edge (advisory, not a gate)",
+         "acknowledging claim c's link",
+         "un-acknowledged → 1", C.structure_residual(LONG)["undischarged"] == 1,
+         "footnoted → 0", C.structure_residual(LONG, discharged={"c"})["undischarged"] == 0),
         ("grounding tracks declared-vs-measured engine overlap",
          "the dependent claim's tests (gate.resolves → rhetoric.kind_of)",
          "overlap → reflected", C.grounding_residual(GROUNDED)["unreflected"] == 0,

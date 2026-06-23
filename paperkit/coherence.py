@@ -6,10 +6,11 @@ its MEASURED sensitivity: the boundary-of-a-boundary residual.
 actually shows up in what makes them fail.  Three faces, all read from the existing
 pipeline (`discriminate --resolution def --json`), so nothing new is measured — re-read:
 
-  STRUCTURE   each claim carries a `from` edge (prose order) and a `rests-on` edge
-              (grounding).  Where the two graphs diverge they do not reflect; until a
-              typed `move` unifies them (one chiral edge) this divergence is the raw
-              residual of face one.
+  STRUCTURE   prose is a LINEARIZATION of the claim-DAG.  A grounding (`rests-on`) edge
+              between prose-ADJACENT claims is carried by the connective for free; a
+              NON-ADJACENT one is a LONG EDGE the linear text owes a projected cross-
+              reference (citation / figure / expounding — what a connective IS at distance
+              > 0).  The residual is the long edges not yet projected.
 
   SENSITIVITY each claim's measured sensitivity set is its Δ `tests` (the inputs whose
               corruption flips it).  --without-K makes the witnesses NAME-distinct, but
@@ -43,21 +44,58 @@ import project as P  # noqa: E402  (read the declared `link` acknowledgments)
 _ENGINE = Path(__file__).resolve().parent
 
 
+def _linearize(records: list) -> dict:
+    """The prose linearization: each section's claims in dep_order (topological by
+    `from`), concatenated in section-first-appearance order.  Returns {key: position}."""
+    frm = {r["key"]: r.get("from", []) for r in records}
+    secs, order = [], {}
+    for r in records:                       # sections in first-appearance order
+        s = r.get("section")
+        order.setdefault(s, []).append(r["key"])
+        if s not in secs:
+            secs.append(s)
+    pos, idx = {}, 0
+    for s in secs:
+        seen, out = set(), []
+
+        def visit(k):
+            if k in seen or k not in order[s]:
+                return
+            seen.add(k)
+            for a in frm.get(k, []):
+                visit(a)
+            out.append(k)
+
+        for k in order[s]:
+            visit(k)
+        for k in out:
+            pos[k] = idx
+            idx += 1
+    return pos
+
+
 def structure_residual(records: list, discharged=frozenset()) -> dict:
-    """Face one: where `from` (prose) and `rests-on` (grounding) disagree.  A pure
-    function of the records.  Divergence is not a defect — prose and grounding are
-    chiral (one edge, two readings), so an author DISCHARGES a divergence with a `link`
-    footnote acknowledging the link's strength (graphviz's constraint=false, made
-    human).  The residual is ADVISORY: how many divergences remain un-acknowledged."""
-    divergent, edges, undischarged = 0, 0, 0
+    """Face one, by the EDGE-PROJECTION model.  Prose is a LINEARIZATION of the claim-DAG;
+    a grounding (`rests-on`) edge to a prose-ADJACENT claim is carried by the connective
+    for free, but a NON-ADJACENT one is a LONG EDGE the linear text owes a projected
+    cross-reference — a citation / figure / expounding (the same thing a connective is, at
+    distance > 0; the direction is the sign of the prose-distance).  The residual is the
+    long edges not yet projected; ADVISORY, dischargeable by a `link` footnote (or, the
+    constructive close, by actually projecting the reference)."""
+    pos = _linearize(records)
+    carried, long_edges = 0, []
     for r in records:
-        d = set(r.get("from", [])) ^ set(r.get("rests-on", []))
-        if d:
-            divergent += 1
-            edges += len(d)
-            if r["key"] not in discharged:
-                undischarged += 1
-    return {"divergent_claims": divergent, "divergent_edges": edges, "undischarged": undischarged}
+        k = r["key"]
+        for y in r.get("rests-on", []):
+            if y not in pos or k not in pos:
+                long_edges.append((k, y, None))      # cross-scope target — always owed
+            elif pos[y] == pos[k] - 1:
+                carried += 1                          # the immediate predecessor: connective carries it
+            else:
+                long_edges.append((k, y, pos[k] - pos[y]))
+    undischarged = sum(1 for k, _, _ in long_edges if k not in discharged)
+    return {"carried": carried, "owed": len(long_edges), "undischarged": undischarged,
+            "long_edges": long_edges}
 
 
 def sensitivity_residual(records: list) -> dict:
@@ -157,9 +195,9 @@ def main(argv: list) -> int:
         return 0
     s, se, g = rep["structure"], rep["sensitivity"], rep["grounding"]
     print(f"coherence (∂²): {project_dir.name or project_dir} — {rep['claims']} cited claims")
-    print(f"  structure  : {s['divergent_claims']} claims diverge between from and rests-on "
-          f"({s['divergent_edges']} edges); {s['undischarged']} un-acknowledged "
-          f"(advisory — discharge with a `link` footnote)")
+    print(f"  structure  : {s['carried']} grounding edges carried by the prose connective, "
+          f"{s['owed']} are LONG edges owed a projected cross-reference; {s['undischarged']} "
+          f"un-acknowledged (advisory — project the reference, or discharge with a `link`)")
     print(f"  sensitivity: {se['behavioral']} behavioral witnesses → {se['signatures']} distinct "
           f"sensitivity signatures ({se['collapse']} collapse); the largest {se['largest_class']} "
           f"share {se['largest_signature']}")

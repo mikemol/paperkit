@@ -25,6 +25,13 @@ PASS = [entry("a", claim="alpha", check="cmd:true"),
 FAIL = [entry("a", claim="alpha", check="cmd:true"),
         entry("b", claim="beta", check="cmd:false", frm="a"),
         entry("c", claim="gamma", check="cmd:true", frm="b")]
+# Declaring a lease (mem) routes a check through the membudget semaphore (when it is
+# available) instead of the plain pool — but a lease is about RAM, not correctness, so
+# the verdict must be identical to the unleased run.
+LEASED_PASS = [entry("a", claim="alpha", check="cmd:true", mem="256"),
+               entry("b", claim="beta", check="cmd:true", frm="a", mem="256")]
+LEASED_FAIL = [entry("a", claim="alpha", check="cmd:true", mem="256"),
+               entry("b", claim="beta", check="cmd:false", frm="a", mem="256")]
 
 
 def main() -> int:
@@ -38,12 +45,16 @@ def main() -> int:
     rc_pass_par, _ = gate(PASS, "--jobs=8")
     rc_fail_serial, _ = gate(FAIL, "--jobs=1")
     rc_fail_par, _ = gate(FAIL, "--jobs=8")
+    rc_leased_pass, _ = gate(LEASED_PASS)     # default jobs → membudget when available
+    rc_leased_fail, _ = gate(LEASED_FAIL)
 
     print("parallel-gate behaviors\n")
     check("a clean project passes serial (--jobs=1 → exit 0)", rc_pass_serial == 0)
     check("a failing check fails serial (--jobs=1 → exit 1)", rc_fail_serial == 1)
     check("parallel agrees with serial on PASS (--jobs=8 → exit 0)", rc_pass_par == 0)
     check("parallel agrees with serial on FAIL (--jobs=8 → exit 1)", rc_fail_par == 1)
+    check("a declared mem lease keeps a clean verdict (→ exit 0)", rc_leased_pass == 0)
+    check("a declared mem lease keeps a failing verdict (→ exit 1)", rc_leased_fail == 1)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -56,6 +67,10 @@ def main() -> int:
          "the worker count (1 → 8)",
          "serial verdicts", (rc_pass_serial, rc_fail_serial) == (0, 1),
          "parallel verdicts (identical)", (rc_pass_par, rc_fail_par) == (rc_pass_serial, rc_fail_serial)),
+        ("a memory lease is semantically inert (verdict unchanged by mem)",
+         "declaring mem={256} on every check (routes through membudget)",
+         "unleased → (0, 1)", (rc_pass_serial, rc_fail_serial) == (0, 1),
+         "leased   → (0, 1) identical", (rc_leased_pass, rc_leased_fail) == (0, 1)),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -68,7 +83,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (4 behaviors, 2 deltas)")
+    print("BOUNDARIES: PASS (6 behaviors, 3 deltas)")
     return 0
 
 

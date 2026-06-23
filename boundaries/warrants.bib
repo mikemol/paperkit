@@ -28,7 +28,7 @@
 }
 @misc{bnd-parallel,
   section = {engine}, from = {bnd-json}, join = {. },
-  claim   = {the parallel gate's boundary --- the verdict tracks the checks, never the worker count, so parallel equals serial},
+  claim   = {the parallel gate's boundary --- the verdict tracks the checks, never the worker count or a check's memory lease, so fanning out (and routing heavy checks through the membudget semaphore) equals running serially},
   check   = {cmd:python3 ../paperkit/tests/boundaries_jobs.py}
 }
 

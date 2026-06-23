@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+# Vendored verbatim from ~/github/substrate/scripts/membudget.  paperkit's gate routes
+# checks that declare a `mem` lease through it so a memory-heavy check fleet self-throttles
+# to fit RAM; without a user systemd scope the gate degrades to a plain bounded pool.
+#
+# membudget — a recursion-aware concurrent-memory-budget SEMAPHORE over `systemd-run --scope`.
+#
+# WHY: `systemd-run --user --scope -p MemoryMax=N` caps ONE subprocess tree (kernel kills
+# only that scope). This adds a shared cotype ledger so the SUM of concurrent trees stays
+# within a global budget — and is RECURSION-AWARE so a membudget-launched job may itself
+# call membudget without deadlock or double-counting:
+#
+#   * TOP-LEVEL run (no MEMBUDGET_PARENT): leases <MB> from the GLOBAL budget and launches
+#     the command in a fresh `systemd-run --scope` with MemoryMax=<MB> (one cgroup for the
+#     whole subtree).
+#   * NESTED run (MEMBUDGET_PARENT set): SUBALLOCATES <MB> from its PARENT's reservation
+#     (not the global pool the ancestor already consumed) and runs the command IN-SCOPE
+#     (no new cgroup — nested `systemd-run --scope` would make a SIBLING cgroup, escaping
+#     the parent's cap; staying in-scope keeps the top-level MemoryMax bounding the subtree).
+#   * REFUSE (exit 3) if the relevant budget (global or parent) can't cover the request —
+#     so over-subscription is blocked, not OOM'd. A child needed by its parent draws from
+#     the parent's reservation (sized for the subtree), so it never deadlocks on the global
+#     pool. Leases release on exit + cascade-GC when an owner (or its parent) dies.
+#
+# Usage:
+#   membudget init [TOTAL_MB]              # create/reset ledger (default 70% RAM)
+#   membudget status                       # TOTAL / top-level-leased / global-free + lease tree
+#   membudget run <MB> <label> -- <cmd...> # lease MB (global or sub), run, release
+set -euo pipefail
+
+SELF="$(realpath "$0")"; SELFDIR="$(dirname "$SELF")"
+case ":$PATH:" in *":$SELFDIR:"*) ;; *) export PATH="$SELFDIR:$PATH";; esac   # children can call `membudget`
+FILE="${MEMBUDGET_FILE:-$HOME/.cache/membudget/budget.cotype}"
+LOCK="$FILE.lock"
+mkdir -p "$(dirname "$FILE")"
+
+# Target top-level budget: 8 GiB, but never exceed 70% of RAM (safe on smaller boxes).
+default_total() { awk '/MemTotal/{p=int($2*7/10/1024); print (p<8192)?p:8192}' /proc/meminfo; }
+ensure() { [ -f "$FILE" ] || cat > "$FILE" <<EOF
+# membudget cotype — recursion-aware concurrent memory-budget semaphore (scripts/membudget).
+# Global free = TOTAL_MB - Σ top-level LEASE mb; a nested lease draws from its PARENT's mb.
+# LEASE <id> <mb> <pid> <epoch> <parent|-> <label>
+TOTAL_MB $(default_total)
+EOF
+}
+with_lock() { exec {LKFD}>"$LOCK"; flock "$LKFD"; }
+unlock()    { flock -u "$LKFD" 2>/dev/null || true; }
+
+gc() { # drop leases whose owner pid died, then cascade-drop leases whose parent vanished
+  local tmp chg=1
+  while [ "$chg" = 1 ]; do
+    chg=0; tmp=$(mktemp)
+    while IFS= read -r line; do
+      case "$line" in
+        LEASE\ *) set -- $line   # $2=id $4=pid $6=parent
+          if ! kill -0 "$4" 2>/dev/null; then chg=1; continue; fi
+          if [ "$6" != "-" ] && ! grep -q "^LEASE $6 " "$FILE"; then chg=1; continue; fi
+          printf '%s\n' "$line" >> "$tmp" ;;
+        *) printf '%s\n' "$line" >> "$tmp" ;;
+      esac
+    done < "$FILE"
+    mv "$tmp" "$FILE"
+  done
+}
+read_total()    { awk '$1=="TOTAL_MB"{print $2; exit}' "$FILE"; }
+budget_of()     { [ "$1" = "-" ] && read_total || awk -v i="$1" '$1=="LEASE"&&$2==i{print $3; exit}' "$FILE"; }
+claimed_under() { awk -v p="$1" '$1=="LEASE"&&$6==p{s+=$3} END{print s+0}' "$FILE"; }
+release()       { with_lock; grep -v "^LEASE $1 " "$FILE" > "$FILE.t" 2>/dev/null && mv "$FILE.t" "$FILE" || true; unlock; }
+
+cmd_init() { rm -f "$FILE"; ensure; [ -n "${1:-}" ] && sed -i "s/^TOTAL_MB .*/TOTAL_MB ${1}/" "$FILE"; cmd_status; }
+
+cmd_status() {
+  ensure; with_lock; gc
+  local t c; t=$(read_total); c=$(claimed_under "-"); unlock
+  printf 'membudget: TOTAL=%sMB top-level-leased=%sMB global-free=%sMB\n' "$t" "$c" "$((t-c))"
+  awk '$1=="LEASE"{p=($6=="-")?"top":("under "$6); printf "  [%s] %sMB pid=%s (%s) %s\n",$2,$3,$4,p,$7}' "$FILE" \
+    | grep . || echo "  (no active leases)"
+}
+
+_wait_change() { # block until the ledger changes (a release) or a short timeout, then re-check
+  if command -v inotifywait >/dev/null 2>&1; then
+    inotifywait -qq -t 5 -e modify,create,moved_to,delete,attrib "$(dirname "$FILE")" 2>/dev/null || true
+  else
+    sleep "${MEMBUDGET_POLL:-0.5}"
+  fi
+}
+
+_auto_mb() { # Ⓡ.autobudget: a right-sized lease (MB) for the module in "$@", from its peak-mem history.
+  # Round the max recorded peak UP to the next POWER OF TWO (floor 64, cap AGDA_MB_MAX=1536 = 1.5GiB).
+  # The power-of-2 step IS the safety margin — it sits 2^n ± 2^(n-1) around the need, so peak ∈
+  # (2^(n-1), 2^n] leases 2^n with up to a 2^(n-1) headroom band; no extra fudge, no over-rounding
+  # (900→1024, not 1536). A lease is a hard kill cap, so rounding UP keeps cap ≥ peak.
+  # CEILING 1.5GiB: the full build runs every module at `+RTS -M1024m` and passes, so worst-case maxRSS
+  # ≈ 1GB heap + ~0.1GB RTS ≈ 1.1GB < 1536 (measured AES/KAT/SBox hogs peak ~110MB after the round/table
+  # decomposition); a peak that would round to 2048 is clamped to 1536, still ≥ the real peak. Default
+  # (192) if no history — measured maxRSS tops ~120MB so 192 covers a typical cold module, and the
+  # retry ladder 192→384→768→1536 lands exactly on the ceiling (1536 = 192·2³), so a heavy unseen
+  # module still self-heals via retry-on-OOM.
+  local a mod="" def="${AGDA_MB_DEFAULT:-192}" cap="${AGDA_MB_MAX:-1536}"
+  for a in "$@"; do case "$a" in *.agda) mod="$a" ;; esac; done
+  [ -n "$mod" ] || { echo "$def"; return; }
+  local led; led="$(dirname "$mod")/.agda-times.tsv"
+  [ -f "$led" ] || { echo "$def"; return; }
+  awk -F'\t' -v m="$(basename "$mod")" -v def="$def" -v cap="$cap" '
+    $1==m && $3 ~ /^[0-9]+$/ { if ($3+0>pk) pk=$3+0 }
+    END { if (pk<=0) { print def; exit }
+          v = 64; while (v < pk) v = v*2          # smallest power of two >= peak (floor 64)
+          if (v > cap) v = cap; print v }' "$led" 2>/dev/null || echo "$def"
+}
+
+cmd_run() {
+  local mb="$1" label="$2"; shift 2; [ "${1:-}" = "--" ] && shift
+  [ "$mb" = auto ] && mb=$(_auto_mb "$@")          # Ⓡ.autobudget: lease from peak-mem history
+  ensure
+  local parent="${MEMBUDGET_PARENT:--}"
+  local id; id=$(printf '%04x%04x' "$RANDOM" "$RANDOM")
+  local where; [ "$parent" = "-" ] && where="global" || where="parent $parent"
+  trap "release $id" EXIT                       # set early: idempotent; covers the wait-window if killed
+  # BLOCKING acquire (WaitForSingleObject-style): block while transiently short, wake on a
+  # release, re-attempt; REFUSE only the impossible (mb > the level's TOTAL — would block forever).
+  local start announced=0; start=$(date +%s)
+  exec {LKFD}>"$LOCK"
+  while true; do
+    flock "$LKFD"; gc
+    local budget; budget=$(budget_of "$parent")
+    if [ -z "$budget" ]; then flock -u "$LKFD"; echo "membudget: REFUSED [$label] — parent lease $parent is gone" >&2; exit 4; fi
+    if [ "$mb" -gt "$budget" ]; then            # impossible at this level → refuse, never block
+      flock -u "$LKFD"
+      echo "membudget: REFUSED [$label] — IMPOSSIBLE: need ${mb}MB > ${budget}MB ($where total). Raise the $([ "$parent" = "-" ] && echo 'global budget (membudget init)' || echo 'parent reservation')." >&2
+      exit 3
+    fi
+    local used free; used=$(claimed_under "$parent"); free=$((budget-used))
+    if [ "$mb" -le "$free" ]; then              # fits → claim and proceed
+      printf 'LEASE %s %s %s %s %s %s\n' "$id" "$mb" "$$" "$(date +%s)" "$parent" "$label" >> "$FILE"
+      flock -u "$LKFD"; break
+    fi
+    flock -u "$LKFD"                             # transiently short → block (or fail-fast / time out)
+    if [ -n "${MEMBUDGET_NOBLOCK:-}" ]; then
+      echo "membudget: REFUSED [$label] (noblock) — need ${mb}MB, free ${free}MB of ${budget}MB ($where)." >&2; exit 3
+    fi
+    if [ -n "${MEMBUDGET_TIMEOUT:-}" ] && [ $(( $(date +%s) - start )) -ge "$MEMBUDGET_TIMEOUT" ]; then
+      echo "membudget: GAVE UP [$label] after ${MEMBUDGET_TIMEOUT}s — need ${mb}MB, free ${free}MB ($where)." >&2; exit 3
+    fi
+    [ "$announced" = 0 ] && { echo "membudget: BLOCKED [$label] — need ${mb}MB, free ${free}MB of ${budget}MB ($where); waiting for a release…" >&2; announced=1; }
+    _wait_change
+  done
+  exec {LKFD}>&-                                 # close the lock fd
+  export MEMBUDGET_PARENT="$id"
+  # genlop-style timing: measure ONLY the post-lease run (not the semaphore wait above), record it to
+  # the module's per-dir ledger, and PROPAGATE the real exit code (cgroup-kill 137 included). The
+  # recording is best-effort and never alters rc.
+  local rc=0 rstart rend tf=""
+  [ -x /usr/bin/time ] && tf=$(mktemp 2>/dev/null || echo "")   # capture peak-mem (maxRSS) if available
+  rstart=$(date +%s.%N)
+  if [ "$parent" = "-" ]; then
+    echo "membudget: TOP lease ${mb}MB [$label] (global free was ${free}MB) → MemoryMax=${mb}M scope" >&2
+    if [ -n "$tf" ]; then
+      systemd-run --user --scope --quiet --setenv=MEMBUDGET_PARENT="$id" \
+        -p MemoryMax="${mb}M" -p MemorySwapMax=0 /usr/bin/time -v -o "$tf" "$@" || rc=$?
+    else
+      systemd-run --user --scope --quiet --setenv=MEMBUDGET_PARENT="$id" \
+        -p MemoryMax="${mb}M" -p MemorySwapMax=0 "$@" || rc=$?
+    fi
+  else
+    echo "membudget: SUB lease ${mb}MB [$label] under $parent (parent free was ${free}MB) → in-scope" >&2
+    if [ -n "$tf" ]; then /usr/bin/time -v -o "$tf" "$@" || rc=$?; else "$@" || rc=$?; fi
+  fi
+  rend=$(date +%s.%N)
+  if [ "$rc" = 0 ]; then _record_time "$rstart" "$rend" "$tf" "$@"; fi   # only learn from SUCCESSFUL runs
+  [ -n "$tf" ] && rm -f "$tf"
+  # RETRY-ON-OOM: a cgroup MemoryMax breach terminates the scope by signal — SIGKILL (rc 137) from the
+  # kernel cgroup OOM-killer, OR SIGTERM (rc 143) from systemd's scope-OOM handling; which one fires
+  # depends on the systemd version (measured: 143 on systemd-run --user --scope here).  Both are the
+  # too-small-lease kill, so retry on either.  (Only TOP leases have their own hard cap.)  If the action
+  # is idempotent (MEMBUDGET_RETRY_OOM — the agda shim sets it; an agda compile re-runs cleanly) and
+  # there's room to grow, RELEASE the too-small lease and re-enter at the next power-of-2 bucket.
+  # Self-corrects a too-tight autobudget guess (then the success records the real peak → history fixes it).
+  if { [ "$rc" = 137 ] || [ "$rc" = 143 ]; } && [ "$parent" = "-" ] && [ -n "${MEMBUDGET_RETRY_OOM:-}" ] \
+     && [ "$mb" -lt "${AGDA_MB_MAX:-1536}" ]; then
+    release "$id"
+    local nb=$((mb*2)); [ "$nb" -gt "${AGDA_MB_MAX:-1536}" ] && nb="${AGDA_MB_MAX:-1536}"
+    echo "membudget: OOM-killed at ${mb}MB [$label] — retrying at ${nb}MB (idempotent)…" >&2
+    export MEMBUDGET_PARENT="$parent"                   # re-enter at the original level (TOP), bigger bucket
+    exec "$0" run "$nb" "$label" -- "$@"
+  fi
+  exit "$rc"
+}
+
+_record_time() { # genlop: append <module>\t<seconds>\t<peak_mb> to the module's per-dir .agda-times.tsv
+  local rstart="$1" rend="$2" tf="$3"; shift 3
+  local a mod=""
+  for a in "$@"; do case "$a" in *.agda) mod="$a" ;; esac; done   # the compiled module (last .agda arg)
+  [ -n "$mod" ] || return 0
+  local dur; dur=$(awk "BEGIN{d=$rend-$rstart; printf \"%.2f\", (d<0?0:d)}" 2>/dev/null) || return 0
+  local peak="" kb=""
+  [ -n "$tf" ] && [ -f "$tf" ] && kb=$(awk '/Maximum resident set size/{print $NF}' "$tf" 2>/dev/null)
+  case "$kb" in ''|*[!0-9]*) ;; *) peak=$(( kb / 1024 )) ;; esac      # KB → MB (the lease unit)
+  printf '%s\t%s\t%s\n' "$(basename "$mod")" "$dur" "$peak" >> "$(dirname "$mod")/.agda-times.tsv" 2>/dev/null || true
+}
+
+cmd_shell() { # open an interactive shell INSIDE a top-level scope (cgroup auto-contains the
+              # whole hierarchy); the membudget-shrc auto-wrap is loaded for per-command sub-budgeting.
+  local mb="${1:-$(ensure; read_total)}"; shift 2>/dev/null || true; [ "${1:-}" = "--" ] && shift
+  ensure
+  local rc; rc="$(mktemp "${TMPDIR:-/tmp}/membudget-rc.XXXXXX")"
+  { echo '[ -f ~/.bashrc ] && source ~/.bashrc'; printf "source %q\n" "$SELFDIR/membudget-shrc"; } > "$rc"
+  if [ "$#" -gt 0 ]; then cmd_run "$mb" "shell" -- bash --rcfile "$rc" -ic "$*"
+  else                    cmd_run "$mb" "shell" -- bash --rcfile "$rc" -i; fi
+  rm -f "$rc"
+}
+
+case "${1:-}" in
+  init)   shift; cmd_init "${1:-}";;
+  status) cmd_status;;
+  run)    shift; cmd_run "$@";;
+  shell)  shift; cmd_shell "$@";;
+  *) echo "usage: membudget {init [MB]|status|run <MB> <label> -- <cmd...>|shell [MB] [-- cmd]}" >&2; exit 2;;
+esac

@@ -35,23 +35,54 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import project as P  # noqa: E402
 
 
-def run_ok(cmd: str, cwd: Path) -> bool:
+_MB_SCRIPT = Path(__file__).resolve().parent / "membudget"
+_MB_OK = None
+
+
+def membudget_ok() -> bool:
+    """Is the memory-budget semaphore usable here?  Cached.  Inside an existing
+    membudget scope (MEMBUDGET_PARENT set) it is by construction — that is the
+    recursion point: a nested gate re-invokes membudget so its checks SUBALLOCATE
+    from the parent's lease rather than the global pool.  At top level, probe that
+    a user systemd scope opens; set PAPERKIT_NO_MEMBUDGET to force the plain path."""
+    global _MB_OK
+    if _MB_OK is not None:
+        return _MB_OK
+    if os.environ.get("PAPERKIT_NO_MEMBUDGET") or not os.access(_MB_SCRIPT, os.X_OK):
+        _MB_OK = False
+    elif os.environ.get("MEMBUDGET_PARENT"):
+        _MB_OK = True
+    else:
+        try:
+            _MB_OK = subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "true"],
+                                    capture_output=True, timeout=15).returncode == 0
+        except Exception:
+            _MB_OK = False
+    return _MB_OK
+
+
+def run_ok(cmd: str, cwd: Path, lease: int | None = None, label: str = "check") -> bool:
     try:
+        if lease:   # run under a memory lease; membudget admits it when RAM fits
+            argv = [str(_MB_SCRIPT), "run", str(lease), label, "--", "sh", "-c", cmd]
+            return subprocess.run(argv, cwd=cwd, capture_output=True).returncode == 0
         return subprocess.run(cmd, shell=True, cwd=cwd,
                               capture_output=True).returncode == 0
     except Exception:
         return False
 
 
-def resolves(check: str, project_dir: Path, custom: dict) -> bool:
+def resolves(check: str, project_dir: Path, custom: dict, lease: int | None = None) -> bool:
     typ, _, target = check.partition(":")
     if typ == "file":
-        return (project_dir / target).exists()
+        return (project_dir / target).exists()        # no subprocess → no lease
     if typ == "cmd":
-        return run_ok(target, project_dir)
-    if typ in custom:
-        return run_ok(custom[typ]["cmd"].replace("{target}", target), project_dir)
-    return False
+        cmd = target
+    elif typ in custom:
+        cmd = custom[typ]["cmd"].replace("{target}", target)
+    else:
+        return False
+    return run_ok(cmd, project_dir, lease=lease, label=check)
 
 
 def cited_keys(prose: str) -> set:
@@ -105,16 +136,40 @@ def main(argv: list) -> int:
     placed = {k for k, f in F.items() if P.is_placed(f)}
     to_verify = (cited | placed) & warrants
     undefined = sorted(cited - set(F))
-    # Resolve each DISTINCT check exactly once (shared witnesses run one time), the
-    # set of them fanned out across `jobs` workers — checks are subprocess-bound, so
-    # threads suffice and the GIL is released during the run.
+    # Resolve each DISTINCT check exactly once (shared witnesses run one time).  Two
+    # kinds of target.  A check whose warrant DECLARES a lease (`mem`) is memory-bound:
+    # run it under the membudget semaphore, fanned out UNBOUNDED and admitted as RAM
+    # frees — and recursion-aware, since a check that runs a nested gate suballocates
+    # from its own lease.  A light check (no `mem`) is CPU-bound, not memory-bound: run
+    # it in a plain pool capped at `jobs` (wrapping every tiny check in a systemd scope
+    # only adds latency and, at scale, thrashes).  So the bib is also the makefile's
+    # resource manifest: heavy targets say how much RAM they hold.
     distinct = sorted({F[k]["check"] for k in to_verify})
-    if jobs > 1 and len(distinct) > 1:
-        with ThreadPoolExecutor(max_workers=jobs) as ex:
-            results = list(ex.map(lambda c: resolves(c, project_dir, custom), distinct))
+    mem_of: dict = {}
+    for k in to_verify:
+        if F[k].get("mem"):
+            c = F[k]["check"]
+            mem_of[c] = max(mem_of.get(c, 0), int(F[k]["mem"]))
+    mb = membudget_ok() and jobs != 1 and bool(mem_of)
+    if mb:
+        subprocess.run([str(_MB_SCRIPT), "status"], capture_output=True)   # init ledger once
+
+    def resolve1(c: str) -> bool:
+        return resolves(c, project_dir, custom, lease=mem_of.get(c) if mb else None)
+
+    heavy = [c for c in distinct if mb and c in mem_of]
+    light = [c for c in distinct if c not in heavy]
+    results: dict = {}
+    if len(distinct) > 1 and (jobs > 1 or heavy):
+        with ThreadPoolExecutor(max_workers=max(1, jobs)) as lex, \
+             ThreadPoolExecutor(max_workers=max(1, len(heavy))) as hex:
+            fut = {lex.submit(resolve1, c): c for c in light}
+            fut.update({hex.submit(resolve1, c): c for c in heavy})
+            for f in fut:
+                results[fut[f]] = f.result()
     else:
-        results = [resolves(c, project_dir, custom) for c in distinct]
-    cache = dict(zip(distinct, results))
+        results = {c: resolve1(c) for c in distinct}
+    cache = {c: results[c] for c in distinct}
 
     bad = sorted(k for k in to_verify if not cache[F[k]["check"]])
     if undefined:

@@ -38,11 +38,15 @@ RESOLVE is the gate's second invariant — a cited claim whose check fails block
 
 A passing check only proves a sentence named a verifier, not that the verifier entails it — so Δ grades each check on a ladder by how much it can fail: a presupposed file is vacuous, a contingent one existence, and a content-sensitive command behavioral [@grade-ladder]. The grade is empirical, not declared — Δ corrupts each input in turn and watches whether the check flips from pass to fail, and the inputs whose corruption flips it are its sensitivity set [@mutation-probes]. A grade is a pure function of a content key — the hash of every project and engine file a check could read — so it is cached and the expensive mutation sweep reruns only when that key changes [@content-cache]. The sweep runs in a sandbox copy whose mutation surface excludes sibling projects (a nested directory with its own paper.toml), so each project grades independently of the others [@sandbox-grade], and --min-strength turns the grades into a gate — a project fails if any cited claim's check grades below the threshold, which is how this paper enforces its own proof-relevance in CI [@min-strength].
 
-## 10. Related Work
+## 10. Liveness: Resumable Witnesses
+
+A slow but sound check need not block — it is structured as a pump/parse witness, where pump advances opaque state one increment with no verdict and parse reads the meaning (done, progress), and the driver only ever loads, pumps, serializes, and persists [@pump-parse-witness]. Under a budget the driver stops after an increment and persists the resumption token, exiting with a resume code rather than a failure — so a slow witness reads as resume me, not as a falsified claim, and resuming completes exactly the run an uninterrupted one would [@resumable], on the strength of a single soundness obligation — that deserializing a serialized state returns that same state — which the driver asserts on every run, so a witness whose token loses information is rejected outright [@roundtrip-obligation].
+
+## 11. Related Work
 
 Literate programming interleaves a program with the prose that explains it, so code and explanation are kept in one source and cannot drift apart [@knuth-lit]; in a parallel spirit, reproducible-research practice ships the code and data that regenerate every figure and number, so a published result can be re-run rather than trusted [@buckheit-donoho]; and on the engine side, build-systems theory frames a build as the demand-driven computation of verified targets from their dependencies — the same shape paperkit gives to a claim-DAG [@mokhov-build].
 
-## 11. Conclusion
+## 12. Conclusion
 
 By making every claim a verifier and the document their projection, paperkit closes the gap between what a paper says and what has been checked [@closes-gap]: an unverified sentence cannot ship [@unverified-cant-ship], because it does not project [@not-project].
 

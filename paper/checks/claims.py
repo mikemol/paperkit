@@ -10,10 +10,12 @@ distinct witness per claim, not one shared `file:` standing for many).
     python3 checks/claims.py <claim-key>      # run from paper/; exit 0 = claim holds
 """
 import json
+import os
 import re
 import shutil
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[2] / "paperkit"
@@ -23,6 +25,7 @@ sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
 import project as P  # noqa: E402
 import discriminate  # noqa: E402  (Δ: the adequacy grader)
+import driver  # noqa: E402  (the pump/parse liveness driver)
 import rhetoric  # noqa: E402  (the move/scheme vocabulary)
 import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
 
@@ -513,7 +516,59 @@ def min_strength():
     assert rc_ok == 0 and rc_bad != 0, f"--min-strength did not gate on grade (ok={rc_ok}, bad={rc_bad})"
 
 
+# ── liveness: resumable pump/parse witnesses ─────────────────────────────────
+def pump_parse_witness():
+    # a slow check is structured as pump()/parse(): pump advances state one increment
+    # (no verdict), parse reads done?/progress; the driver only loads → pump → serialize
+    class W:
+        def initial(self): return {"c": 0}
+        def pump(self, s): return {"c": s["c"] + 1}
+        def parse(self, s): return {"done": s["c"] >= 3, "progress": f'{s["c"]}/3'}
+        def serialize(self, s): return json.dumps(s)
+        def deserialize(self, x): return json.loads(x)
+    meaning, steps, done = driver.drive(W())
+    assert done and steps == 3 and meaning["progress"] == "3/3", \
+        f"the driver did not pump to completion (steps={steps}, {meaning})"
+
+
+def resumable():
+    # under a budget the driver stops short and persists its state (exit 2 = resume,
+    # not failure); resuming from the token completes — a resumed run equals an
+    # uninterrupted one
+    class W:
+        def initial(self): return {"c": 0, "r": []}
+        def pump(self, s): time.sleep(0.05); return {"c": s["c"] + 1, "r": s["r"] + [s["c"]]}
+        def parse(self, s): return {"done": s["c"] >= 4, "results": s["r"]}
+        def serialize(self, s): return json.dumps(s, sort_keys=True)
+        def deserialize(self, x): return json.loads(x)
+    sf = os.path.join(tempfile.mkdtemp(), "s.json")
+    w = W()
+    _, _, done1 = driver.drive(w, state_path=sf, budget=0.06)     # budget bites before 4 pumps
+    assert not done1, "the budget did not stop the witness short"
+    m2, _, done2 = driver.drive(w, state_path=sf, budget=0.0)     # resume; 0 = run to completion
+    assert done2 and m2["results"] == [0, 1, 2, 3], f"resume did not complete faithfully ({m2})"
+
+
+def roundtrip_obligation():
+    # the one soundness obligation is deserialize(serialize(state)) == state; the driver
+    # asserts it, so a witness whose serialization loses state is rejected
+    class Lossy:
+        def initial(self): return {"c": 0, "keep": "x"}
+        def pump(self, s): return {"c": s["c"] + 1, "keep": s["keep"]}
+        def parse(self, s): return {"done": s["c"] >= 2}
+        def serialize(self, s): return json.dumps({"c": s["c"]})   # DROPS "keep"
+        def deserialize(self, x): return json.loads(x)
+    try:
+        driver.drive(Lossy())
+    except AssertionError:
+        return
+    raise AssertionError("the driver did not enforce the round-trip obligation")
+
+
 CLAIMS = {
+    "pump-parse-witness": pump_parse_witness,
+    "resumable": resumable,
+    "roundtrip-obligation": roundtrip_obligation,
     "grade-ladder": grade_ladder,
     "mutation-probes": mutation_probes,
     "content-cache": content_cache,

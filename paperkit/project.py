@@ -5,7 +5,9 @@ A paper is the projection of a claim-DAG.  Each entry in a `.bib` is a claim:
 a statement (`claim`/`title`), a rubric `section`, its dependencies (`from`),
 and a verifier (`check`).  This command reads those records and emits the prose —
 every section's claims ordered by their `from` edges and joined with connective
-`glue` across genuine entailment edges.  The output passes the gate (every
+`glue` across genuine entailment edges, and each claim's NON-ADJACENT grounding
+(`rests-on`) edges projected as trailing cross-references (the long edges the
+connective cannot carry by adjacency).  The output passes the gate (every
 citation resolves, every required claim present, in order) BY CONSTRUCTION.
 
     paperkit-project [DIR]            # write the projection to the configured `out`
@@ -161,9 +163,32 @@ def emit_block(pdir: Path, f: dict) -> list:
     return [f"```{lang}", content, "```"] if lang else [content]
 
 
-def weave(text: list, F: dict, primary: str) -> str:
+def references(k: str, f: dict, pos: dict) -> str:
+    """Project a claim's NON-ADJACENT grounding (`rests-on`) edges as cross-references —
+    the long edges the prose connective cannot carry by adjacency.  A connective IS a
+    reference at distance 0; this is the same edge-projection at distance > 0, the
+    direction read off the sign of the prose-distance (a back-reference to ground already
+    laid, a forward-reference to ground laid below).  Citation is the floor materialization;
+    richer forms (expound, figure) are opt-in.  Returns the trailing parenthetical or ''."""
+    if not pos or k not in pos:
+        return ""
+    back, fwd = [], []
+    for y in f.get("rests-on", []):
+        yp = pos.get(y)
+        if yp is None or yp == pos[k] - 1:        # cross-scope, or carried by the connective
+            continue
+        (back if yp < pos[k] else fwd).append(f"[@{y}]")
+    parts = []
+    if back:
+        parts.append("grounded above in " + ", ".join(back))
+    if fwd:
+        parts.append("developed below at " + ", ".join(fwd))
+    return f" ({'; '.join(parts)})" if parts else ""
+
+
+def weave(text: list, F: dict, primary: str, pos: dict | None = None) -> str:
     """Weave a run of prose-claim keys into one sentence-diagrammed paragraph."""
-    clauses = [sentence(k, F[k], primary) for k in text]
+    clauses = [sentence(k, F[k], primary) + references(k, F[k], pos or {}) for k in text]
     clauses[0] = clauses[0][:1].upper() + clauses[0][1:]
     clauses[1:] = [re.sub(r"^(The|A|An) ", lambda m: m.group(1).lower() + " ", c)
                    for c in clauses[1:]]
@@ -213,6 +238,13 @@ def project(cfg: dict) -> str:
     for k, f in F.items():
         if f.get("section"):
             by_sec.setdefault(f["section"], []).append(k)
+    # global prose linearization (rubric order × dep_order) — positions used to project
+    # a claim's long (non-adjacent) grounding edges as cross-references.
+    pos, _i = {}, 0
+    for sk, _t in rubric(cfg["rubric"]):
+        for k in dep_order(by_sec.get(sk, []), F):
+            pos[k] = _i
+            _i += 1
 
     lines = [f"# {cfg['title']}", ""]
     if cfg["subtitle"]:
@@ -236,7 +268,7 @@ def project(cfg: dict) -> str:
                 if f.get("claim") or f.get("title"):
                     run.append(k)
                 if run:
-                    lines += [weave(run, F, primary), ""]
+                    lines += [weave(run, F, primary, pos), ""]
                     run = []
                 lines += emit_block(pdir, f) + [""]
             elif f.get("check", "").startswith("figure:"):
@@ -244,7 +276,7 @@ def project(cfg: dict) -> str:
             else:
                 run.append(k)
         if run:
-            lines += [weave(run, F, primary), ""]
+            lines += [weave(run, F, primary, pos), ""]
     if cfg["references"]:
         lines += ["## References", ""]
     return "\n".join(lines) + "\n"

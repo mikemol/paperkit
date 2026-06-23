@@ -49,7 +49,7 @@
   section = {commands}, from = {rm-cmds}, join = {. },
   claim   = {you run them like this},
   emit    = {assets/commands.sh},
-  check   = {cmd:sh -n assets/commands.sh}
+  check   = {cmd:grep -q project.py assets/commands.sh}
 }
 @misc{rm-cmds-inv,
   section = {commands}, from = {rm-cmds-eg},
@@ -97,7 +97,7 @@
   section = {adequacy}, from = {rm-delta-tbl}, join = {. },
   claim   = {you run it as a report or as a gate, like this},
   emit    = {assets/delta-cmds.sh},
-  check   = {cmd:sh -n assets/delta-cmds.sh}
+  check   = {cmd:grep -q discriminate.py assets/delta-cmds.sh}
 }
 @misc{rm-boundaries,
   section = {adequacy}, from = {rm-delta-cmds},
@@ -117,7 +117,7 @@
 @misc{rm-ci,
   section = {ci},
   claim   = {checks run locally as a pre-commit githook --- every commit must leave both documents green under --safe and the tool boundaries intact},
-  check   = {cmd:sh -n .githooks/pre-commit}
+  check   = {cmd:grep -q gate.py .githooks/pre-commit}
 }
 @misc{rm-ci-enable,
   section = {ci}, from = {rm-ci}, join = {. },

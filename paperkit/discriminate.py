@@ -59,10 +59,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -71,7 +73,7 @@ import gate as G  # noqa: E402
 import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grading)
 
 CORRUPT = b"\x00\x00DELTA-CORRUPTION\x00\x00\n"
-MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py"}
+MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt"}
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out"}
 _ENGINE = Path(__file__).resolve().parent
 
@@ -82,6 +84,19 @@ def _sandbox_root(project_dir):
     deps are paperkit/), else its parent (a project whose deps are a sibling — the
     paper's ../paperkit — or a self-contained fixture whose engine is elsewhere)."""
     return project_dir if _ENGINE.is_relative_to(project_dir) else project_dir.parent
+
+
+def _nested_roots(base: Path) -> list:
+    """Directories under `base` that are OTHER paperkit projects (each has its own
+    paper.toml).  A root-level project (the README, whose project dir IS the repo)
+    must not key on, or mutate, sibling projects' files — only its own + the engine."""
+    return [t.parent for t in base.rglob("paper.toml") if t.parent != base]
+
+
+def _mutable(f: Path) -> bool:
+    """A text input Δ may corrupt: a known source suffix, or a versioned git hook
+    (no suffix, but a checked artifact — the README's ci claim names it)."""
+    return f.is_file() and (f.suffix in MUTABLE_SUFFIXES or ".githooks" in f.parts)
 
 STRENGTH = {"vacuous": 0, "existence": 1, "indeterminate": 1, "behavioral": 2}
 ORDER = {"existence": 1, "behavioral": 2}  # valid --min-strength thresholds
@@ -100,9 +115,10 @@ def content_key(project_dir: Path) -> str:
     engine = Path(__file__).resolve().parent
     parts = []
     for tag, base in (("proj", project_dir), ("engine", engine)):
+        nested = _nested_roots(base) if tag == "proj" else []
         for f in sorted(base.rglob("*")):
-            if (f.is_file() and f.suffix in MUTABLE_SUFFIXES
-                    and not any(p in SKIP_DIRS for p in f.parts)):
+            if (_mutable(f) and not any(p in SKIP_DIRS for p in f.parts)
+                    and not any(nr in f.parents for nr in nested)):
                 parts.append(f"{tag}/{f.relative_to(base)}:{hashlib.sha256(f.read_bytes()).hexdigest()}")
     return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
 
@@ -131,11 +147,14 @@ def sandbox_files(sandbox_project: Path, exclude_scripts: set) -> list:
     themselves are excluded — corrupting a check's own script is a trivial,
     uninformative self-break)."""
     out = []
+    nested = _nested_roots(sandbox_project)
     for f in sorted(sandbox_project.rglob("*")):
-        if not f.is_file() or f.suffix not in MUTABLE_SUFFIXES:
+        if not _mutable(f):
             continue
         if any(part in SKIP_DIRS for part in f.parts):
             continue
+        if any(nr in f.parents for nr in nested):
+            continue  # a sibling project's file — not this project's to mutate
         if f.suffix == ".sh" and "checks" in f.parts:
             continue  # a verifier script; its corruption tests itself, not the claim
         out.append(f)
@@ -193,11 +212,38 @@ def grade_check(chk: str, project_dir: Path, presupposed: set,
             "not_lower": "not provably vacuous: it runs a cmd:, not a presupposed file:"}
 
 
+def _grade_one(project_dir, chk, custom, presupposed):
+    """Grade one check in its own fresh sandbox copy (so concurrent grades never
+    share a mutation).  The copy is the bounded universe of the project + engine."""
+    tmp = Path(tempfile.mkdtemp(prefix="paperkit-delta-"))
+    try:
+        root = _sandbox_root(project_dir)
+        shutil.copytree(root, tmp / root.name,
+                        ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
+        rel = project_dir.relative_to(root)
+        sandbox = tmp / root.name if rel == Path(".") else tmp / root.name / rel
+        return grade_check(chk, project_dir, presupposed, custom, sandbox)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _grade_parallel(project_dir, checks, custom, presupposed):
+    """Grade every distinct check CONCURRENTLY — each is an independent target with
+    its own sandbox, so the sweep's wall-clock is the slowest single check, not their
+    sum.  Bounded at cpu_count (a heavy check may itself fan out a nested gate)."""
+    jobs = max(1, min(len(checks), os.cpu_count() or 4))
+    with ThreadPoolExecutor(max_workers=jobs) as ex:
+        graded = list(ex.map(lambda c: _grade_one(project_dir, c, custom, presupposed), checks))
+    return dict(zip(checks, graded))
+
+
 class GradeWitness:
     """Δ's grading sweep as a pump()/parse() witness: one distinct check graded per
     pump(), state = {cursor, graded}.  The heavy per-check sandbox is rebuilt INSIDE
     pump and never crosses the serialization boundary — only the cheap cursor and the
-    scalar grade results are persisted, so a long grade is resumable (driver.py)."""
+    scalar grade results are persisted, so a long grade is resumable (driver.py).
+    Used for the resumable (--state/--budget) path; the default path grades in
+    parallel via _grade_parallel."""
 
     def __init__(self, project_dir, checks, custom, presupposed):
         self.project_dir, self.checks = project_dir, checks
@@ -211,16 +257,7 @@ class GradeWitness:
         if i >= len(self.checks):
             return state
         chk = self.checks[i]
-        tmp = Path(tempfile.mkdtemp(prefix="paperkit-delta-"))
-        try:
-            root = _sandbox_root(self.project_dir)
-            shutil.copytree(root, tmp / root.name,
-                            ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
-            rel = self.project_dir.relative_to(root)
-            sandbox = tmp / root.name if rel == Path(".") else tmp / root.name / rel
-            g = grade_check(chk, self.project_dir, self.presupposed, self.custom, sandbox)
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
+        g = _grade_one(self.project_dir, chk, self.custom, self.presupposed)
         return {"cursor": i + 1, "graded": {**state["graded"], chk: g}}
 
     def parse(self, state):
@@ -281,10 +318,17 @@ def main(argv: list) -> int:
     cached = {} if no_cache else _load_cache(project_dir)
     if cached.get("key") == key and all(c in cached.get("graded", {}) for c in share):
         graded = cached["graded"]
+    elif state_file is None and budget is None:
+        # Default: grade every distinct check CONCURRENTLY (each its own sandbox), so a
+        # project with heavy checks (the README's gate-paper / boundary-suite) grades in
+        # the time of its slowest check, not the sum.
+        graded = _grade_parallel(project_dir, list(share), custom, presupposed)
+        if not no_cache:
+            (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded}))
     else:
-        # Grade the distinct checks as a resumable pump-witness: one check per increment,
-        # under an optional budget (--state/--budget make a long grade resume across short
-        # calls instead of dying with nothing — the pump-ask liveness rule).
+        # Resumable path: grade as a pump-witness, one check per increment, under an
+        # optional budget (--state/--budget make a long grade resume across short calls
+        # instead of dying with nothing — the pump-ask liveness rule).
         witness = GradeWitness(project_dir, list(share), custom, presupposed)
         meaning, steps, done = D.drive(witness, state_path=state_file, budget=budget)
         if not done:

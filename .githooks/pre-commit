@@ -26,4 +26,5 @@ run "gate paper (--safe --without-K)"       python3 paperkit/gate.py --safe --wi
 run "gate README (--safe --without-K)"      python3 paperkit/gate.py --safe --without-K .
 run "gate boundaries (--safe --without-K)"  python3 paperkit/gate.py --safe --without-K boundaries
 run "Δ adequacy: paper all-behavioral"      python3 paperkit/discriminate.py --min-strength behavioral paper
+run "Δ adequacy: README all-behavioral"     python3 paperkit/discriminate.py --min-strength behavioral .
 echo "[pre-commit] all checks passed"

@@ -91,6 +91,31 @@
   check   = {ref:zswap-shrinker}
 }
 
+% ── kernel ───────────────────────────────────────────────────────────────────
+@misc{kern-overcommit,
+  section = {kernel},
+  claim   = {The storage tiers are only half the story; the kernel's reclaim policy is the other half. It permits overcommit, so a process may ask for more memory than physically exists --- the precondition for any of this to matter},
+  check   = {ref:overcommit-permits}
+}
+@misc{kern-mglru,
+  section = {kernel}, from = {kern-overcommit}, join = {. },
+  claim   = {When that ask comes due, reclaim runs on the multi-generational LRU, which ages pages in generations and evicts the genuinely cold ones rather than tearing into the working set},
+  rests-on = {kern-overcommit},
+  check   = {ref:mglru-on}
+}
+@misc{kern-watermark,
+  section = {kernel}, from = {kern-mglru}, join = {. },
+  claim   = {And it reclaims ahead of the wall rather than at it: the watermark is scaled an order of magnitude above its default, so the kernel keeps a headroom buffer and begins freeing memory early instead of in a panic},
+  rests-on = {kern-mglru},
+  check   = {ref:watermark-raised}
+}
+@misc{kern-thp,
+  section = {kernel}, from = {kern-watermark}, join = {. },
+  claim   = {Transparent hugepages are left on madvise rather than always, so no speculative two-megabyte allocations arrive to bloat or stall the moment memory tightens},
+  rests-on = {kern-watermark},
+  check   = {ref:thp-madvise}
+}
+
 % ── grace ────────────────────────────────────────────────────────────────────
 @misc{grace-dedup,
   section = {grace},

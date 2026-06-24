@@ -6,13 +6,17 @@
     "/proc/pressure/io",
     "/proc/pressure/memory",
     "/proc/swaps",
+    "/proc/sys/vm/overcommit_memory",
     "/proc/sys/vm/swappiness",
+    "/proc/sys/vm/watermark_scale_factor",
     "/sys/block/nvme0n1/queue/rotational",
     "/sys/block/zram0/comp_algorithm",
     "/sys/block/zram0/disksize",
     "/sys/block/zram0/mm_stat",
     "/sys/devices/system/cpu",
     "/sys/devices/system/node",
+    "/sys/kernel/mm/lru_gen/enabled",
+    "/sys/kernel/mm/transparent_hugepage/enabled",
     "/sys/module/zswap/parameters/compressor",
     "/sys/module/zswap/parameters/enabled",
     "/sys/module/zswap/parameters/max_pool_percent",
@@ -23,10 +27,16 @@
     "model": "12th Gen Intel(R) Core(TM) i7-12650H",
     "numa_nodes": 1
   },
+  "kernel": {
+    "mglru": "0x0007",
+    "overcommit_memory": 0,
+    "thp": "madvise",
+    "watermark_scale_factor": 125
+  },
   "mem_total_kb": 15997868,
   "psi": {
-    "io_avg300": 0.22,
-    "memory_avg300": 2.46
+    "io_avg300": 0.11,
+    "memory_avg300": 1.15
   },
   "root": {
     "device": "nvme0n1p2",
@@ -45,15 +55,15 @@
     }
   ],
   "swap_fill_kb": {
-    "/dev/zram0": 9524492,
-    "/swapfile": 11756488
+    "/dev/zram0": 9585164,
+    "/swapfile": 11976572
   },
   "swappiness": 80,
   "zram_algorithm": "zstd",
-  "zram_compr_bytes": 2200910644,
+  "zram_compr_bytes": 2133312826,
   "zram_disksize": 9829093376,
-  "zram_orig_bytes": 7778099200,
-  "zram_same_pages": 34561,
+  "zram_orig_bytes": 7558381568,
+  "zram_same_pages": 34531,
   "zswap": {
     "compressor": "lz4",
     "enabled": "Y",

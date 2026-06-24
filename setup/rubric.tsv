@@ -1,5 +1,6 @@
 machine	The machine
 swap	The swap stack
+kernel	How the kernel keeps its head
 grace	What the stack buys
 witness	Witnessed under load
 provenance	The data, and where it came from

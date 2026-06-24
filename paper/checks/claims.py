@@ -725,21 +725,28 @@ def env_sanitized():
 
 def grounding_reflected():
     # ∂²'s grounding face — the comparison definition-resolution made possible: each
-    # DECLARED rests-on edge is checked against MEASURED engine sensitivity.  An
-    # overlapping engine-capability fingerprint is reflected; a disjoint one is flagged;
-    # shared test scaffolding (claims.py / _fixture) does NOT count as engine grounding.
+    # DECLARED rests-on edge is checked against MEASURED engine sensitivity.  Overlap is
+    # reflected; a disjoint edge from a claim that tests NO engine capability is vacuously
+    # disjoint (rhetorical, auto-discharged); a disjoint edge from a claim that DOES test
+    # engine capability is a genuine miss, dischargeable by a `link`.  Shared test
+    # scaffolding (claims.py / _fixture) does NOT count as engine grounding.
     recs = [
         {"key": "y", "grade": "behavioral", "rests-on": [],
          "tests": ["paperkit/gate.py::resolves"]},
-        {"key": "x", "grade": "behavioral", "rests-on": ["y"],
+        {"key": "x", "grade": "behavioral", "rests-on": ["y"],          # overlaps y
          "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
-        {"key": "z", "grade": "behavioral", "rests-on": ["y"],
+        {"key": "z", "grade": "behavioral", "rests-on": ["y"],          # tests engine, disjoint → genuine
          "tests": ["paperkit/rhetoric.py::kind_of"]},
+        {"key": "w", "grade": "behavioral", "rests-on": ["y"],          # tests nothing engine → rhetorical
+         "tests": ["checks/claims.py::w"]},
     ]
     g = coherence.grounding_residual(recs)
-    assert g["grounding_edges"] == 2, g                                 # x→y and z→y
+    assert g["grounding_edges"] == 3, g                                 # x→y, z→y, w→y
     assert g["reflected"] == 1 and ["x", "y"] not in g["misses"], g     # x overlaps y
-    assert g["unreflected"] == 1 and ["z", "y"] in g["misses"], g       # z disjoint from y
+    assert g["undischarged"] == 1 and ["z", "y"] in g["misses"], g      # z genuine miss
+    assert g["rhetorical"] == 1 and ["w", "y"] not in g["misses"], g    # w vacuously disjoint, auto-discharged
+    assert coherence.grounding_residual(recs, discharged={"z"})["undischarged"] == 0, \
+        "a `link` did not discharge a genuine grounding miss"
     scaffold = [
         {"key": "y", "grade": "behavioral", "rests-on": [], "tests": ["checks/claims.py::y"]},
         {"key": "x", "grade": "behavioral", "rests-on": ["y"], "tests": ["checks/claims.py::x"]},

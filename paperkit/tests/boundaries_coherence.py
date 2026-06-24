@@ -32,12 +32,14 @@ LONG = [rec("a", section="s"), rec("b", section="s", frm=["a"]),
         rec("c", section="s", frm=["b"], rests=["a"])]                              # c grounds on a, two back
 DISTINCT = [rec("a", tests=["x.py"]), rec("b", tests=["y.py"])]  # different sensitivity
 COLLAPSED = [rec("a", tests=["w.py"]), rec("b", tests=["w.py"])]  # same sensitivity
-# grounding: b rests-on a; engine-capability fingerprints overlap / disjoint / scaffold-only
+# grounding: b rests-on a; engine fingerprints overlap / disjoint-genuine / disjoint-rhetorical
 GROUNDED = [rec("a", tests=["paperkit/gate.py::resolves"]),
             rec("b", rests=["a"], tests=["paperkit/gate.py::resolves", "paperkit/project.py::weave"])]
-UNGROUNDED = [rec("a", tests=["paperkit/gate.py::resolves"]),
-              rec("b", rests=["a"], tests=["paperkit/rhetoric.py::kind_of"])]
-SCAFFOLD = [rec("a", tests=["checks/claims.py::a"]),
+GENUINE = [rec("a", tests=["paperkit/gate.py::resolves"]),       # b tests engine capability, just not a's
+           rec("b", rests=["a"], tests=["paperkit/rhetoric.py::kind_of"])]
+RHETORICAL = [rec("a", tests=["paperkit/gate.py::resolves"]),    # b tests NO engine capability (empty)
+              rec("b", rests=["a"], tests=["checks/claims.py::b"])]
+SCAFFOLD = [rec("a", tests=["checks/claims.py::a"]),             # a measures no engine capability — no edge
             rec("b", rests=["a"], tests=["checks/claims.py::b"])]
 
 
@@ -62,10 +64,14 @@ def main() -> int:
           C.sensitivity_residual(DISTINCT)["signatures"] == 2 and C.sensitivity_residual(DISTINCT)["collapse"] == 0)
     check("sensitivity: shared tests → 1 signature, 1 collapse (name-distinct, sensitivity-same)",
           C.sensitivity_residual(COLLAPSED)["signatures"] == 1 and C.sensitivity_residual(COLLAPSED)["collapse"] == 1)
-    check("grounding: overlapping engine fingerprint → edge reflected, 0 unreflected",
-          C.grounding_residual(GROUNDED)["reflected"] == 1 and C.grounding_residual(GROUNDED)["unreflected"] == 0)
-    check("grounding: disjoint engine fingerprint → edge unreflected (declared, not measured)",
-          C.grounding_residual(UNGROUNDED)["unreflected"] == 1)
+    check("grounding: overlapping engine fingerprint → edge reflected, 0 residual",
+          C.grounding_residual(GROUNDED)["reflected"] == 1 and C.grounding_residual(GROUNDED)["undischarged"] == 0)
+    check("grounding: disjoint with a NON-empty fingerprint → genuine undischarged miss",
+          C.grounding_residual(GENUINE)["undischarged"] == 1)
+    check("grounding: an empty-fingerprint claim is vacuously disjoint → rhetorical, auto-discharged",
+          C.grounding_residual(RHETORICAL)["rhetorical"] == 1 and C.grounding_residual(RHETORICAL)["undischarged"] == 0)
+    check("grounding: a `link` discharges a genuine miss",
+          C.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0)
     check("grounding: shared scaffolding is not engine grounding (no edge counted)",
           C.grounding_residual(SCAFFOLD)["grounding_edges"] == 0)
     print()
@@ -84,10 +90,12 @@ def main() -> int:
          "acknowledging claim c's link",
          "un-acknowledged → 1", C.structure_residual(LONG)["undischarged"] == 1,
          "footnoted → 0", C.structure_residual(LONG, discharged={"c"})["undischarged"] == 0),
-        ("grounding tracks declared-vs-measured engine overlap",
-         "the dependent claim's tests (gate.resolves → rhetoric.kind_of)",
-         "overlap → reflected", C.grounding_residual(GROUNDED)["unreflected"] == 0,
-         "disjoint → unreflected", C.grounding_residual(UNGROUNDED)["unreflected"] == 1),
+        ("grounding: a disjoint edge is residual only when UN-explained",
+         "why the edge is disjoint (empty fingerprint / link / neither)",
+         "rhetorical OR linked → 0 residual",
+         C.grounding_residual(RHETORICAL)["undischarged"] == 0
+         and C.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0,
+         "genuine + unlinked → 1 residual", C.grounding_residual(GENUINE)["undischarged"] == 1),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -100,7 +108,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (9 behaviors, 4 deltas)")
+    print("BOUNDARIES: PASS (11 behaviors, 4 deltas)")
     return 0
 
 

@@ -20,9 +20,10 @@ pipeline (`discriminate --resolution def --json`), so nothing new is measured �
 
   GROUNDING   each DECLARED grounding edge (rests-on) should be REFLECTED in measured
               sensitivity: a claim that rests-on Y should exercise some of the engine Y
-              tests (their fingerprints overlap).  A declared-but-disjoint edge is
-              grounding the measurement does not see — the comparison the definition-
-              resolution fingerprint makes possible.
+              tests (their fingerprints overlap).  A disjoint edge is discharged when its
+              non-reflection is explained — MEASURABLY (X tests no engine capability, so it
+              is vacuously disjoint: rhetorical grounding) or by a `link` (the sibling of
+              the structure discharge).  Only a GENUINE, un-acknowledged miss is residual.
 
 A high residual is not a failure to hide — it is the gap between what a document SAYS
 grounds it and what DEMONSTRABLY does, surfaced so it can be closed (move-unification
@@ -130,19 +131,26 @@ def _engine_cap(tests) -> set:
             if t.startswith("paperkit/") and not t.startswith("paperkit/tests/")}
 
 
-def grounding_residual(records: list) -> dict:
+def grounding_residual(records: list, discharged=frozenset()) -> dict:
     """Face three (the comparison the roadmap reserved): does each DECLARED grounding
     edge (`rests-on`) show up in MEASURED sensitivity?  A claim X that rests-on Y should
     exercise some of the engine Y tests — their engine-capability fingerprints should
-    OVERLAP.  A rests-on edge X→Y whose fingerprints are DISJOINT is declared grounding
-    the measurement does not see: X says it stands on Y yet flips on nothing Y flips on
-    (often because X itself measurably tests no engine capability — a thesis/meta claim
-    grounded rhetorically, not behaviourally).  Advisory, like the other two faces."""
+    OVERLAP.  A disjoint edge X→Y is discharged when its non-reflection is EXPLAINED:
+
+      rhetorical    X tests no engine capability at all (an empty fingerprint), so the
+                    edge is VACUOUSLY disjoint — a thesis/meta claim grounded rhetorically,
+                    not behaviourally.  This is MEASURED, not asserted: it auto-discharges.
+      acknowledged  X DOES test engine capability, just not Y's, but a `link` footnote
+                    acknowledges it (the sibling of the structure face's discharge).
+
+    Only a GENUINE miss — X tests engine capability, disjoint from Y's, and un-acknowledged
+    — is the residual: declared grounding the measurement does not see and no one explained."""
     S = {r["key"]: _engine_cap(r.get("tests", [])) for r in records}
-    edges = reflected = unreflected = 0
+    edges = reflected = rhetorical = undischarged = 0
     misses = []
     for r in records:
-        sx = S.get(r["key"], set())
+        k = r["key"]
+        sx = S.get(k, set())
         for y in r.get("rests-on", []):
             sy = S.get(y)
             if not sy:                          # Y measures no engine capability — no claim to test
@@ -150,11 +158,15 @@ def grounding_residual(records: list) -> dict:
             edges += 1
             if sx & sy:
                 reflected += 1
+            elif not sx:
+                rhetorical += 1                 # X's fingerprint is empty — vacuously disjoint (measured)
+            elif k in discharged:
+                pass                            # author-acknowledged via a `link` footnote
             else:
-                unreflected += 1
-                misses.append([r["key"], y])
-    return {"grounding_edges": edges, "reflected": reflected,
-            "unreflected": unreflected, "misses": misses}
+                undischarged += 1
+                misses.append([k, y])
+    return {"grounding_edges": edges, "reflected": reflected, "rhetorical": rhetorical,
+            "undischarged": undischarged, "misses": misses}
 
 
 def report(records: list, discharged=frozenset()) -> dict:
@@ -162,7 +174,7 @@ def report(records: list, discharged=frozenset()) -> dict:
     return {"claims": len(cited),
             "structure": structure_residual(cited, discharged),
             "sensitivity": sensitivity_residual(cited),
-            "grounding": grounding_residual(cited)}
+            "grounding": grounding_residual(cited, discharged)}
 
 
 def _records(project_dir: Path) -> list:
@@ -202,10 +214,11 @@ def main(argv: list) -> int:
           f"sensitivity signatures ({se['collapse']} collapse); the largest {se['largest_class']} "
           f"share {se['largest_signature']}")
     print(f"  grounding  : {g['reflected']}/{g['grounding_edges']} rests-on edges reflected in "
-          f"measured engine sensitivity; {g['unreflected']} declared-but-disjoint "
-          f"(advisory — a claim grounded rhetorically, not behaviourally)")
+          f"measured engine sensitivity; {g['rhetorical']} vacuously disjoint (rhetorical — the "
+          f"claim tests no engine capability); {g['undischarged']} genuine, un-acknowledged "
+          f"(advisory — overlap the fingerprints, or discharge with a `link`)")
     for x, y in g["misses"]:
-        print(f"               [@{x}] rests-on [@{y}] — engine fingerprints disjoint")
+        print(f"               [@{x}] rests-on [@{y}] — tests engine capability, but not [@{y}]'s")
     return 0
 
 

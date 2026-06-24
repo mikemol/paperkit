@@ -325,7 +325,42 @@ def grade_check(chk: str, project_dir: Path, presupposed: set,
                 "not_lower": "not vacuous: the artifact is contingent, not a presupposed build input, so its absence is a real failure"}
     # cmd: / custom — empirically probe falsifiability
     baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir)
-    return _grade_from_sens(baseline, sens)
+    rec = _grade_from_sens(baseline, sens)
+    if rec["grade"] == "indeterminate":
+        rec = _vacuity_source(rec, chk, sandbox_project, custom, engine_dir)
+    return rec
+
+
+def _vacuity_source(rec: dict, chk: str, sandbox_project: Path,
+                    custom: dict, engine_dir: Path | None) -> dict:
+    """Δ·vacuity-source — split the indeterminate verdict by the ALL-CORRUPTED probe.
+    No SINGLE mutation flipped it; corrupt EVERY mutable input at once and look again.
+    Still green ⇒ insensitive to all project content: it reads only external/live state,
+    or asserts the absence of content no corruption supplies — Δ cannot falsify it, and
+    the fix is to read a PROJECT input (the dataset-backed pattern) or a Π counter-fixture.
+    Goes red ⇒ it does read project content, just not via any one file alone."""
+    files = sandbox_files(sandbox_project, set(), engine_dir)
+    saved = {f: f.read_bytes() for f in files}
+    try:
+        for f in files:
+            f.write_bytes(CORRUPT)
+        still_green = G.resolves(chk, sandbox_project, custom)
+    finally:
+        for f, b in saved.items():
+            f.write_bytes(b)
+    if still_green:
+        return {**rec, "vacuity": "total",
+                "why": "corrupting EVERY project input AT ONCE leaves it green — it is blind to all "
+                       "project content: it reads only external/live state, or asserts the absence "
+                       "of content no corruption supplies; Δ cannot falsify it by mutation",
+                "not_higher": "to rise: read a PROJECT input a mutation can corrupt (a captured "
+                              "dataset — the dataset-backed pattern), or supply a Π counter-fixture "
+                              "(only the latter helps a negative assertion; an external read needs the former)"}
+    return {**rec, "vacuity": "combination",
+            "why": "no single input flips it, but corrupting all of them at once does — it depends "
+                   "on project content in concert, not on any one file",
+            "not_higher": "to rise: a Π counter-fixture isolating the responsible inputs proves it behavioral",
+            "not_lower": "not external: corrupting all inputs DOES flip it, so it reads project content"}
 
 
 def _grade_from_sens(baseline: bool, sens: list) -> dict:

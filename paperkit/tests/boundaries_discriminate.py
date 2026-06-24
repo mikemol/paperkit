@@ -81,6 +81,11 @@ DELTA_CASES = [
      "P": ("_grade_parallel", f"cmd:grep -q {TOKEN} w.bib", False),
      "F": ("_grade_flat", f"cmd:grep -q {TOKEN} w.bib", True),
      "delta": "env: (unset)  →  PAPERKIT_DELTA_FLAT=1", "kind": "grader"},
+    {"name": "Δ vacuity-source: behavioral → total  (corruption-blind, Δ·vacuity-source)",
+     "axis": "whether the check reads a corruptible PROJECT input at all",
+     "P": ("behavioral", f"cmd:grep -q {TOKEN} w.bib"),
+     "F": ("total", "cmd:true"),
+     "delta": f"check: cmd:grep -q {TOKEN} w.bib  →  cmd:true", "kind": "vacuity"},
 ]
 
 
@@ -116,6 +121,12 @@ def main() -> int:
             p_got, f_got = grader_of(p_chk, p_flat), grader_of(f_chk, f_flat)
             ok = (p_got == p_want) and (f_got == f_want) and (p_got != f_got)
             pside, fside = f"grader={p_got}", f"grader={f_got}"
+        elif d["kind"] == "vacuity":
+            (p_want, p_chk), (f_want, f_chk) = d["P"], d["F"]
+            pr, fr = grade_of(p_chk), grade_of(f_chk)
+            p_got, f_got = pr["grade"], fr.get("vacuity")
+            ok = (p_got == p_want) and (f_got == f_want) and (pr["grade"] != fr["grade"])
+            pside, fside = f"grade={p_got}", f"vacuity={f_got}"
         else:
             (p_want, p_chk, p_cite), (f_want, f_chk, f_cite) = d["P"], d["F"]
             p_got, f_got = gate_exit(p_chk, p_cite), gate_exit(f_chk, f_cite)

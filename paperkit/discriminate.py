@@ -620,14 +620,17 @@ def main(argv: list) -> int:
         # 0.0 ("run to done"), and `budget is None` is then never true — which silently
         # routed EVERY default grade through the slow resumable pump below and left this
         # whole batch path (and the flat gate) dead.  Keep it `budget_str is None`.
-        # The FLAT work-queue grader (Σ·flat) was meant to peg the box on the heavy def
-        # grade, but the integrated audit found it slower AND silently wrong: its
-        # witnesses are recursion-trees (each fx.gate fans out, serializing on membudget's
-        # one flock), so N blind outer witnesses convoy on the lock; and a legitimately
-        # slow flip dragged past TIMEOUT is killed and silently dropped from the
-        # sensitivity set (behavioral graded vacuous).  Until Σ·flat·lease (budget the
-        # whole tree through membudget) + Σ·flat·cull (a visible, non-silent timeout)
-        # land, group testing stays the default for both resolutions; flat is opt-in.
+        # The FLAT work-queue grader (Σ·flat) was meant to peg the box by keeping N
+        # witnesses in flight.  It is opt-in and stays that way: MEASURED (Σ·flat·measure
+        # + ·lease, paper file-mode under a 3 GB scope) it ran 8m11s against _grade_parallel's
+        # 40s — 12x SLOWER.  Its oversubscription (N=2.5x cpus blind outer witnesses, each a
+        # fx.gate recursion-tree) THRASHES any real memory budget; the prototype's "peg"
+        # only wins on an idle box with spare RAM.  Σ·flat·lease (throttle the pool to fit
+        # RAM, via membudget) was NOT pursued: fit-RAM concurrency is exactly what
+        # _grade_parallel already does, so ·lease could at best make flat MATCH parallel,
+        # never beat it — and flat is intrinsically heavier (a subprocess per (check,site),
+        # ~13k of them, vs ~70 per-check).  group testing is the default for both
+        # resolutions; flat is kept opt-in only for an idle box with abundant RAM.
         grade_fn = _grade_flat if os.environ.get("PAPERKIT_DELTA_FLAT") == "1" else _grade_parallel
         grader = grade_fn.__name__
         graded = grade_fn(project_dir, list(share), custom, presupposed)

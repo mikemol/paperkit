@@ -62,9 +62,13 @@ import hashlib
 import json
 import os
 import shutil
+import signal
+import subprocess
 import sys
 import tempfile
+import time
 import tomllib
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -321,6 +325,12 @@ def grade_check(chk: str, project_dir: Path, presupposed: set,
                 "not_lower": "not vacuous: the artifact is contingent, not a presupposed build input, so its absence is a real failure"}
     # cmd: / custom — empirically probe falsifiability
     baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir)
+    return _grade_from_sens(baseline, sens)
+
+
+def _grade_from_sens(baseline: bool, sens: list) -> dict:
+    """The cmd/custom verdict as a pure function of (baseline-passes, flip-set) — shared
+    by the per-check path (grade_check → sensitivity) and the flat work-queue grader."""
     if not baseline:
         return {"grade": "broken", "tests": [],
                 "why": "check does not pass in a pristine sandbox — repo is not green",
@@ -365,6 +375,120 @@ def _grade_parallel(project_dir, checks, custom, presupposed):
     with ThreadPoolExecutor(max_workers=jobs) as ex:
         graded = list(ex.map(lambda c: _grade_one(project_dir, c, custom, presupposed), checks))
     return dict(zip(checks, graded))
+
+
+def _witness_cmd(chk: str, custom: dict) -> str:
+    """The shell command a cmd/custom check runs (mirrors the gate's construction)."""
+    typ, _, target = chk.partition(":")
+    if typ in custom:
+        return custom[typ]["cmd"].replace("{target}", target)
+    return target
+
+
+def _grade_flat(project_dir, checks, custom, presupposed):
+    """The FLAT work-queue grader.  Group testing serializes each check's binary-split,
+    so a few heavy integration witnesses form a tail that starves the cores (~50% busy,
+    measured).  Flat instead makes every (check, site) mutation an INDEPENDENT job and
+    keeps N witnesses in flight over a sandbox pool — the box stays pegged (100%), no
+    tail.  It trades group testing's run-count savings for embarrassing parallelism, the
+    right trade on idle cores.  file: checks need no run; cmd/custom checks are graded
+    from a baseline run + the flip set the pool collects.  (Per-candidate footprint
+    pruning to cut the run count is the measured next step, Σ·flat·prune.)"""
+    file_checks = [c for c in checks if c.partition(":")[0] == "file"]
+    run_checks = [c for c in checks if c.partition(":")[0] != "file"]
+    graded = {c: grade_check(c, project_dir, presupposed, custom, project_dir) for c in file_checks}
+    if not run_checks:
+        return graded
+    cpus = os.cpu_count() or 4
+    N = max(1, min(64, int(os.environ.get("PAPERKIT_DELTA_JOBS", str(round(cpus * 2.5))))))
+    tmp = Path(tempfile.mkdtemp(prefix="paperkit-flat-"))
+    try:
+        root = _sandbox_root(project_dir)
+        rel = project_dir.relative_to(root)
+        template = tmp / "tmpl"
+        shutil.copytree(root, template, ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
+        tproj = template if rel == Path(".") else template / rel
+        teng = ((template / _ENGINE.relative_to(root))
+                if _RESOLUTION == "def" and _ENGINE.is_relative_to(root) else None)
+        sites, orig = [], {}            # site = (file_rel_to_root, kind, node|None, label)
+        for f in sandbox_files(tproj, set(), teng):
+            fr = str(f.relative_to(template))
+            orig[fr] = f.read_bytes()
+            label = _rel(f, tproj, teng)
+            if f.suffix == ".py":
+                for qn, node in _def_sites(f.read_text()):
+                    sites.append((fr, "def", node, f"{label}::{qn}"))
+            else:
+                sites.append((fr, "file", None, label))
+        pool = []
+        for i in range(N):
+            sb = tmp / f"sb{i}"
+            shutil.copytree(template, sb, dirs_exist_ok=True)
+            pool.append(sb)
+        proj_cwd = (lambda sb: sb if rel == Path(".") else sb / rel)
+        TIMEOUT = float(os.environ.get("PAPERKIT_DELTA_TIMEOUT", "90"))
+
+        def orchestrate(jobs):
+            free = list(pool)
+            q = deque(jobs)
+            active: dict = {}           # Popen -> (chk, si, sb, fa, launched_at)
+            res: dict = {}              # (chk, si) -> returncode (None = timed out / hung)
+            env = G.clean_env()
+            DEV = subprocess.DEVNULL
+            while q or active:
+                while q and free:
+                    chk, si = q.popleft()
+                    sb = free.pop()
+                    fa = None
+                    if si is not None:
+                        fr, kind, node, _ = sites[si]
+                        fa = sb / fr
+                        if kind == "def":
+                            fa.write_text(_mutate_lines(orig[fr].decode(), [node]))
+                        else:
+                            fa.write_bytes(CORRUPT)
+                    # own session, so a hung witness's whole tree (nested gate / membudget
+                    # scope) can be reaped — no orphans, and a stall can't wedge the grade.
+                    p = subprocess.Popen(_witness_cmd(chk, custom), shell=True,
+                                         cwd=str(proj_cwd(sb)), stdout=DEV, stderr=DEV, env=env,
+                                         start_new_session=True)
+                    active[p] = (chk, si, sb, fa, time.time())
+                now = time.time()
+                done = []
+                for p, (chk, si, sb, fa, t0p) in list(active.items()):
+                    rc = p.poll()
+                    if rc is not None:
+                        done.append((p, rc))
+                    elif now - t0p > TIMEOUT:      # a hung witness (e.g. mem-lease under membudget contention)
+                        try:
+                            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+                        except (ProcessLookupError, PermissionError):
+                            pass
+                        p.wait()
+                        done.append((p, None))     # None = timed out, distinct from a clean flip
+                if not done:
+                    time.sleep(0.02)
+                    continue
+                for p, rc in done:
+                    chk, si, sb, fa, _ = active.pop(p)
+                    if fa is not None:
+                        fa.write_bytes(orig[sites[si][0]])
+                    res[(chk, si)] = rc
+                    free.append(sb)
+            return res
+
+        base = orchestrate([(c, None) for c in run_checks])
+        green = [c for c in run_checks if base[(c, None)] == 0]    # baseline passed CLEANLY
+        flips = orchestrate([(c, si) for c in green for si in range(len(sites))])
+        sens: dict = {c: [] for c in run_checks}
+        for (c, si), rc in flips.items():
+            if rc is not None and rc != 0:          # a clean non-zero exit — a real flip (not a hang)
+                sens[c].append(sites[si][3])
+        for c in run_checks:
+            graded[c] = _grade_from_sens(base[(c, None)] == 0, sorted(sens[c]))
+        return graded
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 class GradeWitness:
@@ -455,14 +579,21 @@ def main(argv: list) -> int:
     if cached.get("key") == key and all(c in cached.get("graded", {}) for c in share):
         graded = cached["graded"]
     elif state_file is None and budget_str is None:
-        # Default: grade every distinct check CONCURRENTLY (each its own sandbox), so a
-        # project with heavy checks (the README's gate-paper / boundary-suite) grades in
-        # the time of its slowest check, not the sum.  NOTE: gate on the RAW flag
-        # (budget_str), not the coerced `budget`: an absent --budget coerces to 0.0
-        # ("run to done"), so `budget is None` was never true — which silently routed
-        # EVERY default grade through the slow resumable pump below and left this whole
-        # concurrent path dead.  Keep it `budget_str is None`.
-        graded = _grade_parallel(project_dir, list(share), custom, presupposed)
+        # Batch grade — the default when neither resumable flag is given.  NOTE: test the
+        # RAW flag (budget_str), not the coerced `budget`: an absent --budget coerces to
+        # 0.0 ("run to done"), and `budget is None` is then never true — which silently
+        # routed EVERY default grade through the slow resumable pump below and left this
+        # whole batch path (and the flat gate) dead.  Keep it `budget_str is None`.
+        # The FLAT work-queue grader (Σ·flat) was meant to peg the box on the heavy def
+        # grade, but the integrated audit found it slower AND silently wrong: its
+        # witnesses are recursion-trees (each fx.gate fans out, serializing on membudget's
+        # one flock), so N blind outer witnesses convoy on the lock; and a legitimately
+        # slow flip dragged past TIMEOUT is killed and silently dropped from the
+        # sensitivity set (behavioral graded vacuous).  Until Σ·flat·lease (budget the
+        # whole tree through membudget) + Σ·flat·cull (a visible, non-silent timeout)
+        # land, group testing stays the default for both resolutions; flat is opt-in.
+        grade_fn = _grade_flat if os.environ.get("PAPERKIT_DELTA_FLAT") == "1" else _grade_parallel
+        graded = grade_fn(project_dir, list(share), custom, presupposed)
         if not no_cache:
             (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded}))
     else:

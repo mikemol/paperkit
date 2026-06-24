@@ -1,163 +1,192 @@
 #!/usr/bin/env python3
-"""Probes for the `probe:<fact>` checks of the setup project.
+"""Two-phase probes for the setup project.
 
-Each fact is a STRUCTURAL property of the running machine — its CPU topology
-and its swap stack — read straight from /proc and /sys (no parsing of
-human-formatted tool output).  `probe.py <fact>` exits 0 iff the fact holds on
-THIS box, so the prose that cites it cannot drift from the hardware: re-gate on
-a different machine and the false claims fail.
+The probe is split the way a paperkit witness is — pump / interpret:
 
-    python3 setup/probe.py cores10
+  pump()              RETRIEVES the machine's readings from /proc and /sys and
+                      INTERNS them into one state object (a plain dict).  This is
+                      the side-effecting half: it touches the live kernel.
+  FACTS[name](state)  INTERPRETS that interned state into a yes/no verdict.  Pure
+                      functions of the dict — they never touch the kernel.
+
+Because interpretation is a pure function of the interned state, the same facts
+can be checked two ways:
+
+    probe.py <fact>                  pump() live, then interpret   (machine-bound)
+    probe.py <fact> --from ref.json  interpret a SHIPPED snapshot   (portable)
+
+so paperkit can ship setup/reference.json — "this is the data that ran on my
+machine" — and a reader re-interprets it anywhere.  `--fresh ref.json` then
+certifies PROVENANCE: it re-pumps and checks the snapshot's STRUCTURAL readings
+still match this box (dynamic readings — pressure, swap fill — are a frozen
+measurement and excluded from the match).
+
+    probe.py --capture > reference.json    # regenerate the shipped dataset
+    probe.py --fresh reference.json        # provenance: does it match this box?
+    probe.py cores10 --from reference.json # interpret one fact from the snapshot
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
-
-def _swaps() -> list[dict]:
-    # /proc/swaps: Filename  Type  Size  Used  Priority
-    rows = Path("/proc/swaps").read_text().splitlines()[1:]
-    out = []
-    for r in rows:
-        f = r.split()
-        if len(f) >= 5:
-            out.append({"name": f[0], "type": f[1], "prio": int(f[4])})
-    return out
-
-
-def _root_device() -> str:
-    for line in Path("/proc/mounts").read_text().splitlines():
-        dev, mnt, *_ = line.split()
-        if mnt == "/" and dev.startswith("/dev/"):
-            return dev.removeprefix("/dev/")
-    return ""
-
-
-def _base_block(dev: str) -> str:
-    # nvme0n1p2 -> nvme0n1 ; sda3 -> sda
-    if "nvme" in dev and "p" in dev:
-        return dev.rsplit("p", 1)[0]
-    return dev.rstrip("0123456789")
-
-
-def _rotational(dev: str) -> str | None:
-    p = Path(f"/sys/block/{_base_block(dev)}/queue/rotational")
-    return p.read_text().strip() if p.exists() else None
-
-
-def _psi_avg300(resource: str) -> float:
-    for line in Path(f"/proc/pressure/{resource}").read_text().splitlines():
-        if line.startswith("some"):
-            for tok in line.split():
-                if tok.startswith("avg300="):
-                    return float(tok.split("=", 1)[1])
-    raise ValueError(f"no avg300 in /proc/pressure/{resource}")
-
-
-def _zram_algorithm() -> str:
-    # comp_algorithm lists candidates with the ACTIVE one in [brackets]
-    txt = Path("/sys/block/zram0/comp_algorithm").read_text()
-    for tok in txt.split():
-        if tok.startswith("[") and tok.endswith("]"):
-            return tok.strip("[]")
-    return ""
-
-
 COMPRESSORS = {"zstd", "lzo", "lzo-rle", "lz4", "lz4hc", "842"}
 
-
-def cores10() -> bool:
-    return len(list(Path("/sys/devices/system/cpu").glob("cpu[0-9]*"))) == 10 and \
-        len([1 for d in Path("/sys/devices/system/cpu").glob("cpu[0-9]*")
-             if (d / "online").exists() or d.name == "cpu0"]) >= 10
-
-
-def numa1() -> bool:
-    nodes = list(Path("/sys/devices/system/node").glob("node[0-9]*"))
-    return len(nodes) == 1
+# the interned readings that are STABLE across captures (hardware + configured
+# topology); the rest (pressure, swap fill, compression fill) are a frozen
+# measurement, so freshness/provenance compares only these.
+STRUCTURAL = ("cpu", "swap_devices", "zram_algorithm", "zram_disksize",
+              "root", "swappiness", "mem_total_kb")
 
 
-def hybrid() -> bool:
-    # an Intel hybrid (P+E) part advertises more than one core TYPE; on this
-    # 12th-gen box the model string carries the H-series mobile hybrid id.
-    info = Path("/proc/cpuinfo").read_text()
-    return "12650H" in info or "12th Gen" in info
+# ── pump: retrieve + intern ───────────────────────────────────────────────────
+def pump() -> dict:
+    """Read the live machine into one interned state object."""
+    src: list[str] = []
+
+    def rd(p: str) -> str:
+        src.append(p)
+        return Path(p).read_text()
+
+    def has(p: str) -> bool:
+        src.append(p)
+        return Path(p).exists()
+
+    # swap devices + fill
+    swaps = []
+    for row in rd("/proc/swaps").splitlines()[1:]:
+        f = row.split()
+        if len(f) >= 5:
+            swaps.append({"name": f[0], "type": f[1], "used_kb": int(f[3]), "prio": int(f[4])})
+
+    # root block device + rotational
+    rootdev = ""
+    for line in rd("/proc/mounts").splitlines():
+        dev, mnt, *_ = line.split()
+        if mnt == "/" and dev.startswith("/dev/"):
+            rootdev = dev.removeprefix("/dev/")
+            break
+    base = rootdev.rsplit("p", 1)[0] if ("nvme" in rootdev and "p" in rootdev) else rootdev.rstrip("0123456789")
+    rota = rd(f"/sys/block/{base}/queue/rotational").strip() if has(f"/sys/block/{base}/queue/rotational") else None
+
+    # zram
+    algo = ""
+    for tok in rd("/sys/block/zram0/comp_algorithm").split():
+        if tok.startswith("[") and tok.endswith("]"):
+            algo = tok.strip("[]")
+    mm = rd("/sys/block/zram0/mm_stat").split()
+
+    # cpu topology
+    logical = len(list(Path("/sys/devices/system/cpu").glob("cpu[0-9]*")))
+    src.append("/sys/devices/system/cpu")
+    nodes = len(list(Path("/sys/devices/system/node").glob("node[0-9]*")))
+    src.append("/sys/devices/system/node")
+    model = ""
+    for line in rd("/proc/cpuinfo").splitlines():
+        if line.startswith("model name"):
+            model = line.split(":", 1)[1].strip()
+            break
+
+    def psi(resource: str) -> float:
+        for line in rd(f"/proc/pressure/{resource}").splitlines():
+            if line.startswith("some"):
+                for t in line.split():
+                    if t.startswith("avg300="):
+                        return float(t.split("=", 1)[1])
+        raise ValueError(resource)
+
+    mem_total = int(next(l.split()[1] for l in rd("/proc/meminfo").splitlines() if l.startswith("MemTotal")))
+
+    state = {
+        "cpu": {"logical": logical, "numa_nodes": nodes, "model": model},
+        "swap_devices": [{"name": s["name"], "type": s["type"], "prio": s["prio"]} for s in swaps],
+        "swap_fill_kb": {s["name"]: s["used_kb"] for s in swaps},
+        "root": {"device": rootdev, "rotational": rota},
+        "zram_algorithm": algo,
+        "zram_disksize": int(rd("/sys/block/zram0/disksize").strip()),
+        "zram_orig_bytes": int(mm[0]), "zram_compr_bytes": int(mm[1]), "zram_same_pages": int(mm[5]),
+        "swappiness": int(rd("/proc/sys/vm/swappiness").strip()),
+        "mem_total_kb": mem_total,
+        "psi": {"io_avg300": psi("io"), "memory_avg300": psi("memory")},
+        "_sources": sorted(set(src)),
+    }
+    return state
 
 
-def zram_primary() -> bool:
-    sw = _swaps()
-    zram = [s for s in sw if "zram" in s["name"]]
-    return bool(zram) and max(s["prio"] for s in sw) == zram[0]["prio"]
+def _structural(state: dict) -> dict:
+    return {k: state[k] for k in STRUCTURAL if k in state}
 
 
-def zram_zstd() -> bool:
-    return _zram_algorithm() == "zstd"
+# ── interpret: pure functions of the interned state ───────────────────────────
+def _zram(s: dict) -> dict | None:
+    z = [d for d in s["swap_devices"] if "zram" in d["name"]]
+    return z[0] if z else None
 
 
-def compressor() -> bool:
-    return _zram_algorithm() in COMPRESSORS
+def cores10(s):       return s["cpu"]["logical"] == 10
+def numa1(s):         return s["cpu"]["numa_nodes"] == 1
+def hybrid(s):        return "12650H" in s["cpu"]["model"] or "12th Gen" in s["cpu"]["model"]
+def zram_zstd(s):     return s["zram_algorithm"] == "zstd"
+def compressor(s):    return s["zram_algorithm"] in COMPRESSORS
+def zram_in_ram(s):   return _zram(s) is not None and s["zram_disksize"] > 0
+def zram_size(s):     return s["zram_disksize"] / (s["mem_total_kb"] * 1024) >= 0.4
+def zram_ratio(s):    return s["zram_compr_bytes"] > 0 and s["zram_orig_bytes"] / s["zram_compr_bytes"] >= 3.0
+def swappiness(s):    return s["swappiness"] >= 60
+def psi_io_low(s):    return s["psi"]["io_avg300"] < 5.0
+def psi_mem_low(s):   return s["psi"]["memory_avg300"] < 10.0
+def psi_readable(s):  return "io_avg300" in s["psi"]
+def env_bound(s):     return bool(s["_sources"]) and all(p.startswith(("/proc/", "/sys/")) for p in s["_sources"])
 
 
-def nvme_overflow() -> bool:
-    sw = _swaps()
-    files = [s for s in sw if s["type"] == "file"]
-    zram = [s for s in sw if "zram" in s["name"]]
-    if not files or not zram:
-        return False
-    lower_prio = all(f["prio"] < zram[0]["prio"] for f in files)
-    return lower_prio and _rotational(_root_device()) == "0"
+def zram_primary(s):
+    z = _zram(s)
+    return z is not None and max(d["prio"] for d in s["swap_devices"]) == z["prio"]
 
 
-def tiered() -> bool:
-    # the kernel drains the highest-priority swap first; zram must outrank disk
-    return zram_primary() and nvme_overflow()
+def nvme_overflow(s):
+    z = _zram(s)
+    files = [d for d in s["swap_devices"] if d["type"] == "file"]
+    return bool(files) and z is not None and all(f["prio"] < z["prio"] for f in files) \
+        and s["root"]["rotational"] == "0"
 
 
-def psi_readable() -> bool:
-    _psi_avg300("io")
-    return True
-
-
-def psi_io_low() -> bool:
-    # the box's BASELINE is not IO-stalled (graceful degradation leaves no
-    # standing IO pressure); threshold is generous — thrash sits far above it.
-    return _psi_avg300("io") < 5.0
-
-
-def psi_mem_low() -> bool:
-    # the complementary half: even under memory oversubscription the box does
-    # not LIVE memory-stalled (the compressed tier absorbs the pressure).
-    return _psi_avg300("memory") < 10.0
-
-
-def zram_in_ram() -> bool:
-    # the compressed swap tier is a RAM-backed block device (not disk).
-    return Path("/sys/block/zram0").exists() and any("zram" in s["name"] for s in _swaps())
-
-
-def env_bound() -> bool:
-    # self-referential: this project's own checks read the LIVE kernel (/proc,
-    # /sys), so its truth is machine-relative — the closing claim proves it.
-    src = Path(__file__).read_text()
-    return "/proc/" in src and "/sys/" in src
+def tiered(s):        return zram_primary(s) and nvme_overflow(s)
 
 
 FACTS = {
     "cores10": cores10, "numa1": numa1, "hybrid": hybrid,
     "zram-primary": zram_primary, "zram-zstd": zram_zstd, "compressor": compressor,
-    "nvme-overflow": nvme_overflow, "tiered": tiered, "zram-in-ram": zram_in_ram,
+    "zram-in-ram": zram_in_ram, "zram-size": zram_size, "zram-ratio": zram_ratio,
+    "nvme-overflow": nvme_overflow, "tiered": tiered, "swappiness": swappiness,
     "psi-readable": psi_readable, "psi-io-low": psi_io_low, "psi-mem-low": psi_mem_low,
     "env-bound": env_bound,
 }
 
 
+# ── CLI ───────────────────────────────────────────────────────────────────────
 def main(argv: list[str]) -> int:
-    if len(argv) != 1 or argv[0] not in FACTS:
-        sys.exit(f"usage: probe.py <{' | '.join(FACTS)}>")
-    ok = FACTS[argv[0]]()
+    if argv[:1] == ["--capture"]:
+        print(json.dumps(pump(), indent=2, sort_keys=True))
+        return 0
+    if argv[:1] == ["--fresh"]:
+        ref = json.loads(Path(argv[1]).read_text())
+        live = pump()
+        ok = _structural(live) == _structural(ref)
+        if not ok:
+            print("probe: reference dataset does NOT match this machine (structural drift)", file=sys.stderr)
+        return 0 if ok else 1
+
+    fact = argv[0] if argv else None
+    if fact not in FACTS:
+        sys.exit(f"usage: probe.py <{' | '.join(FACTS)}> [--from ref.json] | --capture | --fresh ref.json")
+    if "--from" in argv:
+        state = json.loads(Path(argv[argv.index("--from") + 1]).read_text())
+    else:
+        state = pump()
+    ok = bool(FACTS[fact](state))
     if not ok:
-        print(f"probe: {argv[0]} does NOT hold on this machine", file=sys.stderr)
+        print(f"probe: {fact} does NOT hold for the {'snapshot' if '--from' in argv else 'live machine'}", file=sys.stderr)
     return 0 if ok else 1
 
 

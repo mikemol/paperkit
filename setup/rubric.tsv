@@ -2,4 +2,4 @@ machine	The machine
 swap	The swap stack
 grace	What the stack buys
 witness	Witnessed under load
-point	The point
+provenance	The data, and where it came from

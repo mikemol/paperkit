@@ -1,0 +1,53 @@
+{
+  "_sources": [
+    "/proc/cpuinfo",
+    "/proc/meminfo",
+    "/proc/mounts",
+    "/proc/pressure/io",
+    "/proc/pressure/memory",
+    "/proc/swaps",
+    "/proc/sys/vm/swappiness",
+    "/sys/block/nvme0n1/queue/rotational",
+    "/sys/block/zram0/comp_algorithm",
+    "/sys/block/zram0/disksize",
+    "/sys/block/zram0/mm_stat",
+    "/sys/devices/system/cpu",
+    "/sys/devices/system/node"
+  ],
+  "cpu": {
+    "logical": 10,
+    "model": "12th Gen Intel(R) Core(TM) i7-12650H",
+    "numa_nodes": 1
+  },
+  "mem_total_kb": 15997868,
+  "psi": {
+    "io_avg300": 0.06,
+    "memory_avg300": 1.19
+  },
+  "root": {
+    "device": "nvme0n1p2",
+    "rotational": "0"
+  },
+  "swap_devices": [
+    {
+      "name": "/swapfile",
+      "prio": -1,
+      "type": "file"
+    },
+    {
+      "name": "/dev/zram0",
+      "prio": 100,
+      "type": "partition"
+    }
+  ],
+  "swap_fill_kb": {
+    "/dev/zram0": 9574168,
+    "/swapfile": 11683464
+  },
+  "swappiness": 80,
+  "zram_algorithm": "zstd",
+  "zram_compr_bytes": 2088903681,
+  "zram_disksize": 9829093376,
+  "zram_orig_bytes": 7402975232,
+  "zram_same_pages": 33809
+}

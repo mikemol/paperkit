@@ -1,15 +1,21 @@
 [paper]
 title = "Graceful Under Pressure"
-subtitle = "A self-verifying note on one machine's swap stack: every claim below is a PROBE of the live hardware (setup/probe.py), so re-gating on a different box fails the claims that no longer hold — the prose cannot drift from the machine it describes."
+subtitle = "A self-verifying note on one machine's swap stack. The claims read a SHIPPED reference dataset (setup/reference.json), interned from /proc and /sys by setup/probe.py's pump() and interpreted by pure functions of that state — so anyone can re-verify them anywhere (machine-readable, no regex, no model in the loop). A separate freshness check certifies provenance: the dataset's structural readings still match THIS box. Body travels; provenance stays home."
 warrants = ["warrants.bib"]
 rubric = "rubric.tsv"
 out = "SETUP.md"
 numbered = false
 references = false
 
-# `probe:<fact>` is satisfied by setup/probe.py <fact>: it reads /proc and /sys
-# and exits 0 iff the structural fact holds on THIS machine.  The topology claims
-# are gated; the measured magnitudes (3.6x, ~0% IO pressure) live in the prose as
-# a dated observation resting on the topology that makes them possible.
-[checks.probe]
-cmd = "python3 probe.py {target}"
+# `ref:<fact>` interprets the shipped snapshot — setup/probe.py <fact> --from
+# reference.json.  Because the check reads a real file in the project, Δ can
+# corrupt it and flip the verdict: the claims are NON-VACUOUS (behavioral),
+# unlike a live `probe:` read of the kernel, which no file mutation can falsify.
+[checks.ref]
+cmd = "python3 probe.py {target} --from reference.json"
+
+# `fresh:<dataset>` re-pumps the live machine and checks the snapshot's
+# STRUCTURAL readings still match — the provenance anchor that ties the portable
+# dataset to this specific box.
+[checks.fresh]
+cmd = "python3 probe.py --fresh {target}"

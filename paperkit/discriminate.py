@@ -454,10 +454,14 @@ def main(argv: list) -> int:
     cached = {} if no_cache else _load_cache(project_dir)
     if cached.get("key") == key and all(c in cached.get("graded", {}) for c in share):
         graded = cached["graded"]
-    elif state_file is None and budget is None:
+    elif state_file is None and budget_str is None:
         # Default: grade every distinct check CONCURRENTLY (each its own sandbox), so a
         # project with heavy checks (the README's gate-paper / boundary-suite) grades in
-        # the time of its slowest check, not the sum.
+        # the time of its slowest check, not the sum.  NOTE: gate on the RAW flag
+        # (budget_str), not the coerced `budget`: an absent --budget coerces to 0.0
+        # ("run to done"), so `budget is None` was never true — which silently routed
+        # EVERY default grade through the slow resumable pump below and left this whole
+        # concurrent path dead.  Keep it `budget_str is None`.
         graded = _grade_parallel(project_dir, list(share), custom, presupposed)
         if not no_cache:
             (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded}))

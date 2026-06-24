@@ -178,6 +178,18 @@
   rests-on = {cmd-builtin, new-domain-adds},
   check   = {claim:cmd-escape}
 }
+@misc{dataset-backed,
+  section = {resolver}, from = {cmd-escape}, join = {. },
+  claim   = {Pointed at a dataset the project SHIPS rather than a transient command, that hatch turns a claim's evidence into a versioned artifact --- a captured snapshot, a generated figure --- that anyone can re-read and a single edit can falsify},
+  rests-on = {new-domain-adds},
+  check   = {claim:dataset-backed}
+}
+@misc{dataset-fresh,
+  section = {resolver}, from = {dataset-backed}, join = {, kept honest because },
+  claim   = {the verifier re-runs the producer that built that dataset and fails on drift --- shipped evidence that is fresh by construction, not a figure pasted in once and quietly gone stale},
+  rests-on = {dataset-backed},
+  check   = {claim:dataset-fresh}
+}
 
 % ── 5. selfhost ─────────────────────────────────────────────────────────────
 @misc{paper-is-paperkit,

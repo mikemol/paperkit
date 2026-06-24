@@ -71,6 +71,40 @@ def two_builtins():
     assert builtins == {"file", "cmd"}, f"built-in types are {builtins}, expected file & cmd"
 
 
+def dataset_backed():
+    # "a custom verifier may interpret a dataset the project SHIPS … a single edit can
+    # falsify" — a check whose command reads a project file resolves true while the file
+    # matches and flips false on a one-line edit to that shipped dataset.
+    d = Path(tempfile.mkdtemp())
+    try:
+        custom = {"data": {"cmd": "python3 -c \"import json,sys; "
+                                  "sys.exit(0 if json.load(open('d.json'))['k']=='ok' else 1)\""}}
+        (d / "d.json").write_text('{"k": "ok"}')
+        assert gate.resolves("data:x", d, custom) is True, "a dataset-backed check over matching data must resolve"
+        (d / "d.json").write_text('{"k": "drift"}')
+        assert gate.resolves("data:x", d, custom) is False, "a single edit to the shipped dataset must flip the verdict"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def dataset_fresh():
+    # "the verifier re-runs the producer … and fails on drift" — fresh-by-construction:
+    # a check that regenerates via the producer and compares passes on a matching
+    # committed asset and fails once that asset drifts from what the producer yields.
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "producer.py").write_text("print('CANON-V1')")
+        custom = {"fresh": {"cmd": "python3 -c \"import subprocess,sys; "
+                                   "canon=subprocess.run([sys.executable,'producer.py'],capture_output=True,text=True).stdout.strip(); "
+                                   "sys.exit(0 if open('asset.txt').read().strip()==canon else 1)\""}}
+        (d / "asset.txt").write_text("CANON-V1\n")
+        assert gate.resolves("fresh:x", d, custom) is True, "a committed asset matching its producer must pass"
+        (d / "asset.txt").write_text("STALE\n")
+        assert gate.resolves("fresh:x", d, custom) is False, "an asset drifted from its producer must fail"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def file_builtin():
     # "file, that an artifact exists"
     assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: of an existing path failed"
@@ -821,6 +855,8 @@ CLAIMS = {
     "gate-is-subject": gate_is_subject,
     "verifier-named": verifier_named,
     "gate-dispatches": gate_dispatches,
+    "dataset-backed": dataset_backed,
+    "dataset-fresh": dataset_fresh,
     "new-domain-adds": new_domain_adds,
     "two-builtins": two_builtins,
     "file-builtin": file_builtin,

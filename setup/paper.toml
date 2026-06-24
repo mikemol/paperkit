@@ -19,3 +19,11 @@ cmd = "python3 probe.py {target} --from reference.json"
 # dataset to this specific box.
 [checks.fresh]
 cmd = "python3 probe.py --fresh {target}"
+
+# `load:<fact>` interprets loadtest.json — the result of a memory-oversubscription
+# experiment that experiment.py runs BOUNDED BY CONSTRUCTION (inside a systemd
+# cgroup scope with MemoryMax).  The first load: check produces the dataset (runs
+# the experiment); the rest reuse it.  So the witness facts DEPEND on the heavy
+# load having run — the dependency is the build order.
+[checks.load]
+cmd = "python3 experiment.py {target}"

@@ -89,17 +89,44 @@
 }
 
 % ── witness ──────────────────────────────────────────────────────────────────
-@misc{wit-episode,
+% These rest on loadtest.json — a memory-oversubscription experiment run BOUNDED
+% BY CONSTRUCTION (experiment.py, inside a systemd cgroup scope).  The facts
+% depend on the heavy load having run, so the experiment is part of the build.
+@misc{wit-oversub,
   section = {witness},
-  claim   = {This is measured, not assumed: a twenty-five-way grader fan-out drove RAM to full and roughly twenty gigabytes into swap, yet the box never stalled --- the dataset's own pressure reading puts memory contention near one percent, far below the threshold where work would block},
+  claim   = {To watch this happen on demand, experiment.py allocates twice its memory cap across a dozen worker processes},
   rests-on = {grace-cheap},
-  check   = {ref:psi-mem-low}
+  check   = {load:load-oversubscribed}
 }
-@misc{wit-compress,
-  section = {witness}, from = {wit-episode}, join = {. },
-  claim   = {The recorded snapshot shows the compressed tier holding three and a half times its own footprint --- anonymous interpreter pages deduplicated across the identical workers --- while the NVMe tier absorbed the remainder without a stall},
+@misc{wit-bounded,
+  section = {witness}, from = {wit-oversub}, join = {. },
+  claim   = {It needs no restraint to be safe, because it is bounded by construction: it runs inside a systemd cgroup scope with a hard memory cap, and under that two-fold oversubscription its resident set never crossed the cap},
+  rests-on = {wit-oversub},
+  check   = {load:load-bounded}
+}
+@misc{wit-spilled,
+  section = {witness}, from = {wit-bounded}, join = {. },
+  claim   = {The overflow was not killed but spilled to swap, more than a gigabyte of it},
+  rests-on = {swap-tier},
+  check   = {load:load-swap-spilled}
+}
+@misc{wit-ioquiet,
+  section = {witness}, from = {wit-spilled}, join = {, and here is the point: },
+  claim   = {the disk never blocked --- the cgroup's IO stall stayed at three thousandths of a percent, because the spill went into compressed RAM, not onto a platter},
+  rests-on = {swap-inram},
+  check   = {load:load-io-quiet}
+}
+@misc{wit-membound,
+  section = {witness}, from = {wit-ioquiet}, join = {. },
+  claim   = {What pressure there was fell on memory and stayed bounded, well under half --- the honest cost of compressing and reclaiming under load, paid in CPU},
+  rests-on = {grace-dedup},
+  check   = {load:load-mem-bounded}
+}
+@misc{wit-compressed,
+  section = {witness}, from = {wit-membound}, join = {. },
+  claim   = {And the compressed tier earned its keep, holding the spill at about three and a half to one},
   rests-on = {swap-zstd},
-  check   = {ref:zram-ratio}
+  check   = {load:load-compressed}
 }
 
 % ── provenance ───────────────────────────────────────────────────────────────

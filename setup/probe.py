@@ -37,7 +37,7 @@ COMPRESSORS = {"zstd", "lzo", "lzo-rle", "lz4", "lz4hc", "842"}
 # topology); the rest (pressure, swap fill, compression fill) are a frozen
 # measurement, so freshness/provenance compares only these.
 STRUCTURAL = ("cpu", "swap_devices", "zram_algorithm", "zram_disksize",
-              "root", "swappiness", "mem_total_kb")
+              "root", "swappiness", "mem_total_kb", "zswap")
 
 
 # ── pump: retrieve + intern ───────────────────────────────────────────────────
@@ -98,6 +98,11 @@ def pump() -> dict:
 
     mem_total = int(next(l.split()[1] for l in rd("/proc/meminfo").splitlines() if l.startswith("MemTotal")))
 
+    # zswap: the compressed write-back CACHE in front of the disk-swap path (lz4,
+    # bounded to max_pool_percent of RAM) — the second compression layer above zram.
+    zswap = {p: rd(f"/sys/module/zswap/parameters/{p}").strip()
+             for p in ("enabled", "compressor", "max_pool_percent", "shrinker_enabled")}
+
     state = {
         "cpu": {"logical": logical, "numa_nodes": nodes, "model": model},
         "swap_devices": [{"name": s["name"], "type": s["type"], "prio": s["prio"]} for s in swaps],
@@ -106,6 +111,7 @@ def pump() -> dict:
         "zram_algorithm": algo,
         "zram_disksize": int(rd("/sys/block/zram0/disksize").strip()),
         "zram_orig_bytes": int(mm[0]), "zram_compr_bytes": int(mm[1]), "zram_same_pages": int(mm[5]),
+        "zswap": zswap,
         "swappiness": int(rd("/proc/sys/vm/swappiness").strip()),
         "mem_total_kb": mem_total,
         "psi": {"io_avg300": psi("io"), "memory_avg300": psi("memory")},
@@ -133,6 +139,10 @@ def zram_in_ram(s):   return _zram(s) is not None and s["zram_disksize"] > 0
 def zram_size(s):     return s["zram_disksize"] / (s["mem_total_kb"] * 1024) >= 0.4
 def zram_ratio(s):    return s["zram_compr_bytes"] > 0 and s["zram_orig_bytes"] / s["zram_compr_bytes"] >= 3.0
 def swappiness(s):    return s["swappiness"] >= 60
+def zswap_enabled(s): return s["zswap"]["enabled"] == "Y"
+def zswap_lz4(s):     return s["zswap"]["compressor"] == "lz4"           # speed-favouring, for the cache path
+def zswap_bounded(s): return 0 < int(s["zswap"]["max_pool_percent"]) <= 20  # the cache can't eat RAM unbounded
+def zswap_shrinker(s): return s["zswap"]["shrinker_enabled"] == "Y"     # writes back to disk under pressure
 def psi_io_low(s):    return s["psi"]["io_avg300"] < 5.0
 def psi_mem_low(s):   return s["psi"]["memory_avg300"] < 10.0
 def psi_readable(s):  return "io_avg300" in s["psi"]
@@ -159,6 +169,8 @@ FACTS = {
     "zram-primary": zram_primary, "zram-zstd": zram_zstd, "compressor": compressor,
     "zram-in-ram": zram_in_ram, "zram-size": zram_size, "zram-ratio": zram_ratio,
     "nvme-overflow": nvme_overflow, "tiered": tiered, "swappiness": swappiness,
+    "zswap-enabled": zswap_enabled, "zswap-lz4": zswap_lz4,
+    "zswap-bounded": zswap_bounded, "zswap-shrinker": zswap_shrinker,
     "psi-readable": psi_readable, "psi-io-low": psi_io_low, "psi-mem-low": psi_mem_low,
     "env-bound": env_bound,
 }

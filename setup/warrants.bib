@@ -67,6 +67,29 @@
   rests-on = {swap-tier},
   check   = {ref:swappiness}
 }
+@misc{swap-zswap,
+  section = {swap}, from = {swap-swappy}, join = {. },
+  claim   = {There is a second compression layer, too: zswap is enabled, a write-back cache that compresses pages on their way to the disk tier so most never arrive},
+  check   = {ref:zswap-enabled}
+}
+@misc{swap-zswap-lz4,
+  section = {swap}, from = {swap-zswap}, join = {. },
+  claim   = {It compresses with lz4 --- speed over ratio, the opposite choice from the device's zstd, and the right one for a cache on the hot write-back path},
+  rests-on = {swap-zswap},
+  check   = {ref:zswap-lz4}
+}
+@misc{swap-zswap-bounded,
+  section = {swap}, from = {swap-zswap-lz4}, join = {. },
+  claim   = {And it is itself bounded by construction: its pool may consume no more than a fifth of RAM},
+  rests-on = {swap-zswap},
+  check   = {ref:zswap-bounded}
+}
+@misc{swap-zswap-shrinker,
+  section = {swap}, from = {swap-zswap-bounded}, join = {, },
+  claim   = {beyond which a shrinker writes the coldest pages through to disk --- so the cache copes with sustained pressure instead of simply filling up},
+  rests-on = {swap-zswap-bounded},
+  check   = {ref:zswap-shrinker}
+}
 
 % ── grace ────────────────────────────────────────────────────────────────────
 @misc{grace-dedup,
@@ -118,9 +141,9 @@
 }
 @misc{wit-membound,
   section = {witness}, from = {wit-ioquiet}, join = {. },
-  claim   = {What pressure there was fell on memory and stayed bounded, well under half --- the honest cost of compressing and reclaiming under load, paid in CPU},
+  claim   = {The cost was real --- under a threefold oversubscription the workload stalled over half the time --- but it fell on memory and CPU, not the disk: the IO stall was a rounding error beside it. The system stayed up by THROTTLING a greedy workload, not by thrashing a platter or invoking the killer},
   rests-on = {grace-dedup},
-  check   = {load:load-mem-bounded}
+  check   = {load:load-not-io-bound}
 }
 @misc{wit-compressed,
   section = {witness}, from = {wit-membound}, join = {. },

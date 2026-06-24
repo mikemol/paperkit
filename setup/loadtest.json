@@ -3,16 +3,16 @@
     "cgroup memory.max/current/swap.current/{memory,io}.pressure",
     "/sys/block/zram0/mm_stat"
   ],
-  "allocated_bytes": 2147483640,
-  "cap_bytes": 1073741824,
-  "elapsed_s": 12.36,
-  "io_full_stall_fraction": 3e-05,
-  "mem_full_stall_fraction": 0.23955,
+  "allocated_bytes": 12884901888,
+  "cap_bytes": 4294967296,
+  "elapsed_s": 20.56,
+  "io_full_stall_fraction": 0.00048,
+  "mem_full_stall_fraction": 0.60581,
   "peak": {
-    "mem_current_bytes": 880459776,
-    "swap_current_bytes": 1407160320,
-    "zram_compr_bytes": 2238869270,
-    "zram_orig_bytes": 7897137152
+    "mem_current_bytes": 4293898240,
+    "swap_current_bytes": 7557373952,
+    "zram_compr_bytes": 2255146182,
+    "zram_orig_bytes": 7982235648
   },
-  "workers": 12
+  "workers": 16
 }

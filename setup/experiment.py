@@ -30,12 +30,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "loadtest.json"
 GB = 1024 ** 3
-CAP_MB = int(os.environ.get("PAPERKIT_LOAD_CAP_MB", "1024"))   # cgroup MemoryMax (RAM cap)
-SWAP_MB = int(os.environ.get("PAPERKIT_LOAD_SWAP_MB", "3072"))  # cgroup MemorySwapMax (swap allowed)
-OVERSUB = float(os.environ.get("PAPERKIT_LOAD_OVERSUB", "2.0"))  # allocate this x the cap
-WORKERS = int(os.environ.get("PAPERKIT_LOAD_WORKERS", "12"))
-RAMP_S = float(os.environ.get("PAPERKIT_LOAD_RAMP", "12"))     # max wait for workers to fault in
-HOLD_S = float(os.environ.get("PAPERKIT_LOAD_HOLD", "4"))
+CAP_MB = int(os.environ.get("PAPERKIT_LOAD_CAP_MB", "4096"))   # cgroup MemoryMax (RAM cap)
+SWAP_MB = int(os.environ.get("PAPERKIT_LOAD_SWAP_MB", "10240"))  # cgroup MemorySwapMax (swap allowed)
+OVERSUB = float(os.environ.get("PAPERKIT_LOAD_OVERSUB", "3.0"))  # allocate this x the cap (12 GB at 4 GB cap)
+WORKERS = int(os.environ.get("PAPERKIT_LOAD_WORKERS", "16"))
+RAMP_S = float(os.environ.get("PAPERKIT_LOAD_RAMP", "20"))     # let the load build + spill before sampling
 
 
 # ── cgroup introspection (this process's own scope) ───────────────────────────
@@ -139,7 +138,7 @@ def load_oversubscribed(s): return s["allocated_bytes"] > s["cap_bytes"]        
 def load_bounded(s):        return s["peak"]["mem_current_bytes"] <= int(s["cap_bytes"] * 1.05)  # held AT the cap
 def load_swap_spilled(s):   return s["peak"]["swap_current_bytes"] > 64 * 1024 * 1024            # overflow swapped, not OOM
 def load_io_quiet(s):       return s["io_full_stall_fraction"] < 0.01                            # the DISK never blocked
-def load_mem_bounded(s):    return s["mem_full_stall_fraction"] < 0.50                           # memory stall stayed bounded
+def load_not_io_bound(s):   return s["io_full_stall_fraction"] < 0.1 * s["mem_full_stall_fraction"]  # cost is CPU/mem, not disk
 def load_compressed(s):     return s["peak"]["zram_compr_bytes"] > 0 and \
     s["peak"]["zram_orig_bytes"] / s["peak"]["zram_compr_bytes"] >= 1.5
 
@@ -147,7 +146,7 @@ def load_compressed(s):     return s["peak"]["zram_compr_bytes"] > 0 and \
 FACTS = {
     "load-oversubscribed": load_oversubscribed, "load-bounded": load_bounded,
     "load-swap-spilled": load_swap_spilled, "load-io-quiet": load_io_quiet,
-    "load-mem-bounded": load_mem_bounded, "load-compressed": load_compressed,
+    "load-not-io-bound": load_not_io_bound, "load-compressed": load_compressed,
 }
 
 

@@ -749,11 +749,15 @@ def grounding_reflected():
 
 
 def forward_direction():
-    # the one designed-not-built direction left: `move` could subsume from/rests-on as
-    # one chiral edge (the grounding-vs-sensitivity coherence grade landed — see
-    # grounding_reflected).  Trips when move-unification lands, so the roadmap updates.
-    assert '("from", "rests-on")' in PROJECT_SRC, \
-        "from/rests-on no longer parsed separately — move-unification may have landed; update the roadmap"
+    # the structure residual closed by PROJECTION (the grounding DAG renders as
+    # transitively-reduced cross-references), not the retired "subsume into one chiral
+    # edge" flattening.  The open work is the richer materialization rungs (an expounding
+    # clause / a figure beyond the bare citation) — trips when one lands.
+    src = (ENGINE / "project.py").read_text()
+    assert "def transitive_reduction" in src and "def references" in src, \
+        "the reference projection/reduction was removed — update the roadmap"
+    assert "def expound" not in src, \
+        "a richer reference materialization (expound) may have landed — update the roadmap"
 
 
 CLAIMS = {

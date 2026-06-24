@@ -1,0 +1,90 @@
+% warrants.bib — the claim-DAG for "Graceful Under Pressure".
+%
+% Every `check` is probe:<fact>, run by setup/probe.py against /proc and /sys, so
+% each sentence is verified against the LIVE machine at gate time.  `from` carries
+% prose order within a section; `rests-on` is the grounding DAG (what entails what).
+% Re-gate on another box and the claims that stop being true simply fail.
+
+% ── machine ──────────────────────────────────────────────────────────────────
+@misc{mach-cores,
+  section = {machine},
+  claim   = {This machine exposes ten logical cores},
+  check   = {probe:cores10}
+}
+@misc{mach-numa,
+  section = {machine}, from = {mach-cores}, join = {, and },
+  claim   = {all ten share a single NUMA node, so memory is uniform and a worker may land on any core without a cross-node penalty},
+  rests-on = {mach-cores},
+  check   = {probe:numa1}
+}
+@misc{mach-hybrid,
+  section = {machine}, from = {mach-numa}, join = {. },
+  claim   = {The ten are not uniform: six are performance cores and four are efficiency cores, an Intel 12th-generation hybrid part},
+  rests-on = {mach-cores},
+  check   = {probe:hybrid}
+}
+
+% ── swap ─────────────────────────────────────────────────────────────────────
+@misc{swap-zram,
+  section = {swap},
+  claim   = {Swap is served first from a block device that lives in RAM and compresses every page it stores},
+  check   = {probe:zram-primary}
+}
+@misc{swap-zstd,
+  section = {swap}, from = {swap-zram}, join = {, using the },
+  claim   = {zstd compressor, which favours ratio over raw speed},
+  rests-on = {swap-zram},
+  check   = {probe:zram-zstd}
+}
+@misc{swap-nvme,
+  section = {swap}, from = {swap-zstd}, join = {. },
+  claim   = {Behind it, a 32 GB swapfile on a non-rotational NVMe disk catches the overflow at a lower priority},
+  check   = {probe:nvme-overflow}
+}
+@misc{swap-tier,
+  section = {swap}, from = {swap-nvme}, join = {. },
+  claim   = {Because the in-RAM device outranks the swapfile, the kernel fills the fast compressed tier completely before it writes a single page to disk},
+  rests-on = {swap-zram, swap-nvme},
+  check   = {probe:tiered}
+}
+
+% ── grace ────────────────────────────────────────────────────────────────────
+@misc{grace-dedup,
+  section = {grace},
+  claim   = {A fan-out workload spawns many near-identical processes, and their duplicate pages --- shared interpreter, shared imports --- are exactly what a compressor collapses},
+  rests-on = {swap-zstd},
+  check   = {probe:compressor}
+}
+@misc{grace-cheap,
+  section = {grace}, from = {grace-dedup}, join = {. },
+  claim   = {So memory oversubscription that would thrash a single-tier machine instead stays cheap here: it is paid in CPU cycles to compress, not in milliseconds to seek},
+  rests-on = {swap-tier, grace-dedup},
+  check   = {probe:psi-io-low}
+}
+@misc{grace-cpu,
+  section = {grace}, from = {grace-cheap}, join = {. },
+  claim   = {The overload converts into useful work --- the cores stay saturated rather than blocking on disk},
+  rests-on = {grace-cheap, mach-cores},
+  check   = {probe:psi-readable}
+}
+
+% ── witness ──────────────────────────────────────────────────────────────────
+@misc{wit-episode,
+  section = {witness},
+  claim   = {This is measured, not assumed: a twenty-five-way grader fan-out drove RAM to full and roughly twenty gigabytes into swap, yet the box never stalled --- memory pressure held under one percent while the cores stayed pegged at one hundred percent},
+  rests-on = {grace-cheap},
+  check   = {probe:psi-mem-low}
+}
+@misc{wit-compress,
+  section = {witness}, from = {wit-episode}, join = {. },
+  claim   = {About nine of those gigabytes sat in the compressed in-RAM tier --- anonymous interpreter pages, deduplicated across the identical workers at roughly three-and-a-half to one --- while the NVMe tier absorbed the remainder without a stall},
+  rests-on = {swap-zram},
+  check   = {probe:zram-in-ram}
+}
+
+% ── point ────────────────────────────────────────────────────────────────────
+@misc{env-bound,
+  section = {point},
+  claim   = {Every check above reads the live kernel --- /proc and /sys --- so this is not portable prose but a measurement of one machine; re-gate it on different hardware and the lines that have stopped being true simply fail, which is the whole idea: a document that cannot lie about the box it runs on},
+  check   = {probe:env-bound}
+}

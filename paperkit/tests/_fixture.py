@@ -64,8 +64,8 @@ def _write(d, warrants, assets, rubric, title, numbered, references):
     return proj
 
 
-def _run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True)
+def _run(cmd, env=None):
+    return subprocess.run(cmd, capture_output=True, text=True, env=env)
 
 
 def project_text(warrants, *, assets=None, rubric=(("s", "Sec"),),
@@ -93,12 +93,14 @@ def gate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
 
 
 def discriminate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
-                 title="t", numbered=False, references=False):
-    """(returncode, stdout).  Projects out.md before grading (or writes `out`)."""
+                 title="t", numbered=False, references=False, env=None):
+    """(returncode, stdout).  Projects out.md before grading (or writes `out`).
+    `env` overrides the child environment (e.g. PAPERKIT_DELTA_FLAT=1 to select
+    the flat grader) — the Σ·flat·witness boundary toggles it."""
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, title, numbered, references)
         _projected(proj, out)
-        r = _run([sys.executable, str(DISCRIMINATE), *flags, str(proj)])
+        r = _run([sys.executable, str(DISCRIMINATE), *flags, str(proj)], env=env)
         return r.returncode, r.stdout
 
 

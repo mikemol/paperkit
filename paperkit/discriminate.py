@@ -578,6 +578,7 @@ def main(argv: list) -> int:
     cached = {} if no_cache else _load_cache(project_dir)
     if cached.get("key") == key and all(c in cached.get("graded", {}) for c in share):
         graded = cached["graded"]
+        grader = cached.get("grader", "cache")   # report the ORIGINAL grader; "cache" for a pre-witness cache
     elif state_file is None and budget_str is None:
         # Batch grade — the default when neither resumable flag is given.  NOTE: test the
         # RAW flag (budget_str), not the coerced `budget`: an absent --budget coerces to
@@ -593,9 +594,10 @@ def main(argv: list) -> int:
         # whole tree through membudget) + Σ·flat·cull (a visible, non-silent timeout)
         # land, group testing stays the default for both resolutions; flat is opt-in.
         grade_fn = _grade_flat if os.environ.get("PAPERKIT_DELTA_FLAT") == "1" else _grade_parallel
+        grader = grade_fn.__name__
         graded = grade_fn(project_dir, list(share), custom, presupposed)
         if not no_cache:
-            (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded}))
+            (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded, "grader": grader}))
     else:
         # Resumable path: grade as a pump-witness, one check per increment, under an
         # optional budget (--state/--budget make a long grade resume across short calls
@@ -607,9 +609,14 @@ def main(argv: list) -> int:
                   f"not done; state persisted to {state_file}, re-run to resume", file=sys.stderr)
             return 2
         graded = meaning["graded"]
+        grader = "GradeWitness"
         if not no_cache:
-            (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded}))
+            (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded, "grader": grader}))
 
+    # Σ·flat·witness: record WHICH grader produced these grades, so the live execution
+    # path is a checkable artifact, not an inference from the source (a dead branch or a
+    # cache hit is then visible, and any path-agreement check is sound).
+    print(f"paperkit-discriminate: graded by {grader}", file=sys.stderr)
     records = []
     for k in keys:
         chk = F[k]["check"]
@@ -618,6 +625,7 @@ def main(argv: list) -> int:
                  shared_with=[o for o in share[chk] if o != k])
         g["from"] = F[k].get("from", [])
         g["rests-on"] = F[k].get("rests-on", [])     # grounding edges (for clamping)
+        g["grader"] = grader
         records.append(g)
 
     # content inputs = the files a check must touch to discriminate the paper's

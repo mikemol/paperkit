@@ -205,11 +205,22 @@ def references(k: str, targets: list, pos: dict) -> str:
 
 
 def weave(text: list, F: dict, primary: str, pos: dict | None = None,
-          reduced: dict | None = None) -> str:
-    """Weave a run of prose-claim keys into one sentence-diagrammed paragraph."""
-    clauses = [sentence(k, F[k], primary)
-               + references(k, (reduced or {}).get(k, F[k].get("rests-on", [])), pos or {})
-               for k in text]
+          reduced: dict | None = None, footnotes: dict | None = None) -> str:
+    """Weave a run of prose-claim keys into one sentence-diagrammed paragraph.  A
+    claim carrying a `link` is materialized at the EXPOUND rung of the reference
+    ladder (drop < cite < expound < figure): a footnote marker on the sentence, the
+    link explanation + its grounding citations collected into `footnotes` for the
+    document end.  Without a link (or no footnotes sink) the grounding is the CITE
+    floor — the inline parenthetical."""
+    def clause(k: str) -> str:
+        s = sentence(k, F[k], primary)
+        ref = references(k, (reduced or {}).get(k, F[k].get("rests-on", [])), pos or {})
+        link = F[k].get("link")
+        if link and footnotes is not None:           # expound: link + citations → footnote
+            footnotes[k] = clean(link) + ref
+            return s + f"[^{k}]"
+        return s + ref                               # cite floor: inline parenthetical
+    clauses = [clause(k) for k in text]
     clauses[0] = clauses[0][:1].upper() + clauses[0][1:]
     clauses[1:] = [re.sub(r"^(The|A|An) ", lambda m: m.group(1).lower() + " ", c)
                    for c in clauses[1:]]
@@ -269,6 +280,7 @@ def project(cfg: dict) -> str:
     # transitive reduction of the grounding DAG — project only references the reader
     # cannot already reach through a shorter rests-on path (drop redundant clutter).
     reduced = transitive_reduction({k: f.get("rests-on", []) for k, f in F.items()})
+    footnotes: dict = {}                              # expound-rung materializations, in document order
 
     lines = [f"# {cfg['title']}", ""]
     if cfg["subtitle"]:
@@ -292,7 +304,7 @@ def project(cfg: dict) -> str:
                 if f.get("claim") or f.get("title"):
                     run.append(k)
                 if run:
-                    lines += [weave(run, F, primary, pos, reduced), ""]
+                    lines += [weave(run, F, primary, pos, reduced, footnotes), ""]
                     run = []
                 lines += emit_block(pdir, f) + [""]
             elif f.get("check", "").startswith("figure:"):
@@ -300,7 +312,11 @@ def project(cfg: dict) -> str:
             else:
                 run.append(k)
         if run:
-            lines += [weave(run, F, primary, pos, reduced), ""]
+            lines += [weave(run, F, primary, pos, reduced, footnotes), ""]
+    # the expound rung: a claim's `link` materialized as a document-end footnote
+    # (the marker rode the sentence; the explanation + its citations land here).
+    if footnotes:
+        lines += [f"[^{k}]: {v[:1].upper() + v[1:]}" for k, v in footnotes.items()] + [""]
     if cfg["references"]:
         lines += ["## References", ""]
     return "\n".join(lines) + "\n"

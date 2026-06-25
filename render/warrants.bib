@@ -1,0 +1,12 @@
+% warrants.bib — Ρ·render: the paper renders to a document, and the document is gated to
+% present the VERIFIED paper.  On-demand (pandoc); not the pre-commit hook.
+@misc{rnd-emit,
+  section = {emit},
+  claim   = {the paper renders to a Word document --- pandoc turns paper.md into a valid .docx (a well-formed OOXML package that pandoc can read back), the first presentation beyond markdown},
+  check   = {cmd:sh checks/emit.sh}
+}
+@misc{rnd-agree,
+  section = {agree},
+  claim   = {the rendered document PRESENTS the verified paper: the plain text a reader sees in the .docx is byte-for-byte the plain text of paper.md, so the render preserves the content --- presentation agreement extends prose≡projection down the render stack, from the gated source to the delivered document},
+  check   = {cmd:sh checks/agree.sh}
+}

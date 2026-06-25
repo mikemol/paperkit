@@ -1,0 +1,3 @@
+# render-project sections, in document order.
+emit	Emit: paper.md → docx
+agree	Presentation Agreement

@@ -1,0 +1,8 @@
+[paper]
+title = "Paperkit — Rendering: paper.md → docx, Gated to Agree"
+subtitle = "On-demand: the paper renders to a Word document, and the document is gated to PRESENT the verified paper faithfully — presentation agreement extends prose≡projection down the render stack."
+warrants = ["warrants.bib"]
+rubric = "rubric.tsv"
+out = "RENDER.md"
+numbered = false
+references = false

@@ -2,3 +2,4 @@
 emit	Emit: paper.md → docx
 agree	Presentation Agreement
 integrity	Output Integrity & Fidelity
+visual	Visual Fidelity (the rendered pixels)

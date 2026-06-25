@@ -20,3 +20,13 @@
   claim   = {and the reader's view is faithful: rendered all the way to a PDF, every non-ASCII glyph the paper uses survives into the text layer with no missing-glyph tofu, and every heading is present there --- what the consumer copies, searches, or hears through a screen reader is the paper, not a broken rendering},
   check   = {cmd:python3 checks/fidelity.py}
 }
+@misc{rnd-ocr,
+  section = {visual},
+  claim   = {the reader's EYE sees the paper, not just a screen reader: rendered to a PDF and rasterized to images, OCR recovers the paper's text from the pixels themselves --- a font or render regression that turned the body to tofu would crater that recovery, so the visual layer is gated, not only the text layer},
+  check   = {cmd:python3 checks/ocr.py}
+}
+@misc{rnd-fonts,
+  section = {visual}, from = {rnd-ocr}, join = {. },
+  claim   = {and every font in the rendered PDF is EMBEDDED, so it draws identically on a machine that lacks the font --- no silent substitution to a glyph the author never saw},
+  check   = {cmd:python3 checks/fonts.py}
+}

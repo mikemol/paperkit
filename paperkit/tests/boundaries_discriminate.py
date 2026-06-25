@@ -42,6 +42,23 @@ def grader_of(check, resumable=False):
     return json.loads(out)[0]["grader"]
 
 
+def grades_via(warrants, resumable=False):
+    # Σ·flat·agree: the whole grade-set produced by one grader, keyed by check.
+    flags = ("--all", "--json") + (("--budget", "0") if resumable else ())
+    _, out = discriminate(warrants, *flags)
+    return {r["check"]: r["grade"] for r in json.loads(out)}
+
+
+# A deliberately MIXED-grade project: vacuous (presupposed file), behavioral
+# (content-sensitive cmd), indeterminate (corruption-blind cmd) — so grader
+# equivalence is checked on a discriminating set, not a degenerate all-same one.
+MIXED = [
+    entry("v", claim="a presupposed input", check="file:w.bib"),
+    entry("b", claim=f"content that mentions {TOKEN}", check=f"cmd:grep -q {TOKEN} w.bib"),
+    entry("i", claim="a check blind to the project", check="cmd:true"),
+]
+
+
 def gate_exit(check, cited):
     # cited-only gating: control whether [@w] appears in the projection directly
     out = "the claim [@w]\n" if cited else "no citation here\n"
@@ -140,10 +157,25 @@ def main() -> int:
         print(f"      δ (min delta over {d['axis']}):")
         print(f"          {d['delta']}\n")
 
+    # ── Σ·flat·agree: the batch (_grade_parallel) and resumable (GradeWitness)
+    # graders must produce IDENTICAL grades — verified on the MIXED project above,
+    # not a degenerate all-same one (the gap the Σ·flat·gate guard-fix left).
+    print("Δ grader equivalence — Σ·flat·agree\n")
+    par, wit = grades_via(MIXED, resumable=False), grades_via(MIXED, resumable=True)
+    distinct = sorted(set(par.values()))
+    mixed_ok = len(distinct) >= 3                       # genuinely discriminating, not degenerate
+    agree_ok = par == wit
+    if not (mixed_ok and agree_ok):
+        fails.append(("agree", par, wit))
+    print(f"  {'ok ' if mixed_ok and agree_ok else 'XX '}batch (_grade_parallel) ≡ resumable (GradeWitness)")
+    print(f"      parallel: {par}")
+    print(f"      witness : {wit}")
+    print(f"      distinct grades: {distinct}  ({'mixed' if mixed_ok else 'DEGENERATE — proves nothing'})\n")
+
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} case(s) drifted)")
         return 1
-    print(f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas)")
+    print(f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas, 1 grader-equivalence)")
     return 0
 
 

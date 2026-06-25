@@ -1,0 +1,17 @@
+% warrants.bib — Κ·image·claim: the proof-object-as-immutable-image, made a CHECKED claim.
+% On-demand (not the pre-commit hook): img-repro builds the image and runs its gate, ~minutes.
+@misc{img-repro,
+  section = {repro},
+  claim   = {paperkit's proof object reproduces as an immutable container image --- building the pinned image from this repository and running its gate inside it, network-isolated, verifies the paper HERMETICALLY: the same green verdict with no host toolchain, fresh-by-construction each build},
+  check   = {cmd:sh checks/repro.sh}
+}
+@misc{img-pinned,
+  section = {toolchain},
+  claim   = {the image's toolchain is pinned by content digest, not a moving tag, so the proof object reproduces and is not at the mercy of a re-tagged base},
+  check   = {cmd:grep -q "python@sha256:" ../Containerfile}
+}
+@misc{img-hermetic,
+  section = {toolchain}, from = {img-pinned}, join = {, and },
+  claim   = {the verification runs with the network disabled, so a check cannot reach beyond the image and the proof depends on nothing outside it},
+  check   = {cmd:grep -q -- "--network=none" checks/repro.sh}
+}

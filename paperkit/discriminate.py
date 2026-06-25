@@ -319,7 +319,19 @@ def grade_check(chk: str, project_dir: Path, presupposed: set,
                 "why": "existence of a contingent artifact — presence only, not content",
                 "not_higher": "to rise: test the artifact's CONTENT, not just its presence (a content-sensitive cmd:)",
                 "not_lower": "not vacuous: the artifact is contingent, not a presupposed build input, so its absence is a real failure"}
-    # cmd: / custom — empirically probe falsifiability
+    # cmd: / custom — Δ·det: determinism guard, then empirically probe falsifiability.
+    # Δ assumes a check is a PURE FUNCTION of project content; a flaky check (wall-clock,
+    # load, iteration order, the date, network) gets a single-sample grade that is noise.
+    # PAPERKIT_DELTA_REPEAT=N (default 1, off) re-runs the pristine baseline N times; if
+    # they disagree the check is PROVABLY non-deterministic, so the sweep would be noise.
+    reps = max(1, int(os.environ.get("PAPERKIT_DELTA_REPEAT", "1")))
+    if reps > 1 and len({G.resolves(chk, sandbox_project, custom) for _ in range(reps)}) > 1:
+        return {"grade": "broken", "tests": [], "determinism": "flaky",
+                "why": f"non-deterministic — {reps} baseline runs in a pristine sandbox disagreed; "
+                       "the verdict is not a function of project content (wall-clock / load / "
+                       "iteration order / network?), so a single-sample mutation sweep is noise",
+                "not_higher": "to rise: make the check a pure function of project content, then Δ can grade it",
+                "not_lower": "—"}
     baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir)
     rec = _grade_from_sens(baseline, sens)
     if rec["grade"] == "indeterminate":

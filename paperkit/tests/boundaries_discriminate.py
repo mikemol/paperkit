@@ -15,6 +15,7 @@ the same triple for the GATE: minimal fixture, append one drift line (δ), pass�
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -40,6 +41,20 @@ def grader_of(check, resumable=False):
     flags = ("--all", "--json") + (("--budget", "0") if resumable else ())
     _, out = discriminate(W(check), *flags)
     return json.loads(out)[0]["grader"]
+
+
+def determinism_of(check):
+    # Δ·det: grade with the determinism guard ON (PAPERKIT_DELTA_REPEAT=2) and report
+    # "flaky" if the pristine baseline disagreed across runs, else the ordinary grade.
+    env = {**os.environ, "PAPERKIT_DELTA_REPEAT": "2"}
+    _, out = discriminate(W(check), "--all", "--json", env=env)
+    r = json.loads(out)[0]
+    return r.get("determinism") or r["grade"]
+
+
+# a check whose verdict is NOT a function of project content: it toggles a stored
+# bit every run, so consecutive baselines disagree (the cleanest provable flake).
+FLAKY = "cmd:sh -c 'if [ -f det.flag ]; then rm det.flag; false; else touch det.flag; true; fi'"
 
 
 def grades_via(warrants, resumable=False):
@@ -103,6 +118,12 @@ DELTA_CASES = [
      "P": ("behavioral", f"cmd:grep -q {TOKEN} w.bib"),
      "F": ("total", "cmd:true"),
      "delta": f"check: cmd:grep -q {TOKEN} w.bib  →  cmd:true", "kind": "vacuity"},
+    {"name": "Δ determinism: gradable → flaky  (Δ·det, PAPERKIT_DELTA_REPEAT=2)",
+     "axis": "whether the verdict is a function of project content (stable across baseline runs)",
+     "P": ("indeterminate", "cmd:true"),
+     "F": ("flaky", FLAKY),
+     "delta": "the check toggles a stored bit each run (its verdict depends on hidden state)",
+     "kind": "determinism"},
 ]
 
 
@@ -144,6 +165,11 @@ def main() -> int:
             p_got, f_got = pr["grade"], fr.get("vacuity")
             ok = (p_got == p_want) and (f_got == f_want) and (pr["grade"] != fr["grade"])
             pside, fside = f"grade={p_got}", f"vacuity={f_got}"
+        elif d["kind"] == "determinism":
+            (p_want, p_chk), (f_want, f_chk) = d["P"], d["F"]
+            p_got, f_got = determinism_of(p_chk), determinism_of(f_chk)
+            ok = (p_got == p_want) and (f_got == f_want) and (p_got != f_got)
+            pside, fside = f"{p_got}", f"{f_got}"
         else:
             (p_want, p_chk, p_cite), (f_want, f_chk, f_cite) = d["P"], d["F"]
             p_got, f_got = gate_exit(p_chk, p_cite), gate_exit(f_chk, f_cite)

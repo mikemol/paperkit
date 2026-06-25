@@ -169,6 +169,9 @@ def main(argv: list) -> int:
     for c in stale:
         fp = fresh[c].pop("_footprint", [])   # computed once during grading (scoping + cache); strip from the record
         graded[c], grader_of[c] = fresh[c], fresh_grader
+        if fp is None:
+            continue                          # Φ·degrade: untraceable footprint — UNCACHEABLE (re-grade
+            # every run).  Storing it under [] would over-reuse a grade whose inputs we never saw.
         new_entries[c] = {"grade": fresh[c], "footprint": fp, "fp": _footprint_hash(project_dir, fp)}
 
     if not no_cache:

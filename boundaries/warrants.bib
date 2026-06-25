@@ -83,3 +83,8 @@
   claim   = {the configurable pipeline's boundary (Ω·config) --- every knob resolves the one way, explicit arg over env over project config over default, a value outside its choices is refused, and apply_args captures args PROCESS-LOCALLY so a check the grader spawns never inherits the grader's own flags},
   check   = {cmd:python3 ../paperkit/tests/boundaries_config.py}
 }
+@misc{bnd-degrade,
+  section = {engine}, from = {bnd-config}, join = {. },
+  claim   = {footprint's degradation boundary (Φ·degrade) --- when strace is absent or cannot attach, the read footprint returns the sentinel None rather than crashing or returning an empty list, so the grade is swept over the full surface and left uncached instead of over-reused under an empty footprint},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_degrade.py}
+}

@@ -192,15 +192,19 @@ def footprint(check: str, project_dir: Path, custom: dict) -> list:
     with tempfile.NamedTemporaryFile("w+", suffix=".strace", delete=False) as tf:
         trace = Path(tf.name)
     try:
-        subprocess.run(["strace", "-f", "-qq", "-e", "trace=openat,open", "-o", str(trace),
-                        "sh", "-c", cmd], cwd=project_dir, env=clean_env(), capture_output=True)
-        reads = set()
+        try:
+            subprocess.run(["strace", "-f", "-qq", "-e", "trace=openat,open", "-o", str(trace),
+                            "sh", "-c", cmd], cwd=project_dir, env=clean_env(), capture_output=True)
+        except FileNotFoundError:
+            return None                                   # Φ·degrade: strace not installed (see below)
+        reads, traced = set(), False
         for line in trace.read_text(errors="replace").splitlines():
             m = _OPEN_RE.search(line)
-            if not m or m.group("rc").startswith("-"):
-                continue                                  # unparsed line or failed open
-            if "O_WRONLY" in m.group("flags"):
-                continue                                  # write-only = output, not an input
+            if not m:
+                continue                                  # unparsed line
+            traced = True                                 # strace logged an open — it DID attach (any real process opens libc)
+            if m.group("rc").startswith("-") or "O_WRONLY" in m.group("flags"):
+                continue                                  # failed open, or write-only = output, not an input
             raw = m.group("path")
             p = (Path(raw) if raw.startswith("/") else project_dir / raw).resolve()
             if not p.is_file():
@@ -209,6 +213,13 @@ def footprint(check: str, project_dir: Path, custom: dict) -> list:
                 reads.add(str(p.relative_to(project_dir)))
             except ValueError:
                 continue                                  # outside the project — not a cacheable input
+        # Φ·degrade: when strace cannot trace — absent (above) or unable to ATTACH (no ptrace
+        # capability, e.g. a hardened container → an EMPTY trace, `traced` False) — return the
+        # SENTINEL None, never [].  [] means "reads nothing": it hashes stable (the cache would
+        # over-reuse a grade whose inputs we never saw) and scopes the sweep to nothing (a wrong
+        # vacuous grade).  None ⇒ don't-cache + full-surface sweep (sensitivity handles None).
+        if not traced:
+            return None
         return sorted(reads)
     finally:
         trace.unlink(missing_ok=True)

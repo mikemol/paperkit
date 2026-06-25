@@ -4,7 +4,7 @@
 
 ## The Δ Grader and --without-K
 
-The Δ grader's boundary — it flags a check that provably cannot fail (vacuous) and passes one a mutation can break (behavioral) [@bnd-delta]. The --without-K boundary — it flags two cited claims that share a single witness and passes claims that carry distinct witnesses [@bnd-witness]. The ∂² coherence residual — it reports zero when a claim's from and rests-on edges agree and when witnesses carry distinct sensitivities, and surfaces the divergence and the collapse otherwise [@bnd-coherence].
+The Δ grader's boundary — it flags a check that provably cannot fail (vacuous) and passes one a mutation can break (behavioral) [@bnd-delta]. The --without-K boundary — it flags two cited claims that share a single witness and passes claims that carry distinct witnesses [@bnd-witness]. The ∂² coherence residual — it reports zero when a claim's from and rests-on edges agree and when witnesses carry distinct sensitivities, and surfaces the divergence and the collapse otherwise [@bnd-coherence]. The corroboration axis (Ε·agree·grade) — a grade is the pair (falsifiability, corroboration), not one scalar: an agree: verdict from independent producers is marked independently corroborated while a lone witness or identical producers stay single, so a behavioral cmd: and a behavioral agree: share a grade yet differ on this orthogonal axis [@bnd-corroboration].
 
 ## Projector and Gate
 

@@ -41,6 +41,15 @@ RANK_C = {"broken": -1, "vacuous": 0, "indeterminate": 1, "existence": 2, "behav
           "imported": 4}
 GRADE_C = {v: k for k, v in RANK_C.items()}
 
+# Corroboration — a SECOND, ORTHOGONAL evidence axis (Ε·agree·grade), NOT another rung on
+# RANK_C above.  The grade above asks "does a mutation flip this check" (FALSIFIABILITY);
+# this asks "is the verdict confirmed by INDEPENDENT producers" (CORROBORATION).  A check's
+# strength is the PAIR (falsifiability, corroboration), never one collapsed scalar: a lone
+# behavioral witness and a behaviorally-agreeing oracle share a GRADE but differ HERE.  An
+# agree: verdict that passes with ≥2 textually-distinct producers is `independent`; one
+# witness — or identical producers concurring trivially — is `single`.  single < independent.
+CORRO_C = {"single": 0, "independent": 1}
+
 
 def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
     """Resolved paths whose existence the build already presupposes — a file:
@@ -273,6 +282,15 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     rec = _grade_from_sens(baseline, sens)
     if rec["grade"] == "indeterminate":
         rec = _vacuity_source(rec, chk, sandbox_project, custom, engine_dir)
+    # Ε·agree·grade — the corroboration AXIS, orthogonal to the falsifiability grade above:
+    # an agree: verdict that PASSES with ≥2 TEXTUALLY DISTINCT producers is corroborated by
+    # independent means (a shared bug a lone witness carries is ruled out) — a stronger FACT,
+    # not a higher rank.  Identical producers concur trivially (single).  Only agree: carries
+    # the field; its absence reads as single (one witness).
+    if typ == "agree" and rec["grade"] != "broken":
+        producers = [p.strip() for p in target.split("|||") if p.strip()]
+        rec["corroboration"] = "independent" if len(set(producers)) >= 2 else "single"
+        rec["producers"] = len(producers)
     return rec
 
 

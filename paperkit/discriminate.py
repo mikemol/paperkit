@@ -76,7 +76,7 @@ import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grad
 from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
                    footprint_hash as _footprint_hash, load as _load_cache, save as _save_cache)
 from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness,  # noqa: E402,F401
-                    _grade_parallel, STRENGTH, ORDER, RANK_C, GRADE_C)
+                    _grade_parallel, STRENGTH, ORDER, RANK_C, GRADE_C, CORRO_C)
 
 
 def main(argv: list) -> int:
@@ -89,6 +89,12 @@ def main(argv: list) -> int:
     min_strength = optval("--min-strength")
     if min_strength is not None and min_strength not in ORDER:
         sys.exit(f"paperkit-discriminate: --min-strength must be one of {sorted(ORDER)}")
+    # --min-corroboration: the SECOND, ORTHOGONAL gate (Ε·agree·grade) — independent of
+    # --min-strength.  You can require falsifiability, corroboration, either, or both; they
+    # are different axes, not one scalar.  Today only `independent` is a meaningful floor.
+    min_corro = optval("--min-corroboration")
+    if min_corro is not None and min_corro not in CORRO_C:
+        sys.exit(f"paperkit-discriminate: --min-corroboration must be one of {sorted(CORRO_C)}")
     state_file = optval("--state")          # resumable grading: persist the token here
     budget_str = optval("--budget")         # seconds per invocation (<=0 = run to done)
     budget = float(budget_str) if budget_str else 0.0
@@ -99,7 +105,7 @@ def main(argv: list) -> int:
     if resolution not in ("file", "def"):
         sys.exit("paperkit-discriminate: --resolution must be 'file' or 'def'")
 
-    consumed = {x for x in (min_strength, state_file, budget_str, optval("--resolution"))
+    consumed = {x for x in (min_strength, min_corro, state_file, budget_str, optval("--resolution"))
                 if x is not None}
     pos = [a for a in args if a not in consumed]
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
@@ -250,6 +256,18 @@ def main(argv: list) -> int:
         else:
             print(f"\npaperkit-discriminate: all {len(records)} warrant(s) "
                   f"meet strength '{min_strength}'")
+    if min_corro is not None:
+        floor = CORRO_C[min_corro]
+        weak = [r for r in records if CORRO_C.get(r.get("corroboration", "single"), 0) < floor]
+        if weak:
+            print(f"\npaperkit-discriminate: {len(weak)} warrant(s) below "
+                  f"corroboration '{min_corro}':", file=sys.stderr)
+            for r in weak:
+                print(f"  [@{r['key']}] {r.get('corroboration', 'single')} — {r['check']}", file=sys.stderr)
+            rc = 1
+        else:
+            print(f"\npaperkit-discriminate: all {len(records)} warrant(s) "
+                  f"meet corroboration '{min_corro}'")
     return rc
 
 
@@ -264,7 +282,8 @@ def report(records, share, graded, n_cited, n_checked, consider_all):
         dil = f"  (shared by {share_n} claims)" if share_n > 1 else ""
         crash = (r["grade"] == "behavioral" and not r.get("content_sensitive"))
         tag = "  ⚠ config/crash-sensitive only" if crash else ""
-        print(f"  {r['grade']:13} [@{r['key']}]{dil}{tag}")
+        corro = f"  + {r['corroboration']} ({r.get('producers','?')} producers)" if r.get("corroboration") == "independent" else ""
+        print(f"  {r['grade']:13} [@{r['key']}]{dil}{tag}{corro}")
         print(f"  {'':13} check: {r['check']}")
         if r["tests"]:
             shown = ", ".join(r["tests"][:6]) + ("…" if len(r["tests"]) > 6 else "")

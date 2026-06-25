@@ -18,3 +18,7 @@ The rendered document is structurally sound: word/document.xml is well-formed OO
 
 The reader's EYE sees the paper, not just a screen reader: rendered to a PDF and rasterized to images, OCR recovers the paper's text from the pixels themselves — a font or render regression that turned the body to tofu would crater that recovery, so the visual layer is gated, not only the text layer [@rnd-ocr]. And every font in the rendered PDF is EMBEDDED, so it draws identically on a machine that lacks the font — no silent substitution to a glyph the author never saw [@rnd-fonts].
 
+## Citations: Warrants Inline, Sources Referenced
+
+The paper's two kinds of citation RESOLVE in the render: an internal warrant becomes an inline machine-checked marker (cite_split, before pandoc), an external source renders author-date with a References list (–citeproc over references.bib), and no bracketed citation marker is left as bare text — a render-time projection that leaves the gated paper.md untouched [@rnd-bib].
+

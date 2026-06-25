@@ -30,3 +30,8 @@
   claim   = {and every font in the rendered PDF is EMBEDDED, so it draws identically on a machine that lacks the font --- no silent substitution to a glyph the author never saw},
   check   = {cmd:python3 checks/fonts.py}
 }
+@misc{rnd-bib,
+  section = {cite},
+  claim   = {the paper's two kinds of citation RESOLVE in the render: an internal warrant becomes an inline machine-checked marker (cite_split, before pandoc), an external source renders author-date with a References list (--citeproc over references.bib), and no bracketed citation marker is left as bare text --- a render-time projection that leaves the gated paper.md untouched},
+  check   = {cmd:python3 checks/bib.py}
+}

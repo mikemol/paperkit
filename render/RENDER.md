@@ -10,3 +10,7 @@ The paper renders to a Word document — pandoc turns paper.md into a valid .doc
 
 The rendered document PRESENTS the verified paper: the plain text a reader sees in the .docx is byte-for-byte the plain text of paper.md, so the render preserves the content — presentation agreement extends prose≡projection down the render stack, from the gated source to the delivered document [@rnd-agree].
 
+## Output Integrity & Fidelity
+
+The rendered document is structurally sound: word/document.xml is well-formed OOXML, and every section of the paper is presented as a real Word heading whose text matches — the structure survives the render, never flattened into body text [@rnd-wf]. And the reader's view is faithful: rendered all the way to a PDF, every non-ASCII glyph the paper uses survives into the text layer with no missing-glyph tofu, and every heading is present there — what the consumer copies, searches, or hears through a screen reader is the paper, not a broken rendering [@rnd-fidelity].
+

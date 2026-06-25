@@ -1,0 +1,10 @@
+# The pinned TOOLCHAIN base for the proof image (Κ·image·repro).  The digest-pinned
+# python-alpine plus strace (which backs Φ·footprint).  apk's installed-db ordering is
+# irreducibly non-deterministic, so the apk layer is ISOLATED here as a pinned dependency
+# — exactly as the python base isolates ITS apk drift behind a docker.io content digest.
+# Built once and pinned; the proof image (Containerfile) then builds COPY-only and so is
+# byte-reproducible.
+#
+#   podman build --timestamp 0 -t paperkit-base:proof -f Containerfile.base .
+FROM docker.io/library/python@sha256:399babc8b49529dabfd9c922f2b5eea81d611e4512e3ed250d75bd2e7683f4b0
+RUN apk add --no-cache strace

@@ -1,14 +1,19 @@
-% warrants.bib — Κ·image·claim: the proof-object-as-immutable-image, made a CHECKED claim.
-% On-demand (not the pre-commit hook): img-repro builds the image and runs its gate, ~minutes.
+% warrants.bib — Κ·image: the proof-object-as-immutable-image, made CHECKED claims.
+% On-demand (not the pre-commit hook): the build/run checks take minutes.
 @misc{img-repro,
   section = {repro},
-  claim   = {paperkit's proof object reproduces as an immutable container image --- building the pinned image from this repository and running its gate inside it, network-isolated, verifies the paper HERMETICALLY: the same green verdict with no host toolchain, fresh-by-construction each build},
+  claim   = {paperkit's proof object reproduces as an immutable container image --- building the image from this repository and running its gate inside it, network-isolated, verifies the paper HERMETICALLY: the same green verdict with no host toolchain, fresh-by-construction each build},
   check   = {cmd:sh checks/repro.sh}
+}
+@misc{img-stable,
+  section = {repro}, from = {img-repro}, join = {. },
+  claim   = {and the build is REPRODUCIBLE: from the pinned toolchain base the proof image is COPY-only, so building it twice --- forced, with a fixed timestamp --- yields the same content digest, making the digest a stable content-address, the proof's checksum},
+  check   = {cmd:sh checks/stable.sh}
 }
 @misc{img-pinned,
   section = {toolchain},
-  claim   = {the image's toolchain is pinned by content digest, not a moving tag, so the proof object reproduces and is not at the mercy of a re-tagged base},
-  check   = {cmd:grep -q "python@sha256:" ../Containerfile}
+  claim   = {the toolchain base is pinned by content digest, not a moving tag, so the proof reproduces and is not at the mercy of a re-tagged base --- the irreducibly non-deterministic package layer is isolated there, the way the python base isolates its own},
+  check   = {cmd:grep -q "python@sha256:" ../Containerfile.base}
 }
 @misc{img-hermetic,
   section = {toolchain}, from = {img-pinned}, join = {, and },

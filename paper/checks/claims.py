@@ -66,9 +66,33 @@ def new_domain_adds():
 
 
 def two_builtins():
-    # "two verifiers ship built in" — exactly file and cmd (others come from config)
+    # three verifiers ship built in — file EXISTS, cmd EXECS, result PARSES (Ξ·seam);
+    # other types come from config.
     builtins = set(re.findall(r'typ == "(\w+)"', GATE_SRC))
-    assert builtins == {"file", "cmd"}, f"built-in types are {builtins}, expected file & cmd"
+    assert builtins == {"file", "cmd", "result"}, f"built-in types are {builtins}, expected file, cmd & result"
+
+
+def result_builtin():
+    # result PARSES a sibling project's machine-readable gate verdict (gate --json): a
+    # green sibling resolves True, a red one False — composition, not re-derivation.
+    d = Path(tempfile.mkdtemp())
+    try:
+        sib = d / "g"
+        sib.mkdir()
+
+        def write(check):
+            (sib / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
+                                            'rubric = "r.tsv"\nout = "out.md"\n')
+            (sib / "r.tsv").write_text("s\tSec\n")
+            (sib / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {%s}\n}\n" % check)
+            (sib / "out.md").write_text(P.project(P.load_config(sib)))
+
+        write("cmd:true")
+        assert gate.resolves("result:g", d, {}) is True, "result: did not PARSE a green sibling's verdict as pass"
+        write("cmd:false")
+        assert gate.resolves("result:g", d, {}) is False, "result: did not PARSE a red sibling's verdict as fail"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def dataset_backed():
@@ -660,11 +684,11 @@ def multi_project():
 
 
 def project_dag():
-    # the projects form a DAG over the shared engine: the README's gate runs the paper's
-    # gate, and the report ingests the paper's machine-readable grades
+    # the projects form a DAG over the shared engine: the README IMPORTS the paper's
+    # verdict (a result: edge — Ξ·seam), and the report ingests the paper's grades
     root = Path(__file__).resolve().parents[2]
-    assert "gate.py paper" in (root / "warrants.bib").read_text(), \
-        "the README's status check does not gate the paper"
+    assert "result:paper" in (root / "warrants.bib").read_text(), \
+        "the README's status claim does not import the paper's verdict (result:paper)"
     gen = (root / "report" / "gen.py").read_text()
     assert '_delta("paper")' in gen and "--json" in gen, \
         "the report does not ingest the paper's --json pipeline data"
@@ -882,6 +906,7 @@ CLAIMS = {
     "dataset-fresh": dataset_fresh,
     "new-domain-adds": new_domain_adds,
     "two-builtins": two_builtins,
+    "result-builtin": result_builtin,
     "file-builtin": file_builtin,
     "cmd-builtin": cmd_builtin,
     "cmd-escape": cmd_escape,

@@ -31,12 +31,13 @@ The gate enforces three invariants: the committed prose equals its projection, e
 
 ## The check-resolver
 
-A verifier is named type:target, and two types ship built in [@rm-resolver] --- the two built-ins are [@rm-resolver-tbl].
+A verifier is named type:target, and three types ship built in, one per verb — exists, execs, parses [@rm-resolver] --- the three built-ins are [@rm-resolver-tbl].
 
-| type | passes when |
-| --- | --- |
-| `file:<path>` | the artifact exists |
-| `cmd:<script>` | the script exits `0` |
+| type | verb | passes when |
+| --- | --- | --- |
+| `file:<path>` | exists | the artifact exists |
+| `cmd:<script>` | execs | the script exits `0` |
+| `result:<project>` | parses | the sibling project's gate verdict parses green |
 
 Cmd is the universal escape hatch every check reduces to, and a new domain adds named types in paper.toml without touching the engine [@rm-resolver-cmd]. A new domain declares them like this [@rm-resolver-eg].
 

@@ -60,12 +60,12 @@
 % ── resolver ─────────────────────────────────────────────────────────────────
 @misc{rm-resolver,
   section = {resolver},
-  claim   = {a verifier is named type:target, and two types ship built in},
+  claim   = {a verifier is named type:target, and three types ship built in, one per verb --- exists, execs, parses},
   check   = {claim:rm-resolver}
 }
 @misc{rm-resolver-tbl,
   section = {resolver}, from = {rm-resolver}, join = { --- },
-  claim   = {the two built-ins are},
+  claim   = {the three built-ins are},
   emit    = {assets/resolver.md},
   check   = {cmd:grep -q file: assets/resolver.md}
 }
@@ -102,7 +102,7 @@
 @misc{rm-boundaries,
   section = {adequacy}, from = {rm-delta-cmds},
   claim   = {every tool ships its behavioral boundaries as the triple ⟨P, F, δ⟩ --- a minimal pass, a minimal flag, and the minimum delta that flips the verdict},
-  check   = {cmd:python3 paperkit/tests/boundaries_discriminate.py}
+  check   = {result:boundaries}
 }
 
 % ── layout ───────────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@
 @misc{rm-status,
   section = {status},
   claim   = {a working spike --- the engine projects and gates, the self-hosting paper is green, discriminate.py grades check adequacy, and this README is itself a projection},
-  check   = {cmd:python3 paperkit/gate.py paper},
+  check   = {result:paper},
   mem     = {3072}
 }
 @misc{rm-next,

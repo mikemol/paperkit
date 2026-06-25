@@ -60,6 +60,7 @@ def _write(d, warrants, assets, rubric, title, numbered, references):
     (proj / "r.tsv").write_text("".join(f"{k}\t{t}\n" for k, t in rubric))
     (proj / "w.bib").write_text("".join(warrants))
     for name, content in (assets or {}).items():
+        (proj / name).parent.mkdir(parents=True, exist_ok=True)   # subdir keys → e.g. a nested subproject
         (proj / name).write_text(content)
     return proj
 

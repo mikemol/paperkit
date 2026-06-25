@@ -101,13 +101,15 @@ def _mutable(f: Path) -> bool:
     (no suffix, but a checked artifact — the README's ci claim names it)."""
     return f.is_file() and (f.suffix in MUTABLE_SUFFIXES or ".githooks" in f.parts)
 
-STRENGTH = {"vacuous": 0, "existence": 1, "indeterminate": 1, "behavioral": 2}
+STRENGTH = {"vacuous": 0, "existence": 1, "indeterminate": 1, "behavioral": 2, "imported": 3}
 ORDER = {"existence": 1, "behavioral": 2}  # valid --min-strength thresholds
 
 # Total order for clamping (effective grade = min over self + premises).  Conservative:
 # vacuous < indeterminate (runs, falsifiability unproven) < existence (presence proven)
-# < behavioral (falsifiability proven).
-RANK_C = {"broken": -1, "vacuous": 0, "indeterminate": 1, "existence": 2, "behavioral": 3}
+# < behavioral (falsifiability proven) < imported (Ξ·seam: verified whole in a separately-
+# gated sibling — a delegated premise never weakens what rests on it, so it ranks at top).
+RANK_C = {"broken": -1, "vacuous": 0, "indeterminate": 1, "existence": 2, "behavioral": 3,
+          "imported": 4}
 GRADE_C = {v: k for k, v in RANK_C.items()}
 
 
@@ -310,6 +312,23 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
 def grade_check(chk: str, project_dir: Path, presupposed: set,
                 custom: dict, sandbox_project: Path, engine_dir: Path | None = None) -> dict:
     typ, _, target = chk.partition(":")
+    if typ == "result":
+        # Ξ·seam: a verdict-import — adequacy DELEGATED to a separately-gated sibling.
+        # NOT mutation-swept (that would re-run the sibling's whole gate per mutation,
+        # the rm-status cost bomb); graded "imported" iff the sibling gates green now,
+        # else "broken".  Sound because every imported sibling is itself behaviorally
+        # gated in the hook — a project rests-on a sibling as a claim rests-on a premise.
+        if G.resolves(chk, sandbox_project, custom):
+            return {"grade": "imported", "tests": [target],
+                    "why": f"adequacy delegated to sibling project '{target}', which gates "
+                           "green and is itself behaviorally gated (composition, not re-derivation)",
+                    "not_higher": "imported is a delegation, not a falsifiability tier — the "
+                                  "sibling's own Δ pass is the behavioral guarantee",
+                    "not_lower": "not broken: the imported sibling currently gates green"}
+        return {"grade": "broken", "tests": [target],
+                "why": f"verdict-import of sibling project '{target}' does not gate green",
+                "not_higher": "to rise: make the imported sibling gate green",
+                "not_lower": "—"}
     if typ == "file":
         resolved = (project_dir / target).resolve()
         if resolved in presupposed:
@@ -642,7 +661,8 @@ def report(records, share, graded, n_cited, n_checked, consider_all):
     scope = "all checked" if consider_all else f"of {n_cited} cited"
     print(f"paperkit-discriminate (Δ): {n_checked} {scope} warrant(s) carry a "
           f"check, {len(share)} distinct check(s)\n")
-    order = {"broken": 0, "vacuous": 1, "indeterminate": 2, "existence": 3, "behavioral": 4}
+    order = {"broken": 0, "vacuous": 1, "indeterminate": 2, "existence": 3,
+             "behavioral": 4, "imported": 5}
     for r in sorted(records, key=lambda r: (order.get(r["grade"], 9), r["key"])):
         share_n = len(r["shared_with"]) + 1
         dil = f"  (shared by {share_n} claims)" if share_n > 1 else ""

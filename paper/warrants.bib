@@ -157,20 +157,25 @@
 }
 @misc{two-builtins,
   section = {resolver}, from = {gate-dispatches}, join = {. },
-  claim   = {two verifiers ship built in},
-  rests-on = {file-builtin, cmd-builtin},
-  link    = {grounded by the two builtins it names, which the prose introduces just after --- the grounding link runs counter to prose order},
+  claim   = {three verifiers ship built in, one per verb},
+  rests-on = {file-builtin, cmd-builtin, result-builtin},
+  link    = {grounded by the three builtins it names, which the prose introduces just after --- the grounding link runs counter to prose order},
   check   = {claim:two-builtins}
 }
 @misc{file-builtin,
   section = {resolver}, from = {two-builtins}, join = { — },
-  claim   = {file, that an artifact exists},
+  claim   = {file, that an artifact EXISTS},
   check   = {claim:file-builtin}
 }
 @misc{cmd-builtin,
-  section = {resolver}, from = {two-builtins}, join = {, and },
-  claim   = {cmd, that a script exits zero},
+  section = {resolver}, from = {two-builtins}, join = {, },
+  claim   = {cmd, that a script EXECS green},
   check   = {claim:cmd-builtin}
+}
+@misc{result-builtin,
+  section = {resolver}, from = {cmd-builtin}, join = {, and },
+  claim   = {result, that a sibling project's gate verdict PARSES green --- the verb that lets one project rest on another it does not re-derive},
+  check   = {claim:result-builtin}
 }
 @misc{cmd-escape,
   section = {resolver}, from = {cmd-builtin, new-domain-adds}, join = {; and },

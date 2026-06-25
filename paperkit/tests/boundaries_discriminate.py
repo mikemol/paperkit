@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture import discriminate, discriminate_stderr, entry  # noqa: E402
+from _fixture import discriminate, discriminate_stderr, entry, project_text  # noqa: E402
 
 TOKEN = "WARRANT-TOKEN-A1B2"
 
@@ -81,6 +81,17 @@ MIXED = [
 ]
 
 
+def compose_sub(green=True):
+    # Ξ·seam: assets for a nested sibling project 'g' that GATES GREEN (a passing file:
+    # check) or RED (a failing cmd:false) — the verdict a `result:g` import imports.  The
+    # paper.toml/rubric/title MUST match _fixture's so g/out.md == project(g) (prose≡proj).
+    w = entry("c", claim="a sibling claim", check=("file:w.bib" if green else "cmd:false"))
+    toml = ('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
+            'out = "out.md"\nnumbered = false\nreferences = false\n')
+    return {"g/paper.toml": toml, "g/r.tsv": "s\tSec\n", "g/w.bib": w,
+            "g/out.md": project_text([w])}
+
+
 def gate_exit(check, cited):
     # cited-only gating: control whether [@w] appears in the projection directly
     out = "the claim [@w]\n" if cited else "no citation here\n"
@@ -99,6 +110,9 @@ GRADE_CASES = [
      "content-sensitive — flips when the cited token leaves w.bib"),
     ("indeterminate", "cmd:true",
      "always passes; no mutation flips it (vacuous OR negative-assertion)"),
+    ("imported",      "result:g",
+     "Ξ·seam — adequacy DELEGATED to a separately-gated sibling that gates green; run once, never swept",
+     compose_sub(True)),
 ]
 
 # ── ⟨P, F, δ⟩ pairs: the minimum delta that flips a verdict ───────────────────
@@ -136,6 +150,10 @@ DELTA_CASES = [
      "P": ("heartbeat emitted", "default"),
      "F": ("silenced", "PAPERKIT_DELTA_PULSE=0"),
      "delta": "env: (default ~2s) → PAPERKIT_DELTA_PULSE=0", "kind": "pulse"},
+    {"name": "Δ compose: imported → broken  (Ξ·seam verdict-import)",
+     "axis": "whether the imported sibling project gates green",
+     "P": ("imported", "result:g"), "F": ("broken", "result:g"),
+     "delta": "sibling g's check: file:w.bib (green) → cmd:false (red)", "kind": "compose"},
 ]
 
 
@@ -186,6 +204,12 @@ def main() -> int:
             on, off = pulse_lines(MIXED) > 0, pulse_lines(MIXED, off=True) > 0
             ok = on and not off
             pside, fside = f"pulse={'yes' if on else 'NO'}", f"pulse={'yes' if off else 'no'}"
+        elif d["kind"] == "compose":
+            p_want, f_want = d["P"][0], d["F"][0]
+            p_got = grade_of("result:g", compose_sub(green=True))["grade"]
+            f_got = grade_of("result:g", compose_sub(green=False))["grade"]
+            ok = (p_got == p_want) and (f_got == f_want) and (p_got != f_got)
+            pside, fside = f"grade={p_got}", f"grade={f_got}"
         else:
             (p_want, p_chk, p_cite), (f_want, f_chk, f_cite) = d["P"], d["F"]
             p_got, f_got = gate_exit(p_chk, p_cite), gate_exit(f_chk, f_cite)
@@ -214,10 +238,25 @@ def main() -> int:
     print(f"      witness : {wit}")
     print(f"      distinct grades: {distinct}  ({'mixed' if mixed_ok else 'DEGENERATE — proves nothing'})\n")
 
+    # ── Ξ·seam adequacy-composes: --min-strength behavioral ACCEPTS an imported verdict
+    # (delegated to a separately-gated sibling) but REJECTS a vacuous file: — the gate-mode
+    # proof that composition meets the behavioral floor without re-deriving the sibling.
+    print("Δ adequacy-composes — Ξ·seam\n")
+    imp_rc, _ = discriminate(W("result:g"), "--min-strength", "behavioral", assets=compose_sub(True))
+    vac_rc, _ = discriminate(W("file:w.bib"), "--min-strength", "behavioral")
+    compose_ok = imp_rc == 0 and vac_rc == 1
+    if not compose_ok:
+        fails.append(("adequacy-composes", imp_rc, vac_rc))
+    print(f"  {'ok ' if compose_ok else 'XX '}--min-strength behavioral: imported PASSES, vacuous FAILS")
+    print(f"      P (pass side): result:g (imported) → exit {imp_rc}")
+    print(f"      F (flag side): file:w.bib (vacuous) → exit {vac_rc}")
+    print(f"      δ (min delta): the check's grade meets the behavioral floor by DELEGATION, not derivation\n")
+
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} case(s) drifted)")
         return 1
-    print(f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas, 1 grader-equivalence)")
+    print(f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas, "
+          f"1 grader-equivalence, 1 adequacy-composes)")
     return 0
 
 

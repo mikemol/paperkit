@@ -36,6 +36,7 @@ import project as P  # noqa: E402
 
 
 _MB_SCRIPT = Path(__file__).resolve().parent / "membudget"
+_SELF = Path(__file__).resolve()                 # this gate.py, for result: verdict-imports
 _MB_OK = None
 
 
@@ -106,7 +107,23 @@ def run_ok(cmd: str, cwd: Path, lease: int | None = None, label: str = "check") 
 def resolves(check: str, project_dir: Path, custom: dict, lease: int | None = None) -> bool:
     typ, _, target = check.partition(":")
     if typ == "file":
-        return (project_dir / target).exists()        # no subprocess → no lease
+        return (project_dir / target).exists()        # EXISTS — no subprocess → no lease
+    if typ == "result":
+        # Ξ·seam — the third resolver verb: file EXISTS, cmd EXECS, result PARSES.  It
+        # imports a sibling project's machine-readable gate VERDICT (gate --json) and
+        # PARSES it — green iff the parsed verdict reports pass — rather than re-deriving
+        # what the sibling owns and separately gates.  cwd = this project's dir, so the
+        # target is the sibling's path relative to it.  Δ grades it "imported" (run once),
+        # never mutation-sweeping a whole sub-gate.
+        try:
+            argv = [sys.executable, str(_SELF), "--json", "--safe", "--without-K", target]
+            if lease:
+                argv = [str(_MB_SCRIPT), "run", str(lease), check, "--", *argv]
+            r = subprocess.run(argv, cwd=project_dir, env=clean_env(),
+                               capture_output=True, text=True)
+            return bool(json.loads(r.stdout or "{}").get("pass"))
+        except Exception:
+            return False
     if typ == "cmd":
         cmd = target
     elif typ in custom:

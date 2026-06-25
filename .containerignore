@@ -1,0 +1,6 @@
+.git
+**/.delta-cache.json
+**/__pycache__
+**/*.pyc
+node_modules
+.delta-state.json

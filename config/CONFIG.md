@@ -13,6 +13,7 @@ The knobs, each with its flag, environment variable, config key, and default —
 | knob | flag | env var | config | default |
 | --- | --- | --- | --- | --- |
 | `root` (value) | `--root` | `PAPERKIT_ROOT` | `root` | `—` |
+| `path` (value) | `--path` | `PAPERKIT_PATH` | — | `—` |
 | `safe` (flag) | `--safe` | `PAPERKIT_SAFE` | `safe` | `—` |
 | `without-K` (flag) | `--without-K` | `PAPERKIT_WITHOUT_K` | `without_k` | `—` |
 | `jobs` (value) | `--jobs` | `PAPERKIT_JOBS` | `jobs` | `—` |

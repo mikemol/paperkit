@@ -88,3 +88,8 @@
   claim   = {footprint's degradation boundary (Φ·degrade) --- when strace is absent or cannot attach, the read footprint returns the sentinel None rather than crashing or returning an empty list, so the grade is swept over the full surface and left uncached instead of over-reused under an empty footprint},
   check   = {cmd:python3 ../paperkit/tests/boundaries_degrade.py}
 }
+@misc{bnd-path,
+  section = {engine}, from = {bnd-degrade}, join = {. },
+  claim   = {tool-path pinning's boundary (Τ·path) --- by default a check resolves its tools from the host's absolute PATH entries, deduplicated, but when PAPERKIT_PATH is declared resolution is PINNED to exactly those absolute existing dirs and the ambient, user-writable host PATH is dropped entirely, so the same tool resolves on any host},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_path.py}
+}

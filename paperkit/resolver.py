@@ -78,9 +78,26 @@ def clean_env(env: dict | None = None) -> dict:
     src = os.environ if env is None else env
     out = {k: v for k, v in src.items()
            if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)}
-    if "PATH" in out:
-        out["PATH"] = os.pathsep.join(p for p in out["PATH"].split(os.pathsep)
-                                      if p and os.path.isabs(p))
+    pinned = config.resolve(config.PATH)
+    if pinned is not None:
+        # Τ·path: PIN tool resolution to a DECLARED set of absolute, existing dirs —
+        # reproducibility (the same `grep`/`pandoc` on any host) and defence-in-depth (the host
+        # PATH here is dup-laden and full of user-writable dirs ~/bin, ~/.local/bin, .cargo/bin
+        # that could shadow a system tool).  The ambient host PATH is dropped entirely.
+        raw = [p for p in pinned.split(os.pathsep) if os.path.isdir(p)]
+    elif "PATH" in out:
+        raw = out["PATH"].split(os.pathsep)
+    else:
+        return out
+    # keep ABSOLUTE entries only (a relative/empty one resolves a tool to the gated cwd), and
+    # DEDUPE keeping the first occurrence (first-match resolution is unchanged; the host PATH
+    # carries the same dir many times — ~/.lmstudio/bin six times here).
+    seen, dirs = set(), []
+    for p in raw:
+        if p and os.path.isabs(p) and p not in seen:
+            seen.add(p)
+            dirs.append(p)
+    out["PATH"] = os.pathsep.join(dirs)
     return out
 
 

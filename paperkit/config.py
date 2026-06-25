@@ -95,6 +95,8 @@ def resolve(p: Param, config: dict | None = None):
 # ── the registry: every configurable, declared once as data ──────────────────────────────
 ROOT = Param("root", "PAPERKIT_ROOT", config="root",
              help="the Δ sandbox's bounded universe (the dir copied to mutate); else inferred, $HOME refused")
+PATH = Param("path", "PAPERKIT_PATH",
+             help="pin tool resolution to these absolute dirs (colon-separated) instead of the host PATH — reproducibility, and dropping user-writable shadow dirs")
 SAFE = Param("safe", "PAPERKIT_SAFE", config="safe", flag=True,
              help="zero-postulate: an uncited placement FAILS the gate, not merely advises")
 WITHOUT_K = Param("without-K", "PAPERKIT_WITHOUT_K", config="without_k", flag=True, aliases=("--without-k",),
@@ -128,7 +130,7 @@ NO_MEMBUDGET = Param("no-membudget", "PAPERKIT_NO_MEMBUDGET", flag=True,
 CHECK = Param("check", "PAPERKIT_CHECK", flag=True,
               help="project: verify the projection round-trips against the bib, then exit")
 
-REGISTRY = [ROOT, SAFE, WITHOUT_K, JOBS, JSON, MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE,
+REGISTRY = [ROOT, PATH, SAFE, WITHOUT_K, JOBS, JSON, MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE,
             BUDGET, ALL, FOOTPRINT, NO_CACHE, DELTA_REPEAT, DELTA_PULSE, NO_MEMBUDGET, CHECK]
 BY_NAME = {p.name: p for p in REGISTRY}
 

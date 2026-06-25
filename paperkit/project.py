@@ -23,6 +23,9 @@ import sys
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
+
 # Minimal, domain-agnostic LaTeX -> Unicode for claim text (em/en dashes, a few
 # escapes, inline math).  A paper that needs more declares its own; this is the
 # common floor.
@@ -323,12 +326,13 @@ def project(cfg: dict) -> str:
 
 
 def main(argv: list) -> int:
-    args = [a for a in argv if not a.startswith("-")]
-    project_dir = Path(args[0]).resolve() if args else Path.cwd()
+    config.apply_args(argv)
+    pos = config.positionals(argv)
+    project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     cfg = load_config(project_dir)
     out = project(cfg)
 
-    if "--check" in argv:
+    if config.resolve(config.CHECK):
         tgt = cfg["out"]
         if not tgt.exists() or tgt.read_text() != out:
             print(f"paperkit-project: {tgt.name} ≠ projection — regenerate "

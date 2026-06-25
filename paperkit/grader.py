@@ -25,6 +25,8 @@ import threading
 import time
 from pathlib import Path
 
+import config
+
 import resolver
 from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _copy_sandbox, _nested_roots, _mutable
 
@@ -270,7 +272,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     # load, iteration order, the date, network) gets a single-sample grade that is noise.
     # PAPERKIT_DELTA_REPEAT=N (default 1, off) re-runs the pristine baseline N times; if
     # they disagree the check is PROVABLY non-deterministic, so the sweep would be noise.
-    reps = max(1, int(os.environ.get("PAPERKIT_DELTA_REPEAT", "1")))
+    reps = max(1, int(config.resolve(config.DELTA_REPEAT)))
     if reps > 1 and len({resolver.resolves(chk, sandbox_project, custom) for _ in range(reps)}) > 1:
         return {"grade": "broken", "tests": [], "determinism": "flaky",
                 "why": f"non-deterministic — {reps} baseline runs in a pristine sandbox disagreed; "
@@ -385,7 +387,7 @@ def _grade_parallel(project_dir, checks, custom, presupposed, resolution="file")
     jobs = max(1, min(len(checks), os.cpu_count() or 4))
     total, done, lock, t0 = len(checks), [0], threading.Lock(), time.monotonic()
     tty = sys.stderr.isatty()
-    every = float(os.environ.get("PAPERKIT_DELTA_PULSE", "2"))   # min seconds between log pulses; 0 = off
+    every = float(config.resolve(config.DELTA_PULSE))   # min seconds between log pulses; 0 = off
     last = [t0]
 
     def pulse_grade(c):

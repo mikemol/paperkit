@@ -5,10 +5,11 @@ are OTHER projects.  Factored out so neither the cache nor the grader has to own
 each can be imported and tested without the other)."""
 from __future__ import annotations
 
-import os
 import shutil
 import tomllib
 from pathlib import Path
+
+import config
 
 MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt"}
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out"}
@@ -17,17 +18,17 @@ _ENGINE = Path(__file__).resolve().parent
 
 def _root_override(project_dir: Path) -> Path | None:
     """An EXPLICIT sandbox root — for container pipelines and downstream projects whose parent
-    is not a tidy repo.  Precedence: the PAPERKIT_ROOT environment variable (the --root CLI arg
-    overrides it by SETTING it, so explicit-arg beats env), then the project's paper.toml
-    ([paper] root, relative to the project dir).  Whichever is set must CONTAIN the project."""
-    decl = os.environ.get("PAPERKIT_ROOT")
-    if not decl:
-        cfg = project_dir / "paper.toml"
-        if cfg.is_file():
-            try:
-                decl = tomllib.loads(cfg.read_text()).get("paper", {}).get("root")
-            except Exception:
-                decl = None
+    is not a tidy repo.  Resolved through the ONE config pipeline (Ω·config): PAPERKIT_ROOT env
+    (a --root flag overrode it by setting it) > paper.toml [paper] root > none.  Whichever is
+    set must CONTAIN the project."""
+    paper = {}
+    cfg = project_dir / "paper.toml"
+    if cfg.is_file():
+        try:
+            paper = tomllib.loads(cfg.read_text()).get("paper", {})
+        except Exception:
+            paper = {}
+    decl = config.resolve(config.ROOT, paper)
     if not decl:
         return None
     root = Path(decl)

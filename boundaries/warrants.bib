@@ -78,3 +78,8 @@
   claim   = {the Δ sandbox's boundary --- the mutation copy takes the bounded root WHOLE (the bound lives on the root, not a lossy per-dir skip), and that root is DECLARABLE (the PAPERKIT_ROOT environment variable, which a --root flag overrides, or paper.toml) and otherwise inferred as the parent --- but inferring a home directory or above is REFUSED with guidance, so a downstream project living in a home that also holds a clone or cache does not explode the disk},
   check   = {cmd:python3 ../paperkit/tests/boundaries_sandbox.py}
 }
+@misc{bnd-config,
+  section = {engine}, from = {bnd-agree}, join = {. },
+  claim   = {the configurable pipeline's boundary (Ω·config) --- every knob resolves the one way, explicit arg over env over project config over default, a value outside its choices is refused, and apply_args captures args PROCESS-LOCALLY so a check the grader spawns never inherits the grader's own flags},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_config.py}
+}

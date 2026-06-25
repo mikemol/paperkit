@@ -60,12 +60,12 @@ DIR defaults to the current directory and must contain paper.toml.
 from __future__ import annotations
 
 import json
-import os
 import sys
 import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
 import project as P  # noqa: E402
 import gate as G  # noqa: E402  (cited_keys + footprint, re-exported from resolver)
 import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grading)
@@ -80,53 +80,25 @@ from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness, 
 
 
 def main(argv: list) -> int:
-    flags = [a for a in argv if a.startswith("-")]
-    args = [a for a in argv if not a.startswith("-")]
-
-    def optval(name):
-        return argv[argv.index(name) + 1] if name in argv else None
-
-    def opt_or_env(name, env):
-        # Container pipelines: every value-arg also reads a PAPERKIT_* env var, and an
-        # EXPLICIT flag OVERRIDES the env var.  So a Containerfile sets defaults via env and
-        # an ad-hoc run overrides on the command line — one rule for every knob.
-        v = optval(name)
-        return v if v is not None else os.environ.get(env)
-
-    # --root pins the Δ sandbox's bounded universe (the grader's _sandbox_root reads it deep,
-    # via PAPERKIT_ROOT).  Setting the env from the flag IS the "explicit arg overrides env":
-    # one resolved value reaches the grader whether it came from the flag or the container env.
-    if optval("--root") is not None:
-        os.environ["PAPERKIT_ROOT"] = optval("--root")
-
-    min_strength = opt_or_env("--min-strength", "PAPERKIT_MIN_STRENGTH")
-    if min_strength is not None and min_strength not in ORDER:
-        sys.exit(f"paperkit-discriminate: --min-strength must be one of {sorted(ORDER)}")
-    # --min-corroboration: the SECOND, ORTHOGONAL gate (Ε·agree·grade) — independent of
-    # --min-strength.  You can require falsifiability, corroboration, either, or both; they
-    # are different axes, not one scalar.  Today only `independent` is a meaningful floor.
-    min_corro = opt_or_env("--min-corroboration", "PAPERKIT_MIN_CORROBORATION")
-    if min_corro is not None and min_corro not in CORRO_C:
-        sys.exit(f"paperkit-discriminate: --min-corroboration must be one of {sorted(CORRO_C)}")
-    state_file = opt_or_env("--state", "PAPERKIT_STATE")    # resumable grading: persist the token here
-    budget_str = opt_or_env("--budget", "PAPERKIT_BUDGET")  # seconds per invocation (<=0 = run to done)
-    budget = float(budget_str) if budget_str else 0.0
-    consider_all = "--all" in flags
-    as_json = "--json" in flags
-
-    resolution = opt_or_env("--resolution", "PAPERKIT_RESOLUTION") or "file"  # threaded into the grader
-    if resolution not in ("file", "def"):
-        sys.exit("paperkit-discriminate: --resolution must be 'file' or 'def'")
-
-    consumed = {x for x in (optval("--min-strength"), optval("--min-corroboration"), optval("--state"),
-                            optval("--budget"), optval("--resolution"), optval("--root"))
-                if x is not None}
-    pos = [a for a in args if a not in consumed]
+    config.apply_args(argv)          # Ω·config: fold args into PAPERKIT_* env (arg overrides env)
+    pos = config.positionals(argv)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
-    _sandbox_root(project_dir)   # resolve+validate the sandbox root up front (home-guard) — a clean exit before any sweep
+    _sandbox_root(project_dir)       # resolve+validate the sandbox root up front (home-guard) — clean exit before any sweep
     cfg = P.load_config(project_dir)
-    custom = tomllib.loads((project_dir / "paper.toml").read_text()).get("checks", {})
+    raw = tomllib.loads((project_dir / "paper.toml").read_text())
+    pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
     presupposed = presupposed_inputs(project_dir, cfg)
+
+    # every knob resolved through the ONE pipeline (env [post-arg] > paper.toml [paper] > default),
+    # validated against its choices inside resolve().
+    min_strength = config.resolve(config.MIN_STRENGTH, pol)
+    min_corro = config.resolve(config.MIN_CORRO, pol)
+    resolution = config.resolve(config.RESOLUTION, pol)
+    state_file = config.resolve(config.STATE)
+    budget_raw = config.resolve(config.BUDGET)     # None = batch grade; a value = resumable under a budget
+    budget = float(budget_raw) if budget_raw else 0.0
+    consider_all = config.resolve(config.ALL)
+    as_json = config.resolve(config.JSON)
 
     F = {}
     for b in cfg["bibs"]:
@@ -144,7 +116,7 @@ def main(argv: list) -> int:
     for k in keys:
         share.setdefault(F[k]["check"], []).append(k)
 
-    if "--footprint" in flags:
+    if config.resolve(config.FOOTPRINT):
         # Φ·footprint: each considered check's READ footprint (the project files it opens),
         # the SOUND per-check key a footprint cache invalidates on — a diff touching none of
         # a check's footprint cannot change its verdict.  Reads ⊇ Δ's sensitivity `tests`.
@@ -156,7 +128,7 @@ def main(argv: list) -> int:
     # EPOCH (_engine_hash).  A commit then re-grades only the checks whose footprint the diff
     # touched — where the old whole-project content_key cache invalidated EVERY check on any
     # edit.  Reuse a check while its footprint files (and the engine) are unchanged.
-    no_cache = "--no-cache" in flags
+    no_cache = config.resolve(config.NO_CACHE)
     engine = _engine_hash()
     cached = {} if no_cache else _load_cache(project_dir)
     valid = cached.get("engine") == engine and cached.get("resolution") == resolution
@@ -171,8 +143,8 @@ def main(argv: list) -> int:
             stale.append(c)
 
     fresh, fresh_grader = {}, None
-    if stale and state_file is None and budget_str is None:
-        # Batch grade — the default.  Test the RAW flag (budget_str): an absent --budget
+    if stale and state_file is None and budget_raw is None:
+        # Batch grade — the default.  Test the RAW value (budget_raw): an absent --budget
         # coerces to 0.0 ("run to done"), so `budget is None` would never hold and would
         # leave this path dead (the Σ·flat·gate guard-fix).  Only the STALE checks are swept.
         fresh_grader = "_grade_parallel"

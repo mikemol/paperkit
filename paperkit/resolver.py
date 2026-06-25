@@ -25,6 +25,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import config
+
 _MB_SCRIPT = Path(__file__).resolve().parent / "membudget"
 _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
 _MB_OK = None
@@ -39,7 +41,7 @@ def membudget_ok() -> bool:
     global _MB_OK
     if _MB_OK is not None:
         return _MB_OK
-    if os.environ.get("PAPERKIT_NO_MEMBUDGET") or not os.access(_MB_SCRIPT, os.X_OK):
+    if config.resolve(config.NO_MEMBUDGET) or not os.access(_MB_SCRIPT, os.X_OK):
         _MB_OK = False
     elif os.environ.get("MEMBUDGET_PARENT"):
         _MB_OK = True

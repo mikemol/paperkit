@@ -33,6 +33,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
 import project as P  # noqa: E402
 
 
@@ -53,21 +54,22 @@ def cited_keys(prose: str) -> set:
 
 
 def main(argv: list) -> int:
-    args = [a for a in argv if not a.startswith("-")]
-    safe = "--safe" in argv      # zero-postulate: uncited placements FAIL, not advise
-    without_k = "--without-K" in argv or "--without-k" in argv   # forbid shared witnesses
-    as_json = "--json" in argv   # emit structured results to stdout (human lines suppressed)
-    # The bib IS the makefile: a project's distinct checks are independent targets,
-    # so the gate runs them concurrently (default = all cores; --jobs=1 forces serial).
-    jobs = next((int(a.split("=", 1)[1]) for a in argv if a.startswith("--jobs=")),
-                os.cpu_count() or 4)
-    project_dir = Path(args[0]).resolve() if args else Path.cwd()
+    config.apply_args(argv)               # Ω·config: capture args (arg overrides env), process-local
+    pos = config.positionals(argv)
+    project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
+    raw = tomllib.loads((project_dir / "paper.toml").read_text())
+    pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
+    safe = config.resolve(config.SAFE, pol)          # zero-postulate: uncited placements FAIL
+    without_k = config.resolve(config.WITHOUT_K, pol)  # forbid two cited claims sharing a witness
+    as_json = config.resolve(config.JSON)            # structured stdout (human lines suppressed)
+    # The bib IS the makefile: a project's distinct checks are independent targets, so the gate
+    # runs them concurrently (default = all cores; jobs=1 forces serial).
+    jobs = int(config.resolve(config.JOBS) or (os.cpu_count() or 4))
 
     def info(msg):              # human success lines — suppressed under --json
         if not as_json:
             print(msg)
     cfg = P.load_config(project_dir)
-    custom = tomllib.loads((project_dir / "paper.toml").read_text()).get("checks", {})
 
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:

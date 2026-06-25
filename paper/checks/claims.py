@@ -757,6 +757,29 @@ def env_sanitized():
         os.environ.pop("INJECTED_XYZ", None)
 
 
+def path_surface():
+    # the residual env-sanitizing leaves is a TRUST surface, not only reproducibility:
+    # clean_env KEEPS PATH and run_ok runs the command through a shell, so a directory
+    # earlier in PATH SHADOWS a check's tool — whatever it resolves to runs.  (Pinning
+    # absolute tool paths would close it; paperkit does not yet do that.)  Demonstrate:
+    # a bare tool name resolves to our planted binary iff its dir is on PATH.
+    d = Path(tempfile.mkdtemp())
+    saved = os.environ.get("PATH", "")
+    try:
+        shadow = d / "shadow"
+        shadow.mkdir()
+        (shadow / "pkdemotool").write_text("#!/bin/sh\nexit 0\n")
+        os.chmod(shadow / "pkdemotool", 0o755)
+        assert "PATH" in gate.clean_env(), "clean_env drops PATH — the name-resolution surface would not exist"
+        os.environ["PATH"] = str(shadow) + os.pathsep + saved
+        assert gate.resolves("cmd:pkdemotool", d, {}) is True, "a tool earlier on PATH did not resolve inside the gate"
+        os.environ["PATH"] = saved
+        assert gate.resolves("cmd:pkdemotool", d, {}) is False, "the bare tool resolved without the shadow dir — not PATH-shadowed"
+    finally:
+        os.environ["PATH"] = saved
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def grounding_reflected():
     # ∂²'s grounding face — the comparison definition-resolution made possible: each
     # DECLARED rests-on edge is checked against MEASURED engine sensitivity.  Overlap is
@@ -808,6 +831,7 @@ CLAIMS = {
     "crash-sensitive-limit": crash_sensitive_limit,
     "trust-boundary": trust_boundary,
     "env-sanitized": env_sanitized,
+    "path-surface": path_surface,
     "forward-direction": forward_direction,
     "multi-project": multi_project,
     "project-dag": project_dag,

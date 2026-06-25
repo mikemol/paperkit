@@ -402,8 +402,14 @@
   claim   = {a check runs in a controlled, default-deny environment after sshd's defence against injection --- no inherited LD_PRELOAD, IFS, or BASH_ENV --- so a verdict cannot be injected through the caller's environment, though which tools the PATH resolves remains the host's, leaving reproducibility resting on the host toolchain},
   check   = {claim:env-sanitized}
 }
+@misc{path-surface,
+  section = {implications}, from = {env-sanitized}, join = {. },
+  claim   = {That residual is a trust surface, not only a reproducibility one: because PATH is kept and a check runs through a shell, a directory earlier in PATH shadows a check's grep or python with whatever it resolves to first --- pinning each tool to an absolute path would close it, a hardening paperkit has not yet made},
+  rests-on = {env-sanitized},
+  check   = {claim:path-surface}
+}
 @misc{grounding-reflected,
-  section = {implications}, from = {env-sanitized}, rests-on = {crash-sensitive-limit}, join = {. },
+  section = {implications}, from = {path-surface}, rests-on = {crash-sensitive-limit}, join = {. },
   link    = {grounded by the relevance gap it narrows (crash-sensitive-limit), stated several claims earlier --- a grounding link counter to prose order},
   claim   = {definition resolution turns each claim's sensitivity into a distinct engine-capability fingerprint, and the coherence grade checks declared grounding against it --- a rests-on edge whose fingerprint is disjoint from its premise's is grounding the measurement cannot see, narrowing the relevance gap by measurement rather than leaving it asserted},
   check   = {claim:grounding-reflected}

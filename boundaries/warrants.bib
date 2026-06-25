@@ -46,6 +46,11 @@
   claim   = {the reference projector's boundary --- a non-adjacent grounding edge projects as a direction-aware cross-reference, an adjacent one is carried by the connective, and a target reachable by a longer grounding path is dropped as redundant},
   check   = {cmd:python3 ../paperkit/tests/boundaries_references.py}
 }
+@misc{bnd-footprint,
+  section = {engine}, from = {bnd-references}, join = {. },
+  claim   = {the footprint tracer's boundary (Φ) --- a check's READ footprint is exactly the project files it opens when it runs, growing by each file it reads, and it is a superset of the sensitivity set, so a corruption-blind check still reports the input it reads --- the gap that makes the read footprint, not sensitivity, the sound key to cache a grade on},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_footprint.py}
+}
 
 % ── driver + cache ───────────────────────────────────────────────────────────
 @misc{bnd-driver,

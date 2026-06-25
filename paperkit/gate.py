@@ -27,6 +27,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -131,6 +132,66 @@ def resolves(check: str, project_dir: Path, custom: dict, lease: int | None = No
     else:
         return False
     return run_ok(cmd, project_dir, lease=lease, label=check)
+
+
+def _check_cmd(check: str, custom: dict) -> str | None:
+    """The shell command a check RUNS — or None for file:, which opens only its target.
+    The single source of the command behind cmd:/custom/result:, so footprint() traces
+    exactly what resolves() runs."""
+    typ, _, target = check.partition(":")
+    if typ == "file":
+        return None
+    if typ == "result":
+        return f"{sys.executable} {_SELF} --json --safe --without-K {target}"
+    if typ == "cmd":
+        return target
+    if typ in custom:
+        return custom[typ]["cmd"].replace("{target}", target)
+    return None
+
+
+# strace open/openat line: open[at](… "PATH", FLAGS[, MODE]) = RC   (RC<0 ⇒ failed open)
+_OPEN_RE = re.compile(
+    r'open(?:at)?\((?:AT_FDCWD, )?"(?P<path>(?:[^"\\]|\\.)*)", (?P<flags>[^),]*)[^)]*\)'
+    r'\s*=\s*(?P<rc>-?\d+)')
+
+
+def footprint(check: str, project_dir: Path, custom: dict) -> list:
+    """Φ·footprint — the READ footprint: the project-relative files this check OPENS for
+    reading when it runs (traced with strace).  A SOUND basis for caching: a check is a
+    pure function of its inputs, so if a diff touches none of these the verdict cannot
+    change.  Distinct from the SENSITIVITY footprint (Δ's `tests` = files a single
+    mutation flips) — a negative-assertion check reads inputs no corruption flips, so
+    reads ⊇ sensitivity, and only reads is safe to cache on.  Best-effort: needs strace,
+    and resolves openat with AT_FDCWD or absolute paths."""
+    project_dir = Path(project_dir).resolve()
+    typ, _, target = check.partition(":")
+    if typ == "file":
+        return [target] if (project_dir / target).exists() else []   # opens only its target
+    cmd = _check_cmd(check, custom)
+    if cmd is None:
+        return []
+    with tempfile.NamedTemporaryFile("w+", suffix=".strace", delete=False) as tf:
+        trace = Path(tf.name)
+    try:
+        subprocess.run(["strace", "-f", "-qq", "-e", "trace=openat,open", "-o", str(trace),
+                        "sh", "-c", cmd], cwd=project_dir, env=clean_env(), capture_output=True)
+        reads = set()
+        for line in trace.read_text(errors="replace").splitlines():
+            m = _OPEN_RE.search(line)
+            if not m or m.group("rc").startswith("-"):
+                continue                                  # unparsed line or failed open
+            if "O_WRONLY" in m.group("flags"):
+                continue                                  # write-only = output, not an input
+            raw = m.group("path")
+            p = Path(raw) if raw.startswith("/") else project_dir / raw
+            try:
+                reads.add(str(p.resolve().relative_to(project_dir)))
+            except ValueError:
+                continue                                  # outside the project — not a cacheable input
+        return sorted(reads)
+    finally:
+        trace.unlink(missing_ok=True)
 
 
 def cited_keys(prose: str) -> set:

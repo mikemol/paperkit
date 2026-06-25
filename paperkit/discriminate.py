@@ -548,6 +548,13 @@ def main(argv: list) -> int:
     for k in keys:
         share.setdefault(F[k]["check"], []).append(k)
 
+    if "--footprint" in flags:
+        # Φ·footprint: each considered check's READ footprint (the project files it opens),
+        # the SOUND per-check key a footprint cache invalidates on — a diff touching none of
+        # a check's footprint cannot change its verdict.  Reads ⊇ Δ's sensitivity `tests`.
+        print(json.dumps({c: G.footprint(c, project_dir, custom) for c in sorted(share)}, indent=2))
+        return 0
+
     # Memoize: a Δ grade is a pure function of content_key(project), so a cached
     # graded-set is reused verbatim while nothing the checks read has changed — the
     # expensive mutation sweep runs only when the project or engine actually changes.

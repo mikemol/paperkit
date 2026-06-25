@@ -60,12 +60,12 @@
 % ── resolver ─────────────────────────────────────────────────────────────────
 @misc{rm-resolver,
   section = {resolver},
-  claim   = {a verifier is named type:target, and three types ship built in, one per verb --- exists, execs, parses},
+  claim   = {a verifier is named type:target, and four types ship built in, one per verb --- exists, execs, parses, concurs},
   check   = {claim:rm-resolver}
 }
 @misc{rm-resolver-tbl,
   section = {resolver}, from = {rm-resolver}, join = { --- },
-  claim   = {the three built-ins are},
+  claim   = {the four built-ins are},
   emit    = {assets/resolver.md},
   check   = {cmd:grep -q file: assets/resolver.md}
 }

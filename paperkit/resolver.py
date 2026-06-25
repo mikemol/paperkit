@@ -7,6 +7,7 @@ dispatches it, one branch per VERB:
     file:<path>       EXISTS  — the artifact is present (no subprocess)
     cmd:<script>      EXECS   — the script exits 0 (the universal escape hatch)
     result:<project>  PARSES  — a sibling project's machine-readable gate verdict parses green
+    agree:<p>|||<q>   CONCURS — N independent producers all exit 0 and emit identical output
     <custom>:<target> EXECS   — a config-declared cmd template (domain types add here)
 
 It also sanitizes the environment a check runs in (clean_env, sshd-style default-deny) and
@@ -113,6 +114,31 @@ def resolves(check: str, project_dir: Path, custom: dict, lease: int | None = No
             return bool(json.loads(r.stdout or "{}").get("pass"))
         except Exception:
             return False
+    if typ == "agree":
+        # Δ·agree (Ε·agree) — the fourth verb: file EXISTS, cmd EXECS, result PARSES, agree
+        # CONCURS.  The SAME fact established by N INDEPENDENT producers (split on |||) that
+        # must AGREE — every one exits 0 AND emits identical output.  Where cmd: trusts one
+        # implementation, agreement across independent producers rules out a shared bug a
+        # single check cannot catch: stronger evidence, a distinct KIND.
+        producers = [p.strip() for p in target.split("|||") if p.strip()]
+        if len(producers) < 2:
+            return False                              # agreement needs ≥2 independent producers
+        outs = set()
+        for prod in producers:
+            try:
+                if lease:
+                    argv = [str(_MB_SCRIPT), "run", str(lease), check, "--", "sh", "-c", prod]
+                    r = subprocess.run(argv, cwd=project_dir, env=clean_env(),
+                                       capture_output=True, text=True)
+                else:
+                    r = subprocess.run(prod, shell=True, cwd=project_dir, env=clean_env(),
+                                       capture_output=True, text=True)
+            except Exception:
+                return False
+            if r.returncode != 0:
+                return False                          # a producer that fails cannot concur
+            outs.add(r.stdout.rstrip())
+        return len(outs) == 1                         # green iff every producer agreed
     if typ == "cmd":
         cmd = target
     elif typ in custom:
@@ -131,6 +157,8 @@ def _check_cmd(check: str, custom: dict) -> str | None:
         return None
     if typ == "result":
         return f"{sys.executable} {_GATE} --json --safe --without-K {target}"
+    if typ == "agree":   # trace every producer's reads — the footprint is their union
+        return "; ".join(p.strip() for p in target.split("|||") if p.strip())
     if typ == "cmd":
         return target
     if typ in custom:

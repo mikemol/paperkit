@@ -91,11 +91,12 @@ def rm_cmds_inv():
 
 
 def rm_resolver():
-    # a verifier is named type:target, and three types ship built in (one per verb:
-    # file EXISTS, cmd EXECS, result PARSES a sibling's verdict — Ξ·seam)
+    # a verifier is named type:target, and four types ship built in (one per verb:
+    # file EXISTS, cmd EXECS, result PARSES a sibling's verdict — Ξ·seam, agree CONCURS — Δ·agree)
     assert 'partition(":")' in RESOLVER_SRC, "the verifier is not named type:target"
     builtins = set(re.findall(r'typ == "(\w+)"', RESOLVER_SRC))
-    assert builtins == {"file", "cmd", "result"}, f"built-in types are {builtins}, expected file, cmd & result"
+    assert builtins == {"file", "cmd", "result", "agree"}, \
+        f"built-in types are {builtins}, expected file, cmd, result & agree"
 
 
 def rm_resolver_cmd():

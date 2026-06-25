@@ -69,10 +69,20 @@ def new_domain_adds():
 
 
 def two_builtins():
-    # three verifiers ship built in — file EXISTS, cmd EXECS, result PARSES (Ξ·seam);
-    # other types come from config.
+    # four verifiers ship built in — file EXISTS, cmd EXECS, result PARSES (Ξ·seam),
+    # agree CONCURS (Δ·agree); other types come from config.
     builtins = set(re.findall(r'typ == "(\w+)"', RESOLVER_SRC))
-    assert builtins == {"file", "cmd", "result"}, f"built-in types are {builtins}, expected file, cmd & result"
+    assert builtins == {"file", "cmd", "result", "agree"}, \
+        f"built-in types are {builtins}, expected file, cmd, result & agree"
+
+
+def agree_builtin():
+    # agree CONCURS — ≥2 independent producers (split on |||) must all exit 0 and emit
+    # IDENTICAL output; agreement across implementations rules out a shared bug.
+    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: of two concurring producers failed"
+    assert gate.resolves("agree:printf 42 ||| printf 43", ENGINE, {}) is False, "agree: of two disagreeing producers passed"
+    assert gate.resolves("agree:printf 42", ENGINE, {}) is False, "agree: with a single producer (no independence) passed"
+    assert gate.resolves("agree:printf 42 ||| false", ENGINE, {}) is False, "agree: tolerated a producer that failed"
 
 
 def result_builtin():
@@ -968,6 +978,7 @@ CLAIMS = {
     "dataset-fresh": dataset_fresh,
     "new-domain-adds": new_domain_adds,
     "two-builtins": two_builtins,
+    "agree-builtin": agree_builtin,
     "result-builtin": result_builtin,
     "file-builtin": file_builtin,
     "cmd-builtin": cmd_builtin,

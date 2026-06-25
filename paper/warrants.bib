@@ -162,9 +162,9 @@
 }
 @misc{two-builtins,
   section = {resolver}, from = {gate-dispatches}, join = {. },
-  claim   = {three verifiers ship built in, one per verb},
-  rests-on = {file-builtin, cmd-builtin, result-builtin},
-  link    = {grounded by the three builtins it names, which the prose introduces just after --- the grounding link runs counter to prose order},
+  claim   = {four verifiers ship built in, one per verb},
+  rests-on = {file-builtin, cmd-builtin, result-builtin, agree-builtin},
+  link    = {grounded by the four builtins it names, which the prose introduces just after --- the grounding link runs counter to prose order},
   check   = {claim:two-builtins}
 }
 @misc{file-builtin,
@@ -178,9 +178,14 @@
   check   = {claim:cmd-builtin}
 }
 @misc{result-builtin,
-  section = {resolver}, from = {cmd-builtin}, join = {, and },
+  section = {resolver}, from = {cmd-builtin}, join = {, },
   claim   = {result, that a sibling project's gate verdict PARSES green --- the verb that lets one project rest on another it does not re-derive},
   check   = {claim:result-builtin}
+}
+@misc{agree-builtin,
+  section = {resolver}, from = {result-builtin}, join = {, and },
+  claim   = {agree, that N independent producers CONCUR --- all exit green and emit identical output, the verb that corroborates a fact across implementations rather than trusting one (Δ·agree)},
+  check   = {claim:agree-builtin}
 }
 @misc{cmd-escape,
   section = {resolver}, from = {cmd-builtin, new-domain-adds}, join = {; and },

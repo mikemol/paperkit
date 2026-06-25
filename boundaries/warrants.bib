@@ -63,3 +63,8 @@
   claim   = {the memoization boundary --- a grade is reused only when the content key matches, so a changed engine never serves a stale grade},
   check   = {cmd:python3 ../paperkit/tests/boundaries_memoize.py}
 }
+@misc{bnd-agree,
+  section = {engine}, from = {bnd-footprint}, join = {. },
+  claim   = {the agree verb's boundary (Δ·agree) --- independent producers that concur pass, a single byte of disagreement flags, and neither a lone producer nor one that fails can concur, so the verb corroborates a fact across implementations rather than trusting one},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_agree.py}
+}

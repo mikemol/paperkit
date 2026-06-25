@@ -12,5 +12,5 @@ The projector's boundary — it emits a cited example verbatim, and --safe rejec
 
 ## Driver and Μ Cache
 
-The driver's boundary — a witness pumps and serializes resumably, so a slow check is interruptible, not broken [@bnd-driver]. The memoization boundary — a grade is reused only when the content key matches, so a changed engine never serves a stale grade [@bnd-cache].
+The driver's boundary — a witness pumps and serializes resumably, so a slow check is interruptible, not broken [@bnd-driver]. The memoization boundary — a grade is reused only when the content key matches, so a changed engine never serves a stale grade [@bnd-cache]. The Δ sandbox's boundary — the mutation copy takes the bounded root WHOLE (the bound lives on the root, not a lossy per-dir skip), and that root is DECLARABLE (the PAPERKIT_ROOT environment variable, which a --root flag overrides, or paper.toml) and otherwise inferred as the parent — but inferring a home directory or above is REFUSED with guidance, so a downstream project living in a home that also holds a clone or cache does not explode the disk [@bnd-sandbox].
 

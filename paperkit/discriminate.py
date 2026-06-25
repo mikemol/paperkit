@@ -76,7 +76,7 @@ import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grad
 from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
                    footprint_hash as _footprint_hash, load as _load_cache, save as _save_cache)
 from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness,  # noqa: E402,F401
-                    _grade_parallel, STRENGTH, ORDER, RANK_C, GRADE_C, CORRO_C)
+                    _grade_parallel, _sandbox_root, STRENGTH, ORDER, RANK_C, GRADE_C, CORRO_C)
 
 
 def main(argv: list) -> int:
@@ -86,29 +86,44 @@ def main(argv: list) -> int:
     def optval(name):
         return argv[argv.index(name) + 1] if name in argv else None
 
-    min_strength = optval("--min-strength")
+    def opt_or_env(name, env):
+        # Container pipelines: every value-arg also reads a PAPERKIT_* env var, and an
+        # EXPLICIT flag OVERRIDES the env var.  So a Containerfile sets defaults via env and
+        # an ad-hoc run overrides on the command line — one rule for every knob.
+        v = optval(name)
+        return v if v is not None else os.environ.get(env)
+
+    # --root pins the Δ sandbox's bounded universe (the grader's _sandbox_root reads it deep,
+    # via PAPERKIT_ROOT).  Setting the env from the flag IS the "explicit arg overrides env":
+    # one resolved value reaches the grader whether it came from the flag or the container env.
+    if optval("--root") is not None:
+        os.environ["PAPERKIT_ROOT"] = optval("--root")
+
+    min_strength = opt_or_env("--min-strength", "PAPERKIT_MIN_STRENGTH")
     if min_strength is not None and min_strength not in ORDER:
         sys.exit(f"paperkit-discriminate: --min-strength must be one of {sorted(ORDER)}")
     # --min-corroboration: the SECOND, ORTHOGONAL gate (Ε·agree·grade) — independent of
     # --min-strength.  You can require falsifiability, corroboration, either, or both; they
     # are different axes, not one scalar.  Today only `independent` is a meaningful floor.
-    min_corro = optval("--min-corroboration")
+    min_corro = opt_or_env("--min-corroboration", "PAPERKIT_MIN_CORROBORATION")
     if min_corro is not None and min_corro not in CORRO_C:
         sys.exit(f"paperkit-discriminate: --min-corroboration must be one of {sorted(CORRO_C)}")
-    state_file = optval("--state")          # resumable grading: persist the token here
-    budget_str = optval("--budget")         # seconds per invocation (<=0 = run to done)
+    state_file = opt_or_env("--state", "PAPERKIT_STATE")    # resumable grading: persist the token here
+    budget_str = opt_or_env("--budget", "PAPERKIT_BUDGET")  # seconds per invocation (<=0 = run to done)
     budget = float(budget_str) if budget_str else 0.0
     consider_all = "--all" in flags
     as_json = "--json" in flags
 
-    resolution = optval("--resolution") or "file"   # threaded into the grader, not a global
+    resolution = opt_or_env("--resolution", "PAPERKIT_RESOLUTION") or "file"  # threaded into the grader
     if resolution not in ("file", "def"):
         sys.exit("paperkit-discriminate: --resolution must be 'file' or 'def'")
 
-    consumed = {x for x in (min_strength, min_corro, state_file, budget_str, optval("--resolution"))
+    consumed = {x for x in (optval("--min-strength"), optval("--min-corroboration"), optval("--state"),
+                            optval("--budget"), optval("--resolution"), optval("--root"))
                 if x is not None}
     pos = [a for a in args if a not in consumed]
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
+    _sandbox_root(project_dir)   # resolve+validate the sandbox root up front (home-guard) — a clean exit before any sweep
     cfg = P.load_config(project_dir)
     custom = tomllib.loads((project_dir / "paper.toml").read_text()).get("checks", {})
     presupposed = presupposed_inputs(project_dir, cfg)

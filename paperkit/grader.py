@@ -26,7 +26,7 @@ import time
 from pathlib import Path
 
 import resolver
-from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _nested_roots, _mutable
+from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _copy_sandbox, _nested_roots, _mutable
 
 CORRUPT = b"\x00\x00DELTA-CORRUPTION\x00\x00\n"
 
@@ -351,8 +351,7 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
     tmp = Path(tempfile.mkdtemp(prefix="paperkit-delta-"))
     try:
         root = _sandbox_root(project_dir)
-        shutil.copytree(root, tmp / root.name,
-                        ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
+        _copy_sandbox(root, tmp / root.name)
         rel = project_dir.relative_to(root)
         sandbox = tmp / root.name if rel == Path(".") else tmp / root.name / rel
         # the engine in the sandbox copy — included in the mutation surface (def

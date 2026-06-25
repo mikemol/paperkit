@@ -62,13 +62,9 @@ import hashlib
 import json
 import os
 import shutil
-import signal
-import subprocess
 import sys
 import tempfile
-import time
 import tomllib
-from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -412,120 +408,6 @@ def _grade_parallel(project_dir, checks, custom, presupposed):
     return dict(zip(checks, graded))
 
 
-def _witness_cmd(chk: str, custom: dict) -> str:
-    """The shell command a cmd/custom check runs (mirrors the gate's construction)."""
-    typ, _, target = chk.partition(":")
-    if typ in custom:
-        return custom[typ]["cmd"].replace("{target}", target)
-    return target
-
-
-def _grade_flat(project_dir, checks, custom, presupposed):
-    """The FLAT work-queue grader.  Group testing serializes each check's binary-split,
-    so a few heavy integration witnesses form a tail that starves the cores (~50% busy,
-    measured).  Flat instead makes every (check, site) mutation an INDEPENDENT job and
-    keeps N witnesses in flight over a sandbox pool — the box stays pegged (100%), no
-    tail.  It trades group testing's run-count savings for embarrassing parallelism, the
-    right trade on idle cores.  file: checks need no run; cmd/custom checks are graded
-    from a baseline run + the flip set the pool collects.  (Per-candidate footprint
-    pruning to cut the run count is the measured next step, Σ·flat·prune.)"""
-    file_checks = [c for c in checks if c.partition(":")[0] == "file"]
-    run_checks = [c for c in checks if c.partition(":")[0] != "file"]
-    graded = {c: grade_check(c, project_dir, presupposed, custom, project_dir) for c in file_checks}
-    if not run_checks:
-        return graded
-    cpus = os.cpu_count() or 4
-    N = max(1, min(64, int(os.environ.get("PAPERKIT_DELTA_JOBS", str(round(cpus * 2.5))))))
-    tmp = Path(tempfile.mkdtemp(prefix="paperkit-flat-"))
-    try:
-        root = _sandbox_root(project_dir)
-        rel = project_dir.relative_to(root)
-        template = tmp / "tmpl"
-        shutil.copytree(root, template, ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
-        tproj = template if rel == Path(".") else template / rel
-        teng = ((template / _ENGINE.relative_to(root))
-                if _RESOLUTION == "def" and _ENGINE.is_relative_to(root) else None)
-        sites, orig = [], {}            # site = (file_rel_to_root, kind, node|None, label)
-        for f in sandbox_files(tproj, set(), teng):
-            fr = str(f.relative_to(template))
-            orig[fr] = f.read_bytes()
-            label = _rel(f, tproj, teng)
-            if f.suffix == ".py":
-                for qn, node in _def_sites(f.read_text()):
-                    sites.append((fr, "def", node, f"{label}::{qn}"))
-            else:
-                sites.append((fr, "file", None, label))
-        pool = []
-        for i in range(N):
-            sb = tmp / f"sb{i}"
-            shutil.copytree(template, sb, dirs_exist_ok=True)
-            pool.append(sb)
-        proj_cwd = (lambda sb: sb if rel == Path(".") else sb / rel)
-        TIMEOUT = float(os.environ.get("PAPERKIT_DELTA_TIMEOUT", "90"))
-
-        def orchestrate(jobs):
-            free = list(pool)
-            q = deque(jobs)
-            active: dict = {}           # Popen -> (chk, si, sb, fa, launched_at)
-            res: dict = {}              # (chk, si) -> returncode (None = timed out / hung)
-            env = G.clean_env()
-            DEV = subprocess.DEVNULL
-            while q or active:
-                while q and free:
-                    chk, si = q.popleft()
-                    sb = free.pop()
-                    fa = None
-                    if si is not None:
-                        fr, kind, node, _ = sites[si]
-                        fa = sb / fr
-                        if kind == "def":
-                            fa.write_text(_mutate_lines(orig[fr].decode(), [node]))
-                        else:
-                            fa.write_bytes(CORRUPT)
-                    # own session, so a hung witness's whole tree (nested gate / membudget
-                    # scope) can be reaped — no orphans, and a stall can't wedge the grade.
-                    p = subprocess.Popen(_witness_cmd(chk, custom), shell=True,
-                                         cwd=str(proj_cwd(sb)), stdout=DEV, stderr=DEV, env=env,
-                                         start_new_session=True)
-                    active[p] = (chk, si, sb, fa, time.time())
-                now = time.time()
-                done = []
-                for p, (chk, si, sb, fa, t0p) in list(active.items()):
-                    rc = p.poll()
-                    if rc is not None:
-                        done.append((p, rc))
-                    elif now - t0p > TIMEOUT:      # a hung witness (e.g. mem-lease under membudget contention)
-                        try:
-                            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-                        except (ProcessLookupError, PermissionError):
-                            pass
-                        p.wait()
-                        done.append((p, None))     # None = timed out, distinct from a clean flip
-                if not done:
-                    time.sleep(0.02)
-                    continue
-                for p, rc in done:
-                    chk, si, sb, fa, _ = active.pop(p)
-                    if fa is not None:
-                        fa.write_bytes(orig[sites[si][0]])
-                    res[(chk, si)] = rc
-                    free.append(sb)
-            return res
-
-        base = orchestrate([(c, None) for c in run_checks])
-        green = [c for c in run_checks if base[(c, None)] == 0]    # baseline passed CLEANLY
-        flips = orchestrate([(c, si) for c in green for si in range(len(sites))])
-        sens: dict = {c: [] for c in run_checks}
-        for (c, si), rc in flips.items():
-            if rc is not None and rc != 0:          # a clean non-zero exit — a real flip (not a hang)
-                sens[c].append(sites[si][3])
-        for c in run_checks:
-            graded[c] = _grade_from_sens(base[(c, None)] == 0, sorted(sens[c]))
-        return graded
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
 class GradeWitness:
     """Δ's grading sweep as a pump()/parse() witness: one distinct check graded per
     pump(), state = {cursor, graded}.  The heavy per-check sandbox is rebuilt INSIDE
@@ -619,21 +501,13 @@ def main(argv: list) -> int:
         # RAW flag (budget_str), not the coerced `budget`: an absent --budget coerces to
         # 0.0 ("run to done"), and `budget is None` is then never true — which silently
         # routed EVERY default grade through the slow resumable pump below and left this
-        # whole batch path (and the flat gate) dead.  Keep it `budget_str is None`.
-        # The FLAT work-queue grader (Σ·flat) was meant to peg the box by keeping N
-        # witnesses in flight.  It is opt-in and stays that way: MEASURED (Σ·flat·measure
-        # + ·lease, paper file-mode under a 3 GB scope) it ran 8m11s against _grade_parallel's
-        # 40s — 12x SLOWER.  Its oversubscription (N=2.5x cpus blind outer witnesses, each a
-        # fx.gate recursion-tree) THRASHES any real memory budget; the prototype's "peg"
-        # only wins on an idle box with spare RAM.  Σ·flat·lease (throttle the pool to fit
-        # RAM, via membudget) was NOT pursued: fit-RAM concurrency is exactly what
-        # _grade_parallel already does, so ·lease could at best make flat MATCH parallel,
-        # never beat it — and flat is intrinsically heavier (a subprocess per (check,site),
-        # ~13k of them, vs ~70 per-check).  group testing is the default for both
-        # resolutions; flat is kept opt-in only for an idle box with abundant RAM.
-        grade_fn = _grade_flat if os.environ.get("PAPERKIT_DELTA_FLAT") == "1" else _grade_parallel
-        grader = grade_fn.__name__
-        graded = grade_fn(project_dir, list(share), custom, presupposed)
+        # batch path dead.  Keep it `budget_str is None`.
+        # (A flat (check, site) work-queue grader once lived here behind PAPERKIT_DELTA_FLAT;
+        # it was removed — measured 12x slower than this concurrent path under a real memory
+        # budget, because it scheduled the heavy/light jobs FLAT, ignoring the work poset.
+        # See git log, Σ·flat·retire.)
+        grader = "_grade_parallel"
+        graded = _grade_parallel(project_dir, list(share), custom, presupposed)
         if not no_cache:
             (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded, "grader": grader}))
     else:

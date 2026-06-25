@@ -95,8 +95,7 @@ def gate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
 def discriminate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
                  title="t", numbered=False, references=False, env=None):
     """(returncode, stdout).  Projects out.md before grading (or writes `out`).
-    `env` overrides the child environment (e.g. PAPERKIT_DELTA_FLAT=1 to select
-    the flat grader) — the Σ·flat·witness boundary toggles it."""
+    `env` overrides the child environment for the grade subprocess."""
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, title, numbered, references)
         _projected(proj, out)

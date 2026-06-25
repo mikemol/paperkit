@@ -15,7 +15,6 @@ the same triple for the GATE: minimal fixture, append one drift line (δ), pass�
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -34,11 +33,12 @@ def grade_of(check, assets=None):
     return json.loads(out)[0]
 
 
-def grader_of(check, flat=False):
-    # Σ·flat·witness: read the recorded grader identity.  flat=True selects the
-    # opt-in flat grader via the env var (the δ of the provenance boundary).
-    env = {**os.environ, "PAPERKIT_DELTA_FLAT": "1"} if flat else None
-    _, out = discriminate(W(check), "--all", "--json", env=env)
+def grader_of(check, resumable=False):
+    # Σ·flat·witness: read the recorded grader identity.  --budget selects the
+    # resumable pump-witness (GradeWitness); the default is the batch grader
+    # (_grade_parallel).  That the grader is RECORDED, not inferred, is the point.
+    flags = ("--all", "--json") + (("--budget", "0") if resumable else ())
+    _, out = discriminate(W(check), *flags)
     return json.loads(out)[0]["grader"]
 
 
@@ -76,11 +76,11 @@ DELTA_CASES = [
      "axis": "whether the projection cites the warrant",
      "P": (0, "file:w.bib", False), "F": (1, "file:w.bib", True),
      "delta": "out.md: (no citation)  →  …the claim [@w]", "kind": "gate"},
-    {"name": "Δ grader provenance: _grade_parallel → _grade_flat  (Σ·flat·witness)",
-     "axis": "the PAPERKIT_DELTA_FLAT env var (which grader ran is RECORDED, not inferred)",
+    {"name": "Δ grader provenance: _grade_parallel → GradeWitness  (Σ·flat·witness)",
+     "axis": "whether grading is resumable (--budget selects the pump-witness, RECORDED not inferred)",
      "P": ("_grade_parallel", f"cmd:grep -q {TOKEN} w.bib", False),
-     "F": ("_grade_flat", f"cmd:grep -q {TOKEN} w.bib", True),
-     "delta": "env: (unset)  →  PAPERKIT_DELTA_FLAT=1", "kind": "grader"},
+     "F": ("GradeWitness", f"cmd:grep -q {TOKEN} w.bib", True),
+     "delta": "flags: (none)  →  --budget 0", "kind": "grader"},
     {"name": "Δ vacuity-source: behavioral → total  (corruption-blind, Δ·vacuity-source)",
      "axis": "whether the check reads a corruptible PROJECT input at all",
      "P": ("behavioral", f"cmd:grep -q {TOKEN} w.bib"),

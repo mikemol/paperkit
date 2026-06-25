@@ -1,0 +1,19 @@
+| knob | flag | env var | config | default |
+| --- | --- | --- | --- | --- |
+| `root` (value) | `--root` | `PAPERKIT_ROOT` | `root` | `—` |
+| `safe` (flag) | `--safe` | `PAPERKIT_SAFE` | `safe` | `—` |
+| `without-K` (flag) | `--without-K` | `PAPERKIT_WITHOUT_K` | `without_k` | `—` |
+| `jobs` (value) | `--jobs` | `PAPERKIT_JOBS` | `jobs` | `—` |
+| `json` (flag) | `--json` | `PAPERKIT_JSON` | — | `—` |
+| `min-strength` (value) | `--min-strength` | `PAPERKIT_MIN_STRENGTH` | `min_strength` | `—` |
+| `min-corroboration` (value) | `--min-corroboration` | `PAPERKIT_MIN_CORROBORATION` | `min_corroboration` | `—` |
+| `resolution` (value) | `--resolution` | `PAPERKIT_RESOLUTION` | `resolution` | `file` |
+| `state` (value) | `--state` | `PAPERKIT_STATE` | — | `—` |
+| `budget` (value) | `--budget` | `PAPERKIT_BUDGET` | — | `—` |
+| `all` (flag) | `--all` | `PAPERKIT_ALL` | — | `—` |
+| `footprint` (flag) | `--footprint` | `PAPERKIT_FOOTPRINT` | — | `—` |
+| `no-cache` (flag) | `--no-cache` | `PAPERKIT_NO_CACHE` | — | `—` |
+| `delta-repeat` (value) | `--delta-repeat` | `PAPERKIT_DELTA_REPEAT` | — | `1` |
+| `delta-pulse` (value) | `--delta-pulse` | `PAPERKIT_DELTA_PULSE` | — | `2` |
+| `no-membudget` (flag) | `--no-membudget` | `PAPERKIT_NO_MEMBUDGET` | — | `—` |
+| `check` (flag) | `--check` | `PAPERKIT_CHECK` | — | `—` |

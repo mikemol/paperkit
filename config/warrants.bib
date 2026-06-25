@@ -1,0 +1,23 @@
+% warrants.bib — paperkit's configurables, projected from the Ω·config registry.  Each claim is
+% checked against config.REGISTRY, so the documentation is verified, never hand-maintained.
+@misc{cfg-precedence,
+  section = {model},
+  claim   = {every configurable resolves the one way --- an explicit argument over an environment variable over the project's paper.toml config over a built-in default},
+  check   = {cmd:python3 checks/registry.py precedence}
+}
+@misc{cfg-wellformed,
+  section = {model}, from = {cfg-precedence}, join = {. },
+  claim   = {the registry is well-formed --- each knob carries a unique name and a unique PAPERKIT_ environment variable and a help line, and a flag declares no value choices},
+  check   = {cmd:python3 checks/registry.py well-formed}
+}
+@misc{cfg-covers,
+  section = {model}, from = {cfg-wellformed}, join = {. },
+  claim   = {coverage is total --- every knob is reachable by BOTH a command-line flag and an environment variable, so a container pipeline and an ad-hoc run reach the same controls},
+  check   = {cmd:python3 checks/registry.py covers}
+}
+@misc{cfg-table,
+  section = {knobs},
+  claim   = {the knobs, each with its flag, environment variable, config key, and default --- generated from the registry, so this table cannot drift from the code},
+  emit    = {assets/knobs.md},
+  check   = {cmd:python3 checks/registry.py fresh}
+}

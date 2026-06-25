@@ -1,0 +1,8 @@
+[paper]
+title = "paperkit Configurables"
+subtitle = "Every knob resolves one way — arg over env over config over default — and is projected here from the one registry that defines it (Ω·config)."
+warrants = ["warrants.bib"]
+rubric = "rubric.tsv"
+out = "CONFIG.md"
+numbered = false
+references = false

@@ -60,7 +60,6 @@ DIR defaults to the current directory and must contain paper.toml.
 from __future__ import annotations
 
 import ast
-import hashlib
 import json
 import os
 import shutil
@@ -78,30 +77,12 @@ import gate as G  # noqa: E402
 import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grading)
 
 CORRUPT = b"\x00\x00DELTA-CORRUPTION\x00\x00\n"
-MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt"}
-SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out"}
-_ENGINE = Path(__file__).resolve().parent
 
-
-def _sandbox_root(project_dir):
-    """The dir to copy into the mutation sandbox: project_dir itself when the engine
-    lives INSIDE it (a self-contained project — the README at the repo root, whose
-    deps are paperkit/), else its parent (a project whose deps are a sibling — the
-    paper's ../paperkit — or a self-contained fixture whose engine is elsewhere)."""
-    return project_dir if _ENGINE.is_relative_to(project_dir) else project_dir.parent
-
-
-def _nested_roots(base: Path) -> list:
-    """Directories under `base` that are OTHER paperkit projects (each has its own
-    paper.toml).  A root-level project (the README, whose project dir IS the repo)
-    must not key on, or mutate, sibling projects' files — only its own + the engine."""
-    return [t.parent for t in base.rglob("paper.toml") if t.parent != base]
-
-
-def _mutable(f: Path) -> bool:
-    """A text input Δ may corrupt: a known source suffix, or a versioned git hook
-    (no suffix, but a checked artifact — the README's ci claim names it)."""
-    return f.is_file() and (f.suffix in MUTABLE_SUFFIXES or ".githooks" in f.parts)
+# Project topology and the grade cache now live in their own small modules (so each is
+# testable apart from the grader); imported under the names the grader/CLI below already use.
+from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _nested_roots, _mutable  # noqa: E402,F401
+from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
+                   footprint_hash as _footprint_hash, load as _load_cache, save as _save_cache)
 
 STRENGTH = {"vacuous": 0, "existence": 1, "indeterminate": 1, "behavioral": 2, "imported": 3}
 ORDER = {"existence": 1, "behavioral": 2}  # valid --min-strength thresholds
@@ -113,66 +94,6 @@ ORDER = {"existence": 1, "behavioral": 2}  # valid --min-strength thresholds
 RANK_C = {"broken": -1, "vacuous": 0, "indeterminate": 1, "existence": 2, "behavioral": 3,
           "imported": 4}
 GRADE_C = {v: k for k, v in RANK_C.items()}
-
-
-def content_key(project_dir: Path) -> str:
-    """A hash of every file a check in this project could read — the project's own files
-    plus the engine.  A Δ grade is a pure function of these (the mutation probe only ever
-    reads them): the SOUNDNESS BASIS of caching.  The cache itself keys finer — per check,
-    on its read footprint plus the engine epoch (see _footprint_hash / _engine_hash) — so
-    this whole-project key is no longer the cache key, but the invariant it expresses is
-    what makes the finer key sound (a footprint ⊆ this content)."""
-    engine = Path(__file__).resolve().parent
-    parts = []
-    for tag, base in (("proj", project_dir), ("engine", engine)):
-        nested = _nested_roots(base) if tag == "proj" else []
-        for f in sorted(base.rglob("*")):
-            if (_mutable(f) and not any(p in SKIP_DIRS for p in f.parts)
-                    and not any(nr in f.parents for nr in nested)):
-                parts.append(f"{tag}/{f.relative_to(base)}:{hashlib.sha256(f.read_bytes()).hexdigest()}")
-    return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
-
-
-def _engine_hash() -> str:
-    """A hash of the engine alone — its own global cache EPOCH.  The engine is a universal
-    dependency (every check runs through the gate), and footprint() reports only files under
-    a project (the engine usually sits OUTSIDE it at ../paperkit), so the read footprint is
-    completed by this: an engine edit invalidates every check; a project edit invalidates
-    only the checks whose footprint touched it."""
-    engine = Path(__file__).resolve().parent
-    parts = [f"{f.relative_to(engine)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
-             for f in sorted(engine.rglob("*"))
-             if _mutable(f) and not any(p in SKIP_DIRS for p in f.parts)]
-    return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
-
-
-def _footprint_hash(project_dir: Path, files: list) -> str:
-    """A hash of the current content of a check's recorded footprint files — the per-check
-    cache key.  Unchanged ⇒ the check reads the same project inputs ⇒ same verdict ⇒ same
-    grade (sound: a check is a pure function of its inputs; the engine is held by _engine_hash)."""
-    h = hashlib.sha256()
-    for rel in sorted(files):
-        f = project_dir / rel
-        h.update(rel.encode())
-        h.update(b"\0")
-        h.update(f.read_bytes() if f.is_file() else b"\0MISSING\0")
-        h.update(b"\n")
-    return h.hexdigest()
-
-
-def _load_cache(project_dir: Path) -> dict:
-    p = project_dir / ".delta-cache.json"
-    try:
-        return json.loads(p.read_text()) if p.exists() else {}
-    except Exception:
-        return {}
-
-
-def _save_cache(project_dir: Path, data: dict) -> None:
-    try:
-        (project_dir / ".delta-cache.json").write_text(json.dumps(data))
-    except Exception:
-        pass
 
 
 def presupposed_inputs(project_dir: Path, cfg: dict) -> set:

@@ -557,6 +557,55 @@ def content_cache():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def footprint_scopes():
+    # Δ traces each check's READ footprint (the files it opens), a SUPERSET of its
+    # sensitivity set, so the footprint SCOPES the sweep — each check graded against what
+    # it reads, not the whole repo.  An unread file is in neither the footprint nor the flip-set.
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "a.txt").write_text("FOO\n")
+        (d / "b.txt").write_text("unread\n")
+        chk = "cmd:grep -q FOO a.txt"
+        fp = gate.footprint(chk, d, {})
+        assert fp == ["a.txt"], f"footprint should be the one read file: {fp}"
+        baseline, sens = grader.sensitivity(chk, d, {}, None, footprint=fp)
+        assert baseline and set(sens) <= set(fp), f"sensitivity is not within the read footprint: {sens}"
+        assert "b.txt" not in sens, "an unread file flipped the check"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def imported_grade():
+    # a verdict-import sits OUTSIDE the falsifiability ladder: Δ grades result: "imported" —
+    # adequacy delegated to a sibling the gate verifies on its own — run once, never swept.
+    d = Path(tempfile.mkdtemp())
+    try:
+        sib = d / "g"
+        sib.mkdir()
+        (sib / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
+                                        'rubric = "r.tsv"\nout = "out.md"\n')
+        (sib / "r.tsv").write_text("s\tSec\n")
+        (sib / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")
+        (sib / "out.md").write_text(P.project(P.load_config(sib)))
+        rec = grader.grade_check("result:g", d, set(), {}, d)
+        assert rec["grade"] == "imported", f"a green verdict-import should grade imported, got {rec['grade']}"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def module_split():
+    # the engine is not a monolith but small single-responsibility modules — a resolver that
+    # runs a check, a grader that sweeps it, a cache, a topology — each importable on its own;
+    # the leaf modules do not import the orchestrators, so a change to one has a small blast radius.
+    for mod in ("resolver", "grader", "cache", "layout"):
+        assert (ENGINE / f"{mod}.py").exists(), f"engine module {mod}.py is missing"
+    assert "import gate" not in RESOLVER_SRC and "concurrent.futures" not in RESOLVER_SRC, \
+        "the resolver imports the gate / its parallelism — not a small blast radius"
+    grader_src = (ENGINE / "grader.py").read_text()
+    assert "import gate" not in grader_src and "import project" not in grader_src, \
+        "the grader imports gate/project — it would not be testable on its own"
+
+
 def sandbox_grade():
     # grading runs in a sandbox copy whose mutation surface excludes SIBLING projects
     # (a nested dir with its own paper.toml), so a project grades independently of them
@@ -881,6 +930,9 @@ CLAIMS = {
     "grade-ladder": grade_ladder,
     "mutation-probes": mutation_probes,
     "content-cache": content_cache,
+    "footprint-scopes": footprint_scopes,
+    "imported-grade": imported_grade,
+    "module-split": module_split,
     "sandbox-grade": sandbox_grade,
     "min-strength": min_strength,
     "resolve-passes": resolve_passes,

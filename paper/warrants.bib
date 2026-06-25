@@ -136,6 +136,11 @@
   claim   = {every claim tagged for a section must be cited within it},
   check   = {claim:every-claim-cited}
 }
+@misc{module-split,
+  section = {engine}, from = {every-claim-cited}, join = {. },
+  claim   = {the engine is not a monolith but a handful of small single-responsibility modules --- a resolver that runs a check, a grader that sweeps it for sensitivity, a cache, a topology --- each importable and tested on its own, so a change to one carries a small blast radius},
+  check   = {claim:module-split}
+}
 
 % ── 4. resolver ─────────────────────────────────────────────────────────────
 @misc{verifier-named,
@@ -313,6 +318,16 @@
   section = {adequacy}, from = {sandbox-grade}, join = {, and },
   claim   = {--min-strength turns the grades into a gate --- a project fails if any cited claim's check grades below the threshold, which is how this paper enforces its own proof-relevance in CI},
   check   = {claim:min-strength}
+}
+@misc{footprint-scopes,
+  section = {adequacy}, from = {min-strength}, join = {. },
+  claim   = {Δ traces each check's READ footprint --- the project files it opens when it runs, a superset of its sensitivity set --- and beyond keying the per-check cache, that footprint SCOPES the sweep: each check is graded against the files it reads, never the whole repository},
+  check   = {claim:footprint-scopes}
+}
+@misc{imported-grade,
+  section = {adequacy}, from = {footprint-scopes}, join = {. },
+  claim   = {one grade sits outside the falsifiability ladder: a verdict-import is graded imported --- its adequacy delegated to a sibling project the gate verifies on its own, run once and never mutation-swept --- the way one paper rests on another it does not re-derive},
+  check   = {claim:imported-grade}
 }
 
 % ── liveness: resumable witnesses ────────────────────────────────────────────

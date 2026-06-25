@@ -404,7 +404,7 @@
 }
 @misc{path-surface,
   section = {implications}, from = {env-sanitized}, join = {. },
-  claim   = {That residual is a trust surface, not only a reproducibility one: because PATH is kept and a check runs through a shell, a directory earlier in PATH shadows a check's grep or python with whatever it resolves to first --- pinning each tool to an absolute path would close it, a hardening paperkit has not yet made},
+  claim   = {That residual is a trust surface, not only a reproducibility one: a check runs through a shell that resolves tools by name, so paperkit drops PATH's relative and empty entries --- the ones that would resolve to the very project directory being gated --- closing the shadow where a document plants a tool beside itself; which absolute directory resolves a tool it keeps, the host's own trust, the same as the toolchain's},
   rests-on = {env-sanitized},
   check   = {claim:path-surface}
 }

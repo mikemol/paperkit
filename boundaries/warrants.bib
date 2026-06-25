@@ -38,7 +38,7 @@
 }
 @misc{bnd-env,
   section = {engine}, from = {bnd-parallel}, join = {. },
-  claim   = {the environment boundary --- a check runs in a controlled, default-deny environment (sshd's defence against env injection), keeping PATH, locale, and paperkit's own knobs but dropping LD_PRELOAD, IFS, BASH_ENV, and the like},
+  claim   = {the environment boundary --- a check runs in a controlled, default-deny environment (sshd's defence against env injection), keeping PATH, locale, and paperkit's own knobs but dropping LD_PRELOAD, IFS, BASH_ENV, and the like, and dropping PATH's relative entries so a tool cannot resolve to the gated project dir},
   check   = {cmd:python3 ../paperkit/tests/boundaries_env.py}
 }
 @misc{bnd-references,

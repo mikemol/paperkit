@@ -66,8 +66,11 @@ def membudget_ok() -> bool:
 # surface (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH, …) and a reproducibility leak (the
 # verdict would depend on the caller's shell).  Like sshd, we DON'T inherit: we build a
 # controlled environment, default-deny, keeping only what a check (and the membudget
-# semaphore + a nested gate) legitimately need.  PATH is kept so tools resolve; pinning
-# WHICH tools (e.g. GNU vs uutils coreutils) is a further step.
+# semaphore + a nested gate) legitimately need.  PATH is kept so tools resolve, but its
+# RELATIVE entries are dropped (Τ·path): a check runs with cwd = the project dir, so an
+# empty/"." PATH component would resolve a tool to the project being gated — letting a
+# document plant a tool beside itself.  Which ABSOLUTE dir resolves a tool stays the
+# host's trust (the reproducibility leak above); pinning per-tool (GNU vs uutils) is further.
 _ENV_KEEP = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TZ", "TMPDIR",
              "LANG", "LANGUAGE",
              "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}  # membudget's systemd --user
@@ -76,10 +79,16 @@ _ENV_KEEP_PREFIX = ("LC_", "MEMBUDGET_", "PAPERKIT_")        # locale + paperkit
 
 def clean_env(env: dict | None = None) -> dict:
     """A sanitized environment for running a check: the controlled allow-list only, so
-    no LD_PRELOAD/IFS/BASH_ENV/PYTHONPATH and the like reach the command."""
+    no LD_PRELOAD/IFS/BASH_ENV/PYTHONPATH and the like reach the command.  PATH's relative
+    and empty entries are dropped (Τ·path) — they would resolve a tool to the cwd (the
+    project dir being gated), so a document could shadow a tool by planting it beside itself."""
     src = os.environ if env is None else env
-    return {k: v for k, v in src.items()
-            if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)}
+    out = {k: v for k, v in src.items()
+           if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)}
+    if "PATH" in out:
+        out["PATH"] = os.pathsep.join(p for p in out["PATH"].split(os.pathsep)
+                                      if p and os.path.isabs(p))
+    return out
 
 
 def run_ok(cmd: str, cwd: Path, lease: int | None = None, label: str = "check") -> bool:

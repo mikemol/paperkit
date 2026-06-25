@@ -758,23 +758,22 @@ def env_sanitized():
 
 
 def path_surface():
-    # the residual env-sanitizing leaves is a TRUST surface, not only reproducibility:
-    # clean_env KEEPS PATH and run_ok runs the command through a shell, so a directory
-    # earlier in PATH SHADOWS a check's tool — whatever it resolves to runs.  (Pinning
-    # absolute tool paths would close it; paperkit does not yet do that.)  Demonstrate:
-    # a bare tool name resolves to our planted binary iff its dir is on PATH.
+    # Τ·path: a check runs through a shell that resolves tools by NAME via PATH, but
+    # clean_env DROPS PATH's relative/empty entries — the ones that resolve to cwd (the
+    # project dir being gated) — so a document cannot shadow a tool by planting it beside
+    # itself.  Demonstrate: the planted tool resolves with its ABSOLUTE dir on PATH (the
+    # host's trust), but NOT via a "." entry pointing at the project dir (dropped).
     d = Path(tempfile.mkdtemp())
     saved = os.environ.get("PATH", "")
     try:
-        shadow = d / "shadow"
-        shadow.mkdir()
-        (shadow / "pkdemotool").write_text("#!/bin/sh\nexit 0\n")
-        os.chmod(shadow / "pkdemotool", 0o755)
-        assert "PATH" in gate.clean_env(), "clean_env drops PATH — the name-resolution surface would not exist"
-        os.environ["PATH"] = str(shadow) + os.pathsep + saved
-        assert gate.resolves("cmd:pkdemotool", d, {}) is True, "a tool earlier on PATH did not resolve inside the gate"
-        os.environ["PATH"] = saved
-        assert gate.resolves("cmd:pkdemotool", d, {}) is False, "the bare tool resolved without the shadow dir — not PATH-shadowed"
+        (d / "pkdemotool").write_text("#!/bin/sh\nexit 0\n")
+        os.chmod(d / "pkdemotool", 0o755)
+        os.environ["PATH"] = str(d) + os.pathsep + saved          # absolute dir → host's trust
+        assert gate.resolves("cmd:pkdemotool", d, {}) is True, "an absolute PATH dir failed to resolve a tool"
+        os.environ["PATH"] = "." + os.pathsep + saved             # relative "." = cwd = the gated project
+        assert gate.resolves("cmd:pkdemotool", d, {}) is False, "a relative '.' PATH entry resolved the cwd plant — Τ·path not applied"
+        assert all(os.path.isabs(p) for p in gate.clean_env()["PATH"].split(os.pathsep) if p), \
+            "clean_env kept a non-absolute PATH entry"
     finally:
         os.environ["PATH"] = saved
         shutil.rmtree(d, ignore_errors=True)

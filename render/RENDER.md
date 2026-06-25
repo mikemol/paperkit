@@ -26,3 +26,7 @@ The paper's two kinds of citation RESOLVE in the render: an internal warrant bec
 
 The paper renders END-TO-END to a PDF deliverable — cite_split, then citeproc, then docx, then PDF: the human-readable artifact a reader actually receives — gated to be complete and polished: no citation is left as a bare marker, the References list renders, and the paper's content is present in the PDF [@rnd-pdf].
 
+## Figures: Vector and Legible
+
+A generated figure renders into the document as a Word-native VECTOR — SVG converted to EMF (libreoffice), embedded by pandoc, and carried through to the PDF without ever being rasterized — so it stays crisp at any zoom, with no pixelation for a reader who magnifies the page [@rnd-fig-vector]; the figure's legend SURVIVES into the rendered PDF text layer — every label selectable, searchable, and screen-readable rather than locked inside the pixels — the accessibility of the report's Okabe-Ito claim-DAG figure, preserved through the render [@rnd-fig-legible].
+

@@ -174,7 +174,7 @@ def main(argv: list) -> int:
     for c, e in reuse.items():
         graded[c], grader_of[c] = e["grade"], "cache"
     for c in stale:
-        fp = G.footprint(c, project_dir, custom)
+        fp = fresh[c].pop("_footprint", [])   # computed once during grading (scoping + cache); strip from the record
         graded[c], grader_of[c] = fresh[c], fresh_grader
         new_entries[c] = {"grade": fresh[c], "footprint": fp, "fp": _footprint_hash(project_dir, fp)}
 

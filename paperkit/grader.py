@@ -135,7 +135,7 @@ def _mutate_lines(text: str, nodes: list) -> str:
 
 
 def sensitivity(chk: str, sandbox_project: Path, custom: dict,
-                engine_dir: Path | None = None) -> tuple[bool, list]:
+                engine_dir: Path | None = None, footprint: list | None = None) -> tuple[bool, list]:
     """The sensitivity set — the mutations that flip chk red — found by BINARY-SPLIT
     GROUP TESTING, not a linear scan over every site.  Mutate a whole group of sites
     at once: if it does NOT flip, the entire group is proven clear in ONE run (the
@@ -151,17 +151,35 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     if not baseline:
         return False, []
     if engine_dir is None:
-        # file resolution — coarse, fast: corrupt each whole file, label by path
-        sens = []
-        for f in sandbox_files(sandbox_project, set(), engine_dir):
-            orig = f.read_bytes()
-            f.write_bytes(CORRUPT)
-            try:
-                flipped = not resolver.resolves(chk, sandbox_project, custom)
-            finally:
-                f.write_bytes(orig)
-            if flipped:
-                sens.append(_rel(f, sandbox_project, engine_dir))
+        # file resolution — corrupt each whole file, label by path.  Ξ·depth·explain: scope
+        # the scan to the check's READ footprint (Φ — the files it actually opens) when one
+        # is given.  A file the check never reads cannot flip it (sensitivity ⊆ footprint),
+        # so a project is graded against what each check TOUCHES, not the whole repo — the
+        # engine appears only in the surface of the checks that read it.
+        files = sandbox_files(sandbox_project, set(), engine_dir)
+
+        def scan(fs):
+            hits = []
+            for f in fs:
+                orig = f.read_bytes()
+                f.write_bytes(CORRUPT)
+                try:
+                    flipped = not resolver.resolves(chk, sandbox_project, custom)
+                finally:
+                    f.write_bytes(orig)
+                if flipped:
+                    hits.append(_rel(f, sandbox_project, engine_dir))
+            return hits
+
+        if footprint is None:
+            return True, sorted(scan(files))
+        fp = set(footprint)
+        scoped = [f for f in files if str(f.relative_to(sandbox_project)) in fp]
+        sens = scan(scoped)
+        if not sens and len(scoped) < len(files):
+            # the scoped scan found nothing — scan the rest too, in case the (best-effort)
+            # read footprint under-reported; a real flip there means behavioral, not vacuous.
+            sens = scan([f for f in files if f not in set(scoped)])
         return True, sorted(sens)
     sites = []   # (file, node | None, label) — node None ⇒ whole-file corruption
     for f in sandbox_files(sandbox_project, set(), engine_dir):
@@ -206,8 +224,9 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     return True, sorted(flips)
 
 
-def grade_check(chk: str, project_dir: Path, presupposed: set,
-                custom: dict, sandbox_project: Path, engine_dir: Path | None = None) -> dict:
+def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
+                sandbox_project: Path, engine_dir: Path | None = None,
+                footprint: list | None = None) -> dict:
     typ, _, target = chk.partition(":")
     if typ == "result":
         # Ξ·seam: a verdict-import — adequacy DELEGATED to a separately-gated sibling.
@@ -250,7 +269,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set,
                        "iteration order / network?), so a single-sample mutation sweep is noise",
                 "not_higher": "to rise: make the check a pure function of project content, then Δ can grade it",
                 "not_lower": "—"}
-    baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir)
+    baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir, footprint)
     rec = _grade_from_sens(baseline, sens)
     if rec["grade"] == "indeterminate":
         rec = _vacuity_source(rec, chk, sandbox_project, custom, engine_dir)
@@ -324,7 +343,14 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
         # import-crash flood (one collapsed signature), so it is left out.
         engine = ((tmp / root.name / _ENGINE.relative_to(root))
                   if resolution == "def" and _ENGINE.is_relative_to(root) else None)
-        return grade_check(chk, project_dir, presupposed, custom, sandbox, engine)
+        # the check's READ footprint, computed ONCE here: it scopes the file-resolution
+        # sweep (Ξ·depth·explain — grade against what the check touches) AND is the key the
+        # footprint-cache stores (Δ·footprint-cache).  One strace, two uses; attached to the
+        # record under "_footprint" for the CLI to lift into the cache (and strip from output).
+        fp = resolver.footprint(chk, sandbox, custom)
+        rec = grade_check(chk, project_dir, presupposed, custom, sandbox, engine, fp)
+        rec["_footprint"] = fp
+        return rec
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

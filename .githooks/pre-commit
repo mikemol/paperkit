@@ -11,10 +11,11 @@
 # Enable once per clone:   git config core.hooksPath .githooks
 set -eu
 cd "$(git rev-parse --show-toplevel)"
+exec 3>&2                     # fd 3 = the terminal, for live pass-through
 
-run() {                       # run "label" cmd...; show output only on failure
-  desc=$1; shift
-  if ! out=$("$@" 2>&1); then
+run() {                       # run "label" cmd...; STDERR streams live (the Δ·pulse
+  desc=$1; shift              # heartbeat — a slow grade reads as alive, not stalled);
+  if ! out=$("$@" 2>&3); then # STDOUT is captured and shown only on failure.
     echo "[pre-commit] FAIL: $desc" >&2
     echo "$out" >&2
     exit 1

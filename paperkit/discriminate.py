@@ -64,6 +64,8 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
+import time
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -413,10 +415,38 @@ def _grade_one(project_dir, chk, custom, presupposed):
 def _grade_parallel(project_dir, checks, custom, presupposed):
     """Grade every distinct check CONCURRENTLY — each is an independent target with
     its own sandbox, so the sweep's wall-clock is the slowest single check, not their
-    sum.  Bounded at cpu_count (a heavy check may itself fan out a nested gate)."""
+    sum.  Bounded at cpu_count (a heavy check may itself fan out a nested gate).
+
+    Δ·pulse: emit a progress heartbeat to stderr as checks complete, so a slow grade
+    (a cold sweep paging through swap) reads as LIVE, never stalled — the batch path's
+    answer to the liveness the resumable pump has by construction.  \\r-updates a tty;
+    throttled newline pulses to a log/pipe; PAPERKIT_DELTA_PULSE=0 silences it."""
     jobs = max(1, min(len(checks), os.cpu_count() or 4))
+    total, done, lock, t0 = len(checks), [0], threading.Lock(), time.monotonic()
+    tty = sys.stderr.isatty()
+    every = float(os.environ.get("PAPERKIT_DELTA_PULSE", "2"))   # min seconds between log pulses; 0 = off
+    last = [t0]
+
+    def pulse_grade(c):
+        r = _grade_one(project_dir, c, custom, presupposed)
+        with lock:
+            done[0] += 1
+            now = time.monotonic()
+            if not every:
+                return r
+            if tty:
+                print(f"paperkit-discriminate: graded {done[0]}/{total} ({now - t0:.0f}s)",
+                      end="\r", file=sys.stderr, flush=True)
+            elif now - last[0] >= every or done[0] == total:
+                last[0] = now
+                print(f"paperkit-discriminate: graded {done[0]}/{total} ({now - t0:.0f}s)",
+                      file=sys.stderr, flush=True)
+        return r
+
     with ThreadPoolExecutor(max_workers=jobs) as ex:
-        graded = list(ex.map(lambda c: _grade_one(project_dir, c, custom, presupposed), checks))
+        graded = list(ex.map(pulse_grade, checks))
+    if tty and every:
+        print(file=sys.stderr)                                  # close the \r-updated line
     return dict(zip(checks, graded))
 
 

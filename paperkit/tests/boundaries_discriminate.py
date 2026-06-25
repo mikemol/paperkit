@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture import discriminate, entry  # noqa: E402
+from _fixture import discriminate, discriminate_stderr, entry  # noqa: E402
 
 TOKEN = "WARRANT-TOKEN-A1B2"
 
@@ -62,6 +62,13 @@ def grades_via(warrants, resumable=False):
     flags = ("--all", "--json") + (("--budget", "0") if resumable else ())
     _, out = discriminate(warrants, *flags)
     return {r["check"]: r["grade"] for r in json.loads(out)}
+
+
+def pulse_lines(warrants, off=False):
+    # Δ·pulse: count the liveness heartbeat lines ("graded N/total") in the grade's stderr.
+    env = {**os.environ, "PAPERKIT_DELTA_PULSE": "0"} if off else None
+    err = discriminate_stderr(warrants, "--all", "--json", env=env)
+    return sum(1 for ln in err.splitlines() if "graded " in ln and "/" in ln)
 
 
 # A deliberately MIXED-grade project: vacuous (presupposed file), behavioral
@@ -124,6 +131,11 @@ DELTA_CASES = [
      "F": ("flaky", FLAKY),
      "delta": "the check toggles a stored bit each run (its verdict depends on hidden state)",
      "kind": "determinism"},
+    {"name": "Δ pulse: heartbeat → silent  (Δ·pulse)",
+     "axis": "PAPERKIT_DELTA_PULSE — a slow grade must read as LIVE, not stalled",
+     "P": ("heartbeat emitted", "default"),
+     "F": ("silenced", "PAPERKIT_DELTA_PULSE=0"),
+     "delta": "env: (default ~2s) → PAPERKIT_DELTA_PULSE=0", "kind": "pulse"},
 ]
 
 
@@ -170,6 +182,10 @@ def main() -> int:
             p_got, f_got = determinism_of(p_chk), determinism_of(f_chk)
             ok = (p_got == p_want) and (f_got == f_want) and (p_got != f_got)
             pside, fside = f"{p_got}", f"{f_got}"
+        elif d["kind"] == "pulse":
+            on, off = pulse_lines(MIXED) > 0, pulse_lines(MIXED, off=True) > 0
+            ok = on and not off
+            pside, fside = f"pulse={'yes' if on else 'NO'}", f"pulse={'yes' if off else 'no'}"
         else:
             (p_want, p_chk, p_cite), (f_want, f_chk, f_cite) = d["P"], d["F"]
             p_got, f_got = gate_exit(p_chk, p_cite), gate_exit(f_chk, f_cite)

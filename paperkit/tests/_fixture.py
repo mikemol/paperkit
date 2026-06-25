@@ -103,6 +103,14 @@ def discriminate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),)
         return r.returncode, r.stdout
 
 
+def discriminate_stderr(warrants, *flags, assets=None, rubric=(("s", "Sec"),), env=None):
+    """The grade subprocess's STDERR (the Δ·pulse heartbeat lives here)."""
+    with tempfile.TemporaryDirectory() as d:
+        proj = _write(d, warrants, assets, rubric, "t", False, False)
+        _projected(proj, None)
+        return _run([sys.executable, str(DISCRIMINATE), *flags, str(proj)], env=env).stderr
+
+
 def gate_json(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
               title="t", numbered=False, references=False):
     """(returncode, parsed gate --json dict).  Projects out.md first (or writes `out`)."""

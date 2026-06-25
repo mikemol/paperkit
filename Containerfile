@@ -22,5 +22,8 @@ ENV PAPERKIT_NO_MEMBUDGET=1
 COPY . /work
 WORKDIR /work
 
-# The entrypoint IS the proof: gate the paper, hermetically, under --safe --without-K.
-CMD ["python3", "paperkit/gate.py", "--safe", "--without-K", "paper"]
+# Two modes from one image (image/entrypoint.sh, COPY-only so the build stays reproducible):
+#   podman run <img>            → gate  (PROVE: verify the paper hermetically, exit 0)
+#   podman run -p 8000:8000 <img> serve → PRESENT: serve the repository over HTTP
+ENTRYPOINT ["sh", "/work/image/entrypoint.sh"]
+CMD ["gate"]

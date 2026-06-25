@@ -1,3 +1,4 @@
 # image-project sections, in document order.
 repro	The Proof Object, Reproduced
 toolchain	Pinned and Hermetic
+present	The Paper Hosts Itself (HTTP)

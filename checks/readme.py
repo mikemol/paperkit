@@ -24,6 +24,7 @@ import project as P  # noqa: E402
 import _fixture as fx  # noqa: E402
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
+RESOLVER_SRC = (ENGINE / "resolver.py").read_text()   # the check-resolution core (split out of gate)
 DISC_SRC = (ENGINE / "discriminate.py").read_text()
 
 
@@ -91,8 +92,8 @@ def rm_cmds_inv():
 def rm_resolver():
     # a verifier is named type:target, and three types ship built in (one per verb:
     # file EXISTS, cmd EXECS, result PARSES a sibling's verdict — Ξ·seam)
-    assert 'partition(":")' in GATE_SRC, "the verifier is not named type:target"
-    builtins = set(re.findall(r'typ == "(\w+)"', GATE_SRC))
+    assert 'partition(":")' in RESOLVER_SRC, "the verifier is not named type:target"
+    builtins = set(re.findall(r'typ == "(\w+)"', RESOLVER_SRC))
     assert builtins == {"file", "cmd", "result"}, f"built-in types are {builtins}, expected file, cmd & result"
 
 

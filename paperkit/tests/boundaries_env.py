@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import gate  # noqa: E402
+import resolver  # noqa: E402  (clean_env lives in the resolver core — small blast radius, no gate loop)
 
 DIRTY = {
     "PATH": "/usr/bin" + os.pathsep + "." + os.pathsep + os.pathsep + "rel/x",  # abs kept; .,"",rel dropped
@@ -36,7 +36,7 @@ def main() -> int:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
-    e = gate.clean_env(DIRTY)
+    e = resolver.clean_env(DIRTY)
 
     print("env-sanitization behaviors\n")
     check("keeps PATH's absolute dirs so a check's tools still resolve", e.get("PATH") == "/usr/bin")

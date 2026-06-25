@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Behavioral-boundary examples for Φ·footprint — gate.footprint (the READ footprint).
+"""Behavioral-boundary examples for Φ·footprint — resolver.footprint (the READ footprint).
 
 ⟨P, F, δ⟩ per the boundary practice.  footprint(check) is the set of project files the
 check OPENS for reading when it runs (traced with strace) — the SOUND key a footprint
@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import gate  # noqa: E402
+import resolver  # noqa: E402  (footprint lives in the resolver core — small blast radius, no gate loop)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _fixture import discriminate, entry  # noqa: E402
 
@@ -31,7 +31,7 @@ def fp(check):
         (p / "a.txt").write_text("FOO\n")
         (p / "b.txt").write_text("BAR\n")
         (p / "w.bib").write_text("x\n")
-        return gate.footprint(check, p, {})
+        return resolver.footprint(check, p, {})
 
 
 def sens(check):
@@ -60,7 +60,7 @@ def main() -> int:
         pp = Path(dd)
         (pp / "sub").mkdir()
         (pp / "sub" / "x.txt").write_text("y\n")
-        dir_fp = gate.footprint("cmd:ls sub", pp, {})
+        dir_fp = resolver.footprint("cmd:ls sub", pp, {})
     check("a directory a check opens is NOT in the footprint (regular files only)", dir_fp == [])
 
     print("\n⟨P, F, δ⟩ minimum-delta pairs\n")

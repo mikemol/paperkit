@@ -31,6 +31,7 @@ import coherence  # noqa: E402  (∂²: declared grounding vs measured sensitivi
 import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
+RESOLVER_SRC = (ENGINE / "resolver.py").read_text()   # the check-resolution core (split out of gate)
 PROJECT_SRC = (ENGINE / "project.py").read_text()
 
 
@@ -47,13 +48,13 @@ def _parse(bib_text):
 
 def verifier_named():
     # "a claim's verifier is named type:target" — the resolver splits on the ':'
-    assert 'partition(":")' in GATE_SRC, "resolver no longer splits type:target"
+    assert 'partition(":")' in RESOLVER_SRC, "resolver no longer splits type:target"
 
 
 def gate_dispatches():
     # "dispatches through a small registry" — built-in file/cmd branches + custom
     for needle in ('typ == "file"', 'typ == "cmd"', "typ in custom"):
-        assert needle in GATE_SRC, f"resolver missing dispatch branch: {needle}"
+        assert needle in RESOLVER_SRC, f"resolver missing dispatch branch: {needle}"
 
 
 def new_domain_adds():
@@ -68,7 +69,7 @@ def new_domain_adds():
 def two_builtins():
     # three verifiers ship built in — file EXISTS, cmd EXECS, result PARSES (Ξ·seam);
     # other types come from config.
-    builtins = set(re.findall(r'typ == "(\w+)"', GATE_SRC))
+    builtins = set(re.findall(r'typ == "(\w+)"', RESOLVER_SRC))
     assert builtins == {"file", "cmd", "result"}, f"built-in types are {builtins}, expected file, cmd & result"
 
 

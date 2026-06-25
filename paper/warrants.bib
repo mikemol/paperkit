@@ -301,7 +301,7 @@
 }
 @misc{content-cache,
   section = {adequacy}, from = {mutation-probes}, join = {. },
-  claim   = {a grade is a pure function of a content key --- the hash of every project and engine file a check could read --- so it is cached and the expensive mutation sweep reruns only when that key changes},
+  claim   = {a grade is a pure function of the content a check reads, so it is cached PER CHECK on that read footprint --- the files the check opens --- over a shared engine epoch, and the expensive mutation sweep reruns only for the checks a change actually touches; the whole-project content key is the coarse soundness basis the per-check key refines},
   check   = {claim:content-cache}
 }
 @misc{sandbox-grade,

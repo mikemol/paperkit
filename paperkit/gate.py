@@ -184,9 +184,11 @@ def footprint(check: str, project_dir: Path, custom: dict) -> list:
             if "O_WRONLY" in m.group("flags"):
                 continue                                  # write-only = output, not an input
             raw = m.group("path")
-            p = Path(raw) if raw.startswith("/") else project_dir / raw
+            p = (Path(raw) if raw.startswith("/") else project_dir / raw).resolve()
+            if not p.is_file():
+                continue                                  # directories (O_DIRECTORY), /dev nodes, gone — not a hashable input
             try:
-                reads.add(str(p.resolve().relative_to(project_dir)))
+                reads.add(str(p.relative_to(project_dir)))
             except ValueError:
                 continue                                  # outside the project — not a cacheable input
         return sorted(reads)

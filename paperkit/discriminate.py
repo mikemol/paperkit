@@ -49,9 +49,11 @@ signal split N ways.
                                                  resume.  A slow grade resumes, never dies.
     paperkit-discriminate --no-cache [DIR]       ignore the content-addressed cache
 
-Grades are memoized by content_key (the project's files + the engine): an unchanged
-project re-grades in milliseconds (.delta-cache.json, git-ignored), recomputed only
-when something a check could read changes.
+Grades are memoized PER CHECK (Δ·footprint-cache): each check's grade is keyed on the
+content of the files it actually READS (Φ·footprint) plus a global engine epoch, so a
+commit re-grades only the checks whose footprint the diff touched — not the whole
+project.  (.delta-cache.json, git-ignored.  content_key below is the coarse soundness
+basis the per-check key refines: a grade is a pure function of project+engine content.)
 
 DIR defaults to the current directory and must contain paper.toml.
 """
@@ -114,9 +116,12 @@ GRADE_C = {v: k for k, v in RANK_C.items()}
 
 
 def content_key(project_dir: Path) -> str:
-    """A hash of every file a check in this project could read — the project's own
-    files plus the engine.  A Δ grade is a pure function of these (the mutation probe
-    only ever reads them), so a cached grade is valid exactly while this key holds."""
+    """A hash of every file a check in this project could read — the project's own files
+    plus the engine.  A Δ grade is a pure function of these (the mutation probe only ever
+    reads them): the SOUNDNESS BASIS of caching.  The cache itself keys finer — per check,
+    on its read footprint plus the engine epoch (see _footprint_hash / _engine_hash) — so
+    this whole-project key is no longer the cache key, but the invariant it expresses is
+    what makes the finer key sound (a footprint ⊆ this content)."""
     engine = Path(__file__).resolve().parent
     parts = []
     for tag, base in (("proj", project_dir), ("engine", engine)):
@@ -128,12 +133,46 @@ def content_key(project_dir: Path) -> str:
     return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
 
 
+def _engine_hash() -> str:
+    """A hash of the engine alone — its own global cache EPOCH.  The engine is a universal
+    dependency (every check runs through the gate), and footprint() reports only files under
+    a project (the engine usually sits OUTSIDE it at ../paperkit), so the read footprint is
+    completed by this: an engine edit invalidates every check; a project edit invalidates
+    only the checks whose footprint touched it."""
+    engine = Path(__file__).resolve().parent
+    parts = [f"{f.relative_to(engine)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
+             for f in sorted(engine.rglob("*"))
+             if _mutable(f) and not any(p in SKIP_DIRS for p in f.parts)]
+    return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
+
+
+def _footprint_hash(project_dir: Path, files: list) -> str:
+    """A hash of the current content of a check's recorded footprint files — the per-check
+    cache key.  Unchanged ⇒ the check reads the same project inputs ⇒ same verdict ⇒ same
+    grade (sound: a check is a pure function of its inputs; the engine is held by _engine_hash)."""
+    h = hashlib.sha256()
+    for rel in sorted(files):
+        f = project_dir / rel
+        h.update(rel.encode())
+        h.update(b"\0")
+        h.update(f.read_bytes() if f.is_file() else b"\0MISSING\0")
+        h.update(b"\n")
+    return h.hexdigest()
+
+
 def _load_cache(project_dir: Path) -> dict:
     p = project_dir / ".delta-cache.json"
     try:
         return json.loads(p.read_text()) if p.exists() else {}
     except Exception:
         return {}
+
+
+def _save_cache(project_dir: Path, data: dict) -> None:
+    try:
+        (project_dir / ".delta-cache.json").write_text(json.dumps(data))
+    except Exception:
+        pass
 
 
 def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
@@ -555,48 +594,62 @@ def main(argv: list) -> int:
         print(json.dumps({c: G.footprint(c, project_dir, custom) for c in sorted(share)}, indent=2))
         return 0
 
-    # Memoize: a Δ grade is a pure function of content_key(project), so a cached
-    # graded-set is reused verbatim while nothing the checks read has changed — the
-    # expensive mutation sweep runs only when the project or engine actually changes.
+    # Δ·footprint-cache: a Δ grade is a pure function of its inputs, so cache it PER CHECK,
+    # keyed on the content of the files it actually READS (Φ·footprint) plus the engine
+    # EPOCH (_engine_hash).  A commit then re-grades only the checks whose footprint the diff
+    # touched — where the old whole-project content_key cache invalidated EVERY check on any
+    # edit.  Reuse a check while its footprint files (and the engine) are unchanged.
     no_cache = "--no-cache" in flags
-    key = f"{content_key(project_dir)}:{_RESOLUTION}"   # resolution is part of the grade
+    engine = _engine_hash()
     cached = {} if no_cache else _load_cache(project_dir)
-    if cached.get("key") == key and all(c in cached.get("graded", {}) for c in share):
-        graded = cached["graded"]
-        grader = cached.get("grader", "cache")   # report the ORIGINAL grader; "cache" for a pre-witness cache
-    elif state_file is None and budget_str is None:
-        # Batch grade — the default when neither resumable flag is given.  NOTE: test the
-        # RAW flag (budget_str), not the coerced `budget`: an absent --budget coerces to
-        # 0.0 ("run to done"), and `budget is None` is then never true — which silently
-        # routed EVERY default grade through the slow resumable pump below and left this
-        # batch path dead.  Keep it `budget_str is None`.
-        # (A flat (check, site) work-queue grader once lived here behind PAPERKIT_DELTA_FLAT;
-        # it was removed — measured 12x slower than this concurrent path under a real memory
-        # budget, because it scheduled the heavy/light jobs FLAT, ignoring the work poset.
-        # See git log, Σ·flat·retire.)
-        grader = "_grade_parallel"
-        graded = _grade_parallel(project_dir, list(share), custom, presupposed)
-        if not no_cache:
-            (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded, "grader": grader}))
-    else:
-        # Resumable path: grade as a pump-witness, one check per increment, under an
-        # optional budget (--state/--budget make a long grade resume across short calls
-        # instead of dying with nothing — the pump-ask liveness rule).
-        witness = GradeWitness(project_dir, list(share), custom, presupposed)
+    valid = cached.get("engine") == engine and cached.get("resolution") == _RESOLUTION
+    entries = cached.get("checks", {}) if valid else {}
+
+    reuse, stale = {}, []
+    for c in share:
+        e = entries.get(c)
+        if e and _footprint_hash(project_dir, e["footprint"]) == e["fp"]:
+            reuse[c] = e
+        else:
+            stale.append(c)
+
+    fresh, fresh_grader = {}, None
+    if stale and state_file is None and budget_str is None:
+        # Batch grade — the default.  Test the RAW flag (budget_str): an absent --budget
+        # coerces to 0.0 ("run to done"), so `budget is None` would never hold and would
+        # leave this path dead (the Σ·flat·gate guard-fix).  Only the STALE checks are swept.
+        fresh_grader = "_grade_parallel"
+        fresh = _grade_parallel(project_dir, stale, custom, presupposed)
+    elif stale:
+        # Resumable path: grade the stale checks as a pump-witness under an optional budget
+        # (--state/--budget make a long grade resume across short calls — pump-ask liveness).
+        witness = GradeWitness(project_dir, stale, custom, presupposed)
         meaning, steps, done = D.drive(witness, state_path=state_file, budget=budget)
         if not done:
             print(f"paperkit-discriminate: graded {meaning['progress']} in {steps} increment(s) — "
                   f"not done; state persisted to {state_file}, re-run to resume", file=sys.stderr)
             return 2
-        graded = meaning["graded"]
-        grader = "GradeWitness"
-        if not no_cache:
-            (project_dir / ".delta-cache.json").write_text(json.dumps({"key": key, "graded": graded, "grader": grader}))
+        fresh = meaning["graded"]
+        fresh_grader = "GradeWitness"
 
-    # Σ·flat·witness: record WHICH grader produced these grades, so the live execution
-    # path is a checkable artifact, not an inference from the source (a dead branch or a
-    # cache hit is then visible, and any path-agreement check is sound).
-    print(f"paperkit-discriminate: graded by {grader}", file=sys.stderr)
+    # assemble grades + a PER-CHECK grader, and refresh the cache entry of each graded check
+    # with its fresh footprint (Σ·flat·witness: a reused grade reports grader "cache").
+    graded, grader_of, new_entries = {}, {}, dict(reuse)
+    for c, e in reuse.items():
+        graded[c], grader_of[c] = e["grade"], "cache"
+    for c in stale:
+        fp = G.footprint(c, project_dir, custom)
+        graded[c], grader_of[c] = fresh[c], fresh_grader
+        new_entries[c] = {"grade": fresh[c], "footprint": fp, "fp": _footprint_hash(project_dir, fp)}
+
+    if not no_cache:
+        _save_cache(project_dir, {"engine": engine, "resolution": _RESOLUTION, "checks": new_entries})
+
+    if stale:
+        print(f"paperkit-discriminate: graded by {fresh_grader} "
+              f"({len(stale)} graded, {len(reuse)} reused from footprint cache)", file=sys.stderr)
+    else:
+        print(f"paperkit-discriminate: all {len(reuse)} grade(s) reused from footprint cache", file=sys.stderr)
     records = []
     for k in keys:
         chk = F[k]["check"]
@@ -605,7 +658,7 @@ def main(argv: list) -> int:
                  shared_with=[o for o in share[chk] if o != k])
         g["from"] = F[k].get("from", [])
         g["rests-on"] = F[k].get("rests-on", [])     # grounding edges (for clamping)
-        g["grader"] = grader
+        g["grader"] = grader_of[chk]
         records.append(g)
 
     # content inputs = the files a check must touch to discriminate the paper's

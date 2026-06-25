@@ -532,15 +532,22 @@ def mutation_probes():
 
 
 def content_cache():
-    # a Δ grade is a pure function of a CONTENT KEY (the project + engine files a check
-    # could read), so it can be cached and recomputed only when that key changes
+    # a Δ grade is cached PER CHECK on its READ footprint (the files it opens), over the
+    # content key as the coarse soundness basis: a grade is a pure function of that content.
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text('[paper]\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n')
-        (d / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")
+        (d / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:grep -q ZZZ w.bib}\n}\n")
         (d / "r.tsv").write_text("s\tSec\n")
+        # basis: content_key is stable, and moves when an input changes
         k1 = discriminate.content_key(d)
         assert k1 == discriminate.content_key(d), "content key not stable for unchanged inputs"
+        # refinement: the per-check cache key is the check's READ footprint — a SUBSET of
+        # content, so an unread file is not in it (the cache will not over-invalidate)
+        (d / "data.txt").write_text("unread by the check\n")
+        fp = gate.footprint("cmd:grep -q ZZZ w.bib", d, {})
+        assert fp == ["w.bib"], f"footprint is not exactly the file the check reads: {fp}"
+        assert "data.txt" not in fp, "an unread file entered the footprint — the cache would over-invalidate"
         (d / "w.bib").write_text((d / "w.bib").read_text() + "\n% changed\n")
         assert discriminate.content_key(d) != k1, "content key did not change when an input changed"
     finally:

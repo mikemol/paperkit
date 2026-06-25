@@ -53,6 +53,16 @@ def main() -> int:
     check("cmd: footprint is the file the tool reads", fp("cmd:grep -q ZZZ a.txt") == ["a.txt"])
     check("a check reading nothing under the project has an empty footprint", fp("cmd:true") == [])
 
+    # a check OPENS directories too (python imports scandir; ls opens the dir) — only
+    # regular files are hashable cache inputs, so directories are excluded.  (The case the
+    # footprint-cache consumer surfaced: hashing a directory path raised IsADirectoryError.)
+    with tempfile.TemporaryDirectory() as dd:
+        pp = Path(dd)
+        (pp / "sub").mkdir()
+        (pp / "sub" / "x.txt").write_text("y\n")
+        dir_fp = gate.footprint("cmd:ls sub", pp, {})
+    check("a directory a check opens is NOT in the footprint (regular files only)", dir_fp == [])
+
     print("\n⟨P, F, δ⟩ minimum-delta pairs\n")
     p1, f1 = fp("cmd:grep -q ZZZ a.txt"), fp("cmd:grep -q ZZZ a.txt b.txt")
     ok1 = p1 == ["a.txt"] and f1 == ["a.txt", "b.txt"]
@@ -75,7 +85,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (3 behaviors, 2 deltas)")
+    print("BOUNDARIES: PASS (4 behaviors, 2 deltas)")
     return 0
 
 

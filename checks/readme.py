@@ -26,6 +26,7 @@ import _fixture as fx  # noqa: E402
 GATE_SRC = (ENGINE / "gate.py").read_text()
 RESOLVER_SRC = (ENGINE / "resolver.py").read_text()   # the check-resolution core (split out of gate)
 DISC_SRC = (ENGINE / "discriminate.py").read_text()
+GRADER_SRC = (ENGINE / "grader.py").read_text()       # the mutation sweep + grade ladder (split out of discriminate)
 
 
 def _parse(text):
@@ -104,10 +105,11 @@ def rm_resolver_cmd():
 
 
 def rm_delta():
-    # discriminate grades how much a check can actually fail (the four grades, by mutation)
+    # discriminate grades how much a check can actually fail (the four grades, by mutation);
+    # the grader (split out of discriminate) defines the ladder and grades by mutation
     for g in ("vacuous", "existence", "behavioral", "indeterminate"):
-        assert g in DISC_SRC, f"discriminate.py does not define the {g} grade"
-    assert "flips it red" in DISC_SRC, "discriminate does not grade by mutation"
+        assert g in GRADER_SRC, f"the grader does not define the {g} grade"
+    assert "flips it red" in GRADER_SRC, "the grader does not grade by mutation"
 
 
 def rm_next():

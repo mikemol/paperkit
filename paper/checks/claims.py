@@ -24,7 +24,9 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
 import project as P  # noqa: E402
-import discriminate  # noqa: E402  (Δ: the adequacy grader)
+import discriminate  # noqa: E402  (Δ: the adequacy CLI)
+import layout  # noqa: E402  (project topology — sandbox roots, nested projects)
+import grader  # noqa: E402  (Δ's mutation sweep + grade ladder)
 import driver  # noqa: E402  (the pump/parse liveness driver)
 import rhetoric  # noqa: E402  (the move/scheme vocabulary)
 import coherence  # noqa: E402  (∂²: declared grounding vs measured sensitivity)
@@ -565,8 +567,8 @@ def sandbox_grade():
         (d / "sub").mkdir()
         (d / "sub" / "paper.toml").write_text("[paper]\n")          # a nested sibling project
         (d / "sub" / "inner.py").write_text("theirs\n")
-        assert (d / "sub") in discriminate._nested_roots(d), "nested project not detected"
-        names = [f.name for f in discriminate.sandbox_files(d, set())]
+        assert (d / "sub") in layout._nested_roots(d), "nested project not detected"
+        names = [f.name for f in grader.sandbox_files(d, set())]
         assert "main.py" in names and "inner.py" not in names, \
             f"surface should keep own files, drop the sibling's (got {names})"
     finally:

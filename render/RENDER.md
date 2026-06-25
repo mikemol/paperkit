@@ -22,3 +22,7 @@ The reader's EYE sees the paper, not just a screen reader: rendered to a PDF and
 
 The paper's two kinds of citation RESOLVE in the render: an internal warrant becomes an inline machine-checked marker (cite_split, before pandoc), an external source renders author-date with a References list (–citeproc over references.bib), and no bracketed citation marker is left as bare text — a render-time projection that leaves the gated paper.md untouched [@rnd-bib].
 
+## The PDF Deliverable
+
+The paper renders END-TO-END to a PDF deliverable — cite_split, then citeproc, then docx, then PDF: the human-readable artifact a reader actually receives — gated to be complete and polished: no citation is left as a bare marker, the References list renders, and the paper's content is present in the PDF [@rnd-pdf].
+

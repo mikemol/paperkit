@@ -109,19 +109,6 @@ def _verb_rule(name, check, proj, files, reads, custom, local):
         fail("Ζ·verb·wire: check type '" + typ + ":' is neither builtin nor a [checks." + typ +
              "] template — claim '" + name + "'")
 
-def _adequacy(proj, files, union):
-    """The Δ sweep — still an engine sh_test (discriminate.py) until Ζ·nest; data = union of reads."""
-    return "\n".join([
-        'sh_test(',
-        '    name = "adequacy",',
-        '    srcs = ["@@//tools:run.sh"],',
-        '    args = ["adequacy", "%s"],' % proj,
-        '    data = [%s],' % ", ".join([_lit(d) for d in _data(union, files)]),
-        '    size = "large",',
-        '    visibility = ["//visibility:public"],',
-        ')',
-    ])
-
 def _bib_repo_impl(repository_ctx):
     content = repository_ctx.read(repository_ctx.path(repository_ctx.attr.bib))
     proj = repository_ctx.attr.project
@@ -138,19 +125,15 @@ def _bib_repo_impl(repository_ctx):
         custom = _custom(repository_ctx.read(tomlp))
 
     out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")']
-    if repository_ctx.attr.adequacy and repository_ctx.attr.nest:
+    if repository_ctx.attr.adequacy:
         out.append('load("@@//tools:grade.bzl", "pk_adequacy", "pk_grade_claim")')
     out.append("")
     recs = []
-    union = {}
     for k, check, sib, reads in parsed:
         if not check:
             continue
         out.append(_verb_rule(k, check, proj, files, reads, custom, local))
         recs.append('":%s"' % k)
-        if not sib:                       # leaves' reads feed the adequacy union (result: delegates)
-            for t in reads:
-                union[t] = True
 
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an irreducibly
     # GENERAL oracle, kept as a cmd: drop (Ζ·resist).
@@ -163,9 +146,10 @@ def _bib_repo_impl(repository_ctx):
     out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
     out.append('sh_test(name = "gate", srcs = ["@@//tools:assert_pass.sh"], ' +
                'args = ["$(rootpath :gate_rec)"], data = [":gate_rec"], visibility = ["//visibility:public"])')
-    if repository_ctx.attr.adequacy and repository_ctx.attr.nest:
+    if repository_ctx.attr.adequacy:
         # Ζ·nest — adequacy as a NESTING of per-claim grade records (pk_grade_claim) aggregated by
-        # pk_adequacy, replacing the discriminate.py sweep sh_test; the assert-test puts it in //:hook.
+        # pk_adequacy; the assert-test puts it in //:hook.  (The old discriminate.py sweep sh_test
+        # is retired; discriminate.py stays as the per-claim grade ORACLE behind pk_grade_claim.)
         grades = []
         for k, check, sib, reads in parsed:
             if not check:
@@ -177,8 +161,6 @@ def _bib_repo_impl(repository_ctx):
         out.append('pk_adequacy(name = "adequacy_rec", grades = [%s], visibility = ["//visibility:public"])' % ", ".join(grades))
         out.append('sh_test(name = "adequacy", srcs = ["@@//tools:assert_pass.sh"], ' +
                    'args = ["$(rootpath :adequacy_rec)"], data = [":adequacy_rec"], visibility = ["//visibility:public"])')
-    elif repository_ctx.attr.adequacy:
-        out.append(_adequacy(proj, files, union.keys()))
     repository_ctx.file("BUILD.bazel", "\n".join(out) + "\n")
 
 bib_repo = repository_rule(
@@ -188,14 +170,13 @@ bib_repo = repository_rule(
         "project": attr.string(mandatory = True),
         "adequacy": attr.bool(default = False),
         "local": attr.bool(default = False),  # Ζ·resist: host-coupled project (setup) — pk_cmd runs on the host
-        "nest": attr.bool(default = False),   # Ζ·nest: adequacy as nested per-claim pk_grade_claim records
     },
 )
 
 def _bib_ext_impl(module_ctx):
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, nest = tag.nest)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local)
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -206,7 +187,6 @@ bib = module_extension(
             "project": attr.string(mandatory = True),
             "adequacy": attr.bool(default = False),
             "local": attr.bool(default = False),
-            "nest": attr.bool(default = False),
         }),
     },
 )

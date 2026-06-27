@@ -58,6 +58,7 @@ def load_config(project: Path) -> dict:
         "out": project / p.get("out", "paper.md"),
         "numbered": p.get("numbered", True),
         "references": p.get("references", True),
+        "adequacy": p.get("adequacy", False),   # Ζ·project: emit a Δ-adequacy Bazel test for this project
     }
 
 
@@ -119,18 +120,25 @@ def short_author(a: str) -> str:
     return " & ".join(n.split()[-1] if " " in n else n for n in names)
 
 
-def sentence(key: str, f: dict, primary: str) -> str:
-    """A claim sentence ending with its [@key] tag.  Prefer an explicit `claim`;
-    else a warrant's `title` (the title IS the claim); else a terse cite."""
+def _anchor(key: str, body: str, target: str) -> str:
+    """A claim's own citation point: a pandoc [@key] tag (for citeproc), or a web ANCHOR that
+    other claims link to.  The grounding edges are the same `rests-on` DATA either way — only
+    how a citation MATERIALIZES differs by target (the projector's one job, never the prose's)."""
+    return f'<a id="{key}"></a>{body}' if target == "web" else f"{body} [@{key}]"
+
+
+def sentence(key: str, f: dict, primary: str, target: str = "pandoc") -> str:
+    """A claim sentence carrying its own citation/anchor for `target`.  Prefer an explicit
+    `claim`; else a warrant's `title` (the title IS the claim); else a terse cite."""
     if f.get("claim"):
-        return f"{clean(f['claim'])} [@{key}]"
+        return _anchor(key, clean(f["claim"]), target)
     title = clean(f.get("title", key))
     if f["_src"] == primary:
-        return f"{title} [@{key}]"
+        return _anchor(key, title, target)
     yr = f.get("year", "")
     who = short_author(f.get("author", "")) if "author" in f else ""
     paren = ", ".join(x for x in (who, yr) if x)
-    return f"{title}" + (f" ({paren})" if paren else "") + f" [@{key}]"
+    return _anchor(key, title + (f" ({paren})" if paren else ""), target)
 
 
 GLUE = ["and from that, ", "so "]
@@ -184,21 +192,26 @@ def transitive_reduction(rests: dict) -> dict:
     return {k: [y for y in ys if not reaches(k, y)] for k, ys in rests.items()}
 
 
-def references(k: str, targets: list, pos: dict) -> str:
+def references(k: str, targets: list, pos: dict, target: str = "pandoc") -> str:
     """Project a claim's NON-ADJACENT grounding edges (after transitive reduction) as
     cross-references — the long edges the prose connective cannot carry by adjacency.  A
     connective IS a reference at distance 0; this is the same edge-projection at distance
     > 0, the direction read off the sign of the prose-distance (a back-reference to ground
     already laid, a forward-reference to ground laid below).  Citation is the floor
-    materialization; richer forms (expound, figure) are opt-in.  Returns the parenthetical."""
+    materialization; richer forms (expound, figure) are opt-in.  Returns the parenthetical.
+    For `target` web a cross-reference is an intra-page hyperlink to the grounded claim's
+    anchor; for pandoc it is a [@key] citation — the SAME edge, materialized per target."""
     if not pos or k not in pos:
         return ""
+
+    def tok(y: str) -> str:
+        return f"[{y.replace('-', ' ').replace('_', ' ')}](#{y})" if target == "web" else f"[@{y}]"
     back, fwd = [], []
     for y in targets:
         yp = pos.get(y)
         if yp is None or yp == pos[k] - 1:        # cross-scope, or carried by the connective
             continue
-        (back if yp < pos[k] else fwd).append(f"[@{y}]")
+        (back if yp < pos[k] else fwd).append(tok(y))
     parts = []
     if back:
         parts.append("grounded above in " + ", ".join(back))
@@ -208,16 +221,17 @@ def references(k: str, targets: list, pos: dict) -> str:
 
 
 def weave(text: list, F: dict, primary: str, pos: dict | None = None,
-          reduced: dict | None = None, footnotes: dict | None = None) -> str:
+          reduced: dict | None = None, footnotes: dict | None = None,
+          target: str = "pandoc") -> str:
     """Weave a run of prose-claim keys into one sentence-diagrammed paragraph.  A
     claim carrying a `link` is materialized at the EXPOUND rung of the reference
     ladder (drop < cite < expound < figure): a footnote marker on the sentence, the
     link explanation + its grounding citations collected into `footnotes` for the
     document end.  Without a link (or no footnotes sink) the grounding is the CITE
-    floor — the inline parenthetical."""
+    floor — the inline parenthetical.  `target` selects how citations materialize."""
     def clause(k: str) -> str:
-        s = sentence(k, F[k], primary)
-        ref = references(k, (reduced or {}).get(k, F[k].get("rests-on", [])), pos or {})
+        s = sentence(k, F[k], primary, target)
+        ref = references(k, (reduced or {}).get(k, F[k].get("rests-on", [])), pos or {}, target)
         link = F[k].get("link")
         if link and footnotes is not None:           # expound: link + citations → footnote
             footnotes[k] = clean(link) + ref
@@ -264,7 +278,7 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
     return "".join(parts) + "."
 
 
-def project(cfg: dict) -> str:
+def project(cfg: dict, target: str = "pandoc") -> str:
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
         F.update(entries(b))
@@ -307,7 +321,7 @@ def project(cfg: dict) -> str:
                 if f.get("claim") or f.get("title"):
                     run.append(k)
                 if run:
-                    lines += [weave(run, F, primary, pos, reduced, footnotes), ""]
+                    lines += [weave(run, F, primary, pos, reduced, footnotes, target), ""]
                     run = []
                 lines += emit_block(pdir, f) + [""]
             elif f.get("check", "").startswith("figure:"):
@@ -315,7 +329,7 @@ def project(cfg: dict) -> str:
             else:
                 run.append(k)
         if run:
-            lines += [weave(run, F, primary, pos, reduced, footnotes), ""]
+            lines += [weave(run, F, primary, pos, reduced, footnotes, target), ""]
     # the expound rung: a claim's `link` materialized as a document-end footnote
     # (the marker rode the sentence; the explanation + its citations land here).
     if footnotes:
@@ -330,7 +344,9 @@ def main(argv: list) -> int:
     pos = config.positionals(argv)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     cfg = load_config(project_dir)
-    out = project(cfg)
+    pol = tomllib.loads((project_dir / "paper.toml").read_text()).get("paper", {})
+
+    out = project(cfg, config.resolve(config.TARGET, pol))   # Ω·config: pandoc (default) | web
 
     if config.resolve(config.CHECK):
         tgt = cfg["out"]

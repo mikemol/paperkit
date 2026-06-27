@@ -75,7 +75,7 @@
 }
 @misc{bnd-sandbox,
   section = {runtime}, from = {bnd-cache}, join = {. },
-  claim   = {the Δ sandbox's boundary --- the mutation copy takes the bounded root WHOLE (the bound lives on the root, not a lossy per-dir skip), and that root is DECLARABLE (the PAPERKIT_ROOT environment variable, which a --root flag overrides, or paper.toml) and otherwise inferred as the parent --- but inferring a home directory or above is REFUSED with guidance, so a downstream project living in a home that also holds a clone or cache does not explode the disk},
+  claim   = {the Δ sandbox's boundary --- the mutation copy takes the bounded root WHOLE (the bound lives on the root, not a lossy per-dir skip) save for SKIP_DIRS, which prune .git and the bazel-* cache links from both the copy and the deep nested-project walk so an artifact never explodes the sandbox, and that root is DECLARABLE (the PAPERKIT_ROOT environment variable, which a --root flag overrides, or paper.toml) and otherwise inferred as the parent --- but inferring a home directory or above is REFUSED with guidance, so a downstream project living in a home that also holds a clone or cache does not explode the disk},
   check   = {cmd:python3 ../paperkit/tests/boundaries_sandbox.py}
 }
 @misc{bnd-config,
@@ -92,4 +92,15 @@
   section = {engine}, from = {bnd-degrade}, join = {. },
   claim   = {tool-path pinning's boundary (Τ·path) --- by default a check resolves its tools from the host's absolute PATH entries, deduplicated, but when PAPERKIT_PATH is declared resolution is PINNED to exactly those absolute existing dirs and the ambient, user-writable host PATH is dropped entirely, so the same tool resolves on any host},
   check   = {cmd:python3 ../paperkit/tests/boundaries_path.py}
+}
+@misc{bnd-target,
+  section = {engine}, from = {bnd-path}, join = {. },
+  claim   = {the render-target boundary (Ρ·render·web) --- one common projector renders a claim's grounding the SAME edge two ways by target: a pandoc citeproc citation, or for the web target an intra-page hyperlink to the grounded claim's anchor, every link resolving to an anchor present in the document --- the target a config knob, not a new authoring syntax},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_target.py}
+}
+@misc{bnd-check,
+  section = {engine}, from = {bnd-target}, join = {. },
+  claim   = {the recursive check graph's boundary (Ζ·bnd-check) --- the Bazel build graph is ONE mechanism (every project wired by the same bib.project tag, //:hook a single test_suite of uniform per-claim gate and adequacy targets) and the local CI is COMPLETE: //:hook carries both the gate and the Delta adequacy target of every graded project, so bazel test //:hook gates AND grades every document},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_check.py},
+  reads   = {.}
 }

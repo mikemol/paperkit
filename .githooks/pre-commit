@@ -1,21 +1,17 @@
 #!/bin/sh
-# paperkit local CI — every check lives in a bib, and the gate runs each project's
-# checks IN PARALLEL (the bib is the makefile).  A commit must leave every project
-# green: prose ≡ projection, every cited check passing, zero postulates (--safe),
-# distinct witnesses (--without-K), and the paper behaviorally adequate (Δ).
-#
-# The tool boundary suites (⟨P,F,δ⟩) are CLAIMS in the `boundaries` project, so a new
-# tool's suite is gated the moment its claim lands — there is no suite list here to
-# forget.  To gate a new document, add its project dir to the loop below.
+# paperkit local CI — ONE Bazel target.  `bazel test //:hook` gates every project (each claim a
+# per-claim check target — the bib IS the build graph, Ζ·starlark) AND grades each behaviorally
+# adequate (Δ --min-strength, now hermetic under Bazel — Ζ·foot/Ξ·result-imported), so a commit
+# re-runs only what changed, in parallel, with live progress, and never lands the repo broken.
 #
 # Enable once per clone:   git config core.hooksPath .githooks
 set -eu
 cd "$(git rev-parse --show-toplevel)"
 exec 3>&2                     # fd 3 = the terminal, for live pass-through
 
-run() {                       # run "label" cmd...; STDERR streams live (the Δ·pulse
-  desc=$1; shift              # heartbeat — a slow grade reads as alive, not stalled);
-  if ! out=$("$@" 2>&3); then # STDOUT is captured and shown only on failure.
+run() {                       # run "label" cmd...; STDERR streams live (progress reads as alive,
+  desc=$1; shift              # not stalled); STDOUT is captured and shown only on failure.
+  if ! out=$("$@" 2>&3); then
     echo "[pre-commit] FAIL: $desc" >&2
     echo "$out" >&2
     exit 1
@@ -23,9 +19,5 @@ run() {                       # run "label" cmd...; STDERR streams live (the Δ�
   echo "[pre-commit] ok: $desc"
 }
 
-run "gate paper (--safe --without-K)"       python3 paperkit/gate.py --safe --without-K paper
-run "gate README (--safe --without-K)"      python3 paperkit/gate.py --safe --without-K .
-run "gate boundaries (--safe --without-K)"  python3 paperkit/gate.py --safe --without-K boundaries
-run "Δ adequacy: paper all-behavioral"      python3 paperkit/discriminate.py --min-strength behavioral paper
-run "Δ adequacy: README all-behavioral"     python3 paperkit/discriminate.py --min-strength behavioral .
+run "bazel test //:hook"   mise exec -- bazel test //:hook
 echo "[pre-commit] all checks passed"

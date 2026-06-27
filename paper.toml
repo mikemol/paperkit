@@ -1,4 +1,5 @@
 [paper]
+adequacy = true
 title = "paperkit"
 subtitle = "A paper is a projection of a verified claim-DAG — write claims, not prose."
 warrants = ["warrants.bib"]

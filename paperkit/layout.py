@@ -5,6 +5,8 @@ are OTHER projects.  Factored out so neither the cache nor the grader has to own
 each can be imported and tested without the other)."""
 from __future__ import annotations
 
+import fnmatch
+import os
 import shutil
 import tomllib
 from pathlib import Path
@@ -12,7 +14,9 @@ from pathlib import Path
 import config
 
 MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt"}
-SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out"}
+# `bazel-*` are convenience symlinks into the multi-GB Bazel cache; a glob (ignore_patterns
+# is fnmatch) keeps _copy_sandbox from following them and exploding the Δ sandbox (Ζ·skip).
+SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out", "bazel-*"}
 _ENGINE = Path(__file__).resolve().parent
 
 
@@ -63,10 +67,18 @@ def _sandbox_root(project_dir: Path) -> Path:
 
 
 def _nested_roots(base: Path) -> list:
-    """Directories under `base` that are OTHER paperkit projects (each has its own
-    paper.toml).  A root-level project (the README, whose project dir IS the repo)
-    must not key on, or mutate, sibling projects' files — only its own + the engine."""
-    return [t.parent for t in base.rglob("paper.toml") if t.parent != base]
+    """Directories under `base` that are OTHER paperkit projects (each has its own paper.toml,
+    at ANY depth — e.g. paper/checks/fixture).  A root-level project (the README, whose dir IS
+    the repo) must not key on or mutate sibling projects' files — only its own + the engine.
+    Walks with SKIP_DIRS PRUNED and symlinks NOT followed (os.walk default), so a bazel-* link
+    into the GB cache is never traversed (Ζ·skip)."""
+    out = []
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames
+                       if not any(fnmatch.fnmatch(d, s) for s in SKIP_DIRS)]
+        if "paper.toml" in filenames and Path(dirpath) != base:
+            out.append(Path(dirpath))
+    return out
 
 
 def _mutable(f: Path) -> bool:

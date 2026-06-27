@@ -61,6 +61,7 @@ def main(argv: list) -> int:
     pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
     safe = config.resolve(config.SAFE, pol)          # zero-postulate: uncited placements FAIL
     without_k = config.resolve(config.WITHOUT_K, pol)  # forbid two cited claims sharing a witness
+    inv_only = config.resolve(config.INVARIANTS)     # Ζ·starlark: the invariants NODE (no per-check resolve)
     as_json = config.resolve(config.JSON)            # structured stdout (human lines suppressed)
     # The bib IS the makefile: a project's distinct checks are independent targets, so the gate
     # runs them concurrently (default = all cores; jobs=1 forces serial).
@@ -75,6 +76,19 @@ def main(argv: list) -> int:
     for b in cfg["bibs"]:
         F.update(P.entries(b))
 
+    # Ζ·starlark — the LEAF of the recursive check target: resolve ONE claim's check and exit.
+    # A project's gate (the node) is this over every claim ∧ the project invariants; a Bazel
+    # check target is exactly this leaf, so the bib's claim-DAG runs as the build graph.
+    only = config.resolve(config.ONLY)
+    if only:
+        if only not in F or not F[only].get("check"):
+            print(f"paperkit-gate: no check for claim {only!r}", file=sys.stderr)
+            return 2
+        ok = resolves(F[only]["check"], project_dir, custom,
+                      lease=int(F[only]["mem"]) if F[only].get("mem") else None)
+        info(f"paperkit-gate: {only} {'ok' if ok else 'FAIL'} — {F[only]['check']}")
+        return 0 if ok else 1
+
     out = cfg["out"]
     if not out.exists():
         print(f"paperkit-gate: {out.name} not built — run paperkit-project", file=sys.stderr)
@@ -83,8 +97,8 @@ def main(argv: list) -> int:
     cited = cited_keys(prose)
     rc = 0
 
-    # PROJECT — committed prose is the projection
-    proj_ok = prose == P.project(cfg)
+    # PROJECT — committed prose is the projection (for the project's declared render target)
+    proj_ok = prose == P.project(cfg, config.resolve(config.TARGET, pol))
     if not proj_ok:
         print(f"paperkit-gate: {out.name} ≠ projection — regenerate (paperkit-project)", file=sys.stderr)
         rc = 1
@@ -106,34 +120,41 @@ def main(argv: list) -> int:
     # it in a plain pool capped at `jobs` (wrapping every tiny check in a systemd scope
     # only adds latency and, at scale, thrashes).  So the bib is also the makefile's
     # resource manifest: heavy targets say how much RAM they hold.
-    distinct = sorted({F[k]["check"] for k in to_verify})
-    mem_of: dict = {}
-    for k in to_verify:
-        if F[k].get("mem"):
-            c = F[k]["check"]
-            mem_of[c] = max(mem_of.get(c, 0), int(F[k]["mem"]))
-    mb = membudget_ok() and jobs != 1 and bool(mem_of)
-    if mb:
-        subprocess.run([str(_MB_SCRIPT), "status"], capture_output=True)   # init ledger once
-
-    def resolve1(c: str) -> bool:
-        return resolves(c, project_dir, custom, lease=mem_of.get(c) if mb else None)
-
-    heavy = [c for c in distinct if mb and c in mem_of]
-    light = [c for c in distinct if c not in heavy]
-    results: dict = {}
-    if len(distinct) > 1 and (jobs > 1 or heavy):
-        with ThreadPoolExecutor(max_workers=max(1, jobs)) as lex, \
-             ThreadPoolExecutor(max_workers=max(1, len(heavy))) as hex:
-            fut = {lex.submit(resolve1, c): c for c in light}
-            fut.update({hex.submit(resolve1, c): c for c in heavy})
-            for f in fut:
-                results[fut[f]] = f.result()
+    if inv_only:
+        # Ζ·starlark — the invariants NODE.  Per-check resolution is the LEAVES' job (the
+        # generated check targets), so the node skips it and verifies only the whole-project
+        # invariants (PROJECT above, plus COVERAGE and --without-K below).  The recursive
+        # gate = these invariants ∧ every leaf check, with no check resolved twice.
+        bad: list = []
     else:
-        results = {c: resolve1(c) for c in distinct}
-    cache = {c: results[c] for c in distinct}
+        distinct = sorted({F[k]["check"] for k in to_verify})
+        mem_of: dict = {}
+        for k in to_verify:
+            if F[k].get("mem"):
+                c = F[k]["check"]
+                mem_of[c] = max(mem_of.get(c, 0), int(F[k]["mem"]))
+        mb = membudget_ok() and jobs != 1 and bool(mem_of)
+        if mb:
+            subprocess.run([str(_MB_SCRIPT), "status"], capture_output=True)   # init ledger once
 
-    bad = sorted(k for k in to_verify if not cache[F[k]["check"]])
+        def resolve1(c: str) -> bool:
+            return resolves(c, project_dir, custom, lease=mem_of.get(c) if mb else None)
+
+        heavy = [c for c in distinct if mb and c in mem_of]
+        light = [c for c in distinct if c not in heavy]
+        results: dict = {}
+        if len(distinct) > 1 and (jobs > 1 or heavy):
+            with ThreadPoolExecutor(max_workers=max(1, jobs)) as lex, \
+                 ThreadPoolExecutor(max_workers=max(1, len(heavy))) as hex:
+                fut = {lex.submit(resolve1, c): c for c in light}
+                fut.update({hex.submit(resolve1, c): c for c in heavy})
+                for f in fut:
+                    results[fut[f]] = f.result()
+        else:
+            results = {c: resolve1(c) for c in distinct}
+        cache = {c: results[c] for c in distinct}
+
+        bad = sorted(k for k in to_verify if not cache[F[k]["check"]])
     if undefined:
         print(f"paperkit-gate: undefined citations: {', '.join(undefined)}", file=sys.stderr)
         rc = 1
@@ -141,7 +162,9 @@ def main(argv: list) -> int:
         for k in bad:
             print(f"paperkit-gate: check FAILED for [@{k}]: {F[k]['check']}", file=sys.stderr)
         rc = 1
-    if not undefined and not bad:
+    if inv_only:
+        info(f"paperkit-gate: invariants node — {len(to_verify)} claim check(s) deferred to the leaf targets")
+    elif not undefined and not bad:
         info(f"paperkit-gate: {len(to_verify)} cited/placed claim(s) all resolve to passing checks")
 
     # WITHOUT-K — proof-relevance.  The gate reduces each check to a boolean, so it

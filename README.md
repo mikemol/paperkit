@@ -84,7 +84,7 @@ README.md        this file — itself a paperkit projection of the root warrant 
 
 ## Local CI
 
-Checks run locally as a pre-commit githook — every commit must leave both documents green under --safe and the tool boundaries intact [@rm-ci]. A fresh clone enables it once, since git cannot auto-enable a hook from a commit [@rm-ci-enable].
+Checks run locally as a pre-commit githook — every commit runs bazel test //:hook (gating both documents as per-claim check targets) and the Delta adequacy grade, keeping the tool boundaries intact [@rm-ci]. A fresh clone enables it once, since git cannot auto-enable a hook from a commit [@rm-ci-enable].
 
 ```sh
 git config core.hooksPath .githooks   # enable the local-CI pre-commit hook (once per clone)

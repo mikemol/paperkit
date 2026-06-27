@@ -1,0 +1,4 @@
+common --enable_bzlmod
+test --test_output=errors --test_summary=terse
+# Phase 1, host toolchain: the gate runs its OWN sandbox + strace + nested gates and resolves
+# tools from the (Τ·path-pinned) host PATH, so gate tests run `local` (the macro tags them).

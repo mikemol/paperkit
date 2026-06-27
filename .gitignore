@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .delta-cache.json
 setup/.loadtest.lock
+
+# Bazel convenience symlinks (point into the GB-scale cache; must never enter git or the Δ sandbox)
+/bazel-*

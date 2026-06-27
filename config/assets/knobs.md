@@ -9,6 +9,7 @@
 | `min-strength` (value) | `--min-strength` | `PAPERKIT_MIN_STRENGTH` | `min_strength` | `—` |
 | `min-corroboration` (value) | `--min-corroboration` | `PAPERKIT_MIN_CORROBORATION` | `min_corroboration` | `—` |
 | `resolution` (value) | `--resolution` | `PAPERKIT_RESOLUTION` | `resolution` | `file` |
+| `target` (value) | `--target` | `PAPERKIT_TARGET` | `target` | `pandoc` |
 | `state` (value) | `--state` | `PAPERKIT_STATE` | — | `—` |
 | `budget` (value) | `--budget` | `PAPERKIT_BUDGET` | — | `—` |
 | `all` (flag) | `--all` | `PAPERKIT_ALL` | — | `—` |
@@ -18,3 +19,5 @@
 | `delta-pulse` (value) | `--delta-pulse` | `PAPERKIT_DELTA_PULSE` | — | `2` |
 | `no-membudget` (flag) | `--no-membudget` | `PAPERKIT_NO_MEMBUDGET` | — | `—` |
 | `check` (flag) | `--check` | `PAPERKIT_CHECK` | — | `—` |
+| `only` (value) | `--only` | `PAPERKIT_ONLY` | — | `—` |
+| `invariants` (flag) | `--invariants` | `PAPERKIT_INVARIANTS` | — | `—` |

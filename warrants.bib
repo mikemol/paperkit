@@ -116,8 +116,8 @@
 % ── ci ───────────────────────────────────────────────────────────────────────
 @misc{rm-ci,
   section = {ci},
-  claim   = {checks run locally as a pre-commit githook --- every commit must leave both documents green under --safe and the tool boundaries intact},
-  check   = {cmd:grep -q gate.py .githooks/pre-commit}
+  claim   = {checks run locally as a pre-commit githook --- every commit runs bazel test //:hook (gating both documents as per-claim check targets) and the Delta adequacy grade, keeping the tool boundaries intact},
+  check   = {cmd:grep -q "bazel test //:hook" .githooks/pre-commit}
 }
 @misc{rm-ci-enable,
   section = {ci}, from = {rm-ci}, join = {. },

@@ -1,0 +1,9 @@
+# Projected by `paperkit-project --build` from the bib — a BUILD is a projection of the
+# claim-DAG (BUILD ≡ projection), with EXPLICIT srcs (no globs).  Do not edit; re-project.
+
+filegroup(name = "files", srcs = [
+        "paper.md",
+        "paper.toml",
+        "rubric.tsv",
+        "warrants.bib",
+    ], visibility = ["//visibility:public"])

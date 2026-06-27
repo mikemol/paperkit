@@ -1,4 +1,5 @@
 [paper]
+adequacy = true
 title = "Paperkit: A Paper Is a Projection of a Verified Claim-DAG"
 subtitle = "A self-hosting document toolkit — this paper is projected and gated by the tool it describes."
 rubric = "rubric.tsv"

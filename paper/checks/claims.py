@@ -764,11 +764,11 @@ def project_dag():
 
 
 def local_ci():
-    # a pre-commit githook is the local CI: every commit must leave each document green
-    # (--safe --without-K) and the paper behaviorally adequate (--min-strength behavioral)
+    # the local CI is ONE Bazel target: the pre-commit runs `bazel test //:hook`, which both gates
+    # (per-claim checks + invariants) AND grades (Δ adequacy) every document — Ζ·foot folded
+    # adequacy into the hook, so there is no separate --min-strength step in the pre-commit.
     hook = (Path(__file__).resolve().parents[2] / ".githooks" / "pre-commit").read_text()
-    for needle in ("--safe --without-K", "--min-strength behavioral", "gate.py"):
-        assert needle in hook, f"the pre-commit hook does not run {needle!r}"
+    assert "bazel test //:hook" in hook, "the pre-commit hook does not run `bazel test //:hook`"
 
 
 def boundaries_project():

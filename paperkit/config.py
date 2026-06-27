@@ -111,6 +111,8 @@ MIN_CORRO = Param("min-corroboration", "PAPERKIT_MIN_CORROBORATION", config="min
                   choices=("single", "independent"), help="Δ floor on the orthogonal CORROBORATION axis")
 RESOLUTION = Param("resolution", "PAPERKIT_RESOLUTION", config="resolution", default="file",
                    choices=("file", "def"), help="Δ mutation surface: file (project only) or def (+ engine)")
+TARGET = Param("target", "PAPERKIT_TARGET", config="target", default="pandoc", choices=("pandoc", "web"),
+               help="citation render target: pandoc ([@key] for citeproc/PDF) or web (intra-page hyperlinks + anchors, for a blog)")
 STATE = Param("state", "PAPERKIT_STATE",
               help="resumable grading: the resumption-token file (persisted between calls)")
 BUDGET = Param("budget", "PAPERKIT_BUDGET",
@@ -129,9 +131,13 @@ NO_MEMBUDGET = Param("no-membudget", "PAPERKIT_NO_MEMBUDGET", flag=True,
                      help="run checks without the membudget lease (no systemd; podman --memory bounds instead)")
 CHECK = Param("check", "PAPERKIT_CHECK", flag=True,
               help="project: verify the projection round-trips against the bib, then exit")
+ONLY = Param("only", "PAPERKIT_ONLY",
+             help="gate: resolve ONLY this one claim's check (the leaf of the recursive check target, Ζ·starlark) and exit")
+INVARIANTS = Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
+                   help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks")
 
-REGISTRY = [ROOT, PATH, SAFE, WITHOUT_K, JOBS, JSON, MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE,
-            BUDGET, ALL, FOOTPRINT, NO_CACHE, DELTA_REPEAT, DELTA_PULSE, NO_MEMBUDGET, CHECK]
+REGISTRY = [ROOT, PATH, SAFE, WITHOUT_K, JOBS, JSON, MIN_STRENGTH, MIN_CORRO, RESOLUTION, TARGET,
+            STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, DELTA_REPEAT, DELTA_PULSE, NO_MEMBUDGET, CHECK, ONLY, INVARIANTS]
 BY_NAME = {p.name: p for p in REGISTRY}
 
 

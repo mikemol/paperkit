@@ -111,7 +111,7 @@ GRADE_CASES = [
     ("indeterminate", "cmd:true",
      "always passes; no mutation flips it (vacuous OR negative-assertion)"),
     ("imported",      "result:g",
-     "Ξ·seam — adequacy DELEGATED to a separately-gated sibling that gates green; run once, never swept",
+     "Ξ·result-imported — adequacy DELEGATED to a separately-gated sibling; graded imported WITHOUT running it",
      compose_sub(True)),
 ]
 
@@ -150,10 +150,10 @@ DELTA_CASES = [
      "P": ("heartbeat emitted", "default"),
      "F": ("silenced", "PAPERKIT_DELTA_PULSE=0"),
      "delta": "env: (default ~2s) → PAPERKIT_DELTA_PULSE=0", "kind": "pulse"},
-    {"name": "Δ compose: imported → broken  (Ξ·seam verdict-import)",
-     "axis": "whether the imported sibling project gates green",
-     "P": ("imported", "result:g"), "F": ("broken", "result:g"),
-     "delta": "sibling g's check: file:w.bib (green) → cmd:false (red)", "kind": "compose"},
+    {"name": "Δ compose: result: → imported by DELEGATION, INVARIANT to sibling state  (Ξ·result-imported)",
+     "axis": "Δ delegates without running the sibling, so its greenness does NOT change the grade — the gate enforces it",
+     "P": ("imported", "result:g (sibling green)"), "F": ("imported", "result:g (sibling RED)"),
+     "delta": "sibling g's check: file:w.bib (green) → cmd:false (red) — grade UNCHANGED: imported", "kind": "compose"},
 ]
 
 
@@ -205,10 +205,12 @@ def main() -> int:
             ok = on and not off
             pside, fside = f"pulse={'yes' if on else 'NO'}", f"pulse={'yes' if off else 'no'}"
         elif d["kind"] == "compose":
-            p_want, f_want = d["P"][0], d["F"][0]
+            # Ξ·result-imported: result: grades imported by delegation WITHOUT running the sibling,
+            # so a green vs RED sibling yields the SAME grade (imported) — the gate, not Δ, enforces
+            # the sibling.  The boundary here is this INVARIANCE, not a flip.
             p_got = grade_of("result:g", compose_sub(green=True))["grade"]
             f_got = grade_of("result:g", compose_sub(green=False))["grade"]
-            ok = (p_got == p_want) and (f_got == f_want) and (p_got != f_got)
+            ok = (p_got == "imported") and (f_got == "imported")
             pside, fside = f"grade={p_got}", f"grade={f_got}"
         else:
             (p_want, p_chk, p_cite), (f_want, f_chk, f_cite) = d["P"], d["F"]

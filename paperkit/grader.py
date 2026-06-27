@@ -240,22 +240,18 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
                 footprint: list | None = None) -> dict:
     typ, _, target = chk.partition(":")
     if typ == "result":
-        # Ξ·seam: a verdict-import — adequacy DELEGATED to a separately-gated sibling.
-        # NOT mutation-swept (that would re-run the sibling's whole gate per mutation,
-        # the rm-status cost bomb); graded "imported" iff the sibling gates green now,
-        # else "broken".  Sound because every imported sibling is itself behaviorally
-        # gated in the hook — a project rests-on a sibling as a claim rests-on a premise.
-        if resolver.resolves(chk, sandbox_project, custom):
-            return {"grade": "imported", "tests": [target],
-                    "why": f"adequacy delegated to sibling project '{target}', which gates "
-                           "green and is itself behaviorally gated (composition, not re-derivation)",
-                    "not_higher": "imported is a delegation, not a falsifiability tier — the "
-                                  "sibling's own Δ pass is the behavioral guarantee",
-                    "not_lower": "not broken: the imported sibling currently gates green"}
-        return {"grade": "broken", "tests": [target],
-                "why": f"verdict-import of sibling project '{target}' does not gate green",
-                "not_higher": "to rise: make the imported sibling gate green",
-                "not_lower": "—"}
+        # Ξ·result-imported: a verdict-import is adequacy DELEGATED to a separately-gated sibling.
+        # Graded "imported" BY DELEGATION — WITHOUT running the sibling's gate.  Re-running it would
+        # both re-derive the sibling per mutation (the rm-status cost bomb) AND drag the sibling's
+        # whole transitive footprint into this sandbox.  Sound by COMPOSITION: the sibling carries
+        # its own gate AND Δ in //:hook, and the GATE (not Δ) resolves result: live — so a broken or
+        # bogus sibling fails THERE.  The falsifiability tier need not, and does not, re-verify it.
+        return {"grade": "imported", "tests": [target],
+                "why": f"adequacy delegated to the separately-gated sibling project '{target}' "
+                       "(composition, not re-derivation — its own gate + Δ are the guarantee)",
+                "not_higher": "imported is a delegation, not a falsifiability tier",
+                "not_lower": "the sibling is gated independently in the hook; the gate, not Δ, "
+                             "resolves the import live, so a broken sibling fails there"}
     if typ == "file":
         resolved = (project_dir / target).resolve()
         if resolved in presupposed:

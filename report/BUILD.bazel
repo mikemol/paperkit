@@ -1,0 +1,15 @@
+# Hand-maintained file manifest (Ζ·sunset) — a data dep of the Ζ·starlark-generated
+# @paperkit_report check graph; the bib is the source, this just lists the files.
+filegroup(name = "files", srcs = [
+        "REPORT.md",
+        "assets/dag.svg",
+        "assets/delta.md",
+        "assets/gate.md",
+        "assets/without-k.md",
+        "figure.py",
+        "figure_checks.py",
+        "gen.py",
+        "paper.toml",
+        "rubric.tsv",
+        "warrants.bib",
+    ], visibility = ["//visibility:public"])

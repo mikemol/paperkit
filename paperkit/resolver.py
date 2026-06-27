@@ -191,15 +191,20 @@ _OPEN_RE = re.compile(
     r'\s*=\s*(?P<rc>-?\d+)')
 
 
-def footprint(check: str, project_dir: Path, custom: dict) -> list:
-    """Φ·footprint — the READ footprint: the project-relative files this check OPENS for
-    reading when it runs (traced with strace).  A SOUND basis for caching: a check is a
-    pure function of its inputs, so if a diff touches none of these the verdict cannot
-    change.  Distinct from the SENSITIVITY footprint (Δ's `tests` = files a single
-    mutation flips) — a negative-assertion check reads inputs no corruption flips, so
-    reads ⊇ sensitivity, and only reads is safe to cache on.  Best-effort: needs strace,
-    and resolves openat with AT_FDCWD or absolute paths."""
+def footprint(check: str, project_dir: Path, custom: dict, scope: "Path | None" = None) -> list:
+    """Φ·footprint — the READ footprint: the files this check OPENS for reading when it runs
+    (traced with strace), relative to `scope` (default the project dir).  A SOUND basis for
+    caching: a check is a pure function of its inputs, so if a diff touches none of these the
+    verdict cannot change.  Distinct from the SENSITIVITY footprint (Δ's `tests` = files a single
+    mutation flips) — a negative-assertion check reads inputs no corruption flips, so reads ⊇
+    sensitivity, and only reads is safe to cache on.  Best-effort: needs strace, and resolves
+    openat with AT_FDCWD or absolute paths.
+
+    scope=repo_root captures CROSS-PACKAGE reads (.githooks, sibling projects, the engine) as
+    repo-relative paths — the basis Ζ·foot maps to each check target's Bazel deps; the default
+    (project-relative) is the Δ cache's key, which must stay project-scoped."""
     project_dir = Path(project_dir).resolve()
+    scope = Path(scope).resolve() if scope else project_dir
     typ, _, target = check.partition(":")
     if typ == "file":
         return [target] if (project_dir / target).exists() else []   # opens only its target
@@ -227,9 +232,9 @@ def footprint(check: str, project_dir: Path, custom: dict) -> list:
             if not p.is_file():
                 continue                                  # directories (O_DIRECTORY), /dev nodes, gone — not a hashable input
             try:
-                reads.add(str(p.relative_to(project_dir)))
+                reads.add(str(p.relative_to(scope)))
             except ValueError:
-                continue                                  # outside the project — not a cacheable input
+                continue                                  # outside the scope — not an input we track
         # Φ·degrade: when strace cannot trace — absent (above) or unable to ATTACH (no ptrace
         # capability, e.g. a hardened container → an EMPTY trace, `traced` False) — return the
         # SENTINEL None, never [].  [] means "reads nothing": it hashes stable (the cache would

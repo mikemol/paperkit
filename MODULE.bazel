@@ -21,7 +21,7 @@ bib = use_extension("//tools:bibtex.bzl", "bib")
 bib.project(name = "paperkit_boundaries", bib = "//boundaries:warrants.bib", project = "boundaries", verb = True)  # Ζ·verb·wire
 bib.project(name = "paperkit_config", bib = "//config:warrants.bib", project = "config", verb = True)  # Ζ·verb·wire
 # Each target's data is footprint-derived (footprints.json, Ζ·foot) — no hand-declared extra_data.
-bib.project(name = "paperkit_paper", bib = "//paper:warrants.bib", project = "paper", adequacy = True)
-bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adequacy = True)
+bib.project(name = "paperkit_paper", bib = "//paper:warrants.bib", project = "paper", adequacy = True, verb = True)  # Ζ·verb·wire
+bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adequacy = True, verb = True)  # Ζ·verb·wire·custom
 bib.project(name = "paperkit_setup", bib = "//setup:warrants.bib", project = "setup")
 use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_paper", "paperkit_root", "paperkit_setup")

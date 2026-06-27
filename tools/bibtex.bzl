@@ -64,16 +64,35 @@ def _data(tokens, files):
 def _lit(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'  # a Starlark string literal
 
-def _verb_rule(name, check, proj, files, reads):
+def _custom(content):
+    """Parse a project's paper.toml [checks.X] cmd TEMPLATES (a custom verifier type X resolves by
+    running its cmd with {target} substituted).  Starlark has no toml parser, so string ops on the
+    `[checks.X]` / `cmd = "..."` shape — the same discipline as _entries on the bib."""
+    out = {}
+    cur = None
+    for raw in content.splitlines():
+        s = raw.strip()
+        if s.startswith("[checks."):
+            cur = s[len("[checks."):].split("]")[0].strip()
+        elif s.startswith("["):
+            cur = None
+        elif cur != None and s.startswith("cmd") and "=" in s:
+            val = s.split("=", 1)[1].strip()
+            if len(val) >= 2 and val[0] == '"' and val[-1] == '"':
+                val = val[1:-1]
+            out[cur] = val
+    return out
+
+def _verb_rule(name, check, proj, files, reads, custom):
     """Ζ·verb·wire — dispatch ONE bib check to its specific typed rule (a record), not a general
     `gate.py --only` script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd
-    (the exit-code oracle), under the toolchain."""
+    (the exit-code oracle), under the toolchain.  A custom type expands its [checks.X] cmd template."""
     i = check.find(":")
     typ = check[:i]
     target = check[i + 1:]
     dl = ", ".join([_lit(d) for d in _data(reads, files)])
+    pj = "" if proj == "." else ", project = " + _lit(proj)
     if typ == "cmd":
-        pj = "" if proj == "." else ", project = " + _lit(proj)
         return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + ", data = [" + dl + "])"
     elif typ == "file":
         return "pk_file(name = " + _lit(name) + ", path = " + _lit(target) + ", data = [" + dl + "])"
@@ -82,19 +101,23 @@ def _verb_rule(name, check, proj, files, reads):
     elif typ == "agree":
         prods = ", ".join([_lit(p.strip()) for p in target.split("|||") if p.strip()])
         return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "])"
+    elif typ in custom:     # a config-declared cmd template — {target} substituted, run as a cmd oracle
+        cmd = custom[typ].replace("{target}", target)
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + ", data = [" + dl + "])"
     else:
-        fail("Ζ·verb·wire: custom check type '" + typ + ":' needs its config template " +
-             "(Ζ·verb·wire·custom, not yet wired) — claim '" + name + "'")
+        fail("Ζ·verb·wire: check type '" + typ + ":' is neither builtin nor a [checks." + typ +
+             "] template — claim '" + name + "'")
 
-def _verb_build(proj, files, parsed):
+def _verb_build(adequacy, proj, files, parsed, custom):
     """The generated BUILD for a verb-wired project: a record per check + pk_gate over the records
-    + the Ζ·hook·assert test that puts the aggregate record into the live gate."""
+    + the Ζ·hook·assert test that puts the aggregate record into the live gate (+ the old adequacy
+    sh_test, kept on the engine path until Ζ·nest)."""
     out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")', ""]
     recs = []
     for k, check, sib, reads, mem in parsed:
         if not check:
             continue
-        out.append(_verb_rule(k, check, proj, files, reads))
+        out.append(_verb_rule(k, check, proj, files, reads, custom))
         recs.append('":%s"' % k)
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an
     # irreducibly GENERAL oracle, kept as a cmd: drop for now (Ζ·resist).
@@ -104,6 +127,13 @@ def _verb_build(proj, files, parsed):
     out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
     out.append('sh_test(name = "gate", srcs = ["@@//tools:assert_pass.sh"], ' +
                'args = ["$(rootpath :gate_rec)"], data = [":gate_rec"], visibility = ["//visibility:public"])')
+    if adequacy:   # Δ sweep — still the engine path (discriminate.py); union of the leaves' reads
+        union = {}
+        for k, check, sib, reads, mem in parsed:
+            if check and not sib:
+                for t in reads:
+                    union[t] = True
+        out.append(_sh_test("adequacy", ["adequacy", proj], _data(union.keys(), files)))
     return "\n".join(out) + "\n"
 
 def _sh_test(name, args, data, mem = ""):
@@ -131,8 +161,14 @@ def _bib_repo_impl(repository_ctx):
     if repository_ctx.attr.verb:
         # Ζ·verb·wire — project per-verb RECORD rules + pk_gate over the records (the gate IS a
         # check), instead of one sh_test(gate.py --only) per claim.  resolver.resolves()'s dispatch
-        # moves into Starlark; the leaf is typed, not a general script.
-        repository_ctx.file("BUILD.bazel", _verb_build(proj, files, parsed))
+        # moves into Starlark; the leaf is typed, not a general script.  Custom check types resolve
+        # from the project's paper.toml [checks.X] templates (watched, so a template edit re-fetches).
+        custom = {}
+        tomlp = repository_ctx.path(repository_ctx.attr.bib).dirname.get_child("paper.toml")
+        if tomlp.exists:
+            repository_ctx.watch(tomlp)
+            custom = _custom(repository_ctx.read(tomlp))
+        repository_ctx.file("BUILD.bazel", _verb_build(repository_ctx.attr.adequacy, proj, files, parsed, custom))
         return
     checked = [(k, reads, mem) for k, c, sib, reads, mem in parsed if c and not sib]   # LEAVES
     edges = [k for k, c, sib, reads, mem in parsed if c and sib]                       # result: EDGES

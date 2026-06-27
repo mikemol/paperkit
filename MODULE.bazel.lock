@@ -144,8 +144,8 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "F8GrmbZzMVh0gd1rinr0xJSKtSeLGqJhFzmDmfoASk8=",
-        "usagesDigest": "mhsHHdZRTFg5jiirS/JZBNAfaTDTKrhHgFodRNCGEto=",
+        "bzlTransitiveDigest": "l6Jytcf8aTn5CDfCcXaSCjFyWPMgMlGKDjs6mxGoT/E=",
+        "usagesDigest": "Oq6mhSYnJhMc0S13DEbtf61EYIz8dMNdpD4uLtMcodU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -174,7 +174,7 @@
               "bib": "@@//paper:warrants.bib",
               "project": "paper",
               "adequacy": true,
-              "verb": false
+              "verb": true
             }
           },
           "paperkit_root": {
@@ -183,7 +183,7 @@
               "bib": "@@//:warrants.bib",
               "project": ".",
               "adequacy": true,
-              "verb": false
+              "verb": true
             }
           },
           "paperkit_setup": {

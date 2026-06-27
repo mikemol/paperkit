@@ -1,4 +1,6 @@
 common --enable_bzlmod
 test --test_output=errors --test_summary=terse
-# Phase 1, host toolchain: the gate runs its OWN sandbox + strace + nested gates and resolves
-# tools from the (Τ·path-pinned) host PATH, so gate tests run `local` (the macro tags them).
+# A memory-budget pool (replaces the vendored membudget semaphore — Ζ·membudget).  A check
+# declares `mem` (MB) in its bib; Ζ·starlark projects that to tags = ["resources:mem_mb:N"], and
+# Bazel's local scheduler bounds concurrent memory to this pool.  Native, per-machine, no flock.
+test --local_extra_resources=mem_mb=8192

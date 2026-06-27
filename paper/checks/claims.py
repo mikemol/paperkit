@@ -510,17 +510,6 @@ def jobs_parallel():
     assert fx.gate(bad, "--jobs=1")[0] != 0 and fx.gate(bad, "--jobs=8")[0] != 0, "parallel disagreed on a fail"
 
 
-def mem_lease():
-    # mem: a check may declare a memory lease, routed through the vendored membudget
-    # semaphore when a user scope is available — the lease never changes the verdict
-    assert gate._MB_SCRIPT.exists(), "membudget is not vendored beside the engine"
-    leased = [fx.entry("a", claim="alpha", check="cmd:true", mem="256"),
-              fx.entry("b", claim="beta", check="cmd:false", frm="a", mem="256")]
-    plain = [fx.entry("a", claim="alpha", check="cmd:true"),
-             fx.entry("b", claim="beta", check="cmd:false", frm="a")]
-    assert fx.gate(leased)[0] == fx.gate(plain)[0] != 0, "a mem lease changed the verdict"
-
-
 # ── adequacy: how Δ grades a check ───────────────────────────────────────────
 def grade_ladder():
     # Δ grades each check on a ladder by how much it can fail: a presupposed file: is
@@ -949,7 +938,6 @@ CLAIMS = {
     "safe-rejects-postulates": safe_rejects_postulates,
     "without-k-distinct": without_k_distinct,
     "jobs-parallel": jobs_parallel,
-    "mem-lease": mem_lease,
     "weave-sentence": weave_sentence,
     "connector-resolution": connector_resolution,
     "emit-placement": emit_placement,

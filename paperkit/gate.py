@@ -25,7 +25,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import sys
 import tempfile
 import tomllib
@@ -40,10 +39,10 @@ import project as P  # noqa: E402
 # The check-RESOLUTION core lives in resolver.py — a small, standalone module (no projector,
 # no parallel gate loop, no config/CLI) so it can be imported and tested with a small blast
 # radius.  Re-exported here so callers reaching gate.resolves / gate.clean_env / gate.footprint
-# keep working; the gate itself uses resolves + membudget_ok below.
+# keep working; the gate itself uses resolves below.
 from resolver import (  # noqa: E402,F401
-    membudget_ok, clean_env, run_ok, resolves, footprint, _check_cmd,
-    _MB_SCRIPT, _ENV_KEEP, _ENV_KEEP_PREFIX)
+    clean_env, run_ok, resolves, footprint, _check_cmd,
+    _ENV_KEEP, _ENV_KEEP_PREFIX)
 
 
 def cited_keys(prose: str) -> set:
@@ -84,8 +83,7 @@ def main(argv: list) -> int:
         if only not in F or not F[only].get("check"):
             print(f"paperkit-gate: no check for claim {only!r}", file=sys.stderr)
             return 2
-        ok = resolves(F[only]["check"], project_dir, custom,
-                      lease=int(F[only]["mem"]) if F[only].get("mem") else None)
+        ok = resolves(F[only]["check"], project_dir, custom)
         info(f"paperkit-gate: {only} {'ok' if ok else 'FAIL'} — {F[only]['check']}")
         return 0 if ok else 1
 
@@ -112,47 +110,26 @@ def main(argv: list) -> int:
     placed = {k for k, f in F.items() if P.is_placed(f)}
     to_verify = (cited | placed) & warrants
     undefined = sorted(cited - set(F))
-    # Resolve each DISTINCT check exactly once (shared witnesses run one time).  Two
-    # kinds of target.  A check whose warrant DECLARES a lease (`mem`) is memory-bound:
-    # run it under the membudget semaphore, fanned out UNBOUNDED and admitted as RAM
-    # frees — and recursion-aware, since a check that runs a nested gate suballocates
-    # from its own lease.  A light check (no `mem`) is CPU-bound, not memory-bound: run
-    # it in a plain pool capped at `jobs` (wrapping every tiny check in a systemd scope
-    # only adds latency and, at scale, thrashes).  So the bib is also the makefile's
-    # resource manifest: heavy targets say how much RAM they hold.
+    # Resolve each DISTINCT check exactly once (shared witnesses run one time), concurrently.
+    # A memory-heavy check declares `mem` in the bib — the makefile's resource manifest, which
+    # Ζ·starlark projects to a Bazel resource reservation so the SCHEDULER bounds concurrent
+    # memory (membudget retired: Bazel IS the semaphore — per-machine, no cross-repo flock).
     if inv_only:
         # Ζ·starlark — the invariants NODE.  Per-check resolution is the LEAVES' job (the
         # generated check targets), so the node skips it and verifies only the whole-project
-        # invariants (PROJECT above, plus COVERAGE and --without-K below).  The recursive
-        # gate = these invariants ∧ every leaf check, with no check resolved twice.
+        # invariants (PROJECT above, plus COVERAGE and --without-K below).
         bad: list = []
     else:
         distinct = sorted({F[k]["check"] for k in to_verify})
-        mem_of: dict = {}
-        for k in to_verify:
-            if F[k].get("mem"):
-                c = F[k]["check"]
-                mem_of[c] = max(mem_of.get(c, 0), int(F[k]["mem"]))
-        mb = membudget_ok() and jobs != 1 and bool(mem_of)
-        if mb:
-            subprocess.run([str(_MB_SCRIPT), "status"], capture_output=True)   # init ledger once
 
         def resolve1(c: str) -> bool:
-            return resolves(c, project_dir, custom, lease=mem_of.get(c) if mb else None)
+            return resolves(c, project_dir, custom)
 
-        heavy = [c for c in distinct if mb and c in mem_of]
-        light = [c for c in distinct if c not in heavy]
-        results: dict = {}
-        if len(distinct) > 1 and (jobs > 1 or heavy):
-            with ThreadPoolExecutor(max_workers=max(1, jobs)) as lex, \
-                 ThreadPoolExecutor(max_workers=max(1, len(heavy))) as hex:
-                fut = {lex.submit(resolve1, c): c for c in light}
-                fut.update({hex.submit(resolve1, c): c for c in heavy})
-                for f in fut:
-                    results[fut[f]] = f.result()
+        if len(distinct) > 1 and jobs > 1:
+            with ThreadPoolExecutor(max_workers=max(1, jobs)) as ex:
+                cache = dict(zip(distinct, ex.map(resolve1, distinct)))
         else:
-            results = {c: resolve1(c) for c in distinct}
-        cache = {c: results[c] for c in distinct}
+            cache = {c: resolve1(c) for c in distinct}
 
         bad = sorted(k for k in to_verify if not cache[F[k]["check"]])
     if undefined:

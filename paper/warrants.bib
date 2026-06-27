@@ -292,11 +292,6 @@
   claim   = {the gate resolves a project's distinct checks concurrently (the bib is its makefile), and the verdict is independent of the worker count --- parallel equals serial},
   check   = {claim:jobs-parallel}
 }
-@misc{mem-lease,
-  section = {gate}, from = {jobs-parallel}, join = {, and },
-  claim   = {a check may declare a memory lease that routes it through the vendored membudget semaphore so a heavy fleet self-throttles to fit RAM, a lease that never changes the verdict},
-  check   = {claim:mem-lease}
-}
 
 % ── adequacy: how Δ grades a check ───────────────────────────────────────────
 @misc{grade-ladder,

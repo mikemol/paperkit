@@ -17,7 +17,6 @@
 | `no-cache` (flag) | `--no-cache` | `PAPERKIT_NO_CACHE` | — | `—` |
 | `delta-repeat` (value) | `--delta-repeat` | `PAPERKIT_DELTA_REPEAT` | — | `1` |
 | `delta-pulse` (value) | `--delta-pulse` | `PAPERKIT_DELTA_PULSE` | — | `2` |
-| `no-membudget` (flag) | `--no-membudget` | `PAPERKIT_NO_MEMBUDGET` | — | `—` |
 | `check` (flag) | `--check` | `PAPERKIT_CHECK` | — | `—` |
 | `only` (value) | `--only` | `PAPERKIT_ONLY` | — | `—` |
 | `invariants` (flag) | `--invariants` | `PAPERKIT_INVARIANTS` | — | `—` |

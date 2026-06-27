@@ -12,8 +12,8 @@ dispatches it, one branch per VERB:
 
 It also sanitizes the environment a check runs in (clean_env, sshd-style default-deny) and
 traces a check's READ footprint (footprint, Φ — the files it opens, the sound key to cache a
-grade on).  Deps: only the stdlib + the membudget script + gate.py-as-a-subprocess (for
-result:), never the rest of the engine.
+grade on).  Deps: only the stdlib + gate.py-as-a-subprocess (for result:), never the rest of
+the engine.
 """
 from __future__ import annotations
 
@@ -27,47 +27,21 @@ from pathlib import Path
 
 import config
 
-_MB_SCRIPT = Path(__file__).resolve().parent / "membudget"
 _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
-_MB_OK = None
-
-
-def membudget_ok() -> bool:
-    """Is the memory-budget semaphore usable here?  Cached.  Inside an existing
-    membudget scope (MEMBUDGET_PARENT set) it is by construction — that is the
-    recursion point: a nested gate re-invokes membudget so its checks SUBALLOCATE
-    from the parent's lease rather than the global pool.  At top level, probe that
-    a user systemd scope opens; set PAPERKIT_NO_MEMBUDGET to force the plain path."""
-    global _MB_OK
-    if _MB_OK is not None:
-        return _MB_OK
-    if config.resolve(config.NO_MEMBUDGET) or not os.access(_MB_SCRIPT, os.X_OK):
-        _MB_OK = False
-    elif os.environ.get("MEMBUDGET_PARENT"):
-        _MB_OK = True
-    else:
-        try:
-            _MB_OK = subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "true"],
-                                    capture_output=True, timeout=15).returncode == 0
-        except Exception:
-            _MB_OK = False
-    return _MB_OK
 
 
 # A check is arbitrary code (cmd: is the universal escape hatch), so it must not run in
 # whatever ambient environment the gate happened to inherit — that is both an injection
 # surface (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH, …) and a reproducibility leak (the
 # verdict would depend on the caller's shell).  Like sshd, we DON'T inherit: we build a
-# controlled environment, default-deny, keeping only what a check (and the membudget
-# semaphore + a nested gate) legitimately need.  PATH is kept so tools resolve, but its
-# RELATIVE entries are dropped (Τ·path): a check runs with cwd = the project dir, so an
-# empty/"." PATH component would resolve a tool to the project being gated — letting a
-# document plant a tool beside itself.  Which ABSOLUTE dir resolves a tool stays the
-# host's trust (the reproducibility leak above); pinning per-tool (GNU vs uutils) is further.
+# controlled environment, default-deny, keeping only what a check legitimately needs.  PATH
+# is kept so tools resolve, but its RELATIVE entries are dropped (Τ·path): a check runs with
+# cwd = the project dir, so an empty/"." PATH component would resolve a tool to the project
+# being gated — letting a document plant a tool beside itself.  Which ABSOLUTE dir resolves a
+# tool stays the host's trust (the reproducibility leak above); pinning per-tool is further.
 _ENV_KEEP = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TZ", "TMPDIR",
-             "LANG", "LANGUAGE",
-             "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}  # membudget's systemd --user
-_ENV_KEEP_PREFIX = ("LC_", "MEMBUDGET_", "PAPERKIT_")        # locale + paperkit's own knobs
+             "LANG", "LANGUAGE", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}
+_ENV_KEEP_PREFIX = ("LC_", "PAPERKIT_")        # locale + paperkit's own knobs
 
 
 def clean_env(env: dict | None = None) -> dict:
@@ -101,19 +75,15 @@ def clean_env(env: dict | None = None) -> dict:
     return out
 
 
-def run_ok(cmd: str, cwd: Path, lease: int | None = None, label: str = "check") -> bool:
+def run_ok(cmd: str, cwd: Path) -> bool:
     try:
-        e = clean_env()
-        if lease:   # run under a memory lease; membudget admits it when RAM fits
-            argv = [str(_MB_SCRIPT), "run", str(lease), label, "--", "sh", "-c", cmd]
-            return subprocess.run(argv, cwd=cwd, env=e, capture_output=True).returncode == 0
-        return subprocess.run(cmd, shell=True, cwd=cwd, env=e,
+        return subprocess.run(cmd, shell=True, cwd=cwd, env=clean_env(),
                               capture_output=True).returncode == 0
     except Exception:
         return False
 
 
-def resolves(check: str, project_dir: Path, custom: dict, lease: int | None = None) -> bool:
+def resolves(check: str, project_dir: Path, custom: dict) -> bool:
     typ, _, target = check.partition(":")
     if typ == "file":
         return (project_dir / target).exists()        # EXISTS — no subprocess → no lease
@@ -126,8 +96,6 @@ def resolves(check: str, project_dir: Path, custom: dict, lease: int | None = No
         # never mutation-sweeping a whole sub-gate.
         try:
             argv = [sys.executable, str(_GATE), "--json", "--safe", "--without-K", target]
-            if lease:
-                argv = [str(_MB_SCRIPT), "run", str(lease), check, "--", *argv]
             r = subprocess.run(argv, cwd=project_dir, env=clean_env(),
                                capture_output=True, text=True)
             return bool(json.loads(r.stdout or "{}").get("pass"))
@@ -145,13 +113,8 @@ def resolves(check: str, project_dir: Path, custom: dict, lease: int | None = No
         outs = set()
         for prod in producers:
             try:
-                if lease:
-                    argv = [str(_MB_SCRIPT), "run", str(lease), check, "--", "sh", "-c", prod]
-                    r = subprocess.run(argv, cwd=project_dir, env=clean_env(),
-                                       capture_output=True, text=True)
-                else:
-                    r = subprocess.run(prod, shell=True, cwd=project_dir, env=clean_env(),
-                                       capture_output=True, text=True)
+                r = subprocess.run(prod, shell=True, cwd=project_dir, env=clean_env(),
+                                   capture_output=True, text=True)
             except Exception:
                 return False
             if r.returncode != 0:
@@ -164,7 +127,7 @@ def resolves(check: str, project_dir: Path, custom: dict, lease: int | None = No
         cmd = custom[typ]["cmd"].replace("{target}", target)
     else:
         return False
-    return run_ok(cmd, project_dir, lease=lease, label=check)
+    return run_ok(cmd, project_dir)
 
 
 def _check_cmd(check: str, custom: dict) -> str | None:

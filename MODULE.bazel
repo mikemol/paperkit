@@ -1,10 +1,10 @@
-"""paperkit on Bazel — Phase 1 (harness).
+"""paperkit on Bazel — the bib IS the build graph (Ζ).
 
-The bib IS the makefile; Bazel is the build-graph engine.  Phase 1 wraps each paperkit project's
-gate as a Bazel test so Bazel owns scheduling, caching (re-gate only when a project's declared
-inputs change), progress, and resource limits — `bazel test //...` replaces the .githooks loop.
-The engine's home-grown footprint-cache / membudget / Δ-sandbox stay inside for now; Phase 2
-pushes targets down to per-check (bib→BUILD) and deletes them as Bazel subsumes each.
+A module extension (tools/bibtex.bzl) reads each project's warrants.bib at fetch and projects
+every claim into a recursive check target; `bazel test //:hook` gates AND grades every document.
+The engine's home-grown build machinery — the checked-in BUILD projector, the membudget
+semaphore — is RETIRED: Bazel owns scheduling, caching (re-gate only on changed inputs), progress,
+resource limits (--local_extra_resources), and the sandbox.  The bib is the sole source.
 """
 module(name = "paperkit", version = "0.1")
 

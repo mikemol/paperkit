@@ -6,7 +6,7 @@ TOTAL and EQUAL coverage along the same four sources, in the same precedence:
 
 The trick that makes it uniform: a CLI entry folds its args into the matching PAPERKIT_* env
 (apply_args) — so an explicit flag OVERRIDES the env, and the resolved value reaches the deep
-resolvers (the grader, the membudget lease) through the env they already read.  After that ONE
+resolvers (the grader, the spawned checks) through the env they already read.  After that ONE
 fold, every site — CLI or deep — calls resolve(p, config) reading env > config > default.  No
 argv threading; container pipelines set the env; an ad-hoc run overrides on the command line.
 
@@ -127,8 +127,6 @@ DELTA_REPEAT = Param("delta-repeat", "PAPERKIT_DELTA_REPEAT", default="1",
                      help="re-run the pristine baseline N times to detect a flaky (non-deterministic) check")
 DELTA_PULSE = Param("delta-pulse", "PAPERKIT_DELTA_PULSE", default="2",
                     help="min seconds between Δ progress pulses to a log (0 = silent)")
-NO_MEMBUDGET = Param("no-membudget", "PAPERKIT_NO_MEMBUDGET", flag=True,
-                     help="run checks without the membudget lease (no systemd; podman --memory bounds instead)")
 CHECK = Param("check", "PAPERKIT_CHECK", flag=True,
               help="project: verify the projection round-trips against the bib, then exit")
 ONLY = Param("only", "PAPERKIT_ONLY",
@@ -137,7 +135,7 @@ INVARIANTS = Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
                    help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks")
 
 REGISTRY = [ROOT, PATH, SAFE, WITHOUT_K, JOBS, JSON, MIN_STRENGTH, MIN_CORRO, RESOLUTION, TARGET,
-            STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, DELTA_REPEAT, DELTA_PULSE, NO_MEMBUDGET, CHECK, ONLY, INVARIANTS]
+            STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, DELTA_REPEAT, DELTA_PULSE, CHECK, ONLY, INVARIANTS]
 BY_NAME = {p.name: p for p in REGISTRY}
 
 

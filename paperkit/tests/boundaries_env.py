@@ -4,7 +4,7 @@
 ⟨P, F, δ⟩ per the boundary practice.  A check is arbitrary code (cmd: is the universal
 escape hatch), so it must run in a CONTROLLED environment, not whatever the gate
 inherited — sshd's lesson against env injection.  Bounds: the allow-list keeps what a
-check legitimately needs (PATH, locale, the membudget/paperkit knobs) and DROPS the
+check legitimately needs (PATH, locale, paperkit's own knobs) and DROPS the
 injection vectors (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH) and any unknown var; and
 within the kept PATH it drops the RELATIVE/empty entries (Τ·path) that would resolve a
 tool to the cwd — the project dir being gated.
@@ -22,10 +22,9 @@ import resolver  # noqa: E402  (clean_env lives in the resolver core — small b
 
 DIRTY = {
     "PATH": "/usr/bin" + os.pathsep + "." + os.pathsep + os.pathsep + "rel/x",  # abs kept; .,"",rel dropped
-    "HOME": "/h", "LC_ALL": "C",                                     # kept: needed
-    "MEMBUDGET_PARENT": "abcd", "PAPERKIT_CHECK_MB": "256",          # kept: paperkit's own
+    "HOME": "/h", "LC_ALL": "C", "PAPERKIT_CHECK_MB": "256",         # kept: needed + paperkit's knob
     "LD_PRELOAD": "/evil.so", "IFS": " \t", "BASH_ENV": "/inj.sh",   # dropped: injection
-    "PYTHONPATH": "/x", "FOO": "bar",                               # dropped: injection / unknown
+    "PYTHONPATH": "/x", "MEMBUDGET_PARENT": "abcd", "FOO": "bar",    # dropped: injection / retired / unknown
 }
 
 
@@ -43,8 +42,8 @@ def main() -> int:
     check("DROPS PATH's relative/empty entries (Τ·path — they resolve to the gated cwd)",
           all(p and os.path.isabs(p) for p in e.get("PATH", "").split(os.pathsep)))
     check("keeps HOME and locale (LC_ALL)", e.get("HOME") == "/h" and e.get("LC_ALL") == "C")
-    check("keeps the membudget / paperkit knobs (MEMBUDGET_*, PAPERKIT_*)",
-          e.get("MEMBUDGET_PARENT") == "abcd" and e.get("PAPERKIT_CHECK_MB") == "256")
+    check("keeps paperkit's own knobs (PAPERKIT_*), DROPS the retired MEMBUDGET_* (Bazel bounds memory)",
+          e.get("PAPERKIT_CHECK_MB") == "256" and "MEMBUDGET_PARENT" not in e)
     check("DROPS injection vectors (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH)",
           not any(k in e for k in ("LD_PRELOAD", "IFS", "BASH_ENV", "PYTHONPATH")))
     check("DROPS unknown vars (FOO) — default-deny, not block-list", "FOO" not in e)

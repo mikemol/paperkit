@@ -2,21 +2,24 @@
 
 A repository rule reads a paperkit project's warrants.bib during the FETCH phase — the one place
 Starlark may read a file — and projects each CHECKED claim (@misc entry with a `check` field) into
-the ONE recursive check target: an sh_test whose command resolves that claim's check (the leaf),
-aggregated by a `gate` test_suite (the node), with an optional Δ `adequacy` target.  This
-SUPERSEDES the checked-in BUILD projector: Bazel reads the bib DIRECTLY, so a target cannot drift
-from its claim — Bazel re-fetches whenever warrants.bib changes.
+its SPECIFIC TYPED rule (Ζ·verb): the check's type selects a pk_* rule (tools/verb.bzl) that emits
+a verdict RECORD (a build artifact).  pk_gate aggregates the records into the project's verdict
+(`gate_rec`), and a thin assert-test (`gate`, Ζ·hook·assert) puts that record into the live gate.
+This SUPERSEDES the checked-in BUILD projector AND the old sh_test(gate.py --only) projection:
+Bazel reads the bib DIRECTLY (re-fetch on change), and the resolver's per-check dispatch lives in
+Starlark, not a general python script.
 
 Each target's `data` is its own project's files + the engine, plus the claim's DECLARED `reads`
 (Ζ·foot, declare+audit): a bib field naming the cross-package projects the check touches
-(`.` = root files like .githooks, or a sibling project).  Declaration is the cheap, portable
-SOURCE; the repo-scoped Φ·footprint AUDITS it on demand (footdeps --audit: footprint ⊆ declared),
-so the build graph needs no strace and a check cannot silently under-declare.  The node and the Δ
-adequacy target use the UNION of the project's declared reads (the sweep reruns every check).
+(`.` = root files like .githooks, or a sibling project).  A custom check type resolves from the
+project's paper.toml [checks.X] cmd template; a `result:<sibling>` check is a real cross-repo dep
+on the sibling's gate_rec record (records-as-deps, Ξ·result-imported); a host-coupled project
+(setup, `local`) runs its pk_cmd on the host, unsandboxed (Ζ·resist).  adequacy (the Δ sweep) is
+still an engine sh_test (discriminate.py) until Ζ·nest.
 
 Starlark has no regex, so the parse is string ops on the regular `@type{key, field = {val}, ...}`
 shape: an entry begins only at a LINE-START `@type{key,`; a claim is checkable iff a later field
-line's name is `check`; a `result:<sibling>` check is an EDGE (wired by Ζ·hook in //:hook).
+line's name is `check`.
 """
 
 def _entries(content):
@@ -25,17 +28,15 @@ def _entries(content):
     check = ""      # the full check value `type:target` ("" = uncheckable claim)
     sib = ""        # for a result:<sibling> check — the sibling it definitionally reads
     reads = []
-    mem = ""        # declared memory (MB) → a Bazel resource reservation (Ζ·membudget)
     for raw in content.splitlines():
         s = raw.strip()
         if s.startswith("@") and "{" in s:
             if key != None:
-                out.append((key, check, sib, reads, mem))
+                out.append((key, check, sib, reads))
             key = s.split("{", 1)[1].split(",", 1)[0].strip()
             check = ""
             sib = ""
             reads = []
-            mem = ""
         elif key != None and "=" in s:
             name = s.split("=", 1)[0].strip()
             if name == "check":
@@ -45,10 +46,8 @@ def _entries(content):
             elif name == "reads":
                 inner = s.split("{", 1)[1].rsplit("}", 1)[0]
                 reads = [t.strip() for t in inner.split(",") if t.strip()]
-            elif name == "mem":
-                mem = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
     if key != None:
-        out.append((key, check, sib, reads, mem))
+        out.append((key, check, sib, reads))
     return out
 
 def _data(tokens, files):
@@ -84,10 +83,10 @@ def _custom(content):
     return out
 
 def _verb_rule(name, check, proj, files, reads, custom, local):
-    """Ζ·verb·wire — dispatch ONE bib check to its specific typed rule (a record), not a general
-    `gate.py --only` script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd
-    (the exit-code oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.
-    `local` marks a host-coupled project (setup): pk_cmd runs on the host, unsandboxed (Ζ·resist)."""
+    """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
+    script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd (the exit-code
+    oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `local` marks
+    a host-coupled project (setup): pk_cmd runs on the host, unsandboxed (Ζ·resist)."""
     i = check.find(":")
     typ = check[:i]
     target = check[i + 1:]
@@ -110,89 +109,59 @@ def _verb_rule(name, check, proj, files, reads, custom, local):
         fail("Ζ·verb·wire: check type '" + typ + ":' is neither builtin nor a [checks." + typ +
              "] template — claim '" + name + "'")
 
-def _verb_build(adequacy, proj, files, parsed, custom, local):
-    """The generated BUILD for a verb-wired project: a record per check + pk_gate over the records
-    + the Ζ·hook·assert test that puts the aggregate record into the live gate (+ the old adequacy
-    sh_test, kept on the engine path until Ζ·nest)."""
-    out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")', ""]
-    recs = []
-    for k, check, sib, reads, mem in parsed:
-        if not check:
-            continue
-        out.append(_verb_rule(k, check, proj, files, reads, custom, local))
-        recs.append('":%s"' % k)
-    # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an
-    # irreducibly GENERAL oracle, kept as a cmd: drop for now (Ζ·resist).
-    lc = ", local = True" if local else ""
-    inv = "python3 paperkit/gate.py --invariants --safe --without-K " + proj
-    out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + ', "@@//paperkit:engine"])')
-    recs.append('":invariants"')
-    out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
-    out.append('sh_test(name = "gate", srcs = ["@@//tools:assert_pass.sh"], ' +
-               'args = ["$(rootpath :gate_rec)"], data = [":gate_rec"], visibility = ["//visibility:public"])')
-    if adequacy:   # Δ sweep — still the engine path (discriminate.py); union of the leaves' reads
-        union = {}
-        for k, check, sib, reads, mem in parsed:
-            if check and not sib:
-                for t in reads:
-                    union[t] = True
-        out.append(_sh_test("adequacy", ["adequacy", proj], _data(union.keys(), files)))
-    return "\n".join(out) + "\n"
-
-def _sh_test(name, args, data, mem = ""):
-    lines = [
+def _adequacy(proj, files, union):
+    """The Δ sweep — still an engine sh_test (discriminate.py) until Ζ·nest; data = union of reads."""
+    return "\n".join([
         'sh_test(',
-        '    name = "%s",' % name,
+        '    name = "adequacy",',
         '    srcs = ["@@//tools:run.sh"],',
-        '    args = [%s],' % ", ".join(['"%s"' % a for a in args]),
-        '    data = [%s],' % ", ".join(['"%s"' % d for d in data]),
+        '    args = ["adequacy", "%s"],' % proj,
+        '    data = [%s],' % ", ".join([_lit(d) for d in _data(union, files)]),
         '    size = "large",',
-    ]
-    if mem:
-        # Ζ·membudget: the bib's `mem` (MB) → a Bazel resource reservation; the scheduler bounds
-        # concurrent memory to the --local_extra_resources=mem_mb pool (.bazelrc).  No semaphore.
-        lines.append('    tags = ["resources:mem_mb:%s"],' % mem)
-    lines.append('    visibility = ["//visibility:public"],')
-    lines.append(")")
-    return "\n".join(lines)
+        '    visibility = ["//visibility:public"],',
+        ')',
+    ])
 
 def _bib_repo_impl(repository_ctx):
     content = repository_ctx.read(repository_ctx.path(repository_ctx.attr.bib))
     proj = repository_ctx.attr.project
     files = "@@//:files" if proj == "." else "@@//%s:files" % proj
     parsed = _entries(content)
-    if repository_ctx.attr.verb:
-        # Ζ·verb·wire — project per-verb RECORD rules + pk_gate over the records (the gate IS a
-        # check), instead of one sh_test(gate.py --only) per claim.  resolver.resolves()'s dispatch
-        # moves into Starlark; the leaf is typed, not a general script.  Custom check types resolve
-        # from the project's paper.toml [checks.X] templates (watched, so a template edit re-fetches).
-        custom = {}
-        tomlp = repository_ctx.path(repository_ctx.attr.bib).dirname.get_child("paper.toml")
-        if tomlp.exists:
-            repository_ctx.watch(tomlp)
-            custom = _custom(repository_ctx.read(tomlp))
-        repository_ctx.file("BUILD.bazel", _verb_build(repository_ctx.attr.adequacy, proj, files, parsed, custom, repository_ctx.attr.local))
-        return
-    checked = [(k, reads, mem) for k, c, sib, reads, mem in parsed if c and not sib]   # LEAVES
-    edges = [k for k, c, sib, reads, mem in parsed if c and sib]                       # result: EDGES
-    out = ["# Generated by Ζ·starlark from %s — recursive check; data = own + engine + declared reads.\n" %
-           str(repository_ctx.attr.bib)]
-    if edges:
-        out.append("# result: edges (claim → sibling gate), wired in //:hook by Ζ·hook: %s\n" % ", ".join(edges))
-    # adequacy grades every checked claim; result: claims grade "imported" by DELEGATION
-    # (Ξ·result-imported) without running the sibling, so they pull in NO deps — the union is just
-    # the declared reads across the leaves.
+    local = repository_ctx.attr.local
+
+    # Custom check types resolve from the project's paper.toml [checks.X] templates (watched, so a
+    # template edit re-fetches).
+    custom = {}
+    tomlp = repository_ctx.path(repository_ctx.attr.bib).dirname.get_child("paper.toml")
+    if tomlp.exists:
+        repository_ctx.watch(tomlp)
+        custom = _custom(repository_ctx.read(tomlp))
+
+    out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")', ""]
+    recs = []
     union = {}
-    for k, reads, mem in checked:
-        for t in reads:
-            union[t] = True
-    for k, reads, mem in checked:
-        out.append(_sh_test(k, ["check", proj, k], _data(reads, files), mem))
-    out.append(_sh_test("invariants", ["invariants", proj], [files, "@@//paperkit:engine"]))   # NODE
-    tests = ['":%s"' % k for k, _, _ in checked] + ['":invariants"']
-    out.append('test_suite(name = "gate", tests = [%s], visibility = ["//visibility:public"])' % ", ".join(tests))
-    if repository_ctx.attr.adequacy:                              # Δ sweep reruns every check → UNION of reads
-        out.append(_sh_test("adequacy", ["adequacy", proj], _data(union.keys(), files)))
+    for k, check, sib, reads in parsed:
+        if not check:
+            continue
+        out.append(_verb_rule(k, check, proj, files, reads, custom, local))
+        recs.append('":%s"' % k)
+        if not sib:                       # leaves' reads feed the adequacy union (result: delegates)
+            for t in reads:
+                union[t] = True
+
+    # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an irreducibly
+    # GENERAL oracle, kept as a cmd: drop (Ζ·resist).
+    lc = ", local = True" if local else ""
+    inv = "python3 paperkit/gate.py --invariants --safe --without-K " + proj
+    out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + ', "@@//paperkit:engine"])')
+    recs.append('":invariants"')
+
+    # pk_gate aggregates the records → the project verdict; the assert-test puts it in the live gate.
+    out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
+    out.append('sh_test(name = "gate", srcs = ["@@//tools:assert_pass.sh"], ' +
+               'args = ["$(rootpath :gate_rec)"], data = [":gate_rec"], visibility = ["//visibility:public"])')
+    if repository_ctx.attr.adequacy:
+        out.append(_adequacy(proj, files, union.keys()))
     repository_ctx.file("BUILD.bazel", "\n".join(out) + "\n")
 
 bib_repo = repository_rule(
@@ -201,7 +170,6 @@ bib_repo = repository_rule(
         "bib": attr.label(mandatory = True, allow_single_file = True),
         "project": attr.string(mandatory = True),
         "adequacy": attr.bool(default = False),
-        "verb": attr.bool(default = False),   # Ζ·verb·wire: per-verb record rules (migrating project-by-project)
         "local": attr.bool(default = False),  # Ζ·resist: host-coupled project (setup) — pk_cmd runs on the host
     },
 )
@@ -209,7 +177,7 @@ bib_repo = repository_rule(
 def _bib_ext_impl(module_ctx):
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, verb = tag.verb, local = tag.local)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local)
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -219,7 +187,6 @@ bib = module_extension(
             "bib": attr.label(mandatory = True),
             "project": attr.string(mandatory = True),
             "adequacy": attr.bool(default = False),
-            "verb": attr.bool(default = False),
             "local": attr.bool(default = False),
         }),
     },

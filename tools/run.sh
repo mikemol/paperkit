@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# Run a paperkit verdict from the runfiles root, so the project + engine resolve at their
-# workspace paths.  Host toolchain (Phase 1): tools from the host PATH.
+# Run a paperkit ADEQUACY sweep (the Δ grader) from the runfiles root, so the project + engine
+# resolve at their workspace paths.  This is the ONLY surviving run.sh mode: every per-claim check
+# is now a per-verb RECORD action (Ζ·verb·wire), and the gate/invariants are pk_gate/pk_cmd — only
+# adequacy (discriminate.py) is still an engine sh_test, until Ζ·nest makes the whole-project Δ a
+# nesting of per-claim pk_grade artifacts.
 set -euo pipefail
 mode="$1"; proj="$2"
 main="${TEST_SRCDIR}/${TEST_WORKSPACE}"
-# A Ζ·starlark check target lives in a GENERATED external repo, so the engine + project it
-# depends on are MAIN-repo data — which land under $TEST_SRCDIR/_main, not the test's own
+# A generated check target's deps are MAIN-repo data — under $TEST_SRCDIR/_main, not the test's own
 # workspace dir.  Detect that and cd to the main repo so relative paths (../paperkit) resolve.
 [ -d "${TEST_SRCDIR}/_main/paperkit" ] && main="${TEST_SRCDIR}/_main"
 cd "$main"
 case "$mode" in
-  gate)     exec python3 paperkit/gate.py --safe --without-K "$proj" ;;
   adequacy) exec python3 paperkit/discriminate.py --min-strength behavioral "$proj" ;;
-  check)      exec python3 paperkit/gate.py --only "$3" "$proj" ;;          # the recursive leaf
-  invariants) exec python3 paperkit/gate.py --invariants --safe --without-K "$proj" ;;  # the node
-  *) echo "unknown mode: $mode" >&2; exit 2 ;;
+  *) echo "run.sh: only 'adequacy' remains (Ζ·verb·wire retired check/gate/invariants); got: $mode" >&2; exit 2 ;;
 esac

@@ -144,8 +144,8 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "PtniuxKKfKYEA5u2TXvFcj2KGLzRwdc7TySuAYhy9m8=",
-        "usagesDigest": "lNQHy1ETA0zYaLUbUDiGPrmlo6pWkoSfUZqc4sAfiV8=",
+        "bzlTransitiveDigest": "ukZuCuE2PAXGnqBOo9dncWNelNhOwzCRLr6hGAOybME=",
+        "usagesDigest": "UKW2cn1/6jwSCPURPrRGyDNC/3tU1xzmCHyNc0Y5+tg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -156,7 +156,6 @@
               "bib": "@@//boundaries:warrants.bib",
               "project": "boundaries",
               "adequacy": false,
-              "verb": true,
               "local": false
             }
           },
@@ -166,7 +165,6 @@
               "bib": "@@//config:warrants.bib",
               "project": "config",
               "adequacy": false,
-              "verb": true,
               "local": false
             }
           },
@@ -176,7 +174,6 @@
               "bib": "@@//paper:warrants.bib",
               "project": "paper",
               "adequacy": true,
-              "verb": true,
               "local": false
             }
           },
@@ -186,7 +183,6 @@
               "bib": "@@//:warrants.bib",
               "project": ".",
               "adequacy": true,
-              "verb": true,
               "local": false
             }
           },
@@ -196,7 +192,6 @@
               "bib": "@@//setup:warrants.bib",
               "project": "setup",
               "adequacy": false,
-              "verb": true,
               "local": true
             }
           }

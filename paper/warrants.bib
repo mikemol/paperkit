@@ -374,7 +374,7 @@
   section = {projects},
   claim   = {the engine is domain-free, so the repository is several paperkit projects at once --- each a directory with a paper.toml that projects its own document --- discovered by that file, never hard-coded},
   check   = {claim:multi-project},
-  reads   = {boundaries}
+  reads   = {., boundaries, config, setup}
 }
 @misc{project-dag,
   section = {projects}, from = {multi-project}, join = {. },

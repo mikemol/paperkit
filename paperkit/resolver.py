@@ -42,6 +42,11 @@ _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess 
 _ENV_KEEP = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TZ", "TMPDIR",
              "LANG", "LANGUAGE", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}
 _ENV_KEEP_PREFIX = ("LC_", "PAPERKIT_")        # locale + paperkit's own knobs
+# ...except the Δ grader's SANDBOX ROOT, which is grader-internal and must NOT reach a check: a
+# check being graded reruns in the grader's sandbox, and a META-grading check (one that runs its
+# own grader on a fixture) would otherwise inherit the OUTER root and reject its fixture ("root
+# does not contain the project").  Recursive-check env leak (cf. Ω·config args-process-local).
+_ENV_DROP = {"PAPERKIT_ROOT"}
 
 
 def clean_env(env: dict | None = None) -> dict:
@@ -51,7 +56,7 @@ def clean_env(env: dict | None = None) -> dict:
     project dir being gated), so a document could shadow a tool by planting it beside itself."""
     src = os.environ if env is None else env
     out = {k: v for k, v in src.items()
-           if k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)}
+           if (k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)) and k not in _ENV_DROP}
     pinned = config.resolve(config.PATH)
     if pinned is not None:
         # Τ·path: PIN tool resolution to a DECLARED set of absolute, existing dirs —

@@ -145,7 +145,7 @@
     "//tools:bibtex.bzl%bib": {
       "general": {
         "bzlTransitiveDigest": "NTy41obufL5wN/Uf+78VkOlLoawOV9LMk3HzHt02sBY=",
-        "usagesDigest": "mPXI0jluoD3gTpND2AkF6P9PJE5s9odvAEa+9xiV920=",
+        "usagesDigest": "M+YYSWHK6/q+gV8YdY0fMdIe3R0Yui08P8W8Ew5eNPM=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -177,7 +177,7 @@
               "project": "paper",
               "adequacy": true,
               "local": false,
-              "nest": false
+              "nest": true
             }
           },
           "paperkit_root": {

@@ -107,6 +107,20 @@ def main(argv: list) -> int:
     out = cfg["out"]
     cited = G.cited_keys(out.read_text()) if out.exists() else set()
 
+    only = config.resolve(config.ONLY)
+    if only:
+        # Ζ·nest — grade ONE claim (the per-claim grade ORACLE), emitting its raw grade as JSON.
+        # Bazel nests one of these per claim and aggregates them (pk_adequacy), so the whole-project
+        # SWEEP is the build graph — not the loop below, which stays for direct/on-demand use.
+        f = F.get(only)
+        if not f or not f.get("check"):
+            print(json.dumps({"claim": only, "grade": "broken"}))
+            return 0
+        chk = f["check"]
+        res = _grade_parallel(project_dir, [chk], custom, presupposed, resolution)
+        print(json.dumps({"claim": only, "grade": res[chk]["grade"]}))
+        return 0
+
     # which warrants to grade
     keys = [k for k, f in F.items() if f.get("check")
             and (consider_all or k in cited)]

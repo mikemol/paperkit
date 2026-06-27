@@ -61,3 +61,56 @@ pk_grade = rule(
         "mutate": attr.string(mandatory = True, doc = "a repo-relative input file to corrupt for the mutant"),
     },
 )
+
+# Ζ·nest — the per-claim grade as a Bazel action (the grade record family, sibling of pk_cmd's
+# verdict).  discriminate --only is the grade ORACLE (the full sensitivity sweep + ladder stays in
+# the engine grader, which Bazel can't statically fan out); Bazel NESTS one per claim and pk_adequacy
+# aggregates them — so the whole-project SWEEP is the build graph, not discriminate's loop.
+# PAPERKIT_ROOT pins the grader's sandbox universe to the execroot (the staged project + engine).
+def _grade_claim_impl(ctx):
+    py = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    interp = py.interpreter.path
+    v = ctx.actions.declare_file(ctx.label.name + ".grade.json")
+    ctx.actions.run_shell(
+        outputs = [v],
+        inputs = depset(ctx.files.data, transitive = [py.files]),
+        command = ('PY=$(cd "$(dirname ' + interp + ')" && pwd)/$(basename ' + interp + '); ' +
+                   'export PATH="$(dirname "$PY"):$PATH"; export PAPERKIT_ROOT="$PWD"; ' +
+                   '"$PY" paperkit/discriminate.py --only ' + ctx.attr.claim + " " + ctx.attr.project +
+                   " > " + v.path),
+        mnemonic = "PkGradeClaim",
+        progress_message = "Ζ·nest grade " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([v]))]
+
+pk_grade_claim = rule(
+    implementation = _grade_claim_impl,
+    doc = "Grade ONE claim (discriminate --only, the per-claim grade oracle) → a grade record.",
+    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    attrs = {
+        "claim": attr.string(mandatory = True),
+        "project": attr.string(mandatory = True),
+        "data": attr.label_list(allow_files = True),
+    },
+)
+
+# Ζ·nest — pk_adequacy aggregates per-claim grade RECORDS into the project's adequacy verdict (the
+# batched equality, sibling of pk_gate over verdicts): pass iff every claim grades at the behavioral
+# floor or above (the old `discriminate --min-strength behavioral` gate, which reads the RAW grade).
+def _adequacy_impl(ctx):
+    v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
+    paths = " ".join([g.path for g in ctx.files.grades])
+    emit = "printf '{\"verb\":\"adequacy\",\"verdict\":\"%s\"}\\n' \"$V\" > " + v.path
+    if not ctx.files.grades:
+        cmd = "V=pass; " + emit
+    else:
+        cmd = ("if grep -hE '\"grade\": \"(vacuous|existence|indeterminate|broken)\"' " + paths +
+               "; then V=fail; else V=pass; fi; " + emit)
+    ctx.actions.run_shell(outputs = [v], inputs = ctx.files.grades, command = cmd, mnemonic = "PkAdequacy")
+    return [DefaultInfo(files = depset([v]))]
+
+pk_adequacy = rule(
+    implementation = _adequacy_impl,
+    doc = "Aggregate per-claim grade records → adequacy verdict: pass iff all grades >= behavioral.",
+    attrs = {"grades": attr.label_list(allow_files = True, mandatory = True)},
+)

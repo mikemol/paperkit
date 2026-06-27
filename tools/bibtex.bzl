@@ -22,7 +22,7 @@ line's name is `check`; a `result:<sibling>` check is an EDGE (wired by Ζ·hook
 def _entries(content):
     out = []
     key = None
-    has_check = False
+    check = ""      # the full check value `type:target` ("" = uncheckable claim)
     sib = ""        # for a result:<sibling> check — the sibling it definitionally reads
     reads = []
     mem = ""        # declared memory (MB) → a Bazel resource reservation (Ζ·membudget)
@@ -30,26 +30,25 @@ def _entries(content):
         s = raw.strip()
         if s.startswith("@") and "{" in s:
             if key != None:
-                out.append((key, has_check, sib, reads, mem))
+                out.append((key, check, sib, reads, mem))
             key = s.split("{", 1)[1].split(",", 1)[0].strip()
-            has_check = False
+            check = ""
             sib = ""
             reads = []
             mem = ""
         elif key != None and "=" in s:
             name = s.split("=", 1)[0].strip()
             if name == "check":
-                has_check = True
-                val = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
-                if val.startswith("result:"):
-                    sib = val.split(":", 1)[1].strip()
+                check = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
+                if check.startswith("result:"):
+                    sib = check.split(":", 1)[1].strip()
             elif name == "reads":
                 inner = s.split("{", 1)[1].rsplit("}", 1)[0]
                 reads = [t.strip() for t in inner.split(",") if t.strip()]
             elif name == "mem":
                 mem = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
     if key != None:
-        out.append((key, has_check, sib, reads, mem))
+        out.append((key, check, sib, reads, mem))
     return out
 
 def _data(tokens, files):
@@ -61,6 +60,51 @@ def _data(tokens, files):
             continue
         out["@@//:files" if t == "." else "@@//%s:files" % t] = True
     return sorted(out.keys())
+
+def _lit(s):
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'  # a Starlark string literal
+
+def _verb_rule(name, check, proj, files, reads):
+    """Ζ·verb·wire — dispatch ONE bib check to its specific typed rule (a record), not a general
+    `gate.py --only` script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd
+    (the exit-code oracle), under the toolchain."""
+    i = check.find(":")
+    typ = check[:i]
+    target = check[i + 1:]
+    dl = ", ".join([_lit(d) for d in _data(reads, files)])
+    if typ == "cmd":
+        pj = "" if proj == "." else ", project = " + _lit(proj)
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + ", data = [" + dl + "])"
+    elif typ == "file":
+        return "pk_file(name = " + _lit(name) + ", path = " + _lit(target) + ", data = [" + dl + "])"
+    elif typ == "result":   # records-as-deps: depend on the sibling's aggregate verdict record
+        return "pk_result(name = " + _lit(name) + ', sibling_verdict = "@paperkit_' + target + '//:gate_rec")'
+    elif typ == "agree":
+        prods = ", ".join([_lit(p.strip()) for p in target.split("|||") if p.strip()])
+        return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "])"
+    else:
+        fail("Ζ·verb·wire: custom check type '" + typ + ":' needs its config template " +
+             "(Ζ·verb·wire·custom, not yet wired) — claim '" + name + "'")
+
+def _verb_build(proj, files, parsed):
+    """The generated BUILD for a verb-wired project: a record per check + pk_gate over the records
+    + the Ζ·hook·assert test that puts the aggregate record into the live gate."""
+    out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")', ""]
+    recs = []
+    for k, check, sib, reads, mem in parsed:
+        if not check:
+            continue
+        out.append(_verb_rule(k, check, proj, files, reads))
+        recs.append('":%s"' % k)
+    # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an
+    # irreducibly GENERAL oracle, kept as a cmd: drop for now (Ζ·resist).
+    inv = "python3 paperkit/gate.py --invariants --safe --without-K " + proj
+    out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + ", data = [" + _lit(files) + ', "@@//paperkit:engine"])')
+    recs.append('":invariants"')
+    out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
+    out.append('sh_test(name = "gate", srcs = ["@@//tools:assert_pass.sh"], ' +
+               'args = ["$(rootpath :gate_rec)"], data = [":gate_rec"], visibility = ["//visibility:public"])')
+    return "\n".join(out) + "\n"
 
 def _sh_test(name, args, data, mem = ""):
     lines = [
@@ -84,6 +128,12 @@ def _bib_repo_impl(repository_ctx):
     proj = repository_ctx.attr.project
     files = "@@//:files" if proj == "." else "@@//%s:files" % proj
     parsed = _entries(content)
+    if repository_ctx.attr.verb:
+        # Ζ·verb·wire — project per-verb RECORD rules + pk_gate over the records (the gate IS a
+        # check), instead of one sh_test(gate.py --only) per claim.  resolver.resolves()'s dispatch
+        # moves into Starlark; the leaf is typed, not a general script.
+        repository_ctx.file("BUILD.bazel", _verb_build(proj, files, parsed))
+        return
     checked = [(k, reads, mem) for k, c, sib, reads, mem in parsed if c and not sib]   # LEAVES
     edges = [k for k, c, sib, reads, mem in parsed if c and sib]                       # result: EDGES
     out = ["# Generated by Ζ·starlark from %s — recursive check; data = own + engine + declared reads.\n" %
@@ -112,13 +162,14 @@ bib_repo = repository_rule(
         "bib": attr.label(mandatory = True, allow_single_file = True),
         "project": attr.string(mandatory = True),
         "adequacy": attr.bool(default = False),
+        "verb": attr.bool(default = False),   # Ζ·verb·wire: per-verb record rules (migrating project-by-project)
     },
 )
 
 def _bib_ext_impl(module_ctx):
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, verb = tag.verb)
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -128,6 +179,7 @@ bib = module_extension(
             "bib": attr.label(mandatory = True),
             "project": attr.string(mandatory = True),
             "adequacy": attr.bool(default = False),
+            "verb": attr.bool(default = False),
         }),
     },
 )

@@ -32,20 +32,26 @@ def _pypath(py):
 def _cmd_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     v = _v(ctx)
+    inner = "sh -c " + _sq(ctx.attr.cmd)
+    if ctx.attr.project and ctx.attr.project != ".":
+        inner = "cd " + _sq(ctx.attr.project) + " && " + inner  # cwd = the project dir (relative paths)
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset(ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + "if sh -c " + _sq(ctx.attr.cmd) +
-                  " >/dev/null 2>&1; then V=pass; else V=fail; fi;" + _rec(v, "cmd"),
+        command = _pypath(py) + "if ( " + inner + " ) >/dev/null 2>&1; then V=pass; else V=fail; fi;" + _rec(v, "cmd"),
         mnemonic = "PkCmd",
     )
     return [DefaultInfo(files = depset([v]))]
 
 pk_cmd = rule(
     implementation = _cmd_impl,
-    doc = "EXECS — verdict pass iff `cmd` exits 0, under the hermetic toolchain.",
+    doc = "EXECS — verdict pass iff `cmd` exits 0 (run with cwd=project) under the hermetic toolchain.",
     toolchains = [_PY],
-    attrs = {"cmd": attr.string(mandatory = True), "data": attr.label_list(allow_files = True)},
+    attrs = {
+        "cmd": attr.string(mandatory = True),
+        "project": attr.string(default = "."),
+        "data": attr.label_list(allow_files = True),
+    },
 )
 
 def _file_impl(ctx):

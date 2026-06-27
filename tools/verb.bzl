@@ -35,22 +35,30 @@ def _cmd_impl(ctx):
     inner = "sh -c " + _sq(ctx.attr.cmd)
     if ctx.attr.project and ctx.attr.project != ".":
         inner = "cd " + _sq(ctx.attr.project) + " && " + inner  # cwd = the project dir (relative paths)
+    er = {}
+    if ctx.attr.local:
+        # Ζ·resist — a HOST-COUPLED check (setup probes the live /proc,/sys and runs a cgroup
+        # experiment): NOT hermetic, so run on the host, unsandboxed, and uncached (the machine
+        # is not a declared input, so a cached verdict would be unsound).  The sanctioned escape.
+        er = {"local": "1", "no-sandbox": "1", "no-cache": "1", "no-remote": "1"}
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset(ctx.files.data, transitive = [py.files]),
         command = _pypath(py) + "if ( " + inner + " ) >/dev/null 2>&1; then V=pass; else V=fail; fi;" + _rec(v, "cmd"),
         mnemonic = "PkCmd",
+        execution_requirements = er,
     )
     return [DefaultInfo(files = depset([v]))]
 
 pk_cmd = rule(
     implementation = _cmd_impl,
-    doc = "EXECS — verdict pass iff `cmd` exits 0 (run with cwd=project) under the hermetic toolchain.",
+    doc = "EXECS — verdict pass iff `cmd` exits 0 (cwd=project) under the toolchain; local=host escape (Ζ·resist).",
     toolchains = [_PY],
     attrs = {
         "cmd": attr.string(mandatory = True),
         "project": attr.string(default = "."),
         "data": attr.label_list(allow_files = True),
+        "local": attr.bool(default = False),
     },
 )
 

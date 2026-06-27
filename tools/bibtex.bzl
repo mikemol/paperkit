@@ -83,17 +83,19 @@ def _custom(content):
             out[cur] = val
     return out
 
-def _verb_rule(name, check, proj, files, reads, custom):
+def _verb_rule(name, check, proj, files, reads, custom, local):
     """Ζ·verb·wire — dispatch ONE bib check to its specific typed rule (a record), not a general
     `gate.py --only` script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd
-    (the exit-code oracle), under the toolchain.  A custom type expands its [checks.X] cmd template."""
+    (the exit-code oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.
+    `local` marks a host-coupled project (setup): pk_cmd runs on the host, unsandboxed (Ζ·resist)."""
     i = check.find(":")
     typ = check[:i]
     target = check[i + 1:]
     dl = ", ".join([_lit(d) for d in _data(reads, files)])
     pj = "" if proj == "." else ", project = " + _lit(proj)
+    lc = ", local = True" if local else ""
     if typ == "cmd":
-        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + ", data = [" + dl + "])"
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + lc + ", data = [" + dl + "])"
     elif typ == "file":
         return "pk_file(name = " + _lit(name) + ", path = " + _lit(target) + ", data = [" + dl + "])"
     elif typ == "result":   # records-as-deps: depend on the sibling's aggregate verdict record
@@ -103,12 +105,12 @@ def _verb_rule(name, check, proj, files, reads, custom):
         return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "])"
     elif typ in custom:     # a config-declared cmd template — {target} substituted, run as a cmd oracle
         cmd = custom[typ].replace("{target}", target)
-        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + ", data = [" + dl + "])"
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + lc + ", data = [" + dl + "])"
     else:
         fail("Ζ·verb·wire: check type '" + typ + ":' is neither builtin nor a [checks." + typ +
              "] template — claim '" + name + "'")
 
-def _verb_build(adequacy, proj, files, parsed, custom):
+def _verb_build(adequacy, proj, files, parsed, custom, local):
     """The generated BUILD for a verb-wired project: a record per check + pk_gate over the records
     + the Ζ·hook·assert test that puts the aggregate record into the live gate (+ the old adequacy
     sh_test, kept on the engine path until Ζ·nest)."""
@@ -117,12 +119,13 @@ def _verb_build(adequacy, proj, files, parsed, custom):
     for k, check, sib, reads, mem in parsed:
         if not check:
             continue
-        out.append(_verb_rule(k, check, proj, files, reads, custom))
+        out.append(_verb_rule(k, check, proj, files, reads, custom, local))
         recs.append('":%s"' % k)
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an
     # irreducibly GENERAL oracle, kept as a cmd: drop for now (Ζ·resist).
+    lc = ", local = True" if local else ""
     inv = "python3 paperkit/gate.py --invariants --safe --without-K " + proj
-    out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + ", data = [" + _lit(files) + ', "@@//paperkit:engine"])')
+    out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + ', "@@//paperkit:engine"])')
     recs.append('":invariants"')
     out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
     out.append('sh_test(name = "gate", srcs = ["@@//tools:assert_pass.sh"], ' +
@@ -168,7 +171,7 @@ def _bib_repo_impl(repository_ctx):
         if tomlp.exists:
             repository_ctx.watch(tomlp)
             custom = _custom(repository_ctx.read(tomlp))
-        repository_ctx.file("BUILD.bazel", _verb_build(repository_ctx.attr.adequacy, proj, files, parsed, custom))
+        repository_ctx.file("BUILD.bazel", _verb_build(repository_ctx.attr.adequacy, proj, files, parsed, custom, repository_ctx.attr.local))
         return
     checked = [(k, reads, mem) for k, c, sib, reads, mem in parsed if c and not sib]   # LEAVES
     edges = [k for k, c, sib, reads, mem in parsed if c and sib]                       # result: EDGES
@@ -199,13 +202,14 @@ bib_repo = repository_rule(
         "project": attr.string(mandatory = True),
         "adequacy": attr.bool(default = False),
         "verb": attr.bool(default = False),   # Ζ·verb·wire: per-verb record rules (migrating project-by-project)
+        "local": attr.bool(default = False),  # Ζ·resist: host-coupled project (setup) — pk_cmd runs on the host
     },
 )
 
 def _bib_ext_impl(module_ctx):
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, verb = tag.verb)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, verb = tag.verb, local = tag.local)
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -216,6 +220,7 @@ bib = module_extension(
             "project": attr.string(mandatory = True),
             "adequacy": attr.bool(default = False),
             "verb": attr.bool(default = False),
+            "local": attr.bool(default = False),
         }),
     },
 )

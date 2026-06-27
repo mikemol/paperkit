@@ -1,0 +1,25 @@
+# Ζ·verb — the four resolver verbs as specific typed Starlark rules, each emitting a verdict
+# RECORD, proven with ⟨P, F, δ⟩ (minimal pass, minimal flag, minimal delta).  pk_result consumes
+# another verb's record as a dep (records-as-artifacts); pk_agree agglomerates producer
+# intermediates into one batched equality; pk_gate aggregates records to one verdict.  Removable.
+load("//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")
+
+# cmd — EXECS.  δ = the exit code (the toolchain python runs the oracle).
+pk_cmd(name = "cmd-pass", cmd = "python3 -c 'import sys; sys.exit(0)'")
+pk_cmd(name = "cmd-fail", cmd = "python3 -c 'import sys; sys.exit(1)'")
+
+# file — EXISTS.  δ = whether the path is in the staged data.
+pk_file(name = "file-pass", path = "tools/verb_demo/sample.txt", data = ["sample.txt"])
+pk_file(name = "file-fail", path = "tools/verb_demo/nope.xyz", data = ["sample.txt"])
+
+# result — PARSES a sibling's verdict RECORD (records-as-deps).  δ = the consumed record's verdict.
+pk_result(name = "result-pass", sibling_verdict = ":cmd-pass")
+pk_result(name = "result-fail", sibling_verdict = ":cmd-fail")
+
+# agree — CONCURS over agglomerated producer intermediates.  δ = whether the outputs are equal.
+pk_agree(name = "agree-pass", producers = ["printf 42", "printf 42"])
+pk_agree(name = "agree-fail", producers = ["printf 42", "printf 43"])
+
+# gate — aggregate records to ONE verdict.  δ = whether any record reads fail.
+pk_gate(name = "gate-green", checks = [":cmd-pass", ":file-pass", ":result-pass", ":agree-pass"])
+pk_gate(name = "gate-red", checks = [":cmd-pass", ":agree-fail"])

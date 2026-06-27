@@ -1,0 +1,14 @@
+# Ζ·pi — the Δ sweep DECOMPOSED into Bazel, on a REAL heavy check.  pk_grade re-runs the SAME
+# `gate.py --only bnd-emit` the gate leaf runs, on a staged tree, baseline vs. with a sensitive
+# engine file (project.py) mutated.  bnd-emit tests the projector, so corrupting project.py flips
+# it → behavioral, computed by the build graph — a heavy engine-importing check re-run hermetically
+# on a staged+mutated tree (where the monolithic discriminate-in-an-action failed).  Removable.
+load("//tools:grade.bzl", "pk_grade")
+
+pk_grade(
+    name = "bnd-emit",
+    claim = "bnd-emit",
+    project = "boundaries",
+    data = ["//paperkit:engine", "//boundaries:files"],
+    mutate = "paperkit/project.py",
+)

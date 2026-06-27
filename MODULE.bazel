@@ -8,6 +8,13 @@ resource limits (--local_extra_resources), and the sandbox.  The bib is the sole
 """
 module(name = "paperkit", version = "0.1")
 
+# Ζ·toolchain — a HERMETIC python (rules_python), so "which python" is Bazel's, not the host's.
+# The foundation for Bazel-native check execution (Ζ·pi) and the end of host-python fragility
+# (sys.executable empty in a build-action python that re-spawns python).
+bazel_dep(name = "rules_python", version = "1.0.0")
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.13", is_default = True)
+
 # Ζ·starlark — the bib IS the build graph: a module extension reads each project's warrants.bib
 # during the fetch phase and projects each claim into a target (no checked-in BUILD projection).
 bib = use_extension("//tools:bibtex.bzl", "bib")

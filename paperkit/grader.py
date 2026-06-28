@@ -219,20 +219,38 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
             for f, b in saved.items():
                 f.write_bytes(b)
 
-    flips: list[str] = []
+    def run(group) -> list:
+        flips: list[str] = []
 
-    def split(group):
-        if not group or not apply(group):
-            return                       # cleared in one run: no flipper here
-        if len(group) == 1:
-            flips.append(group[0][2])    # a confirmed single-mutation flip
-            return
-        m = len(group) // 2
-        split(group[:m])
-        split(group[m:])
+        def split(g):
+            if not g or not apply(g):
+                return                   # cleared in one run: no flipper here
+            if len(g) == 1:
+                flips.append(g[0][2])    # a confirmed single-mutation flip
+                return
+            m = len(g) // 2
+            split(g[:m])
+            split(g[m:])
 
-    split(sites)
-    return True, sorted(flips)
+        split(group)
+        return sorted(flips)
+
+    # Δ·scope — restrict the def sweep to sites in files the check actually READS (its Φ footprint,
+    # root-relative so engine reads count): sensitivity ⊆ footprint, so a def in a file the check
+    # never opens cannot flip it.  This is what makes the def sweep affordable — mutate only the
+    # engine the claim exercises, not the whole engine.  Mirrors the file-resolution scoping above;
+    # same under-report guard (sweep the rest iff the scoped sweep finds nothing); Φ·degrade
+    # (footprint None) sweeps the full surface.
+    if footprint is None:
+        return True, run(sites)
+    root_copy = engine_dir.parent
+    fp = set(footprint)
+    scoped = [s for s in sites if str(s[0].relative_to(root_copy)) in fp]
+    flips = run(scoped)
+    if not flips and len(scoped) < len(sites):
+        keep = {s[2] for s in scoped}
+        flips = run([s for s in sites if s[2] not in keep])
+    return True, flips
 
 
 def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
@@ -375,12 +393,26 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
                     f"Ν·loud: def-resolution sweep cannot find the engine in the sandbox "
                     f"(expected a directory at {engine}, under the copied root {root}); refusing "
                     f"to silently degrade to file resolution and emit a vacuous fingerprint.")
-        # the check's READ footprint, computed ONCE here: it scopes the file-resolution
-        # sweep (Ξ·depth·explain — grade against what the check touches) AND is the key the
-        # footprint-cache stores (Δ·footprint-cache).  One strace, two uses; attached to the
-        # record under "_footprint" for the CLI to lift into the cache (and strip from output).
-        fp = resolver.footprint(chk, sandbox, custom)
-        rec = grade_check(chk, project_dir, presupposed, custom, sandbox, engine, fp)
+        # the check's READ footprint (strace).  Δ·scope: a def sweep is bounded to the files the
+        # check actually reads (sensitivity ⊆ footprint) — so it mutates only the engine the claim
+        # exercises, not the whole engine.  For that the trace must see ENGINE reads, so a def grade
+        # traces ONCE at ROOT scope ("paperkit/x.py", "<proj>/checks/y.py").  The cache key stays
+        # PROJECT-scoped, DERIVED from the same trace (no second strace): keep this project's
+        # entries, project-relative; engine entries aren't project inputs (the engine-epoch hash
+        # covers them).  File resolution traces project-scoped directly.
+        if engine:
+            root_copy = tmp / root.name
+            sweep_fp = resolver.footprint(chk, sandbox, custom, scope=root_copy)
+            if sweep_fp is None:
+                fp = None
+            elif sandbox == root_copy:
+                fp = sweep_fp                                    # the root project: its scope IS root
+            else:
+                pre = str(sandbox.relative_to(root_copy)) + "/"
+                fp = sorted(p[len(pre):] for p in sweep_fp if p.startswith(pre))
+        else:
+            fp = sweep_fp = resolver.footprint(chk, sandbox, custom)
+        rec = grade_check(chk, project_dir, presupposed, custom, sandbox, engine, sweep_fp)
         rec["_footprint"] = fp
         return rec
     finally:

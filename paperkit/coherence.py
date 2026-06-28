@@ -206,6 +206,10 @@ def emergence_residual(records: list) -> dict:
 def report(records: list, discharged=frozenset()) -> dict:
     cited = [r for r in records if r.get("cited", True)]
     return {"claims": len(cited),
+            # Ν·vac — the whole measurement is vacuous if NO cited claim tests ANY engine capability
+            # (every fingerprint empty): the def-sweep measured nothing, so the faces below are
+            # trivially "sound".  No real verdict is possible — callers must refuse to report green.
+            "vacuous": bool(cited) and not any(_engine_cap(r.get("tests", [])) for r in cited),
             "structure": structure_residual(cited, discharged),
             "sensitivity": sensitivity_residual(cited),
             "grounding": grounding_residual(cited, discharged),
@@ -251,6 +255,17 @@ def _discharged(project_dir: Path) -> set:
     return {k for k, f in F.items() if f.get("link")}
 
 
+def _vacuous_exit(project_dir: Path, rep: dict) -> bool:
+    """Ν·vac — print + signal when the measurement carries NO engine capability at all, so a
+    caller never reports a verdict (green or red) over a vacuous def-sweep."""
+    if not rep["vacuous"]:
+        return False
+    print(f"Ν·vac: coherence over {project_dir.name or project_dir}: NO claim tests any engine "
+          f"capability ({rep['claims']} claims, every fingerprint empty) — a vacuous measurement "
+          f"(a degraded def-sweep?); refusing to emit a verdict.", file=sys.stderr)
+    return True
+
+
 def main(argv: list) -> int:
     as_json = "--json" in argv
     pos = [a for a in argv if not a.startswith("-")]
@@ -261,11 +276,15 @@ def main(argv: list) -> int:
         rep = report(_records_from_calcs(project_dir, pos[1:]), _discharged(project_dir))
         if as_json:
             print(json.dumps({"document": project_dir.name or str(project_dir), **rep}, indent=2))
+        if _vacuous_exit(project_dir, rep):
+            return 2
         return 0 if rep["grounding"]["undischarged"] == 0 else 1
     rep = report(_records(project_dir), _discharged(project_dir))
     if as_json:
         print(json.dumps({"document": project_dir.name or str(project_dir), **rep}, indent=2))
-        return 0
+        return 2 if rep["vacuous"] else 0
+    if _vacuous_exit(project_dir, rep):
+        return 2
     s, se, g, e = rep["structure"], rep["sensitivity"], rep["grounding"], rep["emergence"]
     print(f"coherence (∂²): {project_dir.name or project_dir} — {rep['claims']} cited claims")
     print(f"  structure  : {s['carried']} grounding edges carried by the prose connective, "

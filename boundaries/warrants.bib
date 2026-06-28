@@ -6,7 +6,7 @@
 % ── Δ grader + --without-K ───────────────────────────────────────────────────
 @misc{bnd-delta,
   section = {delta},
-  claim   = {the Δ grader's boundary --- it flags a check that provably cannot fail (vacuous) and passes one a mutation can break (behavioral)},
+  claim   = {the Δ grader's boundary --- it flags a check that provably cannot fail (vacuous) and passes one a mutation can break (behavioral), and a def-resolution sweep that cannot find the engine in its sandbox fails loudly rather than silently degrading to file resolution},
   check   = {cmd:python3 ../paperkit/tests/boundaries_discriminate.py}
 }
 @misc{bnd-witness,
@@ -16,7 +16,7 @@
 }
 @misc{bnd-coherence,
   section = {delta}, from = {bnd-witness}, join = {. },
-  claim   = {the ∂² coherence residual --- it reports zero when a claim's from and rests-on edges agree and when witnesses carry distinct sensitivities, and surfaces the divergence and the collapse otherwise},
+  claim   = {the ∂² coherence residual --- it reports zero when a claim's from and rests-on edges agree and when witnesses carry distinct sensitivities, surfaces the divergence and the collapse otherwise, and refuses a verdict when no claim tests any engine capability at all (a vacuous measurement)},
   check   = {cmd:python3 ../paperkit/tests/boundaries_coherence.py}
 }
 

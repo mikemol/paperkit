@@ -361,12 +361,20 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
         # repo), else by name — the Bazel case, where _ENGINE.resolve() follows the staged
         # symlink OUT to the source tree so is_relative_to(root) is false, though the engine
         # IS copied into the sandbox at root/<name>.  Guard on the copy existing, so a
-        # genuinely absent engine stays file-resolution rather than a silent empty def sweep.
+        # Ν·loud — fail rather than silently degrade if the engine copy is missing (below).
         engine = None
         if resolution == "def":
-            rel = _ENGINE.relative_to(root) if _ENGINE.is_relative_to(root) else Path(_ENGINE.name)
-            cand = tmp / root.name / rel
-            engine = cand if cand.is_dir() else None
+            eng_rel = _ENGINE.relative_to(root) if _ENGINE.is_relative_to(root) else Path(_ENGINE.name)
+            engine = tmp / root.name / eng_rel
+            if not engine.is_dir():
+                # Ν·loud — a def sweep with no engine in the mutation surface measures NOTHING
+                # (an empty fingerprint), and that once shipped a green-for-nothing emergence gate
+                # (the Bazel-symlink degeneracy).  Refuse to degrade to file resolution: FAIL, so
+                # the silence becomes a loud build error instead of a vacuous record.
+                raise RuntimeError(
+                    f"Ν·loud: def-resolution sweep cannot find the engine in the sandbox "
+                    f"(expected a directory at {engine}, under the copied root {root}); refusing "
+                    f"to silently degrade to file resolution and emit a vacuous fingerprint.")
         # the check's READ footprint, computed ONCE here: it scopes the file-resolution
         # sweep (Ξ·depth·explain — grade against what the check touches) AND is the key the
         # footprint-cache stores (Δ·footprint-cache).  One strace, two uses; attached to the

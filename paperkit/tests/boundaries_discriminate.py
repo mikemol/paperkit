@@ -254,11 +254,26 @@ def main() -> int:
     print(f"      F (flag side): file:w.bib (vacuous) → exit {vac_rc}")
     print(f"      δ (min delta): the check's grade meets the behavioral floor by DELEGATION, not derivation\n")
 
+    # ── Ν·loud: a def-resolution sweep with no engine in its sandbox FAILS rather than silently
+    # degrading to file resolution (the degeneracy that once shipped a vacuous emergence gate).
+    # The fixture project has no engine, so def must fail loud; file resolution needs none, passes.
+    print("Δ def-resolution engine guard — Ν·loud\n")
+    chk = f"cmd:grep -q {TOKEN} w.bib"
+    def_rc, _ = discriminate(W(chk), "--all", "--json", "--resolution", "def")
+    file_rc, _ = discriminate(W(chk), "--all", "--json", "--resolution", "file")
+    loud_ok = def_rc != 0 and file_rc == 0
+    if not loud_ok:
+        fails.append(("N-loud", def_rc, file_rc))
+    print(f"  {'ok ' if loud_ok else 'XX '}def with no engine in the sandbox FAILS; file resolution passes")
+    print(f"      P (pass side): --resolution file → exit {file_rc} (no engine in the surface)")
+    print(f"      F (flag side): --resolution def  → exit {def_rc} (engine absent → loud, not silent degrade)")
+    print(f"      δ (min delta): the --resolution flag (file → def)\n")
+
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} case(s) drifted)")
         return 1
     print(f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas, "
-          f"1 grader-equivalence, 1 adequacy-composes)")
+          f"1 grader-equivalence, 1 adequacy-composes, 1 def-engine-guard)")
     return 0
 
 

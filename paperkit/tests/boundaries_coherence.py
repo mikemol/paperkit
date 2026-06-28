@@ -41,6 +41,10 @@ RHETORICAL = [rec("a", tests=["paperkit/gate.py::resolves"]),    # b tests NO en
               rec("b", rests=["a"], tests=["checks/claims.py::b"])]
 SCAFFOLD = [rec("a", tests=["checks/claims.py::a"]),             # a measures no engine capability — no edge
             rec("b", rests=["a"], tests=["checks/claims.py::b"])]
+# Ν·vac: the WHOLE measurement is vacuous iff NO claim tests any engine capability (every
+# fingerprint empty — a degraded def-sweep).  One engine site anywhere makes it non-vacuous.
+VAC = [rec("only", tests=["checks/claims.py::only"])]            # scaffolding only → measures nothing
+LIVE = [rec("only", tests=["paperkit/gate.py::resolves"])]      # one engine site → a real measurement
 
 
 def main() -> int:
@@ -74,6 +78,10 @@ def main() -> int:
           C.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0)
     check("grounding: shared scaffolding is not engine grounding (no edge counted)",
           C.grounding_residual(SCAFFOLD)["grounding_edges"] == 0)
+    check("vacuity (Ν·vac): no claim tests engine capability → report flags vacuous (refuse a verdict)",
+          C.report(VAC)["vacuous"] is True)
+    check("vacuity (Ν·vac): one engine site → NOT vacuous (a real verdict is possible)",
+          C.report(LIVE)["vacuous"] is False)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -96,6 +104,10 @@ def main() -> int:
          C.grounding_residual(RHETORICAL)["undischarged"] == 0
          and C.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0,
          "genuine + unlinked → 1 residual", C.grounding_residual(GENUINE)["undischarged"] == 1),
+        ("Ν·vac: a measurement is vacuous only when NO claim tests engine capability",
+         "the lone claim's fingerprint (scaffolding-only → an engine site)",
+         "engine site → not vacuous", C.report(LIVE)["vacuous"] is False,
+         "scaffold only → vacuous", C.report(VAC)["vacuous"] is True),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -108,7 +120,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (11 behaviors, 4 deltas)")
+    print("BOUNDARIES: PASS (13 behaviors, 5 deltas)")
     return 0
 
 

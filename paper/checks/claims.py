@@ -913,6 +913,27 @@ def emergence_collapse():
         "emergence is not strictly finer than grounding (overlap should pass where coverage can fail)"
 
 
+def collapse_safe():
+    # The proof that COLLAPSE is safe to delete, routed through the graph (not an ephemeral test):
+    # replacing a collapsed claim's witness with consuming its premises preserves the proof's
+    # discrimination — every input that flips it flips a premise (its fingerprint is covered), so the
+    # premise's witness fails and blocks it; only an INCREMENT's residual escapes (no premise catches
+    # it).  So emergence's collapse verdict is SOUND for deletion, its increment verdict a keep-warning.
+    by = {r["key"]: r for r in [
+        {"key": "ax", "rests-on": [], "tests": ["paperkit/gate.py::resolves"]},
+        {"key": "col", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves"]},
+        {"key": "inc", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
+    ]}
+    e = coherence.emergence_residual(list(by.values()))
+    # COLLAPSE ⇒ SAFE: nothing the collapsed claim discriminates escapes its premises.
+    col_escapes = coherence._engine_cap(by["col"]["tests"]) - coherence._engine_cap(by["ax"]["tests"])
+    assert e["collapse"] == 1 and not col_escapes, \
+        "a collapsed claim discriminates an input no premise catches — deletion would lose it"
+    # INCREMENT ⇒ KEEP: the residual is exactly the input no premise catches.
+    assert ["inc", ["paperkit/project.py::weave"]] in e["increments"], \
+        "the increment's escaping input was not surfaced as the keep-residual"
+
+
 def forward_direction():
     # the structure residual closed by PROJECTION (the grounding DAG renders as
     # transitively-reduced cross-references), not the retired "subsume into one chiral
@@ -928,6 +949,7 @@ def forward_direction():
 CLAIMS = {
     "grounding-reflected": grounding_reflected,
     "emergence-collapse": emergence_collapse,
+    "collapse-safe": collapse_safe,
     "fresh-by-construction": fresh_by_construction,
     "adequacy-gap": adequacy_gap,
     "crash-sensitive-limit": crash_sensitive_limit,

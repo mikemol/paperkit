@@ -144,8 +144,8 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "r985x2j6Uv2mdQDzdbtwGUOkW2UVhVqlzn1rY1UxTM8=",
-        "usagesDigest": "UKW2cn1/6jwSCPURPrRGyDNC/3tU1xzmCHyNc0Y5+tg=",
+        "bzlTransitiveDigest": "eMQrB3m2E5BQSDihPcM6UHfl4ztvT3VB/yTL4FUfTmY=",
+        "usagesDigest": "TSUJYLiPln+7rVSNQdJUxSvn5EO4wkdwL4/0Rzb2yDE=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -156,7 +156,8 @@
               "bib": "@@//boundaries:warrants.bib",
               "project": "boundaries",
               "adequacy": false,
-              "local": false
+              "local": false,
+              "compose": false
             }
           },
           "paperkit_config": {
@@ -165,7 +166,8 @@
               "bib": "@@//config:warrants.bib",
               "project": "config",
               "adequacy": false,
-              "local": false
+              "local": false,
+              "compose": false
             }
           },
           "paperkit_paper": {
@@ -174,7 +176,8 @@
               "bib": "@@//paper:warrants.bib",
               "project": "paper",
               "adequacy": true,
-              "local": false
+              "local": false,
+              "compose": true
             }
           },
           "paperkit_root": {
@@ -183,7 +186,8 @@
               "bib": "@@//:warrants.bib",
               "project": ".",
               "adequacy": true,
-              "local": false
+              "local": false,
+              "compose": false
             }
           },
           "paperkit_setup": {
@@ -192,7 +196,8 @@
               "bib": "@@//setup:warrants.bib",
               "project": "setup",
               "adequacy": false,
-              "local": true
+              "local": true,
+              "compose": false
             }
           }
         },

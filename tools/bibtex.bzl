@@ -28,15 +28,17 @@ def _entries(content):
     check = ""      # the full check value `type:target` ("" = uncheckable claim)
     sib = ""        # for a result:<sibling> check — the sibling it definitionally reads
     reads = []
+    rests = []      # rests-on: the premise claims this one is grounded on (Ζ·compose deps)
     for raw in content.splitlines():
         s = raw.strip()
         if s.startswith("@") and "{" in s:
             if key != None:
-                out.append((key, check, sib, reads))
+                out.append((key, check, sib, reads, rests))
             key = s.split("{", 1)[1].split(",", 1)[0].strip()
             check = ""
             sib = ""
             reads = []
+            rests = []
         elif key != None and "=" in s:
             name = s.split("=", 1)[0].strip()
             if name == "check":
@@ -46,8 +48,11 @@ def _entries(content):
             elif name == "reads":
                 inner = s.split("{", 1)[1].rsplit("}", 1)[0]
                 reads = [t.strip() for t in inner.split(",") if t.strip()]
+            elif name == "rests-on" and "{" in s and "}" in s:
+                inner = s.split("{", 1)[1].rsplit("}", 1)[0]
+                rests = [t.strip() for t in inner.split(",") if t.strip()]
     if key != None:
-        out.append((key, check, sib, reads))
+        out.append((key, check, sib, reads, rests))
     return out
 
 def _data(tokens, files):
@@ -86,6 +91,17 @@ def _custom(content):
                 val = val[1:-1]
             out[cur] = val
     return out
+
+def _body(check, custom):
+    """The witness BODY — the shell command behind a cmd:/custom check (exit 0 = the claim holds).
+    file:/result:/agree: have no single-command body (handled by the verb gate, not the proof DAG yet)."""
+    i = check.find(":")
+    typ, target = check[:i], check[i + 1:]
+    if typ == "cmd":
+        return target
+    if typ in custom:
+        return custom[typ].replace("{target}", target)
+    return None
 
 def _verb_rule(name, check, proj, files, reads, custom, local):
     """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
@@ -137,9 +153,11 @@ def _bib_repo_impl(repository_ctx):
         syms += ["pk_footaudit", "pk_footprint"]
     if syms:
         out.append("load(\"@@//tools:grade.bzl\", " + ", ".join([_lit(s) for s in sorted(syms)]) + ")")
+    if repository_ctx.attr.compose:
+        out.append('load("@@//tools:witness.bzl", "pk_proof", "pk_witness")')
     out.append("")
     recs = []
-    for k, check, sib, reads in parsed:
+    for k, check, sib, reads, rests in parsed:
         if not check:
             continue
         out.append(_verb_rule(k, check, proj, files, reads, custom, local))
@@ -161,7 +179,7 @@ def _bib_repo_impl(repository_ctx):
         # pk_adequacy; the assert-test puts it in //:hook.  (The old discriminate.py sweep sh_test
         # is retired; discriminate.py stays as the per-claim grade ORACLE behind pk_grade_claim.)
         grades = []
-        for k, check, sib, reads in parsed:
+        for k, check, sib, reads, rests in parsed:
             if not check:
                 continue
             out.append("pk_grade_claim(name = " + _lit(k + "__grade") + ", claim = " + _lit(k) +
@@ -178,7 +196,7 @@ def _bib_repo_impl(repository_ctx):
         # Data is GENEROUS (every project) so the strace sees reads BEYOND the declaration.  On-demand
         # (not in //:hook); host-coupled projects (local) skip it — their footprint needs the host.
         foots = []
-        for k, check, sib, reads in parsed:
+        for k, check, sib, reads, rests in parsed:
             if not check or sib:        # result: is an edge — no footprint
                 continue
             out.append("pk_footprint(name = " + _lit(k + "__foot") + ", claim = " + _lit(k) +
@@ -186,6 +204,26 @@ def _bib_repo_impl(repository_ctx):
             foots.append('":%s__foot"' % k)
         if foots:
             out.append('pk_footaudit(name = "footaudit", foots = [%s], visibility = ["//visibility:public"])' % ", ".join(foots))
+
+    if repository_ctx.attr.compose:
+        # Ζ·compose — each claim's WITNESS as a build artifact; rests-on as build DEPS (the grounding
+        # DAG IS the build DAG).  `bazel build //<proj>:proof` builds every witness — build-success =
+        # proven, and an unproven premise blocks every claim resting on it.  On-demand (not //:hook yet).
+        checked = {k: True for k, check, sib, reads, rests in parsed if check}
+        wits = []
+        pj = "" if proj == "." else ", project = " + _lit(proj)
+        for k, check, sib, reads, rests in parsed:
+            if not check:
+                continue
+            body = _body(check, custom)
+            if body == None:                 # file:/result:/agree: — not a single-command witness yet
+                continue
+            prem = ['":%s__witness"' % r for r in rests if r in checked]
+            out.append("pk_witness(name = " + _lit(k + "__witness") + ", holds = " + _lit(body) + pj +
+                       ", premises = [" + ", ".join(prem) + "], data = [" +
+                       ", ".join([_lit(d) for d in _data(reads, files)]) + "])")
+            wits.append('":%s__witness"' % k)
+        out.append('pk_proof(name = "proof", witnesses = [%s], visibility = ["//visibility:public"])' % ", ".join(wits))
     repository_ctx.file("BUILD.bazel", "\n".join(out) + "\n")
 
 bib_repo = repository_rule(
@@ -195,13 +233,14 @@ bib_repo = repository_rule(
         "project": attr.string(mandatory = True),
         "adequacy": attr.bool(default = False),
         "local": attr.bool(default = False),  # Ζ·resist: host-coupled project (setup) — pk_cmd runs on the host
+        "compose": attr.bool(default = False),  # Ζ·compose: project the witness DAG (rests-on as build deps) + :proof
     },
 )
 
 def _bib_ext_impl(module_ctx):
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose)
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -212,6 +251,7 @@ bib = module_extension(
             "project": attr.string(mandatory = True),
             "adequacy": attr.bool(default = False),
             "local": attr.bool(default = False),
+            "compose": attr.bool(default = False),
         }),
     },
 )

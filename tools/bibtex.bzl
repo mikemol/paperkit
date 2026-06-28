@@ -173,7 +173,8 @@ def _bib_repo_impl(repository_ctx):
     # pk_gate aggregates the records → the project verdict; the assert-test puts it in the live gate.
     out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
     out.append('sh_test(name = "gate", srcs = ["@@//tools:assert_pass.sh"], ' +
-               'args = ["$(rootpath :gate_rec)"], data = [":gate_rec"], visibility = ["//visibility:public"])')
+               'args = ["$(rootpath :gate_rec)"], data = [":gate_rec"], size = "small", ' +
+               'visibility = ["//visibility:public"])')
     if repository_ctx.attr.adequacy:
         # Ζ·nest — adequacy as a NESTING of per-claim grade records (pk_grade_claim) aggregated by
         # pk_adequacy; the assert-test puts it in //:hook.  (The old discriminate.py sweep sh_test
@@ -188,7 +189,8 @@ def _bib_repo_impl(repository_ctx):
             grades.append('":%s__grade"' % k)
         out.append('pk_adequacy(name = "adequacy_rec", grades = [%s], visibility = ["//visibility:public"])' % ", ".join(grades))
         out.append('sh_test(name = "adequacy", srcs = ["@@//tools:assert_pass.sh"], ' +
-                   'args = ["$(rootpath :adequacy_rec)"], data = [":adequacy_rec"], visibility = ["//visibility:public"])')
+                   'args = ["$(rootpath :adequacy_rec)"], data = [":adequacy_rec"], size = "small", ' +
+                   'visibility = ["//visibility:public"])')
 
     if not local:
         # Ζ·foot·act — the declare+audit cross-check as a NESTING of per-claim footprint records

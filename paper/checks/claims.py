@@ -893,6 +893,26 @@ def grounding_reflected():
         "shared scaffolding counted as engine grounding — the engine restriction failed"
 
 
+def emergence_collapse():
+    # ∂²'s emergence face — the COVERAGE sibling of grounding: a claim whose engine fingerprint is
+    # ⊆ its premises' (fp(X) ⊆ ∪rests-on) COLLAPSES (its witness emerges by consuming them); a
+    # residual is an INCREMENT; no grounding is a LEAF axiom.  STRICTER than grounding — an edge can
+    # OVERLAP yet the claim still test more, which coverage (not overlap) catches.
+    recs = [
+        {"key": "ax", "rests-on": [], "tests": ["paperkit/gate.py::resolves"]},                # no grounding → leaf
+        {"key": "col", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves"]},           # ⊆ premise → collapse
+        {"key": "inc", "rests-on": ["ax"],                                                      # extra site → increment
+         "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
+    ]
+    e = coherence.emergence_residual(recs)
+    assert e["leaf"] == 1, e                                            # 'ax' has no grounding
+    assert e["collapse"] == 1, e                                        # 'col' reduces to its premise
+    assert e["increment"] == 1 and e["increments"][0][0] == "inc", e    # 'inc' tests beyond its premise
+    # STRICTER than grounding: 'inc' OVERLAPS its premise (shares resolves) yet does not collapse
+    assert coherence.grounding_residual(recs)["reflected"] >= 1 and e["collapse"] == 1, \
+        "emergence is not strictly finer than grounding (overlap should pass where coverage can fail)"
+
+
 def forward_direction():
     # the structure residual closed by PROJECTION (the grounding DAG renders as
     # transitively-reduced cross-references), not the retired "subsume into one chiral
@@ -907,6 +927,7 @@ def forward_direction():
 
 CLAIMS = {
     "grounding-reflected": grounding_reflected,
+    "emergence-collapse": emergence_collapse,
     "fresh-by-construction": fresh_by_construction,
     "adequacy-gap": adequacy_gap,
     "crash-sensitive-limit": crash_sensitive_limit,

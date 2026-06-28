@@ -25,9 +25,16 @@ pipeline (`discriminate --resolution def --json`), so nothing new is measured �
               is vacuously disjoint: rhetorical grounding) or by a `link` (the sibling of
               the structure discharge).  Only a GENUINE, un-acknowledged miss is residual.
 
+  EMERGENCE   the STRICTER sibling of grounding (Ζ·emerge): grounding asks per-edge OVERLAP, this
+              asks per-claim COVERAGE — does a claim's fingerprint REDUCE to its premises',
+              fp(X) ⊆ ∪fp(rests-on)?  A claim that collapses adds no engine discrimination beyond
+              its grounding (its witness emerges by consumption — the proof composes); an increment
+              tests engine capability no premise does (under-grounded, or an irreducible leaf); a
+              leaf is an axiom.  Where grounding's overlap passes, coverage can still catch a delta.
+
 A high residual is not a failure to hide — it is the gap between what a document SAYS
 grounds it and what DEMONSTRABLY does, surfaced so it can be closed (move-unification
-for structure; definition-resolution fingerprints for sensitivity and grounding).
+for structure; definition-resolution fingerprints for sensitivity, grounding, and emergence).
 
     coherence.py [DIR]            # the residual report
     coherence.py --json [DIR]     # structured
@@ -169,12 +176,40 @@ def grounding_residual(records: list, discharged=frozenset()) -> dict:
             "undischarged": undischarged, "misses": misses}
 
 
+def emergence_residual(records: list) -> dict:
+    """Face four (Ζ·emerge): the STRICTER sibling of grounding.  Grounding asks per-edge OVERLAP
+    (does X exercise SOME of what Y tests); emergence asks per-claim COVERAGE — does the claim's
+    engine fingerprint REDUCE to its premises', fp(X) ⊆ ∪fp(rests-on)?  A claim that COLLAPSES adds
+    no engine discrimination beyond its grounding: its witness is redundant and EMERGES by
+    consumption (the proof composes — Ζ·compose).  A claim with an INCREMENT tests engine capability
+    NO premise does (the delta) — either under-grounded (add the missing rests-on) or an irreducible
+    leaf to extract.  A LEAF (no rests-on) is an axiom — a self-contained check.  Where grounding's
+    OVERLAP can pass (the edge shares one site) while the claim still tests more, emergence's SUBSET
+    catches it: the residual is the increments — claims the grounding does not COVER."""
+    S = {r["key"]: _engine_cap(r.get("tests", [])) for r in records}
+    collapse = leaf = 0
+    increments = []
+    for r in records:
+        k = r["key"]
+        prem = [y for y in r.get("rests-on", []) if y in S]
+        if not prem:
+            leaf += 1
+            continue
+        delta = sorted(S.get(k, set()) - set().union(*[S[y] for y in prem]))
+        if delta:
+            increments.append([k, delta])
+        else:
+            collapse += 1
+    return {"collapse": collapse, "increment": len(increments), "leaf": leaf, "increments": increments}
+
+
 def report(records: list, discharged=frozenset()) -> dict:
     cited = [r for r in records if r.get("cited", True)]
     return {"claims": len(cited),
             "structure": structure_residual(cited, discharged),
             "sensitivity": sensitivity_residual(cited),
-            "grounding": grounding_residual(cited, discharged)}
+            "grounding": grounding_residual(cited, discharged),
+            "emergence": emergence_residual(cited)}
 
 
 def _records(project_dir: Path) -> list:
@@ -205,7 +240,7 @@ def main(argv: list) -> int:
     if as_json:
         print(json.dumps({"document": project_dir.name or str(project_dir), **rep}, indent=2))
         return 0
-    s, se, g = rep["structure"], rep["sensitivity"], rep["grounding"]
+    s, se, g, e = rep["structure"], rep["sensitivity"], rep["grounding"], rep["emergence"]
     print(f"coherence (∂²): {project_dir.name or project_dir} — {rep['claims']} cited claims")
     print(f"  structure  : {s['carried']} grounding edges carried by the prose connective, "
           f"{s['owed']} are LONG edges owed a projected cross-reference; {s['undischarged']} "
@@ -219,6 +254,12 @@ def main(argv: list) -> int:
           f"(advisory — overlap the fingerprints, or discharge with a `link`)")
     for x, y in g["misses"]:
         print(f"               [@{x}] rests-on [@{y}] — tests engine capability, but not [@{y}]'s")
+    print(f"  emergence  : {e['collapse']} claims COLLAPSE (engine sensitivity ⊆ grounding → witness "
+          f"emerges by consumption), {e['increment']} INCREMENT (test engine capability beyond their "
+          f"grounding), {e['leaf']} LEAF axioms (no grounding → self-contained checks)")
+    for x, d in e["increments"]:
+        print(f"               [@{x}] +{len(d)} engine site(s) beyond its grounding "
+              f"— e.g. {[t.split('::')[-1] for t in d[:3]]}")
     return 0
 
 

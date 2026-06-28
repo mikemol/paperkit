@@ -7,3 +7,14 @@ pk_calc(name = "det", claim = "deterministic", project = "paper",
     data = ["//paperkit:engine", "//paper:files"])
 pk_verdict(name = "det-verdict", calc = ":det")                              # reading: baseline
 pk_grade(name = "det-grade", calc = ":det", data = ["//paperkit:engine", "//tools:read_grade.py"])  # reading: grade
+
+# Ζ·emerge·gate — def-resolution calcs (the cost) + cheap coherence over them (the gate).
+load("//tools:calc.bzl", "pk_cohere")
+[
+    pk_calc(name = c + "-d", claim = c, project = "paper", resolution = "def",
+        data = ["//paperkit:engine", "//paper:files"])
+    for c in ["prose-projected", "projector-emits", "ordered-by-deps", "joined-by-glue"]
+]
+pk_cohere(name = "cohere", project = "paper",
+    calcs = [":prose-projected-d", ":projector-emits-d", ":ordered-by-deps-d", ":joined-by-glue-d"],
+    data = ["//paperkit:engine", "//paper:files"])

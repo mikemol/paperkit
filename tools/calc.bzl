@@ -14,12 +14,13 @@ def _pypath(py):
 def _calc_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     c = ctx.actions.declare_file(ctx.label.name + ".calc.json")
+    res = (" --resolution " + ctx.attr.resolution) if ctx.attr.resolution else ""
     ctx.actions.run_shell(
         outputs = [c],
         inputs = depset(ctx.files.data, transitive = [py.files]),
         command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
                   '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
-                  " --calc " + ctx.attr.project + " > " + c.path,
+                  " --calc" + res + " " + ctx.attr.project + " > " + c.path,
         mnemonic = "PkCalc",
         progress_message = "Ζ·calc " + ctx.label.name,
     )
@@ -31,6 +32,36 @@ pk_calc = rule(
     toolchains = [_PY],
     attrs = {
         "claim": attr.string(mandatory = True),
+        "project": attr.string(mandatory = True),
+        "resolution": attr.string(default = "", doc = "def = per-definition fingerprint (for emergence); else file"),
+        "data": attr.label_list(allow_files = True),
+    },
+)
+
+def _cohere_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
+    v = ctx.actions.declare_file(ctx.label.name + ".cohere.json")
+    calcs = " ".join([c.path for c in ctx.files.calcs])
+    # Ζ·emerge·gate — cheap coherence: read the cached calc records (no re-sweep), assert grounding
+    # soundness (0 genuine misses).  The ∂² faces gated as a READING over the calculation.
+    ctx.actions.run_shell(
+        outputs = [v],
+        inputs = depset(ctx.files.calcs + ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) +
+                  'if "$(command -v python3)" paperkit/coherence.py --from-calcs ' + ctx.attr.project +
+                  " " + calcs + " >/dev/null 2>&1; then V=pass; else V=fail; fi; " +
+                  "printf '{\"verb\":\"cohere\",\"verdict\":\"%s\"}\\n' \"$V\" > " + v.path,
+        mnemonic = "PkCohere",
+        progress_message = "Ζ·emerge·gate cohere " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([v]))]
+
+pk_cohere = rule(
+    implementation = _cohere_impl,
+    doc = "Ζ·emerge·gate — coherence ∂² as a cheap READING over cached calcs; verdict pass iff grounding sound.",
+    toolchains = [_PY],
+    attrs = {
+        "calcs": attr.label_list(allow_files = True, mandatory = True, doc = "the cached def-resolution calc records"),
         "project": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
     },

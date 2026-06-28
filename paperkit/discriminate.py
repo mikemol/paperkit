@@ -76,7 +76,8 @@ import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grad
 from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
                    footprint_hash as _footprint_hash, load as _load_cache, save as _save_cache)
 from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness,  # noqa: E402,F401
-                    _grade_parallel, _sandbox_root, STRENGTH, ORDER, RANK_C, GRADE_C, CORRO_C)
+                    _grade_parallel, _sandbox_root)
+from grade import STRENGTH, ORDER, RANK_C, GRADE_C, CORRO_C  # noqa: E402,F401  (Μ·grade — the ladder leaf)
 
 
 def main(argv: list) -> int:

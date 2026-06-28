@@ -10,6 +10,7 @@ filegroup(
         "driver.py",
         "footdeps.py",
         "gate.py",
+        "grade.py",
         "grader.py",
         "layout.py",
         "project.py",

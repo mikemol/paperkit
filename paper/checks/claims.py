@@ -594,15 +594,19 @@ def imported_grade():
 
 def module_split():
     # the engine is not a monolith but small single-responsibility modules — a resolver that
-    # runs a check, a grader that sweeps it, a cache, a topology — each importable on its own;
-    # the leaf modules do not import the orchestrators, so a change to one has a small blast radius.
-    for mod in ("resolver", "grader", "cache", "layout"):
+    # runs a check, a grader that sweeps it, a grade ladder that interprets the sweep, a cache,
+    # a topology — each importable on its own; the leaf modules do not import the orchestrators,
+    # so a change to one has a small blast radius.
+    for mod in ("resolver", "grader", "grade", "cache", "layout"):
         assert (ENGINE / f"{mod}.py").exists(), f"engine module {mod}.py is missing"
     assert "import gate" not in RESOLVER_SRC and "concurrent.futures" not in RESOLVER_SRC, \
         "the resolver imports the gate / its parallelism — not a small blast radius"
     grader_src = (ENGINE / "grader.py").read_text()
     assert "import gate" not in grader_src and "import project" not in grader_src, \
         "the grader imports gate/project — it would not be testable on its own"
+    grade_src = (ENGINE / "grade.py").read_text()
+    assert not any(f"import {m}" in grade_src for m in ("gate", "project", "grader", "resolver", "cache")), \
+        "the grade ladder imports an orchestrator — it must be a pure leaf (Μ·grade: calc vs interp)"
 
 
 def sandbox_grade():

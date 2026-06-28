@@ -1,0 +1,14 @@
+# Ζ·compose — witnesses as composing build artifacts over a rests-on DAG.  The GOOD chain builds
+# (every premise proven); the BROKEN chain cannot (a dependent of an unproven premise fails to
+# build) — proof composition enforced by Bazel's dep graph, build-success = proven.  Removable.
+load("//tools:witness.bzl", "pk_witness")
+
+# good DAG:  top ← (mid ← leaf), side
+pk_witness(name = "leaf", holds = "true")
+pk_witness(name = "side", holds = "true")
+pk_witness(name = "mid", holds = "true", premises = [":leaf"])
+pk_witness(name = "top", holds = "true", premises = [":mid", ":side"])   # build //:top → proves the whole DAG
+
+# broken: an unproven premise blocks everything resting on it
+pk_witness(name = "broken-leaf", holds = "false")                         # claim does NOT hold → no artifact
+pk_witness(name = "rests-on-broken", holds = "true", premises = [":broken-leaf"])  # cannot build

@@ -793,13 +793,14 @@ def fresh_by_construction():
 
 
 def adequacy_gap():
-    # the honest limit: a passing check proves a sentence NAMED a verifier, not that the
-    # verifier ENTAILS the claim — a false claim with a behavioral-but-irrelevant check
-    # still passes the gate and even grades behavioral
+    # Π — ONE capability: the GATE is blind to relevance.  A passing check proves a sentence
+    # NAMED a verifier, not that the verifier ENTAILS the claim, so a false sentence whose check
+    # is behavioral-but-irrelevant still passes the gate.  That the GRADER even grades such a check
+    # behavioral is a DISTINCT capability — the sibling claim crash-sensitive-limit owns it — so it
+    # is not re-asserted here; re-asserting it dragged the whole grader into this claim's footprint
+    # (Δ·scope then bounds adequacy-gap to the gate it actually exercises, not gate + grader).
     w = [fx.entry("c", claim="the sky is green", check="cmd:grep -q TOKEN a.txt")]
     assert fx.gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
-    recs = json.loads(fx.discriminate(w, "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
-    assert recs[0]["grade"] == "behavioral", "the irrelevant check even grades behavioral"
 
 
 def crash_sensitive_limit():

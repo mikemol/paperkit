@@ -21,9 +21,10 @@ def _witness_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     w = ctx.actions.declare_file(ctx.label.name + ".witness.json")
     prem = " ".join([p.path for p in ctx.files.premises])
-    # The premises are INPUTS: Bazel runs this action only if every premise witness was produced.
-    # A premise whose claim does NOT hold emits no artifact → this dependent cannot build (composition).
-    guard = ("for p in " + prem + "; do test -f \"$p\" || exit 1; done; ") if prem else ""
+    # The premises are INPUTS, and this action CONSUMES them (reads each, like the linker reads
+    # file.o — not just test -f).  A premise whose claim does not hold emits no artifact → this
+    # dependent cannot build; and a premise whose artifact does not assert its fact is rejected.
+    guard = ("for p in " + prem + "; do grep -qE '\"(witness|proof)\":\"(holds|complete)\"' \"$p\" || exit 1; done; ") if prem else ""
     inner = "sh -c " + _sq(ctx.attr.holds)
     if ctx.attr.project and ctx.attr.project != ".":
         inner = "cd " + _sq(ctx.attr.project) + " && " + inner

@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import project as P  # noqa: E402
+import bib  # noqa: E402  (the parser/data-model leaf — footdeps needs only the bib, not the projector)
 import resolver  # noqa: E402
 
 WIRED = ["boundaries", "config", "paper", "setup", "."]   # projects with per-claim Bazel graphs
@@ -53,10 +53,10 @@ def build(repo_root: Path, names: list) -> dict:
         pdir = repo_root if name == "." else repo_root / name
         raw = tomllib.loads((pdir / "paper.toml").read_text())
         custom = raw.get("checks", {})
-        cfg = P.load_config(pdir)
+        cfg = bib.load_config(pdir)
         F = {}
         for b in cfg["bibs"]:
-            F.update(P.entries(b))
+            F.update(bib.parse(b))
         # result: is an EDGE (no leaf target) — its footprint is never used, and stracing it
         # reruns a whole sibling gate; skip it.  strace is I/O-bound, so trace the rest CONCURRENTLY.
         items = [(k, f["check"]) for k, f in sorted(F.items())
@@ -74,11 +74,11 @@ def build(repo_root: Path, names: list) -> dict:
 
 def _declared(pdir: Path) -> dict:
     """{claim: set(declared read tokens)} from each claim's `reads` field (the declare+audit
-    source).  Routed through the canonical parser (paperkit.bib, via P.entries) — `reads` is now
+    source).  Routed through the canonical parser (paperkit.bib, via bib.parse) — `reads` is now
     a first-class field there, so no separate line scanner / no disagreement with the build."""
     F = {}
-    for b in P.load_config(pdir)["bibs"]:
-        F.update(P.entries(b))
+    for b in bib.load_config(pdir)["bibs"]:
+        F.update(bib.parse(b))
     return {k: set(f.get("reads", [])) for k, f in F.items()}
 
 
@@ -113,8 +113,8 @@ def audit_one(proj: str, claim: str) -> dict:
     custom = raw.get("checks", {})
     declared = _declared(project_dir).get(claim, set())
     F = {}
-    for b in P.load_config(project_dir)["bibs"]:
-        F.update(P.entries(b))
+    for b in bib.load_config(project_dir)["bibs"]:
+        F.update(bib.parse(b))
     f = F.get(claim)
     if not f or not f.get("check") or f["check"].startswith("result:"):
         return {"claim": claim, "ok": True, "skip": True}     # result: is an edge — no footprint

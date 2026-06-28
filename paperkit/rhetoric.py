@@ -47,7 +47,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import project as P  # noqa: E402
+import bib  # noqa: E402  (the parser/data-model leaf — NOT project, so rhetoric no longer closes the project↔rhetoric cycle)
 
 # (kind, default connector).  kind is what SCHEMES constrain; connector is the
 # realization project.py falls back to when a claim gives no explicit `join`.
@@ -108,18 +108,18 @@ def check_scheme(scheme: str, claims: list, moves: list) -> list:
 
 def analyze(project_dir: Path) -> list:
     """[(section, scheme, claim_keys, non_first_moves, violations)] for declared sections."""
-    cfg = P.load_config(project_dir)
+    cfg = bib.load_config(project_dir)
     F = {}
     for b in cfg["bibs"]:
-        F.update(P.entries(b))
+        F.update(bib.parse(b))
     by_sec = {}
     for k, f in F.items():
         if f.get("section"):
             by_sec.setdefault(f["section"], []).append(k)
     rows = []
     for sk, scheme in schemes_from_rubric(cfg["rubric"]).items():
-        keys = P.dep_order(by_sec.get(sk, []), F)
-        claims = [k for k in keys if not P.is_placed(F[k])]
+        keys = bib.dep_order(by_sec.get(sk, []), F)
+        claims = [k for k in keys if not bib.is_placed(F[k])]
         moves = [F[k].get("move") for k in claims[1:]]
         rows.append((sk, scheme, claims, moves, check_scheme(scheme, claims, moves)))
     return rows

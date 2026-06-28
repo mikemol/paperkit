@@ -26,9 +26,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
 import bib  # noqa: E402  (paperkit.bib — the one .bib parser + data model)
-# re-exported under their historical names so callers (P.entries, P.load_config, …) are unchanged
+# the projector parses then renders, so it uses the bib data model internally (short names).
 from bib import dep_order, is_placed, load_config, rubric  # noqa: E402,F401
 from bib import parse as entries  # noqa: E402,F401
+# top-level now: after Μ·cycle rhetoric imports bib (a leaf), NOT project, so project→rhetoric is
+# one-way — the project↔rhetoric cycle is gone and this need no longer be a function-local import.
+from rhetoric import MOVES  # noqa: E402
 
 # Minimal, domain-agnostic LaTeX -> Unicode for claim text (em/en dashes, a few
 # escapes, inline math).  A paper that needs more declares its own; this is the
@@ -188,8 +191,7 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
             continue
         mv = f.get("move")
         if mv:                                    # a typed `move` with no explicit `join`:
-            from rhetoric import MOVES            # realize its default connector (lazy: cycle)
-            if mv in MOVES:
+            if mv in MOVES:                       # realize its default connector (MOVES imported up top)
                 conn = MOVES[mv][1]
                 if conn.strip().endswith((".", "!", "?")):
                     parts.append(conn + clause[:1].upper() + clause[1:])

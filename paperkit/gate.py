@@ -33,7 +33,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
-import project as P  # noqa: E402
+import bib  # noqa: E402  (the parser/data-model leaf)
+import project as P  # noqa: E402  (the PROJECTOR — gate's only genuine need for project, the PROJECT invariant)
 
 
 # The check-RESOLUTION core lives in resolver.py — a small, standalone module (no projector,
@@ -69,11 +70,11 @@ def main(argv: list) -> int:
     def info(msg):              # human success lines — suppressed under --json
         if not as_json:
             print(msg)
-    cfg = P.load_config(project_dir)
+    cfg = bib.load_config(project_dir)
 
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
-        F.update(P.entries(b))
+        F.update(bib.parse(b))
 
     # Ζ·starlark — the LEAF of the recursive check target: resolve ONE claim's check and exit.
     # A project's gate (the node) is this over every claim ∧ the project invariants; a Bazel
@@ -107,7 +108,7 @@ def main(argv: list) -> int:
     # Placed warrants (emit:/figure) carry no citation but ARE in the document by
     # construction, so their checks must pass too.
     warrants = {k for k, f in F.items() if f.get("check")}
-    placed = {k for k, f in F.items() if P.is_placed(f)}
+    placed = {k for k, f in F.items() if bib.is_placed(f)}
     to_verify = (cited | placed) & warrants
     undefined = sorted(cited - set(F))
     # Resolve each DISTINCT check exactly once (shared witnesses run one time), concurrently.
@@ -165,13 +166,13 @@ def main(argv: list) -> int:
     # COVERAGE — sections present, section-tagged claims cited
     headings = "\n".join(ln for ln in prose.splitlines() if ln.startswith("## "))
     gaps = []
-    for sk, title in P.rubric(cfg["rubric"]):
+    for sk, title in bib.rubric(cfg["rubric"]):
         if title.lower() not in headings.lower():
             gaps.append(f"section '{title}' absent")
     advisories = []
     for k, f in F.items():
         if f.get("section") and k not in cited:
-            if P.is_placed(f):
+            if bib.is_placed(f):
                 # An uncited placement is a POSTULATE: a block in the document with
                 # no claim citing it — present and load-bearing, but outside the
                 # checked claim-DAG.  Tolerated by default (advisory); under --safe
@@ -181,7 +182,7 @@ def main(argv: list) -> int:
                 (gaps if safe else advisories).append(msg)
             else:
                 gaps.append(f"claim [@{k}] tagged section={f['section']} but not cited")
-    secs = len(P.rubric(cfg["rubric"]))
+    secs = len(bib.rubric(cfg["rubric"]))
     if gaps:
         for g in gaps:
             print(f"paperkit-gate: coverage — {g}", file=sys.stderr)
@@ -197,7 +198,7 @@ def main(argv: list) -> int:
             "verified": len(to_verify), "undefined": undefined, "bad": bad,
             "sections": secs, "gaps": gaps,
             "postulates": sorted(k for k, f in F.items()
-                                 if f.get("section") and k not in cited and P.is_placed(f)),
+                                 if f.get("section") and k not in cited and bib.is_placed(f)),
             "collapses": collapses,
         }, indent=2))
     print("paperkit-gate: PASS" if rc == 0 else "paperkit-gate: FAIL", file=sys.stderr)

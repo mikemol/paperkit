@@ -47,7 +47,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import project as P  # noqa: E402  (read the declared `link` acknowledgments)
+import bib  # noqa: E402  (the parser/data-model leaf — read the bib structure + `link` acknowledgments)
 
 _ENGINE = Path(__file__).resolve().parent
 
@@ -230,10 +230,10 @@ def _records_from_calcs(project_dir: Path, calc_files: list) -> list:
     """Ζ·emerge·gate — assemble the records coherence reads from CACHED calc records (the measurement,
     sens) + the bib STRUCTURE (rests-on/section/from), instead of re-running the def-resolution sweep.
     This is what makes the ∂² faces a CHEAP READING over the cached calculation.  The structure comes
-    from the canonical parser (paperkit.bib, via P.entries) — entries already carries rests-on."""
+    from the canonical parser (paperkit.bib, via bib.parse) — entries already carries rests-on."""
     F = {}
-    for b in P.load_config(project_dir)["bibs"]:
-        F.update(P.entries(b))
+    for b in bib.load_config(project_dir)["bibs"]:
+        F.update(bib.parse(b))
     recs = []
     for f in calc_files:
         c = json.loads(Path(f).read_text())
@@ -248,10 +248,10 @@ def _records_from_calcs(project_dir: Path, calc_files: list) -> list:
 def _discharged(project_dir: Path) -> set:
     """Claims carrying a `link` footnote — the author has acknowledged that this claim's
     prose and grounding edges diverge, and why; that discharges the advisory."""
-    cfg = P.load_config(project_dir)
+    cfg = bib.load_config(project_dir)
     F = {}
     for b in cfg["bibs"]:
-        F.update(P.entries(b))
+        F.update(bib.parse(b))
     return {k for k, f in F.items() if f.get("link")}
 
 

@@ -66,7 +66,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
-import project as P  # noqa: E402
+import bib  # noqa: E402  (the parser/data-model leaf — discriminate needs only the bib, not the projector)
 import gate as G  # noqa: E402  (cited_keys + footprint, re-exported from resolver)
 import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grading)
 
@@ -84,7 +84,7 @@ def main(argv: list) -> int:
     pos = config.positionals(argv)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     _sandbox_root(project_dir)       # resolve+validate the sandbox root up front (home-guard) — clean exit before any sweep
-    cfg = P.load_config(project_dir)
+    cfg = bib.load_config(project_dir)
     raw = tomllib.loads((project_dir / "paper.toml").read_text())
     pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
     presupposed = presupposed_inputs(project_dir, cfg)
@@ -102,7 +102,7 @@ def main(argv: list) -> int:
 
     F = {}
     for b in cfg["bibs"]:
-        F.update(P.entries(b))
+        F.update(bib.parse(b))
 
     out = cfg["out"]
     cited = G.cited_keys(out.read_text()) if out.exists() else set()

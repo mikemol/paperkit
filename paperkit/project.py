@@ -25,6 +25,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
+import bib  # noqa: E402  (paperkit.bib — the one .bib parser + data model)
+# re-exported under their historical names so callers (P.entries, P.load_config, …) are unchanged
+from bib import dep_order, is_placed, load_config, rubric  # noqa: E402,F401
+from bib import parse as entries  # noqa: E402,F401
 
 # Minimal, domain-agnostic LaTeX -> Unicode for claim text (em/en dashes, a few
 # escapes, inline math).  A paper that needs more declares its own; this is the
@@ -43,73 +47,6 @@ def clean(s: str) -> str:
     for pat, rep in _LATEX:
         s = re.sub(pat, rep, s)
     return re.sub(r"[{}]", "", s).strip().rstrip(".")
-
-
-def load_config(project: Path) -> dict:
-    cfg = project / "paper.toml"
-    if not cfg.exists():
-        sys.exit(f"paperkit: no paper.toml in {project}")
-    p = tomllib.loads(cfg.read_text()).get("paper", {})
-    return {
-        "title": p.get("title", "Untitled"),
-        "subtitle": p.get("subtitle", ""),
-        "rubric": project / p.get("rubric", "rubric.tsv"),
-        "bibs": [project / b for b in p.get("warrants", ["warrants.bib"])],
-        "out": project / p.get("out", "paper.md"),
-        "numbered": p.get("numbered", True),
-        "references": p.get("references", True),
-        "adequacy": p.get("adequacy", False),   # Ζ·project: emit a Δ-adequacy Bazel test for this project
-    }
-
-
-def entries(path: Path) -> dict:
-    """{key: {field: cleaned-value, _src}} for one .bib."""
-    out = {}
-    if path.exists():
-        for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", path.read_text(), re.S):
-            key, body = m.group(1), m.group(2)
-            f = {"_src": path.name}
-            for name in ("title", "author", "year", "note", "section", "claim", "check", "glue", "join", "move", "emit", "mem", "link"):
-                fm = re.search(r"\b" + name + r"\s*=\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", body)
-                if fm:
-                    f[name] = fm.group(1)
-            # `from` = prose-order edge (sets dep_order + glue).  `rests-on` =
-            # grounding/entailment edge (what the claim's credibility rests on);
-            # used for adequacy clamping, NOT for prose.  They are often reversed:
-            # prose runs general→specific, grounding runs specific→general.
-            for field in ("from", "rests-on"):
-                fr = re.search(r"\b" + field + r"\s*=\s*\{([^}]*)\}", body)
-                f[field] = [a for a in re.split(r"[,\s]+", fr.group(1)) if a] if fr else []
-            out[key] = f
-    return out
-
-
-def rubric(path: Path) -> list:
-    out = []
-    for ln in path.read_text().splitlines():
-        ln = ln.strip()
-        if ln and not ln.startswith("#") and "\t" in ln:
-            # key <TAB> title [<TAB> scheme …]; the title is the 2nd column only.
-            # A 3rd column (rhetorical scheme) is read by rhetoric.py, not here.
-            parts = ln.split("\t")
-            out.append((parts[0].strip(), parts[1].strip()))
-    return out
-
-
-def dep_order(keys: list, F: dict) -> list:
-    seen, out = set(), []
-
-    def visit(k):
-        if k in seen or k not in keys:
-            return
-        seen.add(k)
-        for a in F.get(k, {}).get("from", []):
-            visit(a)
-        out.append(k)
-
-    for k in keys:
-        visit(k)
-    return out
 
 
 def short_author(a: str) -> str:
@@ -149,12 +86,6 @@ GLUE = ["and from that, ", "so "]
 FENCE = {".sh": "sh", ".bash": "sh", ".py": "python", ".toml": "toml",
          ".bib": "bibtex", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
          ".txt": "text", ".tsv": "text", ".md": ""}   # .md = raw include (tables)
-
-
-def is_placed(f: dict) -> bool:
-    """A warrant projected as a block (emit:) or a figure — placed verbatim, not
-    woven into prose, and so covered by its placement rather than a citation."""
-    return bool(f.get("emit")) or f.get("check", "").startswith("figure:")
 
 
 IMAGE_EXTS = {".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".emf"}

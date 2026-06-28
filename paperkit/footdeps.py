@@ -73,21 +73,13 @@ def build(repo_root: Path, names: list) -> dict:
 
 
 def _declared(pdir: Path) -> dict:
-    """{claim: set(declared read tokens)} from the bib's `reads` field (the declare+audit source).
-    Parses the bib TEXT directly — project.entries() has a field whitelist that drops `reads`, and
-    this mirrors tools/bibtex.bzl's parser so auditor and build agree on the declaration."""
-    cfg = P.load_config(pdir)
-    out = {}
-    for b in cfg["bibs"]:
-        key = None
-        for raw in Path(b).read_text().splitlines():
-            s = raw.strip()
-            if s.startswith("@") and "{" in s:
-                key = s.split("{", 1)[1].split(",", 1)[0].strip()
-            elif key and "=" in s and s.split("=", 1)[0].strip() == "reads":
-                inner = s.split("{", 1)[1].rsplit("}", 1)[0]
-                out[key] = {t.strip() for t in inner.split(",") if t.strip()}
-    return out
+    """{claim: set(declared read tokens)} from each claim's `reads` field (the declare+audit
+    source).  Routed through the canonical parser (paperkit.bib, via P.entries) — `reads` is now
+    a first-class field there, so no separate line scanner / no disagreement with the build."""
+    F = {}
+    for b in P.load_config(pdir)["bibs"]:
+        F.update(P.entries(b))
+    return {k: set(f.get("reads", [])) for k, f in F.items()}
 
 
 def audit(repo_root: Path, names: list) -> list:

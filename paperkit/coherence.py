@@ -222,38 +222,19 @@ def _records(project_dir: Path) -> list:
     return json.loads(r.stdout or "[]")
 
 
-def _bib_struct(project_dir: Path) -> dict:
-    """{key: {rests-on, section, from}} parsed from the bib TEXT (project.entries drops rests-on);
-    the STRUCTURE (grounding edges, prose order) coherence reads alongside the calc's measurement."""
-    cfg = P.load_config(project_dir)
-    out = {}
-    key = None
-    for b in cfg["bibs"]:
-        for raw in Path(b).read_text().splitlines():
-            s = raw.strip()
-            if s.startswith("@") and "{" in s:
-                key = s.split("{", 1)[1].split(",", 1)[0].strip()
-                out[key] = {"rests-on": [], "section": "", "from": []}
-            elif key and "=" in s and "{" in s:
-                name = s.split("=", 1)[0].strip()
-                if name in ("rests-on", "from"):
-                    inner = s.split("{", 1)[1].rsplit("}", 1)[0]
-                    out[key][name] = [t.strip() for t in inner.split(",") if t.strip()]
-                elif name == "section":
-                    out[key]["section"] = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
-    return out
-
-
 def _records_from_calcs(project_dir: Path, calc_files: list) -> list:
     """Ζ·emerge·gate — assemble the records coherence reads from CACHED calc records (the measurement,
-    sens) + the bib STRUCTURE (rests-on), instead of re-running the def-resolution sweep.  This is
-    what makes the ∂² faces a CHEAP READING over the cached calculation — gateable, not on-demand."""
-    struct = _bib_struct(project_dir)
+    sens) + the bib STRUCTURE (rests-on/section/from), instead of re-running the def-resolution sweep.
+    This is what makes the ∂² faces a CHEAP READING over the cached calculation.  The structure comes
+    from the canonical parser (paperkit.bib, via P.entries) — entries already carries rests-on."""
+    F = {}
+    for b in P.load_config(project_dir)["bibs"]:
+        F.update(P.entries(b))
     recs = []
     for f in calc_files:
         c = json.loads(Path(f).read_text())
         k = c["claim"]
-        st = struct.get(k, {})
+        st = F.get(k, {})
         recs.append({"key": k, "tests": c.get("sens", []), "rests-on": st.get("rests-on", []),
                      "section": st.get("section", ""), "from": st.get("from", []),
                      "grade": "behavioral" if c.get("sens") else "vacuous", "cited": True})

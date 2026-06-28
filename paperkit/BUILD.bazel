@@ -2,6 +2,7 @@
 filegroup(
     name = "engine",
     srcs = [
+        "bib.py",
         "cache.py",
         "coherence.py",
         "config.py",

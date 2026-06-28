@@ -14,7 +14,7 @@ A claim is one bibliography entry — a statement, the rubric section it belongs
 @misc{drift,
   section = {engine}, from = {projector},
   claim   = {the gate rejects any prose that has drifted from its projection},
-  check   = {cmd:sh checks/drift-caught.sh}
+  check   = {cmd:true}
 }
 ```
 

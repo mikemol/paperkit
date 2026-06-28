@@ -155,12 +155,25 @@ def _bib_repo_impl(repository_ctx):
         out.append("load(\"@@//tools:grade.bzl\", " + ", ".join([_lit(s) for s in sorted(syms)]) + ")")
     if repository_ctx.attr.compose:
         out.append('load("@@//tools:witness.bzl", "pk_proof", "pk_witness")')
+    calc = repository_ctx.attr.calc
+    if calc:
+        out.append('load("@@//tools:calc.bzl", "pk_calc", "pk_grade", "pk_verdict")')
     out.append("")
     recs = []
+    calc_claims = {}
     for k, check, sib, reads, rests in parsed:
         if not check:
             continue
-        out.append(_verb_rule(k, check, proj, files, reads, custom, local))
+        if calc and _body(check, custom) != None:
+            # Ζ·calc·interp — ONE cached sweep (pk_calc) feeds the verdict reading here (and the grade
+            # reading below); the redundant verdict run + the adequacy re-sweep collapse into it.
+            dl = ", ".join([_lit(d) for d in _data(reads, files)])
+            out.append("pk_calc(name = " + _lit(k + "__calc") + ", claim = " + _lit(k) +
+                       ", project = " + _lit(proj) + ", data = [" + dl + "])")
+            out.append("pk_verdict(name = " + _lit(k) + ", calc = " + _lit(":" + k + "__calc") + ")")
+            calc_claims[k] = True
+        else:
+            out.append(_verb_rule(k, check, proj, files, reads, custom, local))
         recs.append('":%s"' % k)
 
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an irreducibly
@@ -183,9 +196,14 @@ def _bib_repo_impl(repository_ctx):
         for k, check, sib, reads, rests in parsed:
             if not check:
                 continue
-            out.append("pk_grade_claim(name = " + _lit(k + "__grade") + ", claim = " + _lit(k) +
-                       ", project = " + _lit(proj) + ", data = [" +
-                       ", ".join([_lit(d) for d in _data(reads, files)]) + "])")
+            if k in calc_claims:
+                # Ζ·calc·interp — the grade is a READING of the shared calc record (no re-sweep).
+                out.append("pk_grade(name = " + _lit(k + "__grade") + ", calc = " + _lit(":" + k + "__calc") +
+                           ', data = ["@@//paperkit:engine", "@@//tools:read_grade.py"])')
+            else:
+                out.append("pk_grade_claim(name = " + _lit(k + "__grade") + ", claim = " + _lit(k) +
+                           ", project = " + _lit(proj) + ", data = [" +
+                           ", ".join([_lit(d) for d in _data(reads, files)]) + "])")
             grades.append('":%s__grade"' % k)
         out.append('pk_adequacy(name = "adequacy_rec", grades = [%s], visibility = ["//visibility:public"])' % ", ".join(grades))
         out.append('sh_test(name = "adequacy", srcs = ["@@//tools:assert_pass.sh"], ' +
@@ -242,13 +260,14 @@ bib_repo = repository_rule(
         "adequacy": attr.bool(default = False),
         "local": attr.bool(default = False),  # Ζ·resist: host-coupled project (setup) — pk_cmd runs on the host
         "compose": attr.bool(default = False),  # Ζ·compose: project the witness DAG (rests-on as build deps) + :proof
+        "calc": attr.bool(default = False),  # Ζ·calc·interp: one cached pk_calc per claim → verdict + grade readings
     },
 )
 
 def _bib_ext_impl(module_ctx):
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc)
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -260,6 +279,7 @@ bib = module_extension(
             "adequacy": attr.bool(default = False),
             "local": attr.bool(default = False),
             "compose": attr.bool(default = False),
+            "calc": attr.bool(default = False),
         }),
     },
 )

@@ -1,0 +1,9 @@
+# Ζ·calc·interp — ONE calculation (pk_calc, the cached sweep) feeding TWO cheap readings (verdict,
+# grade).  Where pk_cmd ran the check and pk_grade_claim re-swept, here both read one calc record;
+# a change re-runs only pk_calc.  Verify: verdict + grade match the current families.  Removable.
+load("//tools:calc.bzl", "pk_calc", "pk_grade", "pk_verdict")
+
+pk_calc(name = "det", claim = "deterministic", project = "paper",
+    data = ["//paperkit:engine", "//paper:files"])
+pk_verdict(name = "det-verdict", calc = ":det")                              # reading: baseline
+pk_grade(name = "det-grade", calc = ":det", data = ["//paperkit:engine", "//tools:read_grade.py"])  # reading: grade

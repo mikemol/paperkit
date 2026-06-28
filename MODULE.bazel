@@ -21,7 +21,7 @@ bib = use_extension("//tools:bibtex.bzl", "bib")
 bib.project(name = "paperkit_boundaries", bib = "//boundaries:warrants.bib", project = "boundaries", compose = True)  # Ζ·compose (root imports its :proof)
 bib.project(name = "paperkit_config", bib = "//config:warrants.bib", project = "config")
 # Each target's data is footprint-derived (footprints.json, Ζ·foot) — no hand-declared extra_data.
-bib.project(name = "paperkit_paper", bib = "//paper:warrants.bib", project = "paper", adequacy = True, compose = True, calc = True)  # Ζ·calc·interp
-bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adequacy = True, compose = True, calc = True)  # Ζ·calc·interp·wire·root
+bib.project(name = "paperkit_paper", bib = "//paper:warrants.bib", project = "paper", adequacy = True, compose = True, calc = True, emerge = True)  # Ζ·emerge·gate
+bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adequacy = True, compose = True, calc = True, emerge = True)  # Ζ·emerge·gate
 bib.project(name = "paperkit_setup", bib = "//setup:warrants.bib", project = "setup", local = True)  # Ζ·resist: host-coupled
 use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_paper", "paperkit_root", "paperkit_setup")

@@ -144,8 +144,8 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "rh4JeVxiN8dtjN6KaSPsfCtEHaQLY2XHkOqp3/OsTaU=",
-        "usagesDigest": "x2xDD1uIZ4zZkn3YCKNeGB8wg1DVAenGpGicWvFCrJs=",
+        "bzlTransitiveDigest": "oBkLdjmHMwH2mpFxH3U9UpbsU9c3bmFZGl2L7N5eKfg=",
+        "usagesDigest": "wEQOhntXZ4i6ecw/beI3vdwPEWlHpnJmqWC37TC1aVs=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -158,7 +158,8 @@
               "adequacy": false,
               "local": false,
               "compose": true,
-              "calc": false
+              "calc": false,
+              "emerge": false
             }
           },
           "paperkit_config": {
@@ -169,7 +170,8 @@
               "adequacy": false,
               "local": false,
               "compose": false,
-              "calc": false
+              "calc": false,
+              "emerge": false
             }
           },
           "paperkit_paper": {
@@ -180,7 +182,8 @@
               "adequacy": true,
               "local": false,
               "compose": true,
-              "calc": true
+              "calc": true,
+              "emerge": true
             }
           },
           "paperkit_root": {
@@ -191,7 +194,8 @@
               "adequacy": true,
               "local": false,
               "compose": true,
-              "calc": true
+              "calc": true,
+              "emerge": true
             }
           },
           "paperkit_setup": {
@@ -202,7 +206,8 @@
               "adequacy": false,
               "local": true,
               "compose": false,
-              "calc": false
+              "calc": false,
+              "emerge": false
             }
           }
         },

@@ -35,4 +35,6 @@ test_suite(name = "hook", tests = [
     "@paperkit_boundaries//:gate",
     "@paperkit_paper//:adequacy",
     "@paperkit_root//:adequacy",
+    "@paperkit_paper//:cohere",
+    "@paperkit_root//:cohere",
 ])

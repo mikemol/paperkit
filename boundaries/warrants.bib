@@ -100,7 +100,7 @@
 }
 @misc{bnd-check,
   section = {engine}, from = {bnd-target}, join = {. },
-  claim   = {the recursive check graph's boundary (Ζ·bnd-check) --- the Bazel build graph is ONE mechanism (every project wired by the same bib.project tag, //:hook a single test_suite of uniform per-claim gate and adequacy targets) and the local CI is COMPLETE: //:hook carries both the gate and the Delta adequacy target of every graded project, so bazel test //:hook gates AND grades every document},
+  claim   = {the recursive check graph's boundary (Ζ·bnd-check) --- the Bazel build graph is ONE mechanism (every project wired by the same bib.project tag, //:hook a single test_suite of uniform per-claim gate, adequacy and cohere targets) and the local CI is COMPLETE: //:hook carries the gate and the Delta adequacy target of every graded project and the cohere target of every project whose dd-squared faces are gated, so bazel test //:hook gates, grades AND checks the emergence of every document},
   check   = {cmd:python3 ../paperkit/tests/boundaries_check.py},
   reads   = {.}
 }

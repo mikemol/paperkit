@@ -156,8 +156,12 @@ def _bib_repo_impl(repository_ctx):
     if repository_ctx.attr.compose:
         out.append('load("@@//tools:witness.bzl", "pk_proof", "pk_witness")')
     calc = repository_ctx.attr.calc
+    emerge = repository_ctx.attr.emerge
     if calc:
-        out.append('load("@@//tools:calc.bzl", "pk_calc", "pk_grade", "pk_verdict")')
+        csyms = ["pk_calc", "pk_grade", "pk_verdict"]
+        if emerge:
+            csyms.append("pk_cohere")
+        out.append('load("@@//tools:calc.bzl", ' + ", ".join([_lit(s) for s in csyms]) + ")")
     out.append("")
     recs = []
     calc_claims = {}
@@ -172,9 +176,27 @@ def _bib_repo_impl(repository_ctx):
                        ", project = " + _lit(proj) + ", data = [" + dl + "])")
             out.append("pk_verdict(name = " + _lit(k) + ", calc = " + _lit(":" + k + "__calc") + ")")
             calc_claims[k] = True
+            if emerge:
+                # Ζ·emerge·gate — a SEPARATE def-resolution calc (the engine joins the mutation
+                # surface → the precise CAUSAL fingerprint) feeds cohere.  The grade keeps its
+                # file-calc (the footprint-scoped floor) untouched: two ∂² faces, two resolutions,
+                # both needed — not one sweep run twice.
+                out.append("pk_calc(name = " + _lit(k + "__dcalc") + ", claim = " + _lit(k) +
+                           ", project = " + _lit(proj) + ', resolution = "def", data = [' + dl + "])")
         else:
             out.append(_verb_rule(k, check, proj, files, reads, custom, local))
         recs.append('":%s"' % k)
+
+    if emerge and calc_claims:
+        # Ζ·emerge·gate — the ∂² coherence faces (grounding/emergence) as a CHEAP READING over the
+        # def-calcs (coherence --from-calcs): grounding soundness gated with no re-sweep.  The
+        # def-sweep is the cost (in //:hook by the owner's call); the reading itself is ~0.1s.
+        cc = ", ".join([_lit(":" + k + "__dcalc") for k in calc_claims])
+        out.append('pk_cohere(name = "cohere_rec", project = ' + _lit(proj) + ", calcs = [" + cc +
+                   '], data = ["@@//paperkit:engine", ' + _lit(files) + "])")
+        out.append('sh_test(name = "cohere", srcs = ["@@//tools:assert_pass.sh"], ' +
+                   'args = ["$(rootpath :cohere_rec)"], data = [":cohere_rec"], size = "small", ' +
+                   'visibility = ["//visibility:public"])')
 
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an irreducibly
     # GENERAL oracle, kept as a cmd: drop (Ζ·resist).
@@ -261,13 +283,14 @@ bib_repo = repository_rule(
         "local": attr.bool(default = False),  # Ζ·resist: host-coupled project (setup) — pk_cmd runs on the host
         "compose": attr.bool(default = False),  # Ζ·compose: project the witness DAG (rests-on as build deps) + :proof
         "calc": attr.bool(default = False),  # Ζ·calc·interp: one cached pk_calc per claim → verdict + grade readings
+        "emerge": attr.bool(default = False),  # Ζ·emerge·gate: a def-calc per claim + pk_cohere (∂² faces in //:hook)
     },
 )
 
 def _bib_ext_impl(module_ctx):
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc, emerge = tag.emerge)
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -280,6 +303,7 @@ bib = module_extension(
             "local": attr.bool(default = False),
             "compose": attr.bool(default = False),
             "calc": attr.bool(default = False),
+            "emerge": attr.bool(default = False),
         }),
     },
 )

@@ -145,7 +145,7 @@
     "//tools:bibtex.bzl%bib": {
       "general": {
         "bzlTransitiveDigest": "rh4JeVxiN8dtjN6KaSPsfCtEHaQLY2XHkOqp3/OsTaU=",
-        "usagesDigest": "EqoDr4Fb0YRYOpoJQEp+DnVwZ7fKTr/paPEZ0ScwtvI=",
+        "usagesDigest": "x2xDD1uIZ4zZkn3YCKNeGB8wg1DVAenGpGicWvFCrJs=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -191,7 +191,7 @@
               "adequacy": true,
               "local": false,
               "compose": true,
-              "calc": false
+              "calc": true
             }
           },
           "paperkit_setup": {

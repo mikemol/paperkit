@@ -215,10 +215,16 @@ def _bib_repo_impl(repository_ctx):
         for k, check, sib, reads, rests in parsed:
             if not check:
                 continue
-            body = _body(check, custom)
-            if body == None:                 # file:/result:/agree: — not a single-command witness yet
-                continue
             prem = ['":%s__witness"' % r for r in rests if r in checked]
+            if sib:
+                # result: — importing another paper's results is just depending on it as a LIBRARY:
+                # a premise dep on the sibling's :proof (built iff the sibling is proven).  No pk_result.
+                prem.append('"@paperkit_%s//:proof"' % sib)
+                body = "true"
+            else:
+                body = _body(check, custom)
+                if body == None:             # file:/agree: — not a single-command witness yet
+                    continue
             out.append("pk_witness(name = " + _lit(k + "__witness") + ", holds = " + _lit(body) + pj +
                        ", premises = [" + ", ".join(prem) + "], data = [" +
                        ", ".join([_lit(d) for d in _data(reads, files)]) + "])")

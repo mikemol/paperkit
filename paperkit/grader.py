@@ -356,9 +356,17 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
         # the engine in the sandbox copy — included in the mutation surface (def
         # resolution only) so the witnesses are sensitive to the engine they test, not
         # only to their own script.  At file resolution the engine would only add the
-        # import-crash flood (one collapsed signature), so it is left out.
-        engine = ((tmp / root.name / _ENGINE.relative_to(root))
-                  if resolution == "def" and _ENGINE.is_relative_to(root) else None)
+        # import-crash flood (one collapsed signature), so it is left out.  Locate it by
+        # its position UNDER root: directly when _ENGINE lives inside root (a self-contained
+        # repo), else by name — the Bazel case, where _ENGINE.resolve() follows the staged
+        # symlink OUT to the source tree so is_relative_to(root) is false, though the engine
+        # IS copied into the sandbox at root/<name>.  Guard on the copy existing, so a
+        # genuinely absent engine stays file-resolution rather than a silent empty def sweep.
+        engine = None
+        if resolution == "def":
+            rel = _ENGINE.relative_to(root) if _ENGINE.is_relative_to(root) else Path(_ENGINE.name)
+            cand = tmp / root.name / rel
+            engine = cand if cand.is_dir() else None
         # the check's READ footprint, computed ONCE here: it scopes the file-resolution
         # sweep (Ξ·depth·explain — grade against what the check touches) AND is the key the
         # footprint-cache stores (Δ·footprint-cache).  One strace, two uses; attached to the

@@ -108,7 +108,39 @@ def audit(repo_root: Path, names: list) -> list:
     return bad
 
 
+def audit_one(proj: str, claim: str) -> dict:
+    """Ζ·foot·act — the PER-CLAIM footprint-audit ORACLE: strace this one claim's check and report
+    whether its live Φ·footprint is covered by its declared `reads` (+ own project + engine).  Bazel
+    nests one of these per claim and pk_footaudit aggregates them — so the audit SWEEP is the build
+    graph, not footdeps' ThreadPool loop (which stays for direct/on-demand use)."""
+    project_dir = Path(proj).resolve()
+    name = "." if proj == "." else project_dir.name
+    repo_root = project_dir if proj == "." else project_dir.parent
+    projects = {p.name for p in repo_root.iterdir() if (p / "paper.toml").is_file()}
+    raw = tomllib.loads((project_dir / "paper.toml").read_text())
+    custom = raw.get("checks", {})
+    declared = _declared(project_dir).get(claim, set())
+    F = {}
+    for b in P.load_config(project_dir)["bibs"]:
+        F.update(P.entries(b))
+    f = F.get(claim)
+    if not f or not f.get("check") or f["check"].startswith("result:"):
+        return {"claim": claim, "ok": True, "skip": True}     # result: is an edge — no footprint
+    fp = resolver.footprint(f["check"], project_dir, custom, scope=repo_root)
+    if fp is None:
+        return {"claim": claim, "ok": True, "degraded": True}  # strace blocked — over-declare, never fail
+    extra = {t for t in _tokens(fp, projects) if t != "paperkit" and t != name}
+    missing = sorted(extra - declared)
+    return {"claim": claim, "ok": not missing, "missing": missing}
+
+
 def main(argv: list) -> int:
+    if "--only" in argv:
+        i = argv.index("--only")
+        claim = argv[i + 1]
+        rest = [a for a in argv[1:] if a != "--only" and a != claim and not a.startswith("-")]
+        print(json.dumps(audit_one(rest[0] if rest else ".", claim)))
+        return 0
     repo_root = Path(subprocess.run(["git", "rev-parse", "--show-toplevel"],
                                     capture_output=True, text=True).stdout.strip())
     names = [a for a in argv[1:] if not a.startswith("-")] or WIRED

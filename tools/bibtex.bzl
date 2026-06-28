@@ -63,6 +63,11 @@ def _data(tokens, files):
 def _lit(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'  # a Starlark string literal
 
+# Ζ·foot·act — the GENEROUS universe (engine + every project) for a footprint audit: the strace
+# must see reads BEYOND a claim's declaration, else an under-declared read is just an absent file.
+_ALL_DATA = ('"@@//paperkit:engine", "@@//:files", "@@//boundaries:files", ' +
+             '"@@//config:files", "@@//paper:files", "@@//setup:files"')
+
 def _custom(content):
     """Parse a project's paper.toml [checks.X] cmd TEMPLATES (a custom verifier type X resolves by
     running its cmd with {target} substituted).  Starlark has no toml parser, so string ops on the
@@ -125,8 +130,13 @@ def _bib_repo_impl(repository_ctx):
         custom = _custom(repository_ctx.read(tomlp))
 
     out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")']
+    syms = []
     if repository_ctx.attr.adequacy:
-        out.append('load("@@//tools:grade.bzl", "pk_adequacy", "pk_grade_claim")')
+        syms += ["pk_adequacy", "pk_grade_claim"]
+    if not local:                       # Ζ·foot·act — the footprint audit (skips host-coupled projects)
+        syms += ["pk_footaudit", "pk_footprint"]
+    if syms:
+        out.append("load(\"@@//tools:grade.bzl\", " + ", ".join([_lit(s) for s in sorted(syms)]) + ")")
     out.append("")
     recs = []
     for k, check, sib, reads in parsed:
@@ -161,6 +171,21 @@ def _bib_repo_impl(repository_ctx):
         out.append('pk_adequacy(name = "adequacy_rec", grades = [%s], visibility = ["//visibility:public"])' % ", ".join(grades))
         out.append('sh_test(name = "adequacy", srcs = ["@@//tools:assert_pass.sh"], ' +
                    'args = ["$(rootpath :adequacy_rec)"], data = [":adequacy_rec"], visibility = ["//visibility:public"])')
+
+    if not local:
+        # Ζ·foot·act — the declare+audit cross-check as a NESTING of per-claim footprint records
+        # (pk_footprint, footdeps --only) aggregated by pk_footaudit, dissolving footdeps' ThreadPool.
+        # Data is GENEROUS (every project) so the strace sees reads BEYOND the declaration.  On-demand
+        # (not in //:hook); host-coupled projects (local) skip it — their footprint needs the host.
+        foots = []
+        for k, check, sib, reads in parsed:
+            if not check or sib:        # result: is an edge — no footprint
+                continue
+            out.append("pk_footprint(name = " + _lit(k + "__foot") + ", claim = " + _lit(k) +
+                       ", project = " + _lit(proj) + ", data = [" + _ALL_DATA + "])")
+            foots.append('":%s__foot"' % k)
+        if foots:
+            out.append('pk_footaudit(name = "footaudit", foots = [%s], visibility = ["//visibility:public"])' % ", ".join(foots))
     repository_ctx.file("BUILD.bazel", "\n".join(out) + "\n")
 
 bib_repo = repository_rule(

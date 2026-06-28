@@ -114,3 +114,55 @@ pk_adequacy = rule(
     doc = "Aggregate per-claim grade records → adequacy verdict: pass iff all grades >= behavioral.",
     attrs = {"grades": attr.label_list(allow_files = True, mandatory = True)},
 )
+
+# Ζ·foot·act — the per-claim FOOTPRINT-AUDIT as a Bazel action (the footprint record family, sibling
+# of verdict/grade).  footdeps --only is the oracle (strace the check, compare its dep tokens to the
+# claim's declared reads); Bazel nests one per claim and pk_footaudit aggregates — dissolving
+# footdeps' ThreadPool.  Data is GENEROUS (all projects) so the strace sees reads BEYOND the
+# declaration (else an under-declared read is just an absent file, not a detected miss).
+def _footprint_impl(ctx):
+    py = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    interp = py.interpreter.path
+    v = ctx.actions.declare_file(ctx.label.name + ".foot.json")
+    ctx.actions.run_shell(
+        outputs = [v],
+        inputs = depset(ctx.files.data, transitive = [py.files]),
+        command = ('PY=$(cd "$(dirname ' + interp + ')" && pwd)/$(basename ' + interp + '); ' +
+                   'export PATH="$(dirname "$PY"):$PATH"; ' +
+                   '"$PY" paperkit/footdeps.py --only ' + ctx.attr.claim + " " + ctx.attr.project +
+                   " > " + v.path),
+        mnemonic = "PkFootprint",
+        progress_message = "Ζ·foot·act " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([v]))]
+
+pk_footprint = rule(
+    implementation = _footprint_impl,
+    doc = "Audit ONE claim's footprint vs its declared reads (footdeps --only) → a foot record.",
+    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    attrs = {
+        "claim": attr.string(mandatory = True),
+        "project": attr.string(mandatory = True),
+        "data": attr.label_list(allow_files = True),
+    },
+)
+
+# Ζ·foot·act — pk_footaudit aggregates per-claim foot RECORDS into the project's audit verdict
+# (sibling of pk_gate/pk_adequacy): pass iff every claim's footprint is covered by its declared
+# reads (no record reads "ok": false).  On-demand (declare+audit), not in //:hook.
+def _footaudit_impl(ctx):
+    v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
+    paths = " ".join([f.path for f in ctx.files.foots])
+    emit = "printf '{\"verb\":\"footaudit\",\"verdict\":\"%s\"}\\n' \"$V\" > " + v.path
+    if not ctx.files.foots:
+        cmd = "V=pass; " + emit
+    else:
+        cmd = "if grep -hE '\"ok\": ?false' " + paths + "; then V=fail; else V=pass; fi; " + emit
+    ctx.actions.run_shell(outputs = [v], inputs = ctx.files.foots, command = cmd, mnemonic = "PkFootAudit")
+    return [DefaultInfo(files = depset([v]))]
+
+pk_footaudit = rule(
+    implementation = _footaudit_impl,
+    doc = "Aggregate per-claim foot records → audit verdict: pass iff every footprint ⊆ declared reads.",
+    attrs = {"foots": attr.label_list(allow_files = True, mandatory = True)},
+)

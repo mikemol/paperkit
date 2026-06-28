@@ -118,7 +118,15 @@ def main(argv: list) -> int:
             return 0
         chk = f["check"]
         res = _grade_parallel(project_dir, [chk], custom, presupposed, resolution)
-        print(json.dumps({"claim": only, "grade": res[chk]["grade"]}))
+        rec = res[chk]
+        if "--calc" in argv:
+            # Ζ·calc — emit the CALCULATION (the measurement), separate from the grade INTERPRETATION:
+            # the baseline verdict + the sensitivity fingerprint that a reading (grade/emergence/...)
+            # consumes.  The expensive sweep runs ONCE here; readings over this record are free.
+            print(json.dumps({"claim": only, "baseline": rec.get("baseline", rec["grade"] != "broken"),
+                              "sens": rec.get("tests", [])}))
+        else:
+            print(json.dumps({"claim": only, "grade": rec["grade"]}))   # the grade INTERPRETATION
         return 0
 
     # which warrants to grade

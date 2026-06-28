@@ -278,6 +278,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
                 "not_lower": "—"}
     baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir, footprint)
     rec = _grade_from_sens(baseline, sens)
+    rec["baseline"] = baseline   # Ζ·calc — the measured baseline (the verdict), part of the CALCULATION
     if rec["grade"] == "indeterminate":
         rec = _vacuity_source(rec, chk, sandbox_project, custom, engine_dir)
     # Ε·agree·grade — the corroboration AXIS, orthogonal to the falsifiability grade above:

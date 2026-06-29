@@ -11,6 +11,20 @@ _PY = "@bazel_tools//tools/python:toolchain_type"
 def _pypath(py):
     return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
+# Τ·mem·observe·clean — a native bool build setting (no skylib) gating the cgroup peak read.  Only
+# under --config=memobserve (which sets --//tools:observe=True) is each action in its own cgroup, so
+# memory.peak is tree-accurate; OFF, /proc/self/cgroup points at the SHARED bazel cgroup and the read
+# is whole-build garbage.  So OFF the peak action writes a clean 0 (honest "not measured") instead.
+# Because the flag value is spliced into the command string, it is part of the action KEY: observe
+# and default builds cache as DISTINCT actions — a default build can never serve a stale measured
+# peak, and an observe build re-measures rather than reusing a default 0.
+ObserveInfo = provider(doc = "Τ·mem·observe·clean flag state", fields = ["enabled"])
+
+def _observe_impl(ctx):
+    return [ObserveInfo(enabled = ctx.build_setting_value)]
+
+observe_setting = rule(implementation = _observe_impl, build_setting = config.bool(flag = True))
+
 # Τ·mem (RESERVE+LEARN) — declare each sweep's memory so Bazel's local scheduler bounds CONCURRENT
 # sweeps against --local_ram_resources (default HOST_RAM*.67) — PORTABLE memory-bounding for
 # constrained / non-zswap machines, the substrate-membudget pool gone Bazel-native (NOT for this dev
@@ -53,17 +67,19 @@ def _calc_impl(ctx):
     # Τ·mem — the learned bucket (via the bib generator's ladder), or the cold-start floor by
     # resolution when unmeasured (mem == 0).
     bucket = ctx.attr.mem if ctx.attr.mem else (2048 if ctx.attr.resolution == "def" else 768)
+    # Τ·mem·observe·clean — read the cgroup peak ONLY when observing (per-action cgroup ⇒ tree-accurate);
+    # otherwise write a clean 0.  The branch makes the flag part of the action key (see ObserveInfo).
+    if ctx.attr._observe[ObserveInfo].enabled:
+        peak = " ; cat /sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)/memory.peak > " + p.path + \
+               " 2>/dev/null || echo 0 > " + p.path
+    else:
+        peak = " ; echo 0 > " + p.path
     ctx.actions.run_shell(
         outputs = [c, p],
         inputs = depset(ctx.files.data, transitive = [py.files]),
         command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
                   '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
-                  " --calc" + res + " " + ctx.attr.project + " > " + c.path +
-                  # Τ·mem·observe — this action's cgroup memory.peak (tree-accurate; the ONLY observe
-                  # channel — Bazel's log has no peak).  Meaningful under --config=memobserve (each
-                  # action in its own cgroup); best-effort — degrades to 0 where cgroups are absent.
-                  " ; cat /sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)/memory.peak > " + p.path +
-                  " 2>/dev/null || echo 0 > " + p.path,
+                  " --calc" + res + " " + ctx.attr.project + " > " + c.path + peak,
         mnemonic = "PkCalc",
         progress_message = "Ζ·calc " + ctx.label.name,
         # Τ·mem — bound concurrent sweeps against --local_ram_resources (Bazel-native, portable);
@@ -84,6 +100,7 @@ pk_calc = rule(
         "resolution": attr.string(default = "", doc = "def = per-definition fingerprint (for emergence); else file"),
         "mem": attr.int(default = 0, doc = "Τ·mem learned reservation (MB, a pow2 bucket in _RS); 0 = unmeasured → cold-start floor by resolution"),
         "data": attr.label_list(allow_files = True),
+        "_observe": attr.label(default = "@@//tools:observe"),
     },
 )
 

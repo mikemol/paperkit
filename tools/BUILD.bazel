@@ -1,5 +1,9 @@
 load("@rules_python//python:defs.bzl", "py_binary")
+load("//tools:calc.bzl", "observe_setting")
 
 exports_files(["assert_pass.sh", "read_grade.py", "mem_learn.py"])
+
+# Τ·mem·observe·clean — the peak-read gate (OFF by default; --config=memobserve sets it True).
+observe_setting(name = "observe", build_setting_default = False)
 
 py_binary(name = "pyinfo", srcs = ["pyinfo.py"], main = "pyinfo.py")

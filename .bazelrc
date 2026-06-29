@@ -10,3 +10,7 @@ test --local_extra_resources=mem_mb=8192
 # impl), so default builds stay portable on non-cgroup machines; run `bazel build … --config=memobserve`
 # to populate the learned-mem manifest, which then refines the portable reservations for everyone.
 build:memobserve --incompatible_use_new_cgroup_implementation --experimental_sandbox_memory_limit_mb=HOST_RAM
+# Τ·mem·observe·clean — turn the peak read ON only here; default builds write a clean 0 (the read OFF
+# would be the SHARED-cgroup garbage), and the flag is part of the calc action key (observe-vs-default
+# cache as distinct actions, so no stale measured/0 peak crosses configs).
+build:memobserve --//tools:observe=True

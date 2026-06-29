@@ -182,10 +182,15 @@ def emergence_residual(records: list) -> dict:
     engine fingerprint REDUCE to its premises', fp(X) ⊆ ∪fp(rests-on)?  A claim that COLLAPSES adds
     no engine discrimination beyond its grounding: its witness is redundant and EMERGES by
     consumption (the proof composes — Ζ·compose).  A claim with an INCREMENT tests engine capability
-    NO premise does (the delta) — either under-grounded (add the missing rests-on) or an irreducible
-    leaf to extract.  A LEAF (no rests-on) is an axiom — a self-contained check.  Where grounding's
-    OVERLAP can pass (the edge shares one site) while the claim still tests more, emergence's SUBSET
-    catches it: the residual is the increments — claims the grounding does not COVER."""
+    NO premise does (the delta).  An increment is NOT by itself an under-grounding: a def-fingerprint
+    records what the CHECK exercises, which includes the check's MECHANISM (the engine it RUNS to
+    verify a thesis — e.g. a claim about the bib whose check runs the resolver to confirm a check
+    resolves) and the claim's OWN origin-capability, not only the thesis's grounding.  So an increment
+    means KEEP / contributes (collapse-safe), and reads three ways: under-grounded (add the missing
+    rests-on), the claim's irreducible contribution, or pure check mechanism.  The sound under-grounding
+    signal is the GROUNDING face (overlap), not this one.  A LEAF (no rests-on) is an axiom.  Where
+    grounding's OVERLAP can pass (the edge shares one site) while the claim still tests more,
+    emergence's SUBSET catches it: the residual is the increments — claims the grounding does not COVER."""
     S = {r["key"]: _engine_cap(r.get("tests", [])) for r in records}
     collapse = leaf = 0
     increments = []

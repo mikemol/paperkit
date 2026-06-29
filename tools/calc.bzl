@@ -27,19 +27,27 @@ def _rs_calc_file(_os, _inputs):
 def _calc_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     c = ctx.actions.declare_file(ctx.label.name + ".calc.json")
+    p = ctx.actions.declare_file(ctx.label.name + ".peak")
     res = (" --resolution " + ctx.attr.resolution) if ctx.attr.resolution else ""
     ctx.actions.run_shell(
-        outputs = [c],
+        outputs = [c, p],
         inputs = depset(ctx.files.data, transitive = [py.files]),
         command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
                   '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
-                  " --calc" + res + " " + ctx.attr.project + " > " + c.path,
+                  " --calc" + res + " " + ctx.attr.project + " > " + c.path +
+                  # Τ·mem·observe — this action's cgroup memory.peak (tree-accurate; the ONLY observe
+                  # channel — Bazel's log has no peak).  Meaningful under --config=memobserve (each
+                  # action in its own cgroup); best-effort — degrades to 0 where cgroups are absent.
+                  " ; cat /sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)/memory.peak > " + p.path +
+                  " 2>/dev/null || echo 0 > " + p.path,
         mnemonic = "PkCalc",
         progress_message = "Ζ·calc " + ctx.label.name,
         # Τ·mem (RESERVE) — bound concurrent sweeps against --local_ram_resources (Bazel-native, portable).
         resource_set = _rs_calc_def if ctx.attr.resolution == "def" else _rs_calc_file,
     )
-    return [DefaultInfo(files = depset([c]))]
+    # peak in a SEPARATE output group so consumers (verdict/grade/cohere) still see only the calc
+    # record; the learned-mem manifest (Τ·mem·learn) reads the "peak" group.
+    return [DefaultInfo(files = depset([c])), OutputGroupInfo(peak = depset([p]))]
 
 pk_calc = rule(
     implementation = _calc_impl,

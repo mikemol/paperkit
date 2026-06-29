@@ -11,6 +11,19 @@ _PY = "@bazel_tools//tools/python:toolchain_type"
 def _pypath(py):
     return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
+# Τ·mem (RESERVE) — declare each sweep's memory so Bazel's local scheduler bounds CONCURRENT sweeps
+# against --local_ram_resources (default HOST_RAM*.67) — PORTABLE memory-bounding for constrained /
+# non-zswap machines, the substrate-membudget pool gone Bazel-native (NOT for this dev box, which
+# zswap handles; for the general case).  resource_set MUST be a top-level def (Bazel forbids a
+# closure), so per-resolution caps are distinct top-level fns; the learned per-claim value
+# (Τ·mem·observe → pow2 buckets) will refine these cold-start defaults.  A def sweep (project+engine
+# mutation) is far heavier than a file sweep.
+def _rs_calc_def(_os, _inputs):
+    return {"memory": 2048}
+
+def _rs_calc_file(_os, _inputs):
+    return {"memory": 768}
+
 def _calc_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     c = ctx.actions.declare_file(ctx.label.name + ".calc.json")
@@ -23,6 +36,8 @@ def _calc_impl(ctx):
                   " --calc" + res + " " + ctx.attr.project + " > " + c.path,
         mnemonic = "PkCalc",
         progress_message = "Ζ·calc " + ctx.label.name,
+        # Τ·mem (RESERVE) — bound concurrent sweeps against --local_ram_resources (Bazel-native, portable).
+        resource_set = _rs_calc_def if ctx.attr.resolution == "def" else _rs_calc_file,
     )
     return [DefaultInfo(files = depset([c]))]
 

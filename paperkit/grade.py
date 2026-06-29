@@ -12,6 +12,8 @@ exercises only this, not the whole grader.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 STRENGTH = {"vacuous": 0, "existence": 1, "indeterminate": 1, "behavioral": 2, "imported": 3}
 ORDER = {"existence": 1, "behavioral": 2}  # valid --min-strength thresholds
 
@@ -49,3 +51,45 @@ def _grade_from_sens(baseline: bool, sens: list) -> dict:
             "why": "no generic mutation flips it — vacuous OR a negative-assertion check; needs a targeted counter-fixture (Π)",
             "not_higher": "to rise: a targeted counter-fixture (a positive mutation) would prove it behavioral",
             "not_lower": "not provably vacuous: it runs a cmd:, not a presupposed file:"}
+
+
+def mark_content_sensitive(records: list, content: set) -> list:
+    """Mark each behavioral check content_sensitive iff a flipped test file is the document's
+    OWN content (bib/rubric/out), not merely config/engine: a behavioral check sensitive only
+    to config or the engine can-fail by CRASH but does not test the document's content.  A pure
+    reading over the grade records + the document's content-file names."""
+    for r in records:
+        if r["grade"] == "behavioral":
+            r["content_sensitive"] = any(Path(t).name in content for t in r["tests"])
+    return records
+
+
+def clamp(records: list) -> list:
+    """Effective grade — clamp by entailment: a claim is no better grounded than the weakest
+    premise it (transitively) depends on along rests-on.  Annotates each record with
+    effective_grade, clamp (rungs dropped from the self-contained grade), and clamped_by (the
+    premise that pins it).  A pure reading over the grade records + the RANK ladder."""
+    rby = {r["key"]: r for r in records}
+    effc: dict = {}
+
+    def eff(k, stack=()):
+        if k in effc:
+            return effc[k]
+        r = rby.get(k)
+        if r is None:
+            return (RANK_C["behavioral"], None)   # not in scope: impose no constraint
+        best, by = RANK_C.get(r["grade"], 0), None
+        for d in r.get("rests-on", []):              # clamp over GROUNDING edges
+            if d in rby and d not in stack and d != k:
+                de, _ = eff(d, stack + (k,))
+                if de < best:
+                    best, by = de, d
+        effc[k] = (best, by)
+        return effc[k]
+
+    for r in records:
+        e, by = eff(r["key"])
+        r["effective_grade"] = GRADE_C[e]
+        r["clamp"] = RANK_C.get(r["grade"], 0) - e
+        r["clamped_by"] = by
+    return records

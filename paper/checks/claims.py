@@ -26,7 +26,8 @@ import gate  # noqa: E402
 import project as P  # noqa: E402
 import discriminate  # noqa: E402  (Δ: the adequacy CLI)
 import layout  # noqa: E402  (project topology — sandbox roots, nested projects)
-import grader  # noqa: E402  (Δ's mutation sweep + grade ladder)
+import grade  # noqa: E402  (the grade ladder + interpretation — Μ·grade)
+import grader  # noqa: E402  (Δ's mutation sweep)
 import driver  # noqa: E402  (the pump/parse liveness driver)
 import rhetoric  # noqa: E402  (the move/scheme vocabulary)
 import coherence  # noqa: E402  (∂²: declared grounding vs measured sensitivity)
@@ -378,27 +379,28 @@ def edge_from_orders():
 
 
 def edge_rests_grounds():
-    # rests-on is a SEPARATE grounding edge: effective grade clamps to the weakest
-    # premise along it.  A behavioral thesis resting on a vacuous atom clamps to vacuous.
-    recs = json.loads(fx.discriminate(
-        [fx.entry("atom", claim="atom", check="file:w.bib"),                  # vacuous (presupposed)
-         fx.entry("thesis", claim="thesis", check="cmd:grep -q TOKEN a.txt",  # behavioral
-                  frm="atom", rests="atom")],
-        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    # rests-on is a SEPARATE grounding edge: the EFFECTIVE grade clamps to the weakest premise
+    # along it (a behavioral thesis resting on a vacuous atom clamps to vacuous).  Π — this tests
+    # the CLAMP (grade.clamp), the claim's subject; the premise grades are inputs other claims own
+    # (the vacuous/behavioral examples), so they are GIVEN, not re-derived through the whole sweep.
+    recs = grade.clamp([
+        {"key": "atom", "grade": "vacuous", "rests-on": []},
+        {"key": "thesis", "grade": "behavioral", "rests-on": ["atom"]},
+    ])
     th = next(r for r in recs if r["key"] == "thesis")
     assert th["grade"] == "behavioral" and th["effective_grade"] == "vacuous", \
         f"rests-on did not clamp the thesis (self={th['grade']}, eff={th['effective_grade']})"
 
 
 def edge_chiral():
-    # grounding is independent of prose adjacency: rests-on clamps even when the
-    # premise is NOT a from-neighbor (the two graphs diverge / reverse)
-    recs = json.loads(fx.discriminate(
-        [fx.entry("atom", claim="atom", check="file:w.bib"),                  # vacuous
-         fx.entry("mid", claim="mid", check="cmd:grep -q TOKEN a.txt"),       # the prose neighbor
-         fx.entry("thesis", claim="thesis", check="cmd:grep -q TOKEN a.txt",
-                  frm="mid", rests="atom")],                                  # prose←mid, grounding←atom
-        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    # grounding is independent of prose adjacency: rests-on clamps even when the premise is NOT a
+    # from-neighbor (the two graphs diverge / reverse).  Π — tests the CLAMP (grade.clamp) over
+    # known grades: the thesis grounds on `atom` but is a prose-neighbor of `mid`, yet clamps to atom.
+    recs = grade.clamp([
+        {"key": "atom", "grade": "vacuous", "rests-on": []},
+        {"key": "mid", "grade": "behavioral", "rests-on": []},               # the prose neighbor
+        {"key": "thesis", "grade": "behavioral", "from": ["mid"], "rests-on": ["atom"]},
+    ])
     th = next(r for r in recs if r["key"] == "thesis")
     assert "atom" in th.get("rests-on", []) and "atom" not in th.get("from", []), \
         "fixture should ground on a non-prose-neighbor"

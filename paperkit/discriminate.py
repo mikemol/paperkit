@@ -77,7 +77,7 @@ from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
                    footprint_hash as _footprint_hash, load as _load_cache, save as _save_cache)
 from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness,  # noqa: E402,F401
                     _grade_parallel, _sandbox_root)
-from grade import STRENGTH, ORDER, RANK_C, GRADE_C, CORRO_C  # noqa: E402,F401  (Μ·grade — the ladder leaf)
+from grade import STRENGTH, ORDER, CORRO_C, clamp, mark_content_sensitive  # noqa: E402,F401  (Μ·grade — the ladder + interpretation leaf)
 
 
 def main(argv: list) -> int:
@@ -216,40 +216,12 @@ def main(argv: list) -> int:
         g["grader"] = grader_of[chk]
         records.append(g)
 
-    # content inputs = the files a check must touch to discriminate the paper's
-    # CONTENT (not merely its config/engine); a behavioral check sensitive only
-    # to paper.toml or the engine can-fail by CRASH, but does not test content.
+    # content inputs = the files a check must touch to discriminate the paper's CONTENT (not
+    # merely its config/engine).  The INTERPRETATION lives in grade (Μ·grade — calc vs interp):
+    # mark content-sensitivity, then clamp the effective grade by entailment over rests-on.
     content = {p.name for p in cfg["bibs"]} | {cfg["rubric"].name, cfg["out"].name}
-    for r in records:
-        if r["grade"] == "behavioral":
-            r["content_sensitive"] = any(Path(t).name in content for t in r["tests"])
-
-    # EFFECTIVE grade — clamp by entailment: a claim is no better grounded than the
-    # weakest premise it (transitively) depends on.  `clamp` = rungs dropped from the
-    # self-contained grade; `clamped_by` = the premise that pins it.
-    rby = {r["key"]: r for r in records}
-    effc: dict = {}
-
-    def eff(k, stack=()):
-        if k in effc:
-            return effc[k]
-        r = rby.get(k)
-        if r is None:
-            return (RANK_C["behavioral"], None)   # not in scope: impose no constraint
-        best, by = RANK_C.get(r["grade"], 0), None
-        for d in r.get("rests-on", []):              # clamp over GROUNDING edges
-            if d in rby and d not in stack and d != k:
-                de, _ = eff(d, stack + (k,))
-                if de < best:
-                    best, by = de, d
-        effc[k] = (best, by)
-        return effc[k]
-
-    for r in records:
-        e, by = eff(r["key"])
-        r["effective_grade"] = GRADE_C[e]
-        r["clamp"] = RANK_C.get(r["grade"], 0) - e
-        r["clamped_by"] = by
+    mark_content_sensitive(records, content)
+    clamp(records)
 
     if as_json:
         print(json.dumps(records, indent=2))

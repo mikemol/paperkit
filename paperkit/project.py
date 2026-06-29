@@ -49,7 +49,12 @@ _LATEX = [
 def clean(s: str) -> str:
     for pat, rep in _LATEX:
         s = re.sub(pat, rep, s)
-    return re.sub(r"[{}]", "", s).strip().rstrip(".")
+    # Escaped braces \{ \} are LITERAL (e.g. set notation {1,2,3}); shield them
+    # from the grouping-brace strip below, then restore as real braces.
+    s = s.replace(r"\{", "\x00").replace(r"\}", "\x01")
+    s = re.sub(r"[{}]", "", s)
+    s = s.replace("\x00", "{").replace("\x01", "}")
+    return s.strip().rstrip(".")
 
 
 def short_author(a: str) -> str:

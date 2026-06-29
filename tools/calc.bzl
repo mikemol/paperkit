@@ -11,24 +11,48 @@ _PY = "@bazel_tools//tools/python:toolchain_type"
 def _pypath(py):
     return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
-# Τ·mem (RESERVE) — declare each sweep's memory so Bazel's local scheduler bounds CONCURRENT sweeps
-# against --local_ram_resources (default HOST_RAM*.67) — PORTABLE memory-bounding for constrained /
-# non-zswap machines, the substrate-membudget pool gone Bazel-native (NOT for this dev box, which
-# zswap handles; for the general case).  resource_set MUST be a top-level def (Bazel forbids a
-# closure), so per-resolution caps are distinct top-level fns; the learned per-claim value
-# (Τ·mem·observe → pow2 buckets) will refine these cold-start defaults.  A def sweep (project+engine
-# mutation) is far heavier than a file sweep.
-def _rs_calc_def(_os, _inputs):
+# Τ·mem (RESERVE+LEARN) — declare each sweep's memory so Bazel's local scheduler bounds CONCURRENT
+# sweeps against --local_ram_resources (default HOST_RAM*.67) — PORTABLE memory-bounding for
+# constrained / non-zswap machines, the substrate-membudget pool gone Bazel-native (NOT for this dev
+# box, which zswap handles; for the general case).  resource_set MUST be a top-level def (Bazel
+# forbids a closure), so the reservation is one top-level fn PER POW2 BUCKET; the bib generator
+# resolves a claim's bucket down a (project,resolution,claim) specificity ladder (= the Ω·config
+# ladder) and passes it as the `mem` attr.  mem=0 means "unmeasured" → the cold-start floor by
+# resolution (a def sweep, project+engine mutation, is far heavier than a file sweep).  The learned
+# layer (Τ·mem·observe → mem.json) overrides these floors per (project,resolution).
+def _rs_128(_os, _inputs):
+    return {"memory": 128}
+
+def _rs_256(_os, _inputs):
+    return {"memory": 256}
+
+def _rs_512(_os, _inputs):
+    return {"memory": 512}
+
+def _rs_1024(_os, _inputs):
+    return {"memory": 1024}
+
+def _rs_2048(_os, _inputs):
     return {"memory": 2048}
 
-def _rs_calc_file(_os, _inputs):
+def _rs_4096(_os, _inputs):
+    return {"memory": 4096}
+
+def _rs_768(_os, _inputs):
     return {"memory": 768}
+
+# bucket (MB) → its top-level reservation fn.  Learned buckets are pure pow2 (mem_learn clamps to
+# [128,4096]); 768 is the file cold-start floor only.  Add a level here if the distribution grows one.
+_RS = {128: _rs_128, 256: _rs_256, 512: _rs_512, 1024: _rs_1024, 2048: _rs_2048, 4096: _rs_4096, 768: _rs_768}
 
 def _calc_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     c = ctx.actions.declare_file(ctx.label.name + ".calc.json")
     p = ctx.actions.declare_file(ctx.label.name + ".peak")
     res = (" --resolution " + ctx.attr.resolution) if ctx.attr.resolution else ""
+    # Τ·mem — the learned bucket (via the bib generator's ladder), or the cold-start floor by
+    # resolution when unmeasured (mem == 0).
+    bucket = ctx.attr.mem if ctx.attr.mem else (2048 if ctx.attr.resolution == "def" else 768)
     ctx.actions.run_shell(
         outputs = [c, p],
         inputs = depset(ctx.files.data, transitive = [py.files]),
@@ -42,8 +66,9 @@ def _calc_impl(ctx):
                   " 2>/dev/null || echo 0 > " + p.path,
         mnemonic = "PkCalc",
         progress_message = "Ζ·calc " + ctx.label.name,
-        # Τ·mem (RESERVE) — bound concurrent sweeps against --local_ram_resources (Bazel-native, portable).
-        resource_set = _rs_calc_def if ctx.attr.resolution == "def" else _rs_calc_file,
+        # Τ·mem — bound concurrent sweeps against --local_ram_resources (Bazel-native, portable);
+        # the reservation is the learned/floor bucket resolved above.
+        resource_set = _RS[bucket],
     )
     # peak in a SEPARATE output group so consumers (verdict/grade/cohere) still see only the calc
     # record; the learned-mem manifest (Τ·mem·learn) reads the "peak" group.
@@ -57,6 +82,7 @@ pk_calc = rule(
         "claim": attr.string(mandatory = True),
         "project": attr.string(mandatory = True),
         "resolution": attr.string(default = "", doc = "def = per-definition fingerprint (for emergence); else file"),
+        "mem": attr.int(default = 0, doc = "Τ·mem learned reservation (MB, a pow2 bucket in _RS); 0 = unmeasured → cold-start floor by resolution"),
         "data": attr.label_list(allow_files = True),
     },
 )

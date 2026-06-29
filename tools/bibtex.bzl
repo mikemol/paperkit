@@ -130,6 +130,11 @@ def _verb_rule(name, check, proj, files, reads, custom, local):
         fail("Ζ·verb·wire: check type '" + typ + ":' is neither builtin nor a [checks." + typ +
              "] template — claim '" + name + "'")
 
+def _membucket(mem, claim, res):
+    """Τ·mem ladder (= the Ω·config resolution ladder): a claim's reservation is the most-specific
+    learned entry — per-claim override > per-resolution default > 0 (calc.bzl's cold-start floor)."""
+    return mem.get("claims", {}).get(claim, mem.get(res, 0))
+
 def _bib_repo_impl(repository_ctx):
     content = repository_ctx.read(repository_ctx.path(repository_ctx.attr.bib))
     proj = repository_ctx.attr.project
@@ -144,6 +149,16 @@ def _bib_repo_impl(repository_ctx):
     if tomlp.exists:
         repository_ctx.watch(tomlp)
         custom = _custom(repository_ctx.read(tomlp))
+
+    # Τ·mem·learn — the per-project learned reservation manifest (a projection of observed peaks,
+    # mem.json beside the bib; regenerated on-demand by //:mem-learn).  Resolved per claim down the
+    # (claim > resolution > cold-start) ladder when emitting each pk_calc.  Absent ⇒ {} ⇒ every
+    # claim falls through to calc.bzl's cold-start floor (mem = 0).
+    mem = {}
+    memp = repository_ctx.path(repository_ctx.attr.bib).dirname.get_child("mem.json")
+    if memp.exists:
+        repository_ctx.watch(memp)
+        mem = json.decode(repository_ctx.read(memp))
 
     out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")']
     syms = []
@@ -173,7 +188,8 @@ def _bib_repo_impl(repository_ctx):
             # reading below); the redundant verdict run + the adequacy re-sweep collapse into it.
             dl = ", ".join([_lit(d) for d in _data(reads, files)])
             out.append("pk_calc(name = " + _lit(k + "__calc") + ", claim = " + _lit(k) +
-                       ", project = " + _lit(proj) + ", data = [" + dl + "])")
+                       ", project = " + _lit(proj) + ", mem = " + str(_membucket(mem, k, "file")) +
+                       ", data = [" + dl + "])")
             out.append("pk_verdict(name = " + _lit(k) + ", calc = " + _lit(":" + k + "__calc") + ")")
             calc_claims[k] = True
             if emerge:
@@ -182,7 +198,8 @@ def _bib_repo_impl(repository_ctx):
                 # file-calc (the footprint-scoped floor) untouched: two ∂² faces, two resolutions,
                 # both needed — not one sweep run twice.
                 out.append("pk_calc(name = " + _lit(k + "__dcalc") + ", claim = " + _lit(k) +
-                           ", project = " + _lit(proj) + ', resolution = "def", data = [' + dl + "])")
+                           ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
+                           str(_membucket(mem, k, "def")) + ", data = [" + dl + "])")
         else:
             out.append(_verb_rule(k, check, proj, files, reads, custom, local))
         recs.append('":%s"' % k)

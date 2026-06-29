@@ -1,9 +1,9 @@
 common --enable_bzlmod
 test --test_output=errors --test_summary=terse
-# A memory-budget pool (replaces the vendored membudget semaphore — Ζ·membudget).  A check
-# declares `mem` (MB) in its bib; Ζ·starlark projects that to tags = ["resources:mem_mb:N"], and
-# Bazel's local scheduler bounds concurrent memory to this pool.  Native, per-machine, no flock.
-test --local_extra_resources=mem_mb=8192
+# Memory bounding is Τ·mem: each pk_calc declares a resource_set (the learned mem.json bucket via
+# the bib generator's ladder), and Bazel's local scheduler bounds concurrent sweeps against
+# --local_ram_resources (default HOST_RAM*.67) — no rc pool needed.  The old --local_extra_resources
+# mem_mb pool (the membudget→tags projection) was never wired and is retired.
 # Τ·mem·observe — isolate each action in its own cgroup so it can read its OWN tree-peak memory
 # (/sys/fs/cgroup/<action>/memory.peak — the only tree-accurate channel; Bazel's log has no peak,
 # and systemd-run is dead in the scrubbed sandbox env).  OPT-IN (needs cgroup-v2 + the new cgroup

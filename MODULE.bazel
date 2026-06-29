@@ -4,7 +4,8 @@ A module extension (tools/bibtex.bzl) reads each project's warrants.bib at fetch
 every claim into a recursive check target; `bazel test //:hook` gates AND grades every document.
 The engine's home-grown build machinery — the checked-in BUILD projector, the membudget
 semaphore — is RETIRED: Bazel owns scheduling, caching (re-gate only on changed inputs), progress,
-resource limits (--local_extra_resources), and the sandbox.  The bib is the sole source.
+resource limits (per-action resource_set bounded by --local_ram_resources), and the sandbox.  The
+bib is the sole source.
 """
 module(name = "paperkit", version = "0.1")
 

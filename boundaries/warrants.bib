@@ -33,7 +33,7 @@
 }
 @misc{bnd-parallel,
   section = {engine}, from = {bnd-json}, join = {. },
-  claim   = {the parallel gate's boundary --- the verdict tracks the checks, never the worker count or a check's declared memory (mem, the bib's resource manifest that Ζ·starlark projects to a Bazel resource reservation; the engine itself is inert to it), so fanning out equals running serially},
+  claim   = {the parallel gate's boundary --- the verdict tracks the checks, never the worker count or the memory reservation (the learned mem.json that the bib generator projects to a per-sweep Bazel resource_set, bounding concurrent sweeps against the host RAM pool; the engine itself is inert to it), so fanning out equals running serially},
   check   = {cmd:python3 ../paperkit/tests/boundaries_jobs.py}
 }
 @misc{bnd-env,

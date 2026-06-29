@@ -25,9 +25,9 @@ PASS = [entry("a", claim="alpha", check="cmd:true"),
 FAIL = [entry("a", claim="alpha", check="cmd:true"),
         entry("b", claim="beta", check="cmd:false", frm="a"),
         entry("c", claim="gamma", check="cmd:true", frm="b")]
-# Declaring `mem` is the bib's resource manifest — Ζ·starlark projects it to a Bazel resource
-# reservation so the scheduler bounds concurrent memory.  The engine itself is INERT to mem
-# (it just resolves the check), so the verdict must be identical to a run without mem.
+# Memory bounding lives entirely in the Bazel layer (Τ·mem: the bib generator projects the learned
+# mem.json to a per-sweep resource_set).  The engine is INERT to memory — it just resolves the
+# check — so a `mem` annotation on a check leaves the verdict identical to a run without one.
 LEASED_PASS = [entry("a", claim="alpha", check="cmd:true", mem="256"),
                entry("b", claim="beta", check="cmd:true", frm="a", mem="256")]
 LEASED_FAIL = [entry("a", claim="alpha", check="cmd:true", mem="256"),
@@ -68,7 +68,7 @@ def main() -> int:
          "serial verdicts", (rc_pass_serial, rc_fail_serial) == (0, 1),
          "parallel verdicts (identical)", (rc_pass_par, rc_fail_par) == (rc_pass_serial, rc_fail_serial)),
         ("a declared mem is semantically inert (verdict unchanged by mem)",
-         "declaring mem={256} on every check (the bib's resource manifest; engine inert)",
+         "declaring mem={256} on every check (memory bounding is Bazel's resource_set; engine inert)",
          "unleased → (0, 1)", (rc_pass_serial, rc_fail_serial) == (0, 1),
          "leased   → (0, 1) identical", (rc_leased_pass, rc_leased_fail) == (0, 1)),
     ]

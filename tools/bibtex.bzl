@@ -173,7 +173,7 @@ def _bib_repo_impl(repository_ctx):
     calc = repository_ctx.attr.calc
     emerge = repository_ctx.attr.emerge
     if calc:
-        csyms = ["pk_calc", "pk_grade", "pk_verdict"]
+        csyms = ["pk_calc", "pk_grade", "pk_mem_learn", "pk_verdict"]
         if emerge:
             csyms.append("pk_cohere")
         out.append('load("@@//tools:calc.bzl", ' + ", ".join([_lit(s) for s in csyms]) + ")")
@@ -203,6 +203,18 @@ def _bib_repo_impl(repository_ctx):
         else:
             out.append(_verb_rule(k, check, proj, files, reads, custom, local))
         recs.append('":%s"' % k)
+
+    if calc_claims:
+        # Τ·mem·learn — the regen target: aggregate every calc's observed peak → mem.json (the
+        # committed projection consumed by the ladder above).  On-demand: build under
+        # --config=memobserve in a clean output base, then copy bazel-bin .../mem.json to the source
+        # mem.json beside this bib (NOT hook-gated — the observe is too costly and a stale manifest
+        # is a benign perf hint).  Aggregates file-calcs + (when emerge) def-calcs.
+        ml = [":" + k + "__calc" for k in calc_claims]
+        if emerge:
+            ml += [":" + k + "__dcalc" for k in calc_claims]
+        out.append('pk_mem_learn(name = "mem_learn", calcs = [' +
+                   ", ".join([_lit(t) for t in ml]) + '], visibility = ["//visibility:public"])')
 
     if emerge and calc_claims:
         # Ζ·emerge·gate — the ∂² coherence faces (grounding/emergence) as a CHEAP READING over the

@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "PyU2omR9GXEqLeap6SwK9kiouZYrokZNe3MyJomt1T8=",
+        "bzlTransitiveDigest": "s7iLr7wLP6jLtWr2gD9a+qT+UskZRsXMFO8AS5qp0Rg=",
         "usagesDigest": "wEQOhntXZ4i6ecw/beI3vdwPEWlHpnJmqWC37TC1aVs=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

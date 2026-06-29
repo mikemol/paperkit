@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 
-exports_files(["assert_pass.sh", "read_grade.py"])
+exports_files(["assert_pass.sh", "read_grade.py", "mem_learn.py"])
 
 py_binary(name = "pyinfo", srcs = ["pyinfo.py"], main = "pyinfo.py")

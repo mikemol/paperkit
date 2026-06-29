@@ -46,8 +46,12 @@ for arg in sys.argv[1:]:
         continue
     raw = p.read_text().strip()
     mb = (int(raw) if raw.isdigit() else 0) / (1024 * 1024)
-    if mb <= 0:
-        continue  # no isolated measurement; drop rather than learn a floor of 0
+    # Drop un-isolated reads: 0 (cgroups absent / peak channel off) and anything above the largest
+    # reservation bucket (a single sandboxed calc never needs >HI MB — a larger value is the SHARED
+    # cgroup read of a non-`--config=memobserve` build, not this action's tree).  A dropped claim
+    # falls through the ladder to its resolution default — never to a wrong learned floor.
+    if mb <= 0 or mb > HI:
+        continue
     peaks.setdefault(res, {})[claim] = mb
 
 manifest = {"claims": {}}

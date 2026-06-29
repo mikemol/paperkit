@@ -76,7 +76,7 @@ import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grad
 from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
                    footprint_hash as _footprint_hash, load as _load_cache, save as _save_cache)
 from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness,  # noqa: E402,F401
-                    _grade_parallel, _sandbox_root)
+                    _grade_parallel, _sandbox_root, mutate_one)
 from grade import STRENGTH, ORDER, CORRO_C, clamp, mark_content_sensitive  # noqa: E402,F401  (Μ·grade — the ladder + interpretation leaf)
 
 
@@ -118,6 +118,15 @@ def main(argv: list) -> int:
             print(json.dumps({"claim": only, "grade": "broken"}))
             return 0
         chk = f["check"]
+        mutant = config.resolve(config.MUTANT)
+        if mutant:
+            # Ζ·mutant — the SINGLE-SITE probe lifted for Bazel: mutate exactly one def-site and
+            # report whether it flips the check.  A pk_mutant action runs this per (claim, site);
+            # pk_sens aggregates the {flipped} records into the `sens` fingerprint the in-process
+            # sweep used to compute alone.  No sweep here — one mutation, hermetic.
+            print(json.dumps({"claim": only, "site": mutant,
+                              "flipped": mutate_one(project_dir, chk, custom, mutant)}))
+            return 0
         res = _grade_parallel(project_dir, [chk], custom, presupposed, resolution)
         rec = res[chk]
         if "--calc" in argv:

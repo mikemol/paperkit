@@ -136,6 +136,38 @@ pk_mem_learn = rule(
     },
 )
 
+# Ζ·mutant — ONE (claim, def-site) probe as a Bazel action: mutate exactly `site` and report
+# whether it flips the check.  This LIFTS the def-sweep's in-process group-testing fanout into
+# Bazel's graph (parallel + per-site cached); pk_sens aggregates the {flipped} records into the
+# `sens` fingerprint pk_calc's def sweep computes in-process today.  One check-run, hermetic in its
+# own sandbox copy (the per-mutant overhead the spike measures).
+def _mutant_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
+    o = ctx.actions.declare_file(ctx.label.name + ".mutant.json")
+    ctx.actions.run_shell(
+        outputs = [o],
+        inputs = depset(ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
+                  '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
+                  " --mutant '" + ctx.attr.site + "' " + ctx.attr.project + " > " + o.path,
+        mnemonic = "PkMutant",
+        progress_message = "Ζ·mutant " + ctx.label.name,
+        resource_set = _RS[512],
+    )
+    return [DefaultInfo(files = depset([o]))]
+
+pk_mutant = rule(
+    implementation = _mutant_impl,
+    doc = "Ζ·mutant — one (claim, def-site) mutation probe → {claim, site, flipped}; the sweep's atom as a Bazel action.",
+    toolchains = [_PY],
+    attrs = {
+        "claim": attr.string(mandatory = True),
+        "project": attr.string(mandatory = True),
+        "site": attr.string(mandatory = True, doc = "the mutation-site label (path or path::qualname)"),
+        "data": attr.label_list(allow_files = True),
+    },
+)
+
 def _cohere_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     v = ctx.actions.declare_file(ctx.label.name + ".cohere.json")

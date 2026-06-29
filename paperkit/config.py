@@ -131,11 +131,13 @@ CHECK = Param("check", "PAPERKIT_CHECK", flag=True,
               help="project: verify the projection round-trips against the bib, then exit")
 ONLY = Param("only", "PAPERKIT_ONLY",
              help="gate: resolve ONLY this one claim's check (the leaf of the recursive check target, Ζ·starlark) and exit")
+MUTANT = Param("mutant", "PAPERKIT_MUTANT",
+               help="Ζ·mutant: with --only, probe ONE def-site (path or path::qualname) — mutate it, report whether it flips the check, exit (the sweep's atom, for a pk_mutant action)")
 INVARIANTS = Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
                    help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks")
 
 REGISTRY = [ROOT, PATH, SAFE, WITHOUT_K, JOBS, JSON, MIN_STRENGTH, MIN_CORRO, RESOLUTION, TARGET,
-            STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, DELTA_REPEAT, DELTA_PULSE, CHECK, ONLY, INVARIANTS]
+            STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, DELTA_REPEAT, DELTA_PULSE, CHECK, ONLY, INVARIANTS, MUTANT]
 BY_NAME = {p.name: p for p in REGISTRY}
 
 

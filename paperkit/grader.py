@@ -130,6 +130,45 @@ def _mutate_lines(text: str, nodes: list) -> str:
     return "".join(lines)
 
 
+def _sites(sandbox_project: Path, engine_dir: Path | None) -> list:
+    """Every def-resolution mutation SITE as (file, node | None, label): a .py file's
+    DEFINITIONS (label `path::qualname`, body→uncatchable-raise) and any other file as one
+    whole-file site (label `path`, corrupted).  The unit set the group-testing sweep bisects
+    AND the single-site probe (flip_one) selects from — shared so both label sites identically
+    (a per-site Bazel action and the in-process sweep agree by construction)."""
+    sites = []
+    for f in sandbox_files(sandbox_project, set(), engine_dir):
+        label = _rel(f, sandbox_project, engine_dir)
+        if f.suffix == ".py":
+            for qn, node in _def_sites(f.read_text()):
+                sites.append((f, node, f"{label}::{qn}"))
+        else:
+            sites.append((f, None, label))
+    return sites
+
+
+def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
+    """Mutate one GROUP of sites at once (def bodies → uncatchable raise; whole files → CORRUPT),
+    run the check, restore.  True iff the mutation flips chk red.  The atom shared by the
+    group-testing sweep (sensitivity) and the single-site probe (flip_one)."""
+    saved: dict = {}
+    pyfiles: dict = {}
+    try:
+        for f, node, _ in group:
+            saved.setdefault(f, f.read_bytes())
+            if node is not None:
+                pyfiles.setdefault(f, []).append(node)
+        for f, nodes in pyfiles.items():
+            f.write_text(_mutate_lines(saved[f].decode(), nodes))
+        for f, node, _ in group:
+            if node is None:
+                f.write_bytes(CORRUPT)
+        return not resolver.resolves(chk, sandbox_project, custom)
+    finally:
+        for f, b in saved.items():
+            f.write_bytes(b)
+
+
 def sensitivity(chk: str, sandbox_project: Path, custom: dict,
                 engine_dir: Path | None = None, footprint: list | None = None) -> tuple[bool, list]:
     """The sensitivity set — the mutations that flip chk red — found by BINARY-SPLIT
@@ -177,32 +216,10 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
             # read footprint under-reported; a real flip there means behavioral, not vacuous.
             sens = scan([f for f in files if f not in set(scoped)])
         return True, sorted(sens)
-    sites = []   # (file, node | None, label) — node None ⇒ whole-file corruption
-    for f in sandbox_files(sandbox_project, set(), engine_dir):
-        label = _rel(f, sandbox_project, engine_dir)
-        if f.suffix == ".py":
-            for qn, node in _def_sites(f.read_text()):
-                sites.append((f, node, f"{label}::{qn}"))
-        else:
-            sites.append((f, None, label))
+    sites = _sites(sandbox_project, engine_dir)   # (file, node | None, label)
 
     def apply(group) -> bool:
-        saved: dict = {}
-        pyfiles: dict = {}
-        try:
-            for f, node, _ in group:
-                saved.setdefault(f, f.read_bytes())
-                if node is not None:
-                    pyfiles.setdefault(f, []).append(node)
-            for f, nodes in pyfiles.items():
-                f.write_text(_mutate_lines(saved[f].decode(), nodes))
-            for f, node, _ in group:
-                if node is None:
-                    f.write_bytes(CORRUPT)
-            return not resolver.resolves(chk, sandbox_project, custom)
-        finally:
-            for f, b in saved.items():
-                f.write_bytes(b)
+        return _apply(chk, sandbox_project, custom, group)
 
     def run(group) -> list:
         flips: list[str] = []
@@ -236,6 +253,20 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
         keep = {s[2] for s in scoped}
         flips = run([s for s in sites if s[2] not in keep])
     return True, flips
+
+
+def flip_one(chk: str, sandbox_project: Path, custom: dict,
+             engine_dir: Path | None, site_label: str) -> bool:
+    """Ζ·mutant — the SINGLE-SITE probe: does mutating exactly `site_label` flip chk red?
+    The atomic unit the in-process group-testing sweep is built from, exposed so BAZEL can own
+    the fanout — one pk_mutant action per (claim, site) — instead of an adaptive in-process
+    bisection.  Selects the site from the SAME _sites list the sweep group-tests, then _apply,
+    so a per-site action and the sweep agree by construction.  Ν·loud if the label is not a site
+    in the surface (a stale/garbled mutant), rather than silently reporting no-flip."""
+    for s in _sites(sandbox_project, engine_dir):
+        if s[2] == site_label:
+            return _apply(chk, sandbox_project, custom, [s])
+    raise RuntimeError(f"Ν·loud: site '{site_label}' is not in the mutation surface")
 
 
 def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
@@ -328,47 +359,47 @@ def _vacuity_source(rec: dict, chk: str, sandbox_project: Path,
             "not_lower": "not external: corrupting all inputs DOES flip it, so it reads project content"}
 
 
-def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
-    """Grade one check in its own fresh sandbox copy (so concurrent grades never
-    share a mutation).  The copy is the bounded universe of the project + engine.
-    `resolution` ("file"|"def") decides whether the engine joins the mutation surface."""
+def _sandbox_setup(project_dir, resolution="def"):
+    """A fresh sandbox COPY of the project + engine (the bounded mutation universe), shared by the
+    grade sweep (_grade_one) and the single-site probe (mutate_one).  Returns
+    (tmp, sandbox_project, engine_dir, root_copy): engine_dir is the COPIED engine when
+    resolution == "def" (so witnesses are sensitive to the engine they test, not only their own
+    script), None at file resolution (the engine would add only the import-crash flood).  Locate
+    the engine by its position UNDER root — directly when _ENGINE lives inside root (a
+    self-contained repo), else by name (the Bazel case, where _ENGINE.resolve() follows the staged
+    symlink OUT of the execroot though the engine IS copied to root/<name>).  Ν·loud if a def
+    sweep's engine copy is missing: refuse to degrade to file resolution and emit a vacuous
+    fingerprint (the Bazel-symlink degeneracy that once shipped a green-for-nothing gate).  Caller
+    rmtree's tmp."""
     tmp = Path(tempfile.mkdtemp(prefix="paperkit-delta-"))
+    root = _sandbox_root(project_dir)
+    _copy_sandbox(root, tmp / root.name)
+    root_copy = tmp / root.name
+    rel = project_dir.relative_to(root)
+    sandbox = root_copy if rel == Path(".") else root_copy / rel
+    engine = None
+    if resolution == "def":
+        eng_rel = _ENGINE.relative_to(root) if _ENGINE.is_relative_to(root) else Path(_ENGINE.name)
+        engine = root_copy / eng_rel
+        if not engine.is_dir():
+            raise RuntimeError(
+                f"Ν·loud: def-resolution sweep cannot find the engine in the sandbox "
+                f"(expected a directory at {engine}, under the copied root {root}); refusing "
+                f"to silently degrade to file resolution and emit a vacuous fingerprint.")
+    return tmp, sandbox, engine, root_copy
+
+
+def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
+    """Grade one check in its own fresh sandbox copy (so concurrent grades never share a
+    mutation).  `resolution` ("file"|"def") decides whether the engine joins the surface."""
+    tmp, sandbox, engine, root_copy = _sandbox_setup(project_dir, resolution)
     try:
-        root = _sandbox_root(project_dir)
-        _copy_sandbox(root, tmp / root.name)
-        rel = project_dir.relative_to(root)
-        sandbox = tmp / root.name if rel == Path(".") else tmp / root.name / rel
-        # the engine in the sandbox copy — included in the mutation surface (def
-        # resolution only) so the witnesses are sensitive to the engine they test, not
-        # only to their own script.  At file resolution the engine would only add the
-        # import-crash flood (one collapsed signature), so it is left out.  Locate it by
-        # its position UNDER root: directly when _ENGINE lives inside root (a self-contained
-        # repo), else by name — the Bazel case, where _ENGINE.resolve() follows the staged
-        # symlink OUT to the source tree so is_relative_to(root) is false, though the engine
-        # IS copied into the sandbox at root/<name>.  Guard on the copy existing, so a
-        # Ν·loud — fail rather than silently degrade if the engine copy is missing (below).
-        engine = None
-        if resolution == "def":
-            eng_rel = _ENGINE.relative_to(root) if _ENGINE.is_relative_to(root) else Path(_ENGINE.name)
-            engine = tmp / root.name / eng_rel
-            if not engine.is_dir():
-                # Ν·loud — a def sweep with no engine in the mutation surface measures NOTHING
-                # (an empty fingerprint), and that once shipped a green-for-nothing emergence gate
-                # (the Bazel-symlink degeneracy).  Refuse to degrade to file resolution: FAIL, so
-                # the silence becomes a loud build error instead of a vacuous record.
-                raise RuntimeError(
-                    f"Ν·loud: def-resolution sweep cannot find the engine in the sandbox "
-                    f"(expected a directory at {engine}, under the copied root {root}); refusing "
-                    f"to silently degrade to file resolution and emit a vacuous fingerprint.")
         # the check's READ footprint (strace).  Δ·scope: a def sweep is bounded to the files the
-        # check actually reads (sensitivity ⊆ footprint) — so it mutates only the engine the claim
-        # exercises, not the whole engine.  For that the trace must see ENGINE reads, so a def grade
-        # traces ONCE at ROOT scope ("paperkit/x.py", "<proj>/checks/y.py").  The cache key stays
-        # PROJECT-scoped, DERIVED from the same trace (no second strace): keep this project's
-        # entries, project-relative; engine entries aren't project inputs (the engine-epoch hash
-        # covers them).  File resolution traces project-scoped directly.
+        # check actually reads (sensitivity ⊆ footprint).  A def grade traces ONCE at ROOT scope so
+        # the trace sees ENGINE reads ("paperkit/x.py", "<proj>/checks/y.py"); the cache key stays
+        # PROJECT-scoped, derived from the same trace (no second strace) — engine entries aren't
+        # project inputs (the engine-epoch hash covers them).  File resolution traces project-scoped.
         if engine:
-            root_copy = tmp / root.name
             sweep_fp = resolver.footprint(chk, sandbox, custom, scope=root_copy)
             if sweep_fp is None:
                 fp = None
@@ -382,6 +413,17 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
         rec = grade_check(chk, project_dir, presupposed, custom, sandbox, engine, sweep_fp)
         rec["_footprint"] = fp
         return rec
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def mutate_one(project_dir: Path, chk: str, custom: dict, site_label: str) -> bool:
+    """Ζ·mutant — set up the def-resolution sandbox and probe ONE site (flip_one).  The engine
+    entry a pk_mutant action calls: one (claim, site) → flipped, hermetic in its own sandbox copy,
+    so Bazel owns and caches the sweep's fanout site-by-site instead of an in-process bisection."""
+    tmp, sandbox, engine, _ = _sandbox_setup(project_dir, "def")
+    try:
+        return flip_one(chk, sandbox, custom, engine, site_label)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

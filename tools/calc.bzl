@@ -263,19 +263,18 @@ pk_mutant = rule(
     },
 )
 
+# Ζ·emerge·gate — cheap coherence READING (tools/cohere.py): run coherence.py over the cached calc
+# records (no re-sweep), assert grounding soundness (0 genuine misses), emit the verdict.  The ∂²
+# faces gated as a reading over the calculation.
 def _cohere_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     v = ctx.actions.declare_file(ctx.label.name + ".cohere.json")
     calcs = " ".join([c.path for c in ctx.files.calcs])
-    # Ζ·emerge·gate — cheap coherence: read the cached calc records (no re-sweep), assert grounding
-    # soundness (0 genuine misses).  The ∂² faces gated as a READING over the calculation.
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset(ctx.files.calcs + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) +
-                  'if "$(command -v python3)" paperkit/coherence.py --from-calcs ' + ctx.attr.project +
-                  " " + calcs + " >/dev/null 2>&1; then V=pass; else V=fail; fi; " +
-                  "printf '{\"verb\":\"cohere\",\"verdict\":\"%s\"}\\n' \"$V\" > " + v.path,
+        inputs = depset([ctx.file._tool] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
+                  ctx.attr.project + " " + v.path + " " + calcs,
         mnemonic = "PkCohere",
         progress_message = "Ζ·emerge·gate cohere " + ctx.label.name,
     )
@@ -289,25 +288,33 @@ pk_cohere = rule(
         "calcs": attr.label_list(allow_files = True, mandatory = True, doc = "the cached def-resolution calc records"),
         "project": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
+        "_tool": attr.label(default = "//tools:cohere.py", allow_single_file = True),
     },
 )
 
+# A cheap READING of a calc record (tools/verdict.py): the verdict is the measured baseline.
 def _verdict_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
     v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
     calc = ctx.file.calc
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = [calc],
-        command = "if grep -q '\"baseline\": true' " + calc.path + "; then V=pass; else V=fail; fi; " +
-                  "printf '{\"verb\":\"verdict\",\"verdict\":\"%s\"}\\n' \"$V\" > " + v.path,
+        inputs = depset([ctx.file._tool, calc], transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
+                  calc.path + " " + v.path,
         mnemonic = "PkVerdict",
+        progress_message = "Ζ·calc verdict " + ctx.label.name,
     )
     return [DefaultInfo(files = depset([v]))]
 
 pk_verdict = rule(
     implementation = _verdict_impl,
     doc = "A cheap READING of a calc record: the verdict is the measured baseline.",
-    attrs = {"calc": attr.label(allow_single_file = True, mandatory = True)},
+    toolchains = [_PY],
+    attrs = {
+        "calc": attr.label(allow_single_file = True, mandatory = True),
+        "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
+    },
 )
 
 def _grade_impl(ctx):

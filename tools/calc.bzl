@@ -165,6 +165,44 @@ pk_mutate = rule(
     },
 )
 
+# Ζ·mutant·eval — run a claim's check against the engine with ONE module mutated, as a NORMAL action
+# under --experimental_use_hermetic_linux_sandbox (hardlinks + chroot, so claims.py's resolve() can't
+# escape the sandbox to source — the standard sandbox symlinks, which let it escape).  Overwrite the
+# mutated module in place: `rm` removes the sandbox's hardlink (never the source inode), `cp` writes
+# the mutant.  flipped = the check exits non-zero (the mutation broke the claim's assertion).
+def _eval_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
+    o = ctx.actions.declare_file(ctx.label.name + ".eval.json")
+    m = ctx.file.mutated
+    cmd = (_pypath(py) +
+           "rm -f " + ctx.attr.module + " && cp " + m.path + " " + ctx.attr.module + "; " +
+           'if "$(command -v python3)" paper/checks/claims.py ' + ctx.attr.claim + " >/dev/null 2>&1; " +
+           "then FL=false; else FL=true; fi; " +
+           "printf '{\"claim\": \"%s\", \"site\": \"%s\", \"flipped\": %s}\\n' " +
+           "'" + ctx.attr.claim + "' '" + ctx.attr.site + "' \"$FL\" > " + o.path)
+    ctx.actions.run_shell(
+        outputs = [o],
+        inputs = depset(ctx.files.engine + ctx.files.project + [m], transitive = [py.files]),
+        command = cmd,
+        mnemonic = "PkEval",
+        progress_message = "Ζ·eval " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([o]))]
+
+pk_eval = rule(
+    implementation = _eval_impl,
+    doc = "Ζ·mutant evaluation — a claim's check vs the engine with one module mutated (hermetic sandbox) → {claim, site, flipped}.",
+    toolchains = [_PY],
+    attrs = {
+        "claim": attr.string(mandatory = True, doc = "the claim key (the check's {target})"),
+        "site": attr.string(mandatory = True, doc = "the def-site label (for the record)"),
+        "module": attr.string(mandatory = True, doc = "the engine module path mutated, e.g. paperkit/bib.py"),
+        "mutated": attr.label(allow_single_file = True, mandatory = True, doc = "the pk_mutate'd module"),
+        "engine": attr.label_list(allow_files = True, mandatory = True, doc = "//paperkit:engine"),
+        "project": attr.label_list(allow_files = True, doc = "the paper project files"),
+    },
+)
+
 # Ζ·mutant — ONE (claim, def-site) probe as a Bazel action: mutate exactly `site` and report
 # whether it flips the check.  This LIFTS the def-sweep's in-process group-testing fanout into
 # Bazel's graph (parallel + per-site cached); pk_sens aggregates the {flipped} records into the

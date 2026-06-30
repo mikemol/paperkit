@@ -14,3 +14,12 @@ build:memobserve --incompatible_use_new_cgroup_implementation --experimental_san
 # would be the SHARED-cgroup garbage), and the flag is part of the calc action key (observe-vs-default
 # cache as distinct actions, so no stale measured/0 peak crosses configs).
 build:memobserve --//tools:observe=True
+
+# Ζ·mutant·eval — the def-sweep's counterfactuals run as NORMAL actions in the HERMETIC linux-sandbox
+# (hardlinks + chroot), so a check's Path(__file__).resolve() and its subprocesses CANNOT follow
+# symlinks out to the source tree — they see only the staged inputs (the mutated engine at its
+# canonical path).  The system dirs are mount-paired for bash/python+libs; the SOURCE tree is NOT
+# mounted, so it stays unreachable.  Standard-FHS dirs → portable across Linux.
+build:mutant --experimental_use_hermetic_linux_sandbox
+build:mutant --sandbox_add_mount_pair=/bin --sandbox_add_mount_pair=/usr
+build:mutant --sandbox_add_mount_pair=/lib --sandbox_add_mount_pair=/lib64 --sandbox_add_mount_pair=/etc

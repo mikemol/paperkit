@@ -1,3 +1,5 @@
+load("//tools:calc.bzl", "pk_pyc")
+
 # The engine — EXPLICIT srcs (no globs).  Every project's gate deps on //paperkit:engine.
 # The list is shared by the filegroup AND exports_files, so each module is also referenceable as
 # //paperkit:<module>.py — the per-module unit pk_pyc compiles to a .pyc build artifact (Ζ·pyc).
@@ -46,3 +48,19 @@ filegroup(
 )
 
 exports_files(ENGINE_SRCS)
+
+# Ζ·pyc·engine — the engine's COMPILED form: one pk_pyc per module (one .cc → one .o), so editing a
+# module recompiles only its .pyc.  The output preserves the module's path (tests/_fixture.py →
+# tests/_fixture.pyc), so a consumer maps it to __pycache__/<stem>.<tag>.pyc by parallel structure.
+# //paperkit:pyc mirrors //paperkit:engine — the bytecode the engine runs off (pk_eval now; the gate
+# and checks at Ζ·pyc·run).  Compile ONCE, shared across the whole def-sweep fanout.
+[
+    pk_pyc(name = m[:-len(".py")], src = m)
+    for m in ENGINE_SRCS
+]
+
+filegroup(
+    name = "pyc",
+    srcs = [":" + m[:-len(".py")] for m in ENGINE_SRCS],
+    visibility = ["//visibility:public"],
+)

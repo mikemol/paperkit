@@ -7,4 +7,7 @@
 #
 #   podman build --timestamp 0 -t paperkit-base:proof -f Containerfile.base .
 FROM docker.io/library/python@sha256:399babc8b49529dabfd9c922f2b5eea81d611e4512e3ed250d75bd2e7683f4b0
-RUN apk add --no-cache strace
+# strace backs Φ·footprint; bash is the action shell for the Ζ·mutant def-sweep counterfactuals,
+# which run in THIS image as their hermetic root under --config=mutant-oci (the proof image IS the
+# verification environment — Κ·image ↔ Ζ·mutant).  Both in the isolated, pinned package layer.
+RUN apk add --no-cache strace bash

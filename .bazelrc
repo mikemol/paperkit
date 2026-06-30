@@ -23,3 +23,14 @@ build:memobserve --//tools:observe=True
 build:mutant --experimental_use_hermetic_linux_sandbox
 build:mutant --sandbox_add_mount_pair=/bin --sandbox_add_mount_pair=/usr
 build:mutant --sandbox_add_mount_pair=/lib --sandbox_add_mount_pair=/lib64 --sandbox_add_mount_pair=/etc
+
+# Ζ·mutant·oci — the FULLY hermetic route: each counterfactual runs in a CONTAINER from the
+# proof-object Κ·image (paperkit-base:proof carries python+bash+strace), no host /usr at all —
+# the proof image IS the verification environment (Κ·image ↔ Ζ·mutant).  use_customized_images=false
+# runs the action as the image root → rootless podman maps it to the host uid, so bazel-out is
+# writable (no Bazel uid-add, no keep-id).  Prereq: build the image once —
+#   podman build --timestamp 0 -t paperkit-base:proof -f Containerfile.base .
+build:mutant-oci --experimental_enable_docker_sandbox
+build:mutant-oci --experimental_docker_image=localhost/paperkit-base:proof
+build:mutant-oci --experimental_docker_use_customized_images=false
+build:mutant-oci --strategy=PkEval=docker --strategy=PkMutate=docker

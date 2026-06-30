@@ -171,13 +171,15 @@ pk_mutate = rule(
 # compile is a BUILD step here, not an import-time side effect; pk_eval runs off these .pyc, swapping
 # the one mutated module's .pyc rather than recompiling the engine on every counterfactual.
 def _pyc_impl(ctx):
-    py = ctx.toolchains[_PY].py3_runtime
     o = ctx.actions.declare_file(ctx.label.name + ".pyc")
+    # Compile with the SANDBOX python (`command -v`, NOT the staged toolchain) — it MUST be the same
+    # interpreter pk_eval runs, or the .pyc magic/cache-tag won't match and Python silently recompiles
+    # from source (every counterfactual then reads baseline → no flip).  So //paperkit:pyc is built
+    # under the eval's config (--config=mutant ⇒ host python; OCI ⇒ image python) and matches it.
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, ctx.file.src], transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
-                  ctx.file.src.path + " " + o.path,
+        inputs = depset([ctx.file._tool, ctx.file.src]),
+        command = '"$(command -v python3)" ' + ctx.file._tool.path + " " + ctx.file.src.path + " " + o.path,
         mnemonic = "PkPyc",
         progress_message = "Ζ·pyc " + ctx.label.name,
     )
@@ -186,7 +188,6 @@ def _pyc_impl(ctx):
 pk_pyc = rule(
     implementation = _pyc_impl,
     doc = "Ζ·pyc — compile one .py to its content-addressed .pyc build artifact (UNCHECKED_HASH).",
-    toolchains = [_PY],
     attrs = {
         "src": attr.label(allow_single_file = [".py"], mandatory = True, doc = "the .py module to compile"),
         "_tool": attr.label(default = "//tools:pyc.py", allow_single_file = True),
@@ -202,16 +203,17 @@ def _eval_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".eval.json")
     m = ctx.file.mutated
     # The eval logic lives in tools/eval.py (a real script, not a shell blob in a string); here we
-    # only stage its inputs and pass args.  `"$(command -v python3)"` invokes the interpreter by
-    # ABSOLUTE path so eval.py's sys.executable is populated — the check it spawns re-spawns the
-    # projector as [sys.executable, …], which execs '' (PermissionError → spurious flip) when the
-    # tool is run as bare `python3`.  No toolchain ⇒ no glibc rules_python python staged, so
-    # command -v resolves the sandbox/OCI-image interpreter (musl-safe).
+    # only stage its inputs and pass args.  The engine RUNS OFF its .pyc artifacts (Ζ·pyc): we stage
+    # //paperkit:engine (the .py, for findability) + //paperkit:pyc (the precompiled bytecode) +
+    # the ONE mutated module's .pyc; eval.py places the .pyc in __pycache__ and swaps the mutant.
+    # `"$(command -v python3)"` invokes the interpreter by ABSOLUTE path so eval.py's sys.executable
+    # is populated — the check re-spawns the projector as [sys.executable, …], which execs '' (a
+    # spurious flip) under bare `python3`.  No toolchain ⇒ command -v resolves the sandbox/OCI python.
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool] + ctx.files.engine + ctx.files.project + [m]),
+        inputs = depset([ctx.file._tool, m] + ctx.files.engine + ctx.files.engine_pyc + ctx.files.project),
         command = '"$(command -v python3)" ' + ctx.file._tool.path +
-                  " --module " + ctx.attr.module + " --mutant " + m.path +
+                  " --engine-dir paperkit --module " + ctx.attr.module + " --mutant " + m.path +
                   " --check paper/checks/claims.py --claim " + ctx.attr.claim +
                   " --site '" + ctx.attr.site + "' --out " + o.path,
         mnemonic = "PkEval",
@@ -221,13 +223,14 @@ def _eval_impl(ctx):
 
 pk_eval = rule(
     implementation = _eval_impl,
-    doc = "Ζ·mutant evaluation — a claim's check vs the engine with one module mutated (hermetic/OCI sandbox) → {claim, site, flipped}.",
+    doc = "Ζ·mutant evaluation — a claim's check run off the engine .pyc with one module's bytecode swapped → {claim, site, flipped}.",
     attrs = {
         "claim": attr.string(mandatory = True, doc = "the claim key (the check's {target})"),
         "site": attr.string(mandatory = True, doc = "the def-site label (for the record)"),
         "module": attr.string(mandatory = True, doc = "the engine module path mutated, e.g. paperkit/bib.py"),
-        "mutated": attr.label(allow_single_file = True, mandatory = True, doc = "the pk_mutate'd module"),
-        "engine": attr.label_list(allow_files = True, mandatory = True, doc = "//paperkit:engine"),
+        "mutated": attr.label(allow_single_file = [".pyc"], mandatory = True, doc = "the mutated module's .pyc (pk_pyc of pk_mutate; identity .pyc for ∅)"),
+        "engine": attr.label_list(allow_files = True, mandatory = True, doc = "//paperkit:engine (the .py, for findability)"),
+        "engine_pyc": attr.label_list(allow_files = True, mandatory = True, doc = "//paperkit:pyc (the precompiled bytecode)"),
         "project": attr.label_list(allow_files = True, doc = "the paper project files"),
         "_tool": attr.label(default = "//tools:eval.py", allow_single_file = True),
     },

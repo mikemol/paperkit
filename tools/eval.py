@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-"""Ζ·mutant·eval — run a claim's check against the engine with ONE module replaced by its mutant,
-and report whether the mutation FLIPS the check (makes it fail).  The Bazel-graph atom of the
-def-sweep: one (claim, site) probe per action, parallel + per-site cached; pk_sens aggregates the
-{flipped} records into the claim's sensitivity set.
+"""Ζ·mutant·eval — run a claim's check against the engine RUN OFF ITS .pyc BUILD ARTIFACTS, with ONE
+module's bytecode swapped for its mutant, and report whether the mutation FLIPS the check.
 
-Delivery: the staged engine is read-only at its canonical path (paperkit/…); we replace the one
-mutated module in place (unlink the sandbox hardlink — never the source inode — then copy the
-mutant).  The check then imports the mutated engine at the path it resolves to.  This runs as a
-NORMAL action under the hermetic linux-sandbox (or the OCI sandbox), so the check's Path.resolve()
-and its subprocesses cannot escape to the source tree.
+The engine is compiled once (//paperkit:pyc, Ζ·pyc·engine) and staged as `paperkit/<relpath>.pyc`
+beside the source `paperkit/<relpath>.py`.  This tool places each precompiled .pyc at its real
+import location — `paperkit/<dir>/__pycache__/<stem>.<cache-tag>.pyc` — so Python runs the bytecode
+directly (UNCHECKED_HASH ⇒ the source is never rechecked; see tools/pyc.py).  The counterfactual is
+delivered by overwriting the ONE mutated module's __pycache__ slot with its mutant .pyc — the .py
+stays original (only for findability + __file__).  The ∅ baseline passes the module's own identity
+.pyc, a no-op swap.  No import-time compilation: the def-sweep compiles the engine once, not per eval.
 
-Idempotency: the check spawns the projector as [sys.executable, …] (tests/_fixture.py).  This tool
-MUST be invoked by an absolute interpreter path so sys.executable is populated — invoked as bare
-`python3`, the sandbox interpreter leaves sys.executable='' and EVERY subprocess-spawning check
-"flips" regardless of the mutation (a non-idempotent verdict that depended on the ambient env).
-With sys.executable pinned, the verdict is a function of the INPUTS alone."""
+Idempotency: invoke this tool by an ABSOLUTE interpreter path so sys.executable is populated — the
+check re-spawns the projector as [sys.executable, …] (see the history of the '' spurious-flip bug)."""
 import argparse
 import json
 import pathlib
@@ -25,21 +22,33 @@ import sys
 
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--module", required=True, help="engine module path to replace, e.g. paperkit/bib.py")
-    ap.add_argument("--mutant", required=True, help="the pk_mutate'd module to put in its place")
+    ap.add_argument("--engine-dir", required=True, help="the staged engine dir, e.g. paperkit")
+    ap.add_argument("--module", required=True, help="the mutated module's .py path, e.g. paperkit/bib.py")
+    ap.add_argument("--mutant", required=True, help="the mutated module's .pyc (identity for the ∅ baseline)")
     ap.add_argument("--check", required=True, help="the check script, e.g. paper/checks/claims.py")
-    ap.add_argument("--claim", required=True, help="the claim key passed to the check")
+    ap.add_argument("--claim", required=True)
     ap.add_argument("--site", required=True, help="the def-site label, recorded in the result")
-    ap.add_argument("--out", required=True, help="where to write the {claim, site, flipped} record")
+    ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
 
-    module = pathlib.Path(a.module)
-    module.unlink()                          # drop the read-only staged hardlink (not the source)
-    shutil.copyfile(a.mutant, module)        # … and deliver the mutant at the canonical path
+    tag = sys.implementation.cache_tag                       # e.g. cpython-313 — matches THIS runtime
+
+    def slot(py_path):                                       # paperkit/x.py → paperkit/__pycache__/x.<tag>.pyc
+        p = pathlib.Path(py_path)
+        d = p.parent / "__pycache__"
+        d.mkdir(parents=True, exist_ok=True)
+        return d / (p.stem + "." + tag + ".pyc")
+
+    # place every precompiled engine .pyc (staged as paperkit/<relpath>.pyc) at its import location
+    for pyc in pathlib.Path(a.engine_dir).rglob("*.pyc"):
+        if "__pycache__" in pyc.parts:
+            continue
+        shutil.move(str(pyc), str(slot(pyc.with_suffix(".py"))))
+    # … then overwrite the ONE mutated module's slot with the mutant bytecode (∅ = identity = no-op)
+    shutil.copyfile(a.mutant, slot(a.module))
 
     flipped = subprocess.run([sys.executable, a.check, a.claim],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
-
     pathlib.Path(a.out).write_text(
         json.dumps({"claim": a.claim, "site": a.site, "flipped": flipped}) + "\n")
     return 0

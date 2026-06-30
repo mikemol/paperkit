@@ -171,18 +171,19 @@ pk_mutate = rule(
 # mutated module in place: `rm` removes the sandbox's hardlink (never the source inode), `cp` writes
 # the mutant.  flipped = the check exits non-zero (the mutation broke the claim's assertion).
 def _eval_impl(ctx):
-    py = ctx.toolchains[_PY].py3_runtime
     o = ctx.actions.declare_file(ctx.label.name + ".eval.json")
     m = ctx.file.mutated
-    cmd = (_pypath(py) +
-           "rm -f " + ctx.attr.module + " && cp " + m.path + " " + ctx.attr.module + "; " +
-           'if "$(command -v python3)" paper/checks/claims.py ' + ctx.attr.claim + " >/dev/null 2>&1; " +
+    # Bare `python3` — the SANDBOX provides it: the OCI image's interpreter under --config=mutant
+    # (docker sandbox), or host /usr's under the hermetic-mount-pairs fallback.  NOT the staged
+    # rules_python (glibc), which won't run on a musl image.  The image/env IS the hermetic python.
+    cmd = ("rm -f " + ctx.attr.module + " && cp " + m.path + " " + ctx.attr.module + "; " +
+           "if python3 paper/checks/claims.py " + ctx.attr.claim + " >/dev/null 2>&1; " +
            "then FL=false; else FL=true; fi; " +
            "printf '{\"claim\": \"%s\", \"site\": \"%s\", \"flipped\": %s}\\n' " +
            "'" + ctx.attr.claim + "' '" + ctx.attr.site + "' \"$FL\" > " + o.path)
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(ctx.files.engine + ctx.files.project + [m], transitive = [py.files]),
+        inputs = depset(ctx.files.engine + ctx.files.project + [m]),
         command = cmd,
         mnemonic = "PkEval",
         progress_message = "Ζ·eval " + ctx.label.name,
@@ -191,8 +192,7 @@ def _eval_impl(ctx):
 
 pk_eval = rule(
     implementation = _eval_impl,
-    doc = "Ζ·mutant evaluation — a claim's check vs the engine with one module mutated (hermetic sandbox) → {claim, site, flipped}.",
-    toolchains = [_PY],
+    doc = "Ζ·mutant evaluation — a claim's check vs the engine with one module mutated (hermetic/OCI sandbox) → {claim, site, flipped}.",
     attrs = {
         "claim": attr.string(mandatory = True, doc = "the claim key (the check's {target})"),
         "site": attr.string(mandatory = True, doc = "the def-site label (for the record)"),

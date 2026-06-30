@@ -99,7 +99,7 @@ def _result_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool, sib], transitive = [py.files]),
-        command = _verdict_tool(py, ctx.file._tool) + "agg result " + v.path + " " + sib.path,
+        command = _verdict_tool(py, ctx.file._tool) + "agg result " + v.path + " verdict fail " + sib.path,
         mnemonic = "PkResult",
     )
     return [DefaultInfo(files = depset([v]))]
@@ -164,7 +164,7 @@ def _gate_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool] + ctx.files.checks, transitive = [py.files]),
-        command = _verdict_tool(py, ctx.file._tool) + "agg gate " + v.path + " " +
+        command = _verdict_tool(py, ctx.file._tool) + "agg gate " + v.path + " verdict fail " +
                   " ".join([r.path for r in ctx.files.checks]),
         mnemonic = "PkGate",
     )

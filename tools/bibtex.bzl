@@ -230,7 +230,7 @@ def _bib_repo_impl(repository_ctx):
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an irreducibly
     # GENERAL oracle, kept as a cmd: drop (Ζ·resist).
     lc = ", local = True" if local else ""
-    inv = "python3 paperkit/gate.py --invariants --safe --without-K " + proj
+    inv = "\"$(command -v python3)\" paperkit/gate.py --invariants --safe --without-K " + proj
     out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + ', "@@//paperkit:engine"])')
     recs.append('":invariants"')
 

@@ -11,12 +11,16 @@ record (json.dumps default spacing) that pk_gate's `grep '"verdict":"fail"'` (no
 so a failed check went green.  One emitter + parsing consumers makes that unrepresentable.
 
 Subcommands — each writes one compact {verb, verdict} record to <out>:
-  emit   <verb> <pass|fail> <out>          — record a verdict the caller already computed (pk_cmd)
-  exists <verb> <path> <out>               — pass iff <path> is present (pk_file)
-  agg    <verb> <out> <record.json>...     — pass iff NO input record reads fail (pk_result=1, pk_gate=N)
-  agree  <verb> <out> <produced>...        — pass iff >=2 produced outputs, all byte-equal, none failed
-  calc   <verb> <calc.json> <out>          — pass iff the calc record's baseline holds (pk_verdict)
-  cohere <verb> <project> <out> <calc>...  — pass iff coherence.py passes over the calcs (pk_cohere)
+  emit   <verb> <pass|fail> <out>                  — record a verdict the caller computed (pk_cmd)
+  exists <verb> <path> <out>                       — pass iff <path> is present (pk_file)
+  agg    <verb> <out> <field> <bad> <record>...    — pass iff NO record has record[field] in <bad>
+                                                     (a comma list).  The ONE aggregator: pk_gate /
+                                                     pk_result = (verdict, fail); pk_adequacy =
+                                                     (grade, vacuous,existence,indeterminate,broken);
+                                                     pk_footaudit = (ok, false).
+  agree  <verb> <out> <produced>...                — pass iff >=2 produced outputs, all byte-equal, none failed
+  calc   <verb> <calc.json> <out>                  — pass iff the calc record's baseline holds (pk_verdict)
+  cohere <verb> <project> <out> <calc>...          — pass iff coherence.py passes over the calcs (pk_cohere)
 """
 import argparse
 import json
@@ -30,10 +34,6 @@ def _write(out, verb, ok):
         json.dumps({"verb": verb, "verdict": "pass" if ok else "fail"}, separators=(",", ":")) + "\n")
 
 
-def _verdict(record):
-    return json.loads(pathlib.Path(record).read_text()).get("verdict")
-
-
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -43,11 +43,16 @@ def main(argv):
         for e in extra:
             p.add_argument(e)
         p.add_argument("out")
-    for name, rest in [("agg", "records"), ("agree", "produced")]:
-        p = sub.add_parser(name)
-        p.add_argument("verb")
-        p.add_argument("out")
-        p.add_argument(rest, nargs="*")
+    pg = sub.add_parser("agg")
+    pg.add_argument("verb")
+    pg.add_argument("out")
+    pg.add_argument("field")
+    pg.add_argument("bad")
+    pg.add_argument("records", nargs="*")
+    pr = sub.add_parser("agree")
+    pr.add_argument("verb")
+    pr.add_argument("out")
+    pr.add_argument("produced", nargs="*")
     pc = sub.add_parser("cohere")
     pc.add_argument("verb")
     pc.add_argument("project")
@@ -60,7 +65,12 @@ def main(argv):
     elif a.cmd == "exists":
         _write(a.out, a.verb, pathlib.Path(a.path).exists())
     elif a.cmd == "agg":
-        _write(a.out, a.verb, all(_verdict(r) != "fail" for r in a.records))
+        bad = {b.lower() for b in a.bad.split(",")}
+
+        def field_val(r):
+            return str(json.loads(pathlib.Path(r).read_text()).get(a.field)).lower()
+
+        _write(a.out, a.verb, all(field_val(r) not in bad for r in a.records))
     elif a.cmd == "agree":
         texts = [pathlib.Path(p).read_text() for p in a.produced]
         lines = {ln for t in texts for ln in t.splitlines()}

@@ -1,7 +1,11 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("//tools:calc.bzl", "observe_setting")
 
-exports_files(["assert_pass.sh", "read_grade.py", "mem_learn.py", "sens.py", "eval.py", "verdict.py"])
+# Ξ·lint (tool) — the static witness: forbids bare-python3 / printf-JSON / grep-JSON in .bzl.  The
+# tool is validated and runnable (python3 tools/lint_bzl.py tools/*.bzl); ENFORCEMENT in //:hook is
+# Ξ·lint·wire — it must be authored as a project WARRANT (bnd-check requires hook members be uniform
+# @proj//:{gate,adequacy}), which also projects its prose.  Not a bolted-on py_test.
+exports_files(["assert_pass.sh", "read_grade.py", "mem_learn.py", "sens.py", "eval.py", "verdict.py", "lint_bzl.py"])
 
 # Τ·mem·observe·clean — the peak-read gate (OFF by default; --config=memobserve sets it True).
 observe_setting(name = "observe", build_setting_default = False)

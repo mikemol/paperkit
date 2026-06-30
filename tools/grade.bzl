@@ -10,6 +10,14 @@ Proof: baseline + ONE mutant (a sensitive engine file) for a real check.  The fu
 fan-out + ladder + rests_on clamp is the scaled version.
 """
 
+_PY = "@bazel_tools//tools/python:toolchain_type"
+
+def _pypath(py):
+    return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
+
+def _verdict_tool(py, tool):
+    return _pypath(py) + '"$(command -v python3)" ' + tool.path + " "
+
 def _rerun(ctx, tag, mutate):
     """A Bazel action: stage the inputs, optionally corrupt `mutate`, run `gate.py --only` under
     the HERMETIC python (so the check + its subprocesses have a real sys.executable)."""
@@ -98,21 +106,27 @@ pk_grade_claim = rule(
 # batched equality, sibling of pk_gate over verdicts): pass iff every claim grades at the behavioral
 # floor or above (the old `discriminate --min-strength behavioral` gate, which reads the RAW grade).
 def _adequacy_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
     v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
     paths = " ".join([g.path for g in ctx.files.grades])
-    emit = "printf '{\"verb\":\"adequacy\",\"verdict\":\"%s\"}\\n' \"$V\" > " + v.path
-    if not ctx.files.grades:
-        cmd = "V=pass; " + emit
-    else:
-        cmd = ("if grep -hE '\"grade\": \"(vacuous|existence|indeterminate|broken)\"' " + paths +
-               "; then V=fail; else V=pass; fi; " + emit)
-    ctx.actions.run_shell(outputs = [v], inputs = ctx.files.grades, command = cmd, mnemonic = "PkAdequacy")
+    # PARSES each grade record (verdict.py agg) — fail iff any grade is below the behavioral floor.
+    ctx.actions.run_shell(
+        outputs = [v],
+        inputs = depset([ctx.file._tool] + ctx.files.grades, transitive = [py.files]),
+        command = _verdict_tool(py, ctx.file._tool) +
+                  "agg adequacy " + v.path + " grade vacuous,existence,indeterminate,broken " + paths,
+        mnemonic = "PkAdequacy",
+    )
     return [DefaultInfo(files = depset([v]))]
 
 pk_adequacy = rule(
     implementation = _adequacy_impl,
     doc = "Aggregate per-claim grade records → adequacy verdict: pass iff all grades >= behavioral.",
-    attrs = {"grades": attr.label_list(allow_files = True, mandatory = True)},
+    toolchains = [_PY],
+    attrs = {
+        "grades": attr.label_list(allow_files = True, mandatory = True),
+        "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
+    },
 )
 
 # Ζ·foot·act — the per-claim FOOTPRINT-AUDIT as a Bazel action (the footprint record family, sibling
@@ -151,18 +165,24 @@ pk_footprint = rule(
 # (sibling of pk_gate/pk_adequacy): pass iff every claim's footprint is covered by its declared
 # reads (no record reads "ok": false).  On-demand (declare+audit), not in //:hook.
 def _footaudit_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
     v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
     paths = " ".join([f.path for f in ctx.files.foots])
-    emit = "printf '{\"verb\":\"footaudit\",\"verdict\":\"%s\"}\\n' \"$V\" > " + v.path
-    if not ctx.files.foots:
-        cmd = "V=pass; " + emit
-    else:
-        cmd = "if grep -hE '\"ok\": ?false' " + paths + "; then V=fail; else V=pass; fi; " + emit
-    ctx.actions.run_shell(outputs = [v], inputs = ctx.files.foots, command = cmd, mnemonic = "PkFootAudit")
+    # PARSES each foot record (verdict.py agg) — fail iff any footprint is not ⊆ declared reads.
+    ctx.actions.run_shell(
+        outputs = [v],
+        inputs = depset([ctx.file._tool] + ctx.files.foots, transitive = [py.files]),
+        command = _verdict_tool(py, ctx.file._tool) + "agg footaudit " + v.path + " ok false " + paths,
+        mnemonic = "PkFootAudit",
+    )
     return [DefaultInfo(files = depset([v]))]
 
 pk_footaudit = rule(
     implementation = _footaudit_impl,
     doc = "Aggregate per-claim foot records → audit verdict: pass iff every footprint ⊆ declared reads.",
-    attrs = {"foots": attr.label_list(allow_files = True, mandatory = True)},
+    toolchains = [_PY],
+    attrs = {
+        "foots": attr.label_list(allow_files = True, mandatory = True),
+        "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
+    },
 )

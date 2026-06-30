@@ -104,3 +104,9 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_check.py},
   reads   = {.}
 }
+@misc{bnd-lint,
+  section = {engine}, from = {bnd-check}, join = {. },
+  claim   = {the build rules hold to the same boundary --- every .bzl action INVOKES a tool rather than embedding a script, so a bare interpreter (which leaves sys.executable empty), a printf-built JSON record, or a grep-parsed JSON field cannot enter a command string, and the verdict record has one owner (tools/verdict.py); Ξ·lint blocks all three across every .bzl},
+  check   = {cmd:python3 ../tools/lint_bzl.py ../tools/calc.bzl ../tools/verb.bzl ../tools/grade.bzl ../tools/bibtex.bzl ../tools/witness.bzl},
+  reads   = {.}
+}

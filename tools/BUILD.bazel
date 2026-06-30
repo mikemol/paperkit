@@ -7,6 +7,10 @@ load("//tools:calc.bzl", "observe_setting")
 # @proj//:{gate,adequacy}), which also projects its prose.  Not a bolted-on py_test.
 exports_files(["assert_pass.sh", "read_grade.py", "mem_learn.py", "sens.py", "eval.py", "verdict.py", "lint_bzl.py"])
 
+# Ξ·lint·wire — the .bzl files exported so the boundaries bnd-lint check (a data dep via //:files) can
+# lint them.  Explicit set (no globs); KEEP in sync with the lint's arg list + //:files.
+exports_files(["calc.bzl", "verb.bzl", "grade.bzl", "bibtex.bzl", "witness.bzl"])
+
 # Τ·mem·observe·clean — the peak-read gate (OFF by default; --config=memobserve sets it True).
 observe_setting(name = "observe", build_setting_default = False)
 

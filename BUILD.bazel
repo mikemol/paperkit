@@ -25,6 +25,13 @@ filegroup(name = "files", srcs = [
         "rubric.tsv",
         "scripts/check-grades.sh",
         "warrants.bib",
+        # Ξ·lint·wire — the .bzl + the lint tool, so the boundaries bnd-lint check can lint them.
+        "//tools:lint_bzl.py",
+        "//tools:calc.bzl",
+        "//tools:verb.bzl",
+        "//tools:grade.bzl",
+        "//tools:bibtex.bzl",
+        "//tools:witness.bzl",
     ], visibility = ["//visibility:public"])
 
 # The local CI: `bazel test //:hook` IS the pre-commit (Ζ·hook / Ζ·foot·hook) — it gates AND grades

@@ -165,6 +165,34 @@ pk_mutate = rule(
     },
 )
 
+# Ζ·pyc — compile one .py to its .pyc BUILD ARTIFACT (the .o-analog), via tools/pyc.py.  PEP 552
+# UNCHECKED_HASH ⇒ content-addressed (no mtime → byte-reproducible, cacheable) + authoritative (the
+# runtime never rechecks the source, so a mutated .pyc over an unchanged .py runs the mutation).  The
+# compile is a BUILD step here, not an import-time side effect; pk_eval runs off these .pyc, swapping
+# the one mutated module's .pyc rather than recompiling the engine on every counterfactual.
+def _pyc_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
+    o = ctx.actions.declare_file(ctx.label.name + ".pyc")
+    ctx.actions.run_shell(
+        outputs = [o],
+        inputs = depset([ctx.file._tool, ctx.file.src], transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
+                  ctx.file.src.path + " " + o.path,
+        mnemonic = "PkPyc",
+        progress_message = "Ζ·pyc " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([o]))]
+
+pk_pyc = rule(
+    implementation = _pyc_impl,
+    doc = "Ζ·pyc — compile one .py to its content-addressed .pyc build artifact (UNCHECKED_HASH).",
+    toolchains = [_PY],
+    attrs = {
+        "src": attr.label(allow_single_file = [".py"], mandatory = True, doc = "the .py module to compile"),
+        "_tool": attr.label(default = "//tools:pyc.py", allow_single_file = True),
+    },
+)
+
 # Ζ·mutant·eval — run a claim's check against the engine with ONE module mutated, as a NORMAL action
 # under --experimental_use_hermetic_linux_sandbox (hardlinks + chroot, so claims.py's resolve() can't
 # escape the sandbox to source — the standard sandbox symlinks, which let it escape).  Overwrite the

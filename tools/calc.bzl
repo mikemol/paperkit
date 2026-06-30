@@ -278,8 +278,8 @@ def _cohere_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
-                  ctx.attr.project + " " + v.path + " " + calcs,
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+                  " cohere cohere " + ctx.attr.project + " " + v.path + " " + calcs,
         mnemonic = "PkCohere",
         progress_message = "Ζ·emerge·gate cohere " + ctx.label.name,
     )
@@ -293,7 +293,7 @@ pk_cohere = rule(
         "calcs": attr.label_list(allow_files = True, mandatory = True, doc = "the cached def-resolution calc records"),
         "project": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
-        "_tool": attr.label(default = "//tools:cohere.py", allow_single_file = True),
+        "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
     },
 )
 
@@ -305,8 +305,8 @@ def _verdict_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool, calc], transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
-                  calc.path + " " + v.path,
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+                  " calc verdict " + calc.path + " " + v.path,
         mnemonic = "PkVerdict",
         progress_message = "Ζ·calc verdict " + ctx.label.name,
     )

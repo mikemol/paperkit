@@ -268,7 +268,7 @@ pk_mutant = rule(
     },
 )
 
-# Ζ·emerge·gate — cheap coherence READING (tools/cohere.py): run coherence.py over the cached calc
+# Ζ·emerge·gate — cheap coherence READING (verdict.py cohere): run coherence.py over the cached calc
 # records (no re-sweep), assert grounding soundness (0 genuine misses), emit the verdict.  The ∂²
 # faces gated as a reading over the calculation.
 def _cohere_impl(ctx):

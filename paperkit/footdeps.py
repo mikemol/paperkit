@@ -46,6 +46,27 @@ def _tokens(reads: list, projects: set) -> list:
     return sorted(out)
 
 
+def _engine(reads: list) -> list:
+    """Ζ·mutant — the ENGINE MODULES a check reads (the def-mutable surface for footprints.json):
+    paperkit/*.py.  sensitivity ⊆ footprint (Φ), so a claim's def-sweep need mutate only the
+    def-sites in THESE modules — the scope tools/bibtex.bzl reads at fetch to bound the pk_mutate /
+    pk_eval fanout.  CRITICAL for soundness: a check's subprocess imports modules from the BYTECODE
+    cache, so strace sees `paperkit/__pycache__/bib.cpython-NN.pyc`, not `paperkit/bib.py` — map each
+    such .pyc back to its source .py, else the scope silently OMITS a sensitive module (bib/config for
+    `deterministic`) and sens ⊄ footprint."""
+    mods = set()
+    for r in reads:
+        if not r.startswith("paperkit/"):
+            continue
+        p = Path(r)
+        if p.suffix == ".py":
+            mods.add(r)
+        elif p.suffix == ".pyc" and p.parent.name == "__pycache__":
+            # paperkit/[sub/]__pycache__/x.cpython-NN.pyc → paperkit/[sub/]x.py
+            mods.add(str(p.parent.parent / (p.name.split(".")[0] + ".py")))
+    return sorted(mods)
+
+
 def build(repo_root: Path, names: list) -> dict:
     projects = {p.name for p in repo_root.iterdir() if (p / "paper.toml").is_file()}
     manifest = {}
@@ -123,7 +144,9 @@ def audit_one(proj: str, claim: str) -> dict:
         return {"claim": claim, "ok": True, "degraded": True}  # strace blocked — over-declare, never fail
     extra = {t for t in _tokens(fp, projects) if t != "paperkit" and t != name}
     missing = sorted(extra - declared)
-    return {"claim": claim, "ok": not missing, "missing": missing}
+    # `engine` = the def-mutable surface (the modules whose def-sites the Ζ·mutant fanout sweeps);
+    # pk_foot_learn aggregates it across claims → footprints.json (the def-scope manifest).
+    return {"claim": claim, "ok": not missing, "missing": missing, "engine": _engine(fp)}
 
 
 def main(argv: list) -> int:

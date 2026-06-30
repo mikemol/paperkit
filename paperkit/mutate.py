@@ -56,7 +56,12 @@ def _mutate_lines(text: str, nodes: list) -> str:
 
 def emit_mutant(text: str, qualname: str) -> str:
     """The module with exactly the def-site `qualname`'s body replaced by the uncatchable raise.
-    Raises KeyError (Ν·loud) if the qualname is not a def-site in the module — never silently a no-op."""
+    The EMPTY qualname is the IDENTITY mutation (∅): the module byte-for-byte, no def touched — the
+    baseline point of the mutation set, so an eval against it measures the UNMUTATED check in the very
+    same sandbox (its `flipped=false` is the harness's validity witness; see tools/sens.py).  Raises
+    KeyError (Ν·loud) for a NON-empty qualname that is not a def-site — a real miss is never a no-op."""
+    if qualname == "":
+        return text                                  # ∅ — the identity element of the mutation set
     for qn, node in _def_sites(text):
         if qn == qualname:
             return _mutate_lines(text, [node])

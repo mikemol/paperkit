@@ -207,15 +207,19 @@ pk_eval = rule(
 
 # Ζ·mutant·sens — aggregate a claim's per-site pk_eval {flipped} records → its SENSITIVITY set (the
 # sites whose mutation flips the check).  The Bazel-graph counterpart of grader.sensitivity: the
-# fanout (one pk_eval per site) IS the graph; this reads the results.  A cheap LOCAL action.
+# fanout (one pk_eval per site) IS the graph; this reads the results.  A cheap LOCAL action.  The
+# `baseline` is the ∅-mutation eval (the identity point of the same sweep) — its flipped=false is the
+# harness's validity witness; sens.py FAILS this action if it flipped (a degenerate all-flip ⇒ broken
+# harness, not a real sens set).
 def _sens_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     o = ctx.actions.declare_file(ctx.label.name + ".sens.json")
     evals = " ".join([e.path for e in ctx.files.evals])
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool] + ctx.files.evals, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " + evals + " > " + o.path,
+        inputs = depset([ctx.file._tool, ctx.file.baseline] + ctx.files.evals, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+                  " --baseline " + ctx.file.baseline.path + " " + evals + " > " + o.path,
         mnemonic = "PkSens",
         progress_message = "Ζ·sens " + ctx.label.name,
     )
@@ -227,6 +231,7 @@ pk_sens = rule(
     toolchains = [_PY],
     attrs = {
         "evals": attr.label_list(allow_files = True, mandatory = True, doc = "the pk_eval records for one claim"),
+        "baseline": attr.label(allow_single_file = True, mandatory = True, doc = "the ∅-mutation eval — must be flipped=false"),
         "_tool": attr.label(default = "//tools:sens.py", allow_single_file = True),
     },
 )

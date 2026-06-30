@@ -173,18 +173,19 @@ pk_mutate = rule(
 def _eval_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".eval.json")
     m = ctx.file.mutated
-    # Bare `python3` — the SANDBOX provides it: the OCI image's interpreter under --config=mutant
-    # (docker sandbox), or host /usr's under the hermetic-mount-pairs fallback.  NOT the staged
-    # rules_python (glibc), which won't run on a musl image.  The image/env IS the hermetic python.
-    cmd = ("rm -f " + ctx.attr.module + " && cp " + m.path + " " + ctx.attr.module + "; " +
-           "if python3 paper/checks/claims.py " + ctx.attr.claim + " >/dev/null 2>&1; " +
-           "then FL=false; else FL=true; fi; " +
-           "printf '{\"claim\": \"%s\", \"site\": \"%s\", \"flipped\": %s}\\n' " +
-           "'" + ctx.attr.claim + "' '" + ctx.attr.site + "' \"$FL\" > " + o.path)
+    # The eval logic lives in tools/eval.py (a real script, not a shell blob in a string); here we
+    # only stage its inputs and pass args.  `"$(command -v python3)"` invokes the interpreter by
+    # ABSOLUTE path so eval.py's sys.executable is populated — the check it spawns re-spawns the
+    # projector as [sys.executable, …], which execs '' (PermissionError → spurious flip) when the
+    # tool is run as bare `python3`.  No toolchain ⇒ no glibc rules_python python staged, so
+    # command -v resolves the sandbox/OCI-image interpreter (musl-safe).
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(ctx.files.engine + ctx.files.project + [m]),
-        command = cmd,
+        inputs = depset([ctx.file._tool] + ctx.files.engine + ctx.files.project + [m]),
+        command = '"$(command -v python3)" ' + ctx.file._tool.path +
+                  " --module " + ctx.attr.module + " --mutant " + m.path +
+                  " --check paper/checks/claims.py --claim " + ctx.attr.claim +
+                  " --site '" + ctx.attr.site + "' --out " + o.path,
         mnemonic = "PkEval",
         progress_message = "Ζ·eval " + ctx.label.name,
     )
@@ -200,6 +201,33 @@ pk_eval = rule(
         "mutated": attr.label(allow_single_file = True, mandatory = True, doc = "the pk_mutate'd module"),
         "engine": attr.label_list(allow_files = True, mandatory = True, doc = "//paperkit:engine"),
         "project": attr.label_list(allow_files = True, doc = "the paper project files"),
+        "_tool": attr.label(default = "//tools:eval.py", allow_single_file = True),
+    },
+)
+
+# Ζ·mutant·sens — aggregate a claim's per-site pk_eval {flipped} records → its SENSITIVITY set (the
+# sites whose mutation flips the check).  The Bazel-graph counterpart of grader.sensitivity: the
+# fanout (one pk_eval per site) IS the graph; this reads the results.  A cheap LOCAL action.
+def _sens_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
+    o = ctx.actions.declare_file(ctx.label.name + ".sens.json")
+    evals = " ".join([e.path for e in ctx.files.evals])
+    ctx.actions.run_shell(
+        outputs = [o],
+        inputs = depset([ctx.file._tool] + ctx.files.evals, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " + evals + " > " + o.path,
+        mnemonic = "PkSens",
+        progress_message = "Ζ·sens " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([o]))]
+
+pk_sens = rule(
+    implementation = _sens_impl,
+    doc = "Ζ·mutant — aggregate per-(claim, site) {flipped} eval records → the claim's sensitivity set.",
+    toolchains = [_PY],
+    attrs = {
+        "evals": attr.label_list(allow_files = True, mandatory = True, doc = "the pk_eval records for one claim"),
+        "_tool": attr.label(default = "//tools:sens.py", allow_single_file = True),
     },
 )
 

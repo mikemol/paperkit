@@ -18,7 +18,11 @@ import tempfile
 import time
 from pathlib import Path
 
-ENGINE = Path(__file__).resolve().parents[2] / "paperkit"
+# Ζ·mutant — the engine LOCATION is overridable via PAPERKIT_ENGINE (a paperkit knob, so it survives
+# resolver.clean_env): a pk_eval action points it at an engine-VARIANT (the real engine with one
+# module swapped for a mutated one) to test whether mutating that def flips this check.  Unset →
+# the engine beside the paper (the normal gate path).
+ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or Path(__file__).resolve().parents[2] / "paperkit")
 PAPER_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))

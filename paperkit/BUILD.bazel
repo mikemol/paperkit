@@ -13,6 +13,7 @@ filegroup(
         "grade.py",
         "grader.py",
         "layout.py",
+        "mutate.py",
         "project.py",
         "resolver.py",
         "rhetoric.py",

@@ -136,6 +136,35 @@ pk_mem_learn = rule(
     },
 )
 
+# Ζ·mutant (PREPARATION) — emit ONE mutated module as a Bazel artifact: `site`'s def-body → raise,
+# the rest byte-identical (the pure paperkit/mutate.py transform).  Per (module, site) and
+# CLAIM-INDEPENDENT, so Bazel generates it once and SHARES it across every claim whose check tests
+# that mutation; an edit to one module invalidates only its own mutated modules.  pk_eval then runs
+# a check with this module shadowing the real one on PYTHONPATH (the EVALUATION half).
+def _mutate_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
+    o = ctx.actions.declare_file(ctx.label.name + ".mutated.py")
+    ctx.actions.run_shell(
+        outputs = [o],
+        inputs = depset(ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" paperkit/mutate.py ' +
+                  ctx.attr.module + " '" + ctx.attr.site + "' > " + o.path,
+        mnemonic = "PkMutate",
+        progress_message = "Ζ·mutate " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([o]))]
+
+pk_mutate = rule(
+    implementation = _mutate_impl,
+    doc = "Ζ·mutant preparation — emit one mutated module (site's body→raise) as a cached, claim-independent artifact.",
+    toolchains = [_PY],
+    attrs = {
+        "module": attr.string(mandatory = True, doc = "path of the .py module to mutate, e.g. paperkit/grader.py"),
+        "site": attr.string(mandatory = True, doc = "the def-site qualname whose body is replaced"),
+        "data": attr.label_list(allow_files = True, doc = "the staged files (mutate.py + the module)"),
+    },
+)
+
 # Ζ·mutant — ONE (claim, def-site) probe as a Bazel action: mutate exactly `site` and report
 # whether it flips the check.  This LIFTS the def-sweep's in-process group-testing fanout into
 # Bazel's graph (parallel + per-site cached); pk_sens aggregates the {flipped} records into the

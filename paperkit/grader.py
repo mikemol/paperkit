@@ -17,7 +17,6 @@ A function downstream of _grade_one needs no resolution string: engine_dir IS th
 """
 from __future__ import annotations
 
-import ast
 import json
 import os
 import shutil
@@ -31,6 +30,7 @@ import config
 
 import resolver
 from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _copy_sandbox, _nested_roots, _mutable
+from mutate import _def_sites, _mutate_lines  # Ζ·mutant — the pure AST mutation primitives (their own leaf)
 from grade import _grade_from_sens  # Μ·grade — the pure ladder/interpretation (the rungs + clamp
 # orders STRENGTH/ORDER/RANK_C/GRADE_C/CORRO_C live in grade.py now; the SWEEP below is the
 # calculation, that module the interpretation — Ζ·calc·interp in code).
@@ -84,50 +84,10 @@ def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None) -> str:
         return f"{engine_dir.name}/{f.relative_to(engine_dir)}"
 
 
-def _def_sites(text: str) -> list:
-    """Every def/method in a .py source as (qualname, node).  Mutation resolution
-    for code is the DEFINITION, not the file: corrupting a whole engine file breaks
-    its `import` and flips EVERY witness identically (the import-crash flood, one
-    collapsed signature); breaking one function's BODY leaves the module importable,
-    so a witness flips only if it actually exercises that function — the sensitivity
-    set becomes the measured fingerprint of the engine capabilities the claim rests on."""
-    out: list = []
-    try:
-        tree = ast.parse(text)
-    except SyntaxError:
-        return out
-
-    def rec(node, prefix):
-        for child in ast.iter_child_nodes(node):
-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                # a one-liner (`def f(): return 1`) shares its signature line with the
-                # body, so a line-span replacement can't isolate the body — skip it.
-                if child.body[0].lineno > child.lineno:
-                    out.append((prefix + child.name, child))
-                rec(child, prefix + child.name + ".")
-            elif isinstance(child, ast.ClassDef):
-                rec(child, prefix + child.name + ".")
-            else:
-                rec(child, prefix)
-
-    rec(tree, "")
-    return out
-
-
-def _mutate_lines(text: str, nodes: list) -> str:
-    """Replace each given def's body line-span with an UNCATCHABLE raise, leaving the
-    rest of the file byte-identical (so a source-grep witness flips only when ITS
-    grepped text lived in a mutated body, not because the file was reformatted).
-    BaseException — not Exception — so a witness's own `except Exception` cannot
-    swallow the mutation; that makes group testing MONOTONE BY CONSTRUCTION (a group
-    fails iff some member fails alone) rather than resting on an assumption that no
-    witness catches the raise."""
-    lines = text.splitlines(keepends=True)
-    for node in sorted(nodes, key=lambda n: n.body[0].lineno, reverse=True):
-        s, e = node.body[0].lineno, node.end_lineno
-        col = node.body[0].col_offset
-        lines[s - 1:e] = [" " * col + "raise BaseException('PAPERKIT_MUT')\n"]
-    return "".join(lines)
+# Ζ·mutant — _def_sites / _mutate_lines (the pure AST mutation primitives) now live in their own leaf
+# (paperkit/mutate.py, imported at the top), so the Bazel-orchestrated mutant graph builds on them
+# without importing this sweep machinery.  The sensitivity INTERPRETATION (group-testing, the
+# capability fingerprint) stays here.
 
 
 def _sites(sandbox_project: Path, engine_dir: Path | None) -> list:

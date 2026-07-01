@@ -46,14 +46,21 @@ def _parse(bib_text):
 
 
 def verifier_named():
-    # "a claim's verifier is named type:target" — the resolver splits on the ':'
-    assert 'partition(":")' in RESOLVER_SRC, "resolver no longer splits type:target"
+    import gate
+    # a verifier is NAMED type:target — the resolver splits on the ':' so the TYPE prefix selects the
+    # verb: the SAME target under a different type yields a different verdict (behavioral, Ε·behavioral).
+    assert gate.resolves("cmd:true", ENGINE, {}) is True, "cmd:true — the type did not dispatch to RUN the target"
+    assert gate.resolves("file:true", ENGINE, {}) is False, "file:true — same target, but the file verb must find no file named 'true'"
 
 
 def gate_dispatches():
-    # "dispatches through a small registry" — built-in file/cmd branches + custom
-    for needle in ('typ == "file"', 'typ == "cmd"', "typ in custom"):
-        assert needle in RESOLVER_SRC, f"resolver missing dispatch branch: {needle}"
+    import gate
+    # dispatch through a small registry — a built-in branch per verb, plus a CUSTOM type from the
+    # project's [checks.X] registry; each resolves through ITS OWN branch (behavioral, Ε·behavioral).
+    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "the file: branch did not dispatch"
+    assert gate.resolves("cmd:true", ENGINE, {}) is True, "the cmd: branch did not dispatch"
+    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, "the custom-type (registry) branch did not dispatch"
+    assert gate.resolves("demo:x", ENGINE, {}) is False, "an unregistered type resolved through no branch"
 
 
 def new_domain_adds():
@@ -67,11 +74,14 @@ def new_domain_adds():
 
 
 def two_builtins():
-    # four verifiers ship built in — file EXISTS, cmd EXECS, result PARSES (Ξ·seam),
-    # agree CONCURS (Δ·agree); other types come from config.
-    builtins = set(re.findall(r'typ == "(\w+)"', RESOLVER_SRC))
-    assert builtins == {"file", "cmd", "result", "agree"}, \
-        f"built-in types are {builtins}, expected file, cmd, result & agree"
+    import gate
+    # four verbs ship built in (file EXISTS, cmd EXECS, agree CONCURS; result PARSES a sibling —
+    # result_builtin), each resolving through its OWN branch, and an UNREGISTERED type resolves through
+    # NONE — the built-in set is CLOSED (a 5th verb needs the [checks.X] registry).  Behavioral.
+    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: verb"
+    assert gate.resolves("cmd:true", ENGINE, {}) is True, "cmd: verb"
+    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: verb"
+    assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "an unregistered type resolved — the built-in set is not closed"
 
 
 def agree_builtin():
@@ -303,10 +313,16 @@ def claims_are_warrants():
 
 
 def gate_is_subject():
-    # the gate that accepts this paper is its subject: gate.py implements the very invariants
-    # the paper describes (projection-equality, check-resolution, coverage)
-    for inv in ("PROJECT", "RESOLVE", "COVERAGE"):
-        assert inv in GATE_SRC, f"gate.py does not implement the {inv} invariant the paper describes"
+    # the gate that accepts this paper is its subject: gate.py ENFORCES the very invariants the paper
+    # describes — violating each makes it RED (behavioral, Ε·behavioral).  PROJECT = out.md is the
+    # projection; RESOLVE = every cited claim's check passes.  (COVERAGE — every section-tagged claim
+    # cited — is entailed by a faithful projection, which cites them all.)
+    w = [fx.entry("x", claim="a verified claim", check="cmd:true")]
+    good = fx.project_text(w)
+    assert fx.gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
+    assert fx.gate(w, out=good + "\nDRIFT\n")[0] != 0, "PROJECT: out.md ≠ the projection was not caught"
+    bad = [fx.entry("x", claim="an unverified claim", check="cmd:false")]
+    assert fx.gate(bad, out=fx.project_text(bad))[0] != 0, "RESOLVE: a failing cited check was not caught"
 
 
 # ── Π·selfhost: the drift-caught negative-assertions, as Φ counter-fixtures ───

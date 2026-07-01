@@ -86,18 +86,25 @@ def rm_cmds():
 
 
 def rm_cmds_inv():
-    # the gate enforces three invariants: projection-equality, check-resolution, coverage
-    for inv in ("PROJECT", "RESOLVE", "COVERAGE"):
-        assert inv in GATE_SRC, f"gate.py does not enforce the {inv} invariant"
+    # the gate ENFORCES three invariants — violating each makes it RED (projection-equality,
+    # check-resolution; coverage is entailed by a faithful projection).  Behavioral (Ε·behavioral).
+    w = [fx.entry("x", claim="content", check="cmd:true")]
+    good = fx.project_text(w)
+    assert fx.gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
+    assert fx.gate(w, out=good + "\nDRIFT\n")[0] != 0, "projection-equality not enforced"
+    bad = [fx.entry("x", claim="content", check="cmd:false")]
+    assert fx.gate(bad, out=fx.project_text(bad))[0] != 0, "check-resolution not enforced"
 
 
 def rm_resolver():
-    # a verifier is named type:target, and four types ship built in (one per verb:
-    # file EXISTS, cmd EXECS, result PARSES a sibling's verdict — Ξ·seam, agree CONCURS — Δ·agree)
-    assert 'partition(":")' in RESOLVER_SRC, "the verifier is not named type:target"
-    builtins = set(re.findall(r'typ == "(\w+)"', RESOLVER_SRC))
-    assert builtins == {"file", "cmd", "result", "agree"}, \
-        f"built-in types are {builtins}, expected file, cmd, result & agree"
+    # a verifier is NAMED type:target (the type prefix selects the verb), and built-in verbs ship —
+    # file EXISTS, cmd EXECS, agree CONCURS (result PARSES a sibling — rm-resolver's sibling test);
+    # an unregistered type resolves through none (the set is closed).  Behavioral (Ε·behavioral).
+    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("file:true", ENGINE, {}) is False, \
+        "the type prefix does not select the verb (a verifier is named type:target)"
+    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: verb"
+    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: verb"
+    assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "an unregistered type resolved — the built-in set is not closed"
 
 
 def rm_resolver_cmd():

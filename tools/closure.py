@@ -25,11 +25,12 @@ from pathlib import Path
 
 
 def _fx_cli(fixture_text, names):
-    """helper name → {CLI module stem}, DERIVED from _fixture.py: module-level NAME = "…py" constants
-    (the CLI entrypoints, e.g. PROJECT = ENGINE / "project.py"), then per top-level function which of
-    those names it references (gate() → GATE → gate)."""
+    """helper name → {engine module stem it runs}, DERIVED from _fixture.py: its engine IMPORTS
+    (Φ·spawn — gate.main/project.main run in-process) UNION the engine .py PATH-CONSTANTS it references
+    (the grade helpers still SPAWN discriminate by its DISCRIMINATE = ENGINE/"discriminate.py" path —
+    Φ·spawn·sweep).  Follows intra-fixture calls (gate() → _projected() → project)."""
     tree = ast.parse(fixture_text)
-    const = {}  # NAME → stem
+    const = {}  # NAME → stem, from module-level PROJECT/GATE/DISCRIMINATE = ENGINE / "x.py"
     for n in tree.body:
         if isinstance(n, ast.Assign):
             tgts = n.targets[0].elts if isinstance(n.targets[0], ast.Tuple) else [n.targets[0]]
@@ -42,12 +43,21 @@ def _fx_cli(fixture_text, names):
                         stem = Path(s.value).stem
                         if stem in names:
                             const[t.id] = stem
-    cli = {}
-    for fn in tree.body:
-        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            refs = {x.id for x in ast.walk(fn) if isinstance(x, ast.Name) and x.id in const}
-            cli[fn.name] = {const[r] for r in refs}
-    return cli
+    funcs = {fn.name: fn for fn in tree.body if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))}
+
+    def roots(name, seen):
+        if name in seen or name not in funcs:
+            return set()
+        seen.add(name)
+        fn = funcs[name]
+        r = _imports(fn, names)
+        r |= {const[x.id] for x in ast.walk(fn) if isinstance(x, ast.Name) and x.id in const}
+        for c in ast.walk(fn):
+            if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in funcs:
+                r |= roots(c.func.id, seen)
+        return r
+
+    return {name: roots(name, set()) for name in funcs}
 
 
 def _imports(node, names):

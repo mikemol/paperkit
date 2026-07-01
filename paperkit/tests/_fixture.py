@@ -16,13 +16,22 @@ All three manage their own tempdir and return plain values.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent.parent
+if str(ENGINE) not in sys.path:                  # Φ·spawn: the helpers import the engine IN-PROCESS
+    sys.path.insert(0, str(ENGINE))              # (was: spawn by absolute path), so ENGINE is on path
+                                                 # here — self-contained, not reliant on the caller's setup
+# The engine CLI paths — for the few boundary suites that genuinely test CROSS-PROCESS behaviour
+# (memoize: a Δ grade cached across processes) and so spawn a real process (under the standard
+# boundaries gate, not the hermetic grid).  The fx helpers below run IN-PROCESS, not via these.
 PROJECT, GATE, DISCRIMINATE = ENGINE / "project.py", ENGINE / "gate.py", ENGINE / "discriminate.py"
 
 
@@ -65,20 +74,44 @@ def _write(d, warrants, assets, rubric, title, numbered, references):
     return proj
 
 
-def _run(cmd, env=None):
-    return subprocess.run(cmd, capture_output=True, text=True, env=env)
+def _call(main, argv, env=None):
+    """Run an engine main(argv) IN-PROCESS (Φ·spawn — process spawning is Bazel's job, and a hermetic
+    mutation cell can't spawn/ptrace faithfully), capturing (returncode, stdout, stderr).  os.environ
+    is SAVED and RESTORED around every call: discriminate.main folds args into PAPERKIT_* env
+    (config.apply_args, Ω·config) — process-isolated when spawned, but in-process it would LEAK into
+    the witness and later calls (the recursive-check leak).  env=None inherits the current environment
+    (saved/restored); env=<dict> replaces it for the call, as a subprocess env= would.  A main() that
+    returns None or raises SystemExit yields its exit code.  The engine is imported LAZILY by each
+    helper (not at module level) so a witness's def-closure isn't widened to discriminate's whole cone
+    (Ξ·dag·eval incrementality) — closure.py maps fx.<helper> → its module from these imports."""
+    o, e = io.StringIO(), io.StringIO()
+    saved = os.environ.copy()
+    if env is not None:
+        os.environ.clear()
+        os.environ.update(env)
+    try:
+        with contextlib.redirect_stdout(o), contextlib.redirect_stderr(e):
+            rc = main(list(argv))
+    except SystemExit as se:
+        rc = se.code if isinstance(se.code, int) else (0 if se.code is None else 1)
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+    return (rc or 0), o.getvalue(), e.getvalue()
 
 
 def project_text(warrants, *, assets=None, rubric=(("s", "Sec"),),
                  title="t", numbered=False, references=False) -> str:
+    import project
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, title, numbered, references)
-        return _run([sys.executable, str(PROJECT), "-o", "-", str(proj)]).stdout
+        return _call(project.main, ["-o", "-", str(proj)])[1]
 
 
 def _projected(proj, out):
     if out is None:                       # faithful: out.md IS the projection
-        _run([sys.executable, str(PROJECT), str(proj)])
+        import project
+        _call(project.main, [str(proj)])
     else:                                 # caller controls out.md (e.g. citations)
         (proj / "out.md").write_text(out)
 
@@ -86,13 +119,19 @@ def _projected(proj, out):
 def gate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
          title="t", numbered=False, references=False):
     """(returncode, stderr).  Projects out.md before gating (or writes `out`)."""
+    import gate as _gate
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, title, numbered, references)
         _projected(proj, out)
-        r = _run([sys.executable, str(GATE), *flags, str(proj)])
-        return r.returncode, r.stderr
+        rc, _o, e = _call(_gate.main, [*flags, str(proj)])
+        return rc, e
 
 
+# Δ grading drives the def-resolution SWEEP (copy the engine into a sandbox, mutate its defs,
+# re-run the check) — heavy process orchestration that is Bazel's job (Φ·spawn·sweep) and whose
+# sandbox-root/engine-copy relies on process isolation (in-process it can't locate the engine for an
+# isolated tempdir project).  So the two grade helpers stay a SUBPROCESS for now; the light/pure
+# paths (project, gate) run in-process above.  Non-hermetic, standard-sandbox callers only.
 def discriminate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
                  title="t", numbered=False, references=False, env=None):
     """(returncode, stdout).  Projects out.md before grading (or writes `out`).
@@ -100,7 +139,8 @@ def discriminate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),)
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, title, numbered, references)
         _projected(proj, out)
-        r = _run([sys.executable, str(DISCRIMINATE), *flags, str(proj)], env=env)
+        r = subprocess.run([sys.executable, str(DISCRIMINATE), *flags, str(proj)],
+                           capture_output=True, text=True, env=env)
         return r.returncode, r.stdout
 
 
@@ -109,14 +149,16 @@ def discriminate_stderr(warrants, *flags, assets=None, rubric=(("s", "Sec"),), e
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, "t", False, False)
         _projected(proj, None)
-        return _run([sys.executable, str(DISCRIMINATE), *flags, str(proj)], env=env).stderr
+        return subprocess.run([sys.executable, str(DISCRIMINATE), *flags, str(proj)],
+                              capture_output=True, text=True, env=env).stderr
 
 
 def gate_json(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
               title="t", numbered=False, references=False):
     """(returncode, parsed gate --json dict).  Projects out.md first (or writes `out`)."""
+    import gate as _gate
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, title, numbered, references)
         _projected(proj, out)
-        r = _run([sys.executable, str(GATE), "--json", *flags, str(proj)])
-        return r.returncode, json.loads(r.stdout or "{}")
+        rc, o, _e = _call(_gate.main, ["--json", *flags, str(proj)])
+        return rc, json.loads(o or "{}")

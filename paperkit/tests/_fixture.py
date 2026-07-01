@@ -20,7 +20,6 @@ import contextlib
 import io
 import json
 import os
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -94,6 +93,12 @@ def _call(main, argv, env=None):
             rc = main(list(argv))
     except SystemExit as se:
         rc = se.code if isinstance(se.code, int) else (0 if se.code is None else 1)
+    except Exception as ex:
+        # A subprocess exits NONZERO on an engine crash; match that in-process.  The Ν·loud guards
+        # RAISE (e.g. a def-resolution sweep with no engine in the sandbox — the def-engine-guard),
+        # and witnesses assert that nonzero.  Record the crash on the captured stderr.
+        e.write("%s: %s\n" % (type(ex).__name__, ex))
+        rc = 1
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -127,30 +132,25 @@ def gate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
         return rc, e
 
 
-# Δ grading drives the def-resolution SWEEP (copy the engine into a sandbox, mutate its defs,
-# re-run the check) — heavy process orchestration that is Bazel's job (Φ·spawn·sweep) and whose
-# sandbox-root/engine-copy relies on process isolation (in-process it can't locate the engine for an
-# isolated tempdir project).  So the two grade helpers stay a SUBPROCESS for now; the light/pure
-# paths (project, gate) run in-process above.  Non-hermetic, standard-sandbox callers only.
 def discriminate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
                  title="t", numbered=False, references=False, env=None):
     """(returncode, stdout).  Projects out.md before grading (or writes `out`).
-    `env` overrides the child environment for the grade subprocess."""
+    `env` overrides the child environment for the grade run."""
+    import discriminate as _disc
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, title, numbered, references)
         _projected(proj, out)
-        r = subprocess.run([sys.executable, str(DISCRIMINATE), *flags, str(proj)],
-                           capture_output=True, text=True, env=env)
-        return r.returncode, r.stdout
+        rc, o, _e = _call(_disc.main, [*flags, str(proj)], env=env)
+        return rc, o
 
 
 def discriminate_stderr(warrants, *flags, assets=None, rubric=(("s", "Sec"),), env=None):
-    """The grade subprocess's STDERR (the Δ·pulse heartbeat lives here)."""
+    """The grade run's STDERR (the Δ·pulse heartbeat lives here)."""
+    import discriminate as _disc
     with tempfile.TemporaryDirectory() as d:
         proj = _write(d, warrants, assets, rubric, "t", False, False)
         _projected(proj, None)
-        return subprocess.run([sys.executable, str(DISCRIMINATE), *flags, str(proj)],
-                              capture_output=True, text=True, env=env).stderr
+        return _call(_disc.main, [*flags, str(proj)], env=env)[2]
 
 
 def gate_json(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),

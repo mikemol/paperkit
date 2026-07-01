@@ -1002,15 +1002,14 @@ def collapse_safe():
 
 
 def forward_direction():
-    # the structure residual closed by PROJECTION (the grounding DAG renders as
-    # transitively-reduced cross-references), not the retired "subsume into one chiral
-    # edge" flattening.  The open work is the richer materialization rungs (an expounding
-    # clause / a figure beyond the bare citation) — trips when one lands.
-    src = (ENGINE / "project.py").read_text()
-    assert "def transitive_reduction" in src and "def references" in src, \
-        "the reference projection/reduction was removed — update the roadmap"
-    assert "def expound" not in src, \
-        "a richer reference materialization (expound) may have landed — update the roadmap"
+    import project as P
+    # the structure residual is closed by PROJECTION: the grounding DAG renders as transitively-REDUCED
+    # cross-references — a re-cited premise reachable by a LONGER rests-on path is redundant and dropped
+    # (transitive_reduction, the `drop` rung of drop < cite < expound < figure).  Behavioral (Ε·behavioral).
+    assert P.transitive_reduction({"c": ["a", "b"], "b": ["a"]}) == {"c": ["b"], "b": ["a"]}, \
+        "did not drop the redundant c→a edge (a is already reachable from c via b)"
+    assert P.transitive_reduction({"c": ["a"], "b": ["a"]}) == {"c": ["a"], "b": ["a"]}, \
+        "dropped a direct grounding edge that has no longer path"
 
 
 CLAIMS = {

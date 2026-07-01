@@ -142,6 +142,12 @@ def _sitename(m, q):
     spec = q.replace(".", "_").replace("+", "_add_").replace("-", "_drop_").replace(":", "_")
     return m[len("paperkit/"):-len(".py")].replace("/", "_") + "__" + spec
 
+def _filesitename(spec):
+    """A valid target-name fragment for a FILE toggle site (file+:/file-:<path>): the spec flattened
+    to an identifier (file+:paperkit/cli.py → file_add_paperkit_cli_py).  No module stem — a file cell
+    perturbs a path in the sandbox, not an engine module."""
+    return spec.replace(".", "_").replace("+", "_add_").replace("-", "_drop_").replace(":", "_").replace("/", "_")
+
 # ·gen·surface — the def-mutable SURFACE is a property of the ENGINE, not any project.  It is
 # enumerated ONCE in the module extension (engine-side, below) and passed to each emerge bib_repo;
 # NOT per-project (a check that non-emerge "skips it" would be the tell of a misplaced engine
@@ -223,7 +229,10 @@ def _closures(module_ctx, project, core):
     py = _host_py(module_ctx, "·gen·closure")
     cl = module_ctx.path(Label("@@//tools:closure.py"))
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
-    res = module_ctx.execute([str(py), str(cl), "--check", str(check), "--fixture", str(fixture)] + core, working_directory = root)
+    # --relpath — the check's REPO-RELATIVE path (paper/checks/claims.py, checks/readme.py), so
+    # closure.py resolves Path(__file__).parents[N] to the SANDBOX prefix a file toggle must hit.
+    relpath = script if project == "." else project + "/" + script
+    res = module_ctx.execute([str(py), str(cl), "--check", str(check), "--fixture", str(fixture), "--relpath", relpath] + core, working_directory = root)
     if res.return_code != 0:
         fail("·gen·closure: closure.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]
@@ -269,9 +278,13 @@ def _bib_repo_impl(repository_ctx):
     # get it; non-emerge get [] because they build no grid — the surface is not conditional on them).
     sites = [l.split("\t") for l in repository_ctx.attr.sites]
     closures = {}  # ·gen·closure — claim key → its witness's closure ROOT modules (Ξ·dag·eval)
+    fsites = {}    # Ζ·mutant·struct·node-kinds — claim key → its FILE toggle specs (file+:/file-:<path>)
     for l in repository_ctx.attr.closures:
         k, m = l.split("\t")
-        closures.setdefault(k, []).append(m)
+        if m.startswith("file+:") or m.startswith("file-:"):
+            fsites.setdefault(k, []).append(m)
+        else:
+            closures.setdefault(k, []).append(m)
     # the claim-WITNESS script each pk_eval runs, EXEC-relative — the .py in THIS project's
     # [checks.claim] cmd (paper → paper/checks/claims.py, root → checks/readme.py), project-prefixed.
     # NOT hardcoded: root's readme.py is a different module than paper's claims.py, so a hardcoded
@@ -335,12 +348,25 @@ def _bib_repo_impl(repository_ctx):
                 # multi-project/report-live read siblings); the old pk_calc staged dl, so the grid ∅
                 # must too, else the unmutated check errors and the baseline flips (garbage sens).
                 ev = "check = " + _lit(wscript) + ", closure = [" + cl + "], project = [" + dl + "]"
+                cellnames = []
                 for m, q in csites:
                     sn = _sitename(m, q)
                     out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, module = %s, mutated_py = ":mut_%s", mutated_pyc = ":pyc_%s", %s)' % (
                         k, sn, _lit(k), _lit(m + "::" + q), _lit(m), sn, sn, ev))
+                    cellnames.append(sn)
+                # Ζ·mutant·struct·node-kinds — the claim's FILE toggle cells (file+ inject / file- drop),
+                # per its witness's .exists() edges.  A file cell mutates no module: it passes no
+                # module/mutant (eval.py branches on the file+/file- site prefix), only the site + the
+                # same check/closure/project (ev).  The file analog of the import+/- cells, so it folds
+                # into the SAME pk_sens — sens now spans both artifact kinds (module defs/imports AND
+                # file existence).  This makes rm-next (a "cli.py does not exist" negative) BEHAVIORALLY
+                # falsifiable at the grid: file+ injects cli.py → the assertion flips.
+                for spec in fsites.get(k, []):
+                    fn = _filesitename(spec)
+                    out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, %s)' % (k, fn, _lit(k), _lit(spec), ev))
+                    cellnames.append(fn)
                 out.append('pk_eval(name = "%s__0", claim = %s, site = "0", module = "paperkit/bib.py", mutated_py = ":mut_0", mutated_pyc = ":pyc_0", %s)' % (k, _lit(k), ev))
-                out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0")' % (k, ", ".join(['":%s__%s"' % (k, _sitename(m, q)) for m, q in csites]), k))
+                out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0")' % (k, ", ".join(['":%s__%s"' % (k, c) for c in cellnames]), k))
             elif emerge:
                 # A calc claim with NO engine witness (a cmd:/result: check — e.g. a grep over a static
                 # asset).  It has no closure (closure.py enumerates only the witness module's CLAIMS), so

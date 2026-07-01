@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "yaYwmOxtuBiAhFPRIntHnHOCLG65bkuPnazZ5a3PLTg=",
+        "bzlTransitiveDigest": "qrvBJCQm/LjYpOw7XxlYpHiII/rE4i4q8jKhmiFqLCc=",
         "usagesDigest": "wEQOhntXZ4i6ecw/beI3vdwPEWlHpnJmqWC37TC1aVs=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "93054558f06af42ba714ebf2f1c61ffd29638f4b412805b6da337471cb5d4494",
@@ -777,6 +777,7 @@
                 "paper-is-paperkit\tpaperkit/gate.py",
                 "paper-is-paperkit\tpaperkit/project.py",
                 "paper-is-paperkit\tpaperkit/resolver.py",
+                "paper-is-paperkit\tfile-:paper/paper.toml",
                 "paper-is-projection\tpaperkit/tests/_fixture.py",
                 "paper-is-projection\tpaperkit/gate.py",
                 "paper-is-projection\tpaperkit/project.py",
@@ -1273,6 +1274,8 @@
                 "rm-next\tpaperkit/grader.py",
                 "rm-next\tpaperkit/project.py",
                 "rm-next\tpaperkit/resolver.py",
+                "rm-next\tfile+:mkdocx.sh",
+                "rm-next\tfile+:paperkit/cli.py",
                 "rm-noship\tpaperkit/tests/_fixture.py",
                 "rm-noship\tpaperkit/discriminate.py",
                 "rm-noship\tpaperkit/gate.py",

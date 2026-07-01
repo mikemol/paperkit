@@ -229,12 +229,17 @@ def _eval_impl(ctx):
     # spurious flip) under bare `python3`.  No toolchain ⇒ command -v resolves the sandbox/OCI python.
     closure_pyc = depset(transitive = [t[PycInfo].pyc for t in ctx.attr.closure])
     closure_py = depset(transitive = [t[PycInfo].py for t in ctx.attr.closure])
+    # Ζ·mutant·struct·node-kinds — a FILE cell (site = file+:/file-:) mutates no module: it toggles a
+    # path in the sandbox, so it stages no mutant .py/.pyc and passes no --module/--mutant (eval.py
+    # branches on the site prefix).  A .py cell passes them as before.
+    mut = [ctx.file._tool] + ([mpy, mpyc] if mpy else [])
+    marg = (" --module " + ctx.attr.module + " --mutant-py " + mpy.path +
+            " --mutant-pyc " + mpyc.path) if mpy else ""
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, mpy, mpyc] + ctx.files.project, transitive = [closure_pyc, closure_py]),
+        inputs = depset(mut + ctx.files.project, transitive = [closure_pyc, closure_py]),
         command = '"$(command -v python3)" ' + ctx.file._tool.path +
-                  " --engine-dir paperkit --module " + ctx.attr.module +
-                  " --mutant-py " + mpy.path + " --mutant-pyc " + mpyc.path +
+                  " --engine-dir paperkit" + marg +
                   " --check " + ctx.attr.check + " --claim " + ctx.attr.claim +
                   " --site '" + ctx.attr.site + "' --out " + o.path,
         mnemonic = "PkEval",
@@ -248,10 +253,10 @@ pk_eval = rule(
     attrs = {
         "claim": attr.string(mandatory = True, doc = "the claim key (the check's {target})"),
         "check": attr.string(mandatory = True, doc = "the claim-witness script, exec-relative (paper/checks/claims.py, checks/readme.py) — the project's [checks.claim] cmd, NOT hardcoded"),
-        "site": attr.string(mandatory = True, doc = "the def-site label (for the record)"),
-        "module": attr.string(mandatory = True, doc = "the engine module path mutated, e.g. paperkit/bib.py"),
-        "mutated_py": attr.label(allow_single_file = [".py"], mandatory = True, doc = "the mutated module SOURCE (pk_mutate; identity for ∅) — the script-run path"),
-        "mutated_pyc": attr.label(allow_single_file = [".pyc"], mandatory = True, doc = "the mutated module BYTECODE (pk_pyc of it) — the import path"),
+        "site": attr.string(mandatory = True, doc = "the site label: a def-site/import spec for a .py cell, or file+:/file-:<path> for a file cell"),
+        "module": attr.string(default = "", doc = "the engine module path mutated, e.g. paperkit/bib.py (empty for a file cell)"),
+        "mutated_py": attr.label(allow_single_file = [".py"], doc = "the mutated module SOURCE (pk_mutate; identity for ∅) — the script-run path; absent for a file cell"),
+        "mutated_pyc": attr.label(allow_single_file = [".pyc"], doc = "the mutated module BYTECODE (pk_pyc of it) — the import path; absent for a file cell"),
         "closure": attr.label_list(providers = [PycInfo], mandatory = True, doc = "Ξ·dag·eval — the check's closure ROOTS (pk_pyc targets, closure.py); PycInfo expands the transitive .py/.pyc cone"),
         "project": attr.label_list(allow_files = True, doc = "the paper project files"),
         "_tool": attr.label(default = "//tools:eval.py", allow_single_file = True),

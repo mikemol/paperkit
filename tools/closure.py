@@ -88,10 +88,50 @@ def _roots_of(node, names, cli):
     return _imports(node, names) | _reads(node, names) | _fx_calls(node, cli)
 
 
+def _dir_consts(relpath, tree):
+    """Module-level Path DIR constants → their sandbox-relative prefix.  The check runs with __file__
+    at its REPO-RELATIVE path in the hermetic sandbox, so `Path(__file__).resolve().parents[N]` is that
+    path with N+1 trailing components dropped: for checks/readme.py, parents[1] = "" (root); for
+    paper/checks/claims.py, parents[1] = "paper".  NAME / "sub" extends a known prefix (ENGINE =
+    ROOT / "paperkit" → "paperkit").  A file toggle must hit exactly these sandbox paths."""
+    parts = relpath.split("/")
+    pref = {}
+    for n in tree.body:
+        if not isinstance(n, ast.Assign) or not isinstance(n.targets[0], ast.Name):
+            continue
+        tgt, v = n.targets[0].id, n.value
+        if (isinstance(v, ast.Subscript) and isinstance(v.value, ast.Attribute)
+                and v.value.attr == "parents" and isinstance(v.slice, ast.Constant)
+                and isinstance(v.slice.value, int)
+                and any(isinstance(x, ast.Name) and x.id == "__file__" for x in ast.walk(v))):
+            pref[tgt] = "/".join(parts[:-(v.slice.value + 1)])       # Path(__file__)….parents[N]
+        elif (isinstance(v, ast.BinOp) and isinstance(v.op, ast.Div) and isinstance(v.left, ast.Name)
+              and v.left.id in pref and isinstance(v.right, ast.Constant) and isinstance(v.right.value, str)):
+            pref[tgt] = "/".join(p for p in (pref[v.left.id], v.right.value) if p)   # NAME / "sub"
+    return pref
+
+
+def _exists_paths(node, pref):
+    """Sandbox paths a witness tests via `(BASE / "leaf").exists()` (BASE a known dir constant) — the
+    EXISTS edges.  A claim asserting a file's presence/absence is falsifiable by TOGGLING that file
+    (Ζ·mutant·struct·node-kinds): the file analog of the import+/- toggle.  Only plain string leaves
+    (not f-strings / loop vars) are resolved here."""
+    out = set()
+    for c in ast.walk(node):
+        if not (isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "exists"):
+            continue
+        r = c.func.value
+        if (isinstance(r, ast.BinOp) and isinstance(r.op, ast.Div) and isinstance(r.left, ast.Name)
+                and r.left.id in pref and isinstance(r.right, ast.Constant) and isinstance(r.right.value, str)):
+            out.add((pref[r.left.id] + "/" + r.right.value).lstrip("/"))
+    return out
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", required=True, help="the check module, e.g. paper/checks/claims.py")
     ap.add_argument("--fixture", required=True, help="the fixture module, e.g. paperkit/tests/_fixture.py")
+    ap.add_argument("--relpath", default="", help="the check's REPO-RELATIVE path (for parents[N] resolution); defaults to --check")
     ap.add_argument("engine", nargs="+", help="the engine module .py paths (the resolvable names)")
     a = ap.parse_args(argv)
 
@@ -128,9 +168,19 @@ def main(argv):
                 if isinstance(k, ast.Constant) and isinstance(v, ast.Name):
                     claims[k.value] = v.id
 
+    # Ζ·mutant·struct·node-kinds — per-claim FILE toggle sites, from the witness's own .exists() tests
+    # (an EXISTS edge, alongside the .py closure roots).  The falsifier is the TOGGLE of the artifact's
+    # CURRENT state (checked here at analysis time, cwd = repo root): an absent file → file+ (inject
+    # it, falsifying "X does not exist" — rm-next's cli.py); a present file → file- (drop it, falsifying
+    # "X exists").  No `not`-parsing needed: the counterfactual is simply the opposite of what is.
+    pref = _dir_consts(a.relpath or a.check, tree)
+
     for key in sorted(claims):
         for stem in sorted(base | roots(claims[key], set())):
             print("{}\t{}".format(key, names[stem]))
+        for path in sorted(_exists_paths(funcs[claims[key]], pref)):
+            op = "file-" if Path(path).exists() else "file+"
+            print("{}\t{}:{}".format(key, op, path))
     return 0
 
 

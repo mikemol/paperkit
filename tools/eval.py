@@ -10,6 +10,19 @@ delivered by overwriting the ONE mutated module's __pycache__ slot with its muta
 stays original (only for findability + __file__).  The ∅ baseline passes the module's own identity
 .pyc, a no-op swap.  No import-time compilation: the def-sweep compiles the engine once, not per eval.
 
+Ζ·mutant·struct·node-kinds — a perturbation TOGGLES an element's presence, and a FILE's presence is
+togglable like an import's (one artifact-kind down).  When `--site` is a FILE spec (no module to
+mutate) the counterfactual is delivered by toggling that path in the sandbox instead of swapping a
+.pyc:
+    file+:<path>   INJECT an absent file (create it) — falsifies a "X does not exist" assertion (the
+                   contrapositive of rm-next's roadmap-pending claim: if cli.py ships, the check must
+                   fail).  The NEGATIVE-existence polarity, the file analog of import+.
+    file-:<path>   DROP a present file (remove it) — falsifies a "X exists" assertion.  The POSITIVE
+                   polarity, the file analog of import-.
+The path is sandbox-relative, aligned with the check's own Path(__file__).resolve() root (the
+hermetic sandbox keeps both in the same tree).  A file cell needs no --module/--mutant (nothing is
+recompiled); it still stages the check's engine .pyc closure and runs it.
+
 Idempotency: invoke this tool by an ABSOLUTE interpreter path so sys.executable is populated — the
 check re-spawns the projector as [sys.executable, …] (see the history of the '' spurious-flip bug)."""
 import argparse
@@ -23,9 +36,9 @@ import sys
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine-dir", required=True, help="the staged engine dir, e.g. paperkit")
-    ap.add_argument("--module", required=True, help="the mutated module's .py path, e.g. paperkit/bib.py")
-    ap.add_argument("--mutant-py", required=True, help="the mutated module SOURCE (pk_mutate; identity for ∅)")
-    ap.add_argument("--mutant-pyc", required=True, help="the mutated module BYTECODE (pk_pyc of it)")
+    ap.add_argument("--module", default="", help="the mutated module's .py path, e.g. paperkit/bib.py (empty for a file cell)")
+    ap.add_argument("--mutant-py", default="", help="the mutated module SOURCE (pk_mutate; identity for ∅; empty for a file cell)")
+    ap.add_argument("--mutant-pyc", default="", help="the mutated module BYTECODE (pk_pyc of it; empty for a file cell)")
     ap.add_argument("--check", required=True, help="the check script, e.g. paper/checks/claims.py")
     ap.add_argument("--claim", required=True)
     ap.add_argument("--site", required=True, help="the def-site label, recorded in the result")
@@ -45,14 +58,24 @@ def main(argv):
         if "__pycache__" in pyc.parts:
             continue
         shutil.move(str(pyc), str(slot(pyc.with_suffix(".py"))))
-    # … then deliver the ONE mutated module on BOTH paths (∅ = identity = no-op): its .pyc (used when
-    # the module is IMPORTED) AND its .py source (used when the module is run as a MAIN SCRIPT — a
-    # main script's bytecode is never read from __pycache__, so an entry-point module like project.py
-    # would otherwise escape the mutation).
-    mod = pathlib.Path(a.module)
-    mod.unlink(missing_ok=True)   # Ξ·dag·eval: D may lie outside its own check's closure .py (a
-    shutil.copyfile(a.mutant_py, mod)   # non-sensitive cell) → not staged; deliver the mutant anyway
-    shutil.copyfile(a.mutant_pyc, slot(mod))
+    op, sep, arg = a.site.partition(":")
+    if op == "file+":
+        # Ζ·mutant·struct·node-kinds — INJECT an absent file: its mere existence is the counterfactual
+        # (an empty file suffices; the assertion tests .exists(), not content), so no module is mutated.
+        p = pathlib.Path(arg)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("")
+    elif op == "file-":
+        pathlib.Path(arg).unlink(missing_ok=True)      # DROP a present file — the counterfactual absence
+    else:
+        # … deliver the ONE mutated module on BOTH paths (∅ = identity = no-op): its .pyc (used when
+        # the module is IMPORTED) AND its .py source (used when the module is run as a MAIN SCRIPT — a
+        # main script's bytecode is never read from __pycache__, so an entry-point module like
+        # project.py would otherwise escape the mutation).
+        mod = pathlib.Path(a.module)
+        mod.unlink(missing_ok=True)   # Ξ·dag·eval: D may lie outside its own check's closure .py (a
+        shutil.copyfile(a.mutant_py, mod)   # non-sensitive cell) → not staged; deliver the mutant anyway
+        shutil.copyfile(a.mutant_pyc, slot(mod))
 
     flipped = subprocess.run([sys.executable, a.check, a.claim],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0

@@ -269,6 +269,15 @@ def _bib_repo_impl(repository_ctx):
     for l in repository_ctx.attr.closures:
         k, m = l.split("\t")
         closures.setdefault(k, []).append(m)
+    # the claim-WITNESS script each pk_eval runs, EXEC-relative — the .py in THIS project's
+    # [checks.claim] cmd (paper → paper/checks/claims.py, root → checks/readme.py), project-prefixed.
+    # NOT hardcoded: root's readme.py is a different module than paper's claims.py, so a hardcoded
+    # paper/checks/claims.py ran the wrong script for every root cell → every root ∅ flipped (garbage).
+    wscript = ""
+    for tok in custom.get("claim", "").split(" "):
+        if tok.endswith(".py"):
+            wscript = tok if proj == "." else proj + "/" + tok
+            break
     if emerge:
         out.append("# ·gen·surface: %d core engine def-sites (enumerated once, engine-side)" % len(sites))
     if calc:
@@ -308,7 +317,11 @@ def _bib_repo_impl(repository_ctx):
                 # (a drop-in for the old pk_calc __dcalc pk_cohere consumes).  The fanout IS the build
                 # graph — each cell a node — lifted from grader.sensitivity's in-process group-testing.
                 cl = ", ".join(['"@@//paperkit:%s"' % m[len("paperkit/"):-len(".py")] for m in closures[k]])
-                ev = "closure = [" + cl + "], project = [" + _lit(files) + "]"
+                # stage the claim's DECLARED reads (dl = _data(reads, files)), not just the project
+                # files — a witness may read cross-project inputs (local-ci reads .githooks/pre-commit,
+                # multi-project/report-live read siblings); the old pk_calc staged dl, so the grid ∅
+                # must too, else the unmutated check errors and the baseline flips (garbage sens).
+                ev = "check = " + _lit(wscript) + ", closure = [" + cl + "], project = [" + dl + "]"
                 for m, q in sites:
                     sn = _sitename(m, q)
                     out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, module = %s, mutated_py = ":mut_%s", mutated_pyc = ":pyc_%s", %s)' % (

@@ -235,7 +235,7 @@ def _eval_impl(ctx):
         command = '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --engine-dir paperkit --module " + ctx.attr.module +
                   " --mutant-py " + mpy.path + " --mutant-pyc " + mpyc.path +
-                  " --check paper/checks/claims.py --claim " + ctx.attr.claim +
+                  " --check " + ctx.attr.check + " --claim " + ctx.attr.claim +
                   " --site '" + ctx.attr.site + "' --out " + o.path,
         mnemonic = "PkEval",
         progress_message = "Ζ·eval " + ctx.label.name,
@@ -247,6 +247,7 @@ pk_eval = rule(
     doc = "Ζ·mutant evaluation — a claim's check run off the engine .pyc with one module mutated on BOTH paths → {claim, site, flipped}.",
     attrs = {
         "claim": attr.string(mandatory = True, doc = "the claim key (the check's {target})"),
+        "check": attr.string(mandatory = True, doc = "the claim-witness script, exec-relative (paper/checks/claims.py, checks/readme.py) — the project's [checks.claim] cmd, NOT hardcoded"),
         "site": attr.string(mandatory = True, doc = "the def-site label (for the record)"),
         "module": attr.string(mandatory = True, doc = "the engine module path mutated, e.g. paperkit/bib.py"),
         "mutated_py": attr.label(allow_single_file = [".py"], mandatory = True, doc = "the mutated module SOURCE (pk_mutate; identity for ∅) — the script-run path"),

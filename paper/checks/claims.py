@@ -134,10 +134,12 @@ def dataset_fresh():
     import gate
     d = Path(tempfile.mkdtemp())
     try:
-        (d / "producer.py").write_text("print('CANON-V1')")
-        custom = {"fresh": {"cmd": "python3 -c \"import subprocess,sys; "
-                                   "canon=subprocess.run([sys.executable,'producer.py'],capture_output=True,text=True).stdout.strip(); "
-                                   "sys.exit(0 if open('asset.txt').read().strip()==canon else 1)\""}}
+        # a fresh: check REGENERATES via its producer and compares to the committed asset — the
+        # producer RUN is the essence (that is what "fresh" means), a single-level cmd spawn gate
+        # runs like any cmd: check.  (The regenerator is a plain producer.sh, not a nested python
+        # subprocess — one spawn, so the hermetic mutation sandbox runs it like grade-ladder's cmd.)
+        (d / "producer.sh").write_text("echo CANON-V1\n")
+        custom = {"fresh": {"cmd": 'test "$(cat asset.txt)" = "$(sh producer.sh)"'}}
         (d / "asset.txt").write_text("CANON-V1\n")
         assert gate.resolves("fresh:x", d, custom) is True, "a committed asset matching its producer must pass"
         (d / "asset.txt").write_text("STALE\n")
@@ -892,26 +894,19 @@ def env_sanitized():
 
 
 def path_surface():
-    # Τ·path: a check runs through a shell that resolves tools by NAME via PATH, but
-    # clean_env DROPS PATH's relative/empty entries — the ones that resolve to cwd (the
-    # project dir being gated) — so a document cannot shadow a tool by planting it beside
-    # itself.  Demonstrate: the planted tool resolves with its ABSOLUTE dir on PATH (the
-    # host's trust), but NOT via a "." entry pointing at the project dir (dropped).
-    import gate
-    d = Path(tempfile.mkdtemp())
-    saved = os.environ.get("PATH", "")
-    try:
-        (d / "pkdemotool").write_text("#!/bin/sh\nexit 0\n")
-        os.chmod(d / "pkdemotool", 0o755)
-        os.environ["PATH"] = str(d) + os.pathsep + saved          # absolute dir → host's trust
-        assert gate.resolves("cmd:pkdemotool", d, {}) is True, "an absolute PATH dir failed to resolve a tool"
-        os.environ["PATH"] = "." + os.pathsep + saved             # relative "." = cwd = the gated project
-        assert gate.resolves("cmd:pkdemotool", d, {}) is False, "a relative '.' PATH entry resolved the cwd plant — Τ·path not applied"
-        assert all(os.path.isabs(p) for p in gate.clean_env()["PATH"].split(os.pathsep) if p), \
-            "clean_env kept a non-absolute PATH entry"
-    finally:
-        os.environ["PATH"] = saved
-        shutil.rmtree(d, ignore_errors=True)
+    # Τ·path: clean_env DROPS PATH's relative/empty entries — the ones that resolve a tool to the cwd
+    # (the project dir being gated) — so a document cannot shadow a tool by planting it beside itself.
+    # The OWNED logic is clean_env's PATH filter, a PURE function of the input environment; testing it
+    # over an explicit env needs no subprocess and no os.environ/cwd manipulation (the end-to-end
+    # plant-a-tool-and-resolve DEMONSTRATION is a cwd/PATH process probe — boundaries_path, standard
+    # sandbox; running it here would depend on the cwd/PATH the hermetic mutation sandbox controls).
+    import resolver
+    kept = resolver.clean_env(
+        {"PATH": os.pathsep.join(["/usr/bin", ".", "", "reldir", "/bin"])})["PATH"].split(os.pathsep)
+    assert "/usr/bin" in kept and "/bin" in kept, "clean_env dropped an ABSOLUTE PATH dir (the host's trust)"
+    assert all(os.path.isabs(p) for p in kept if p), "clean_env kept a non-absolute PATH entry"
+    assert not ({".", "", "reldir"} & set(kept)), \
+        "clean_env kept a cwd-relative PATH entry — a document could shadow a tool beside itself"
 
 
 def grounding_reflected():

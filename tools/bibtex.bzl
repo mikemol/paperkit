@@ -135,45 +135,37 @@ def _membucket(mem, claim, res):
     learned entry — per-claim override > per-resolution default > 0 (calc.bzl's cold-start floor)."""
     return mem.get("claims", {}).get(claim, mem.get(res, 0))
 
-# ·gen·sites — the CORE engine surface the Ζ·mutant grid sweeps: the logic modules + the test fixture
-# the checks import; NOT the boundary test suites (no check imports them).  Explicit (no globs); keep
-# in sync with //paperkit:engine's non-boundaries members.
-_CORE = [
-    "paperkit/bib.py",
-    "paperkit/cache.py",
-    "paperkit/coherence.py",
-    "paperkit/config.py",
-    "paperkit/discriminate.py",
-    "paperkit/driver.py",
-    "paperkit/footdeps.py",
-    "paperkit/gate.py",
-    "paperkit/grade.py",
-    "paperkit/grader.py",
-    "paperkit/layout.py",
-    "paperkit/mutate.py",
-    "paperkit/project.py",
-    "paperkit/resolver.py",
-    "paperkit/rhetoric.py",
-    "paperkit/tests/_fixture.py",
-]
+# ·gen·surface — the def-mutable SURFACE is a property of the ENGINE, not any project.  It is
+# enumerated ONCE in the module extension (engine-side, below) and passed to each emerge bib_repo;
+# NOT per-project (a check that non-emerge "skips it" would be the tell of a misplaced engine
+# property).  The core modules are DERIVED from //paperkit:engine's declaration (ENGINE_SRCS — the
+# single source, no glob), minus the boundary suites no check imports.
+_BOUNDARY = "tests/boundaries_"
 
-def _def_sites(repository_ctx):
-    """·gen·sites — enumerate the CORE engine def-sites at FETCH via def_sites.py (host-python AST —
-    build-graph metadata like the bib parse, NOT check execution, so the hermetic-python principle
-    holds).  Returns [(module, qualname)]: the def-mutable surface the grid sweeps (every emerge
-    claim × every site).  Watches each module so a def added/removed re-fetches — the site set is a
-    pure function of the sources."""
-    for m in _CORE:
-        repository_ctx.watch(repository_ctx.path(Label("@@//paperkit:" + m[len("paperkit/"):])))
-    py = repository_ctx.which("python3")
+def _core_from_engine(build_text):
+    i = build_text.find("ENGINE_SRCS = [")
+    body = build_text[i + len("ENGINE_SRCS = ["):build_text.find("]", i)]
+    srcs = [t.strip().strip('"').strip("'") for t in body.split(",")]
+    return ["paperkit/" + s for s in srcs if s and not s.startswith(_BOUNDARY)]
+
+def _surface(module_ctx):
+    """·gen·surface — enumerate the engine def-site surface ONCE via def_sites.py over the core
+    modules derived from //paperkit:engine (host-python AST — build-graph metadata like the bib
+    parse, NOT check execution, so the hermetic-python principle holds).  Returns ["module\tqualname",
+    ...].  Watches the engine declaration + each module so a def added/removed re-generates."""
+    module_ctx.watch(module_ctx.path(Label("@@//paperkit:BUILD.bazel")))
+    core = _core_from_engine(module_ctx.read(module_ctx.path(Label("@@//paperkit:BUILD.bazel"))))
+    for m in core:
+        module_ctx.watch(module_ctx.path(Label("@@//paperkit:" + m[len("paperkit/"):])))
+    py = module_ctx.which("python3")
     if not py:
-        fail("·gen·sites: python3 not on PATH for def-site enumeration")
-    ds = repository_ctx.path(Label("@@//tools:def_sites.py"))
-    root = str(repository_ctx.path(Label("@@//:MODULE.bazel")).dirname)
-    res = repository_ctx.execute([str(py), str(ds)] + _CORE, working_directory = root)
+        fail("·gen·surface: python3 not on PATH for def-site enumeration")
+    ds = module_ctx.path(Label("@@//tools:def_sites.py"))
+    root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
+    res = module_ctx.execute([str(py), str(ds)] + core, working_directory = root)
     if res.return_code != 0:
-        fail("·gen·sites: def_sites.py failed (%d): %s" % (res.return_code, res.stderr))
-    return [tuple(l.split("\t")) for l in res.stdout.splitlines() if "\t" in l]
+        fail("·gen·surface: def_sites.py failed (%d): %s" % (res.return_code, res.stderr))
+    return [l for l in res.stdout.splitlines() if "\t" in l]
 
 def _bib_repo_impl(repository_ctx):
     content = repository_ctx.read(repository_ctx.path(repository_ctx.attr.bib))
@@ -212,10 +204,11 @@ def _bib_repo_impl(repository_ctx):
         out.append('load("@@//tools:witness.bzl", "pk_proof", "pk_witness")')
     calc = repository_ctx.attr.calc
     emerge = repository_ctx.attr.emerge
-    # ·gen·sites — the def-mutable surface for the Ζ·mutant grid (emerge projects only).
-    sites = _def_sites(repository_ctx) if emerge else []
+    # ·gen·surface — the def-mutable surface, enumerated ONCE engine-side and passed in (emerge repos
+    # get it; non-emerge get [] because they build no grid — the surface is not conditional on them).
+    sites = [l.split("\t") for l in repository_ctx.attr.sites]
     if emerge:
-        out.append("# ·gen·sites: %d core engine def-sites enumerated at fetch" % len(sites))
+        out.append("# ·gen·surface: %d core engine def-sites (enumerated once, engine-side)" % len(sites))
     if calc:
         csyms = ["pk_calc", "pk_grade", "pk_mem_learn", "pk_verdict"]
         if emerge:
@@ -357,13 +350,17 @@ bib_repo = repository_rule(
         "compose": attr.bool(default = False),  # Ζ·compose: project the witness DAG (rests-on as build deps) + :proof
         "calc": attr.bool(default = False),  # Ζ·calc·interp: one cached pk_calc per claim → verdict + grade readings
         "emerge": attr.bool(default = False),  # Ζ·emerge·gate: a def-calc per claim + pk_cohere (∂² faces in //:hook)
+        "sites": attr.string_list(default = []),  # ·gen·surface: the engine def-sites (enumerated once by the extension)
     },
 )
 
 def _bib_ext_impl(module_ctx):
+    # ·gen·surface — enumerate the engine def-site surface ONCE (engine-side), then hand it to each
+    # emerge repo.  The surface is a property of the engine, computed here, not in any project.
+    sites = _surface(module_ctx)
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc, emerge = tag.emerge)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, sites = sites if tag.emerge else [])
 
 bib = module_extension(
     implementation = _bib_ext_impl,

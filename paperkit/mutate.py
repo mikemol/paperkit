@@ -88,9 +88,13 @@ def _drop_import(text: str, name: str) -> str:
 
 
 def _inject_import(text: str, name: str) -> str:
-    """INJECT `import <name>` (an ABSENT import → present).  Placed AFTER the module docstring and any
-    `from __future__` imports (which must stay first), so the result is valid Python and the source
-    now CONTAINS the import — a "module does NOT import X" assertion flips."""
+    """INJECT `import <name>` GUARDED under `if False:` (an ABSENT import → present in the SOURCE).  A
+    "module does NOT import X" assertion — whether it greps the source or walks the AST — now flips,
+    because the import statement IS there.  But it is DEAD code: the peephole optimiser drops the
+    `if False:` block from the .pyc, so it NEVER EXECUTES — no circular-import breakage flips OTHER
+    claims spuriously (a top-level `import gate` into resolver would break resolver, an imprecise
+    whole-module flip).  A PRECISE toggle of the import's TEXTUAL presence.  Placed after the module
+    docstring / any `from __future__` imports (which must stay first)."""
     after = 0                                            # line to insert after (0 = top of file)
     for node in ast.parse(text).body:
         if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
@@ -101,7 +105,7 @@ def _inject_import(text: str, name: str) -> str:
         else:
             break
     lines = text.splitlines(keepends=True)
-    lines.insert(after, f"import {name}  # PAPERKIT_MUT\n")
+    lines.insert(after, f"if False:  # PAPERKIT_MUT\n    import {name}\n")
     return "".join(lines)
 
 

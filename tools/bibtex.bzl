@@ -136,9 +136,11 @@ def _membucket(mem, claim, res):
     return mem.get("claims", {}).get(claim, mem.get(res, 0))
 
 def _sitename(m, q):
-    """A unique, valid target-name fragment for a def-site (module, qualname): stem__qualname with
-    path/dot separators flattened (qualnames are dotted python identifiers)."""
-    return m[len("paperkit/"):-len(".py")].replace("/", "_") + "__" + q.replace(".", "_")
+    """A unique, valid target-name fragment for a perturbation site (module, spec): stem__spec with
+    the mutate.py spec flattened to an identifier — a def-drop qualname's dots, and an import op's
+    `+`/`-`/`:` (import+:gate → import_add__gate) — so every op has a distinct, valid target name."""
+    spec = q.replace(".", "_").replace("+", "_add_").replace("-", "_drop_").replace(":", "_")
+    return m[len("paperkit/"):-len(".py")].replace("/", "_") + "__" + spec
 
 # ·gen·surface — the def-mutable SURFACE is a property of the ENGINE, not any project.  It is
 # enumerated ONCE in the module extension (engine-side, below) and passed to each emerge bib_repo;
@@ -170,15 +172,16 @@ def _host_py(module_ctx, who):
     return py
 
 def _surface(module_ctx, core):
-    """·gen·surface — enumerate the engine def-site surface ONCE via def_sites.py over the core
-    modules (host-python AST — build-graph metadata like the bib parse, NOT check execution, so the
-    hermetic-python principle holds).  Returns ["module\tqualname", ...]."""
+    """·gen·surface — enumerate the engine PERTURBATION surface ONCE via sites.py over the core modules
+    (host-python AST — build-graph metadata like the bib parse, NOT check execution, so the
+    hermetic-python principle holds).  Returns ["module\tspec", ...] where spec is a mutate.py mutation:
+    a def-drop (bare qualname) or an import+ inject (Ζ·mutant·struct — toggle presence, both polarities)."""
     py = _host_py(module_ctx, "·gen·surface")
-    ds = module_ctx.path(Label("@@//tools:def_sites.py"))
+    ds = module_ctx.path(Label("@@//tools:sites.py"))
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
     res = module_ctx.execute([str(py), str(ds)] + core, working_directory = root)
     if res.return_code != 0:
-        fail("·gen·surface: def_sites.py failed (%d): %s" % (res.return_code, res.stderr))
+        fail("·gen·surface: sites.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]
 
 def _claim_script(module_ctx, project):

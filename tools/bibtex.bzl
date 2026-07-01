@@ -135,6 +135,46 @@ def _membucket(mem, claim, res):
     learned entry — per-claim override > per-resolution default > 0 (calc.bzl's cold-start floor)."""
     return mem.get("claims", {}).get(claim, mem.get(res, 0))
 
+# ·gen·sites — the CORE engine surface the Ζ·mutant grid sweeps: the logic modules + the test fixture
+# the checks import; NOT the boundary test suites (no check imports them).  Explicit (no globs); keep
+# in sync with //paperkit:engine's non-boundaries members.
+_CORE = [
+    "paperkit/bib.py",
+    "paperkit/cache.py",
+    "paperkit/coherence.py",
+    "paperkit/config.py",
+    "paperkit/discriminate.py",
+    "paperkit/driver.py",
+    "paperkit/footdeps.py",
+    "paperkit/gate.py",
+    "paperkit/grade.py",
+    "paperkit/grader.py",
+    "paperkit/layout.py",
+    "paperkit/mutate.py",
+    "paperkit/project.py",
+    "paperkit/resolver.py",
+    "paperkit/rhetoric.py",
+    "paperkit/tests/_fixture.py",
+]
+
+def _def_sites(repository_ctx):
+    """·gen·sites — enumerate the CORE engine def-sites at FETCH via def_sites.py (host-python AST —
+    build-graph metadata like the bib parse, NOT check execution, so the hermetic-python principle
+    holds).  Returns [(module, qualname)]: the def-mutable surface the grid sweeps (every emerge
+    claim × every site).  Watches each module so a def added/removed re-fetches — the site set is a
+    pure function of the sources."""
+    for m in _CORE:
+        repository_ctx.watch(repository_ctx.path(Label("@@//paperkit:" + m[len("paperkit/"):])))
+    py = repository_ctx.which("python3")
+    if not py:
+        fail("·gen·sites: python3 not on PATH for def-site enumeration")
+    ds = repository_ctx.path(Label("@@//tools:def_sites.py"))
+    root = str(repository_ctx.path(Label("@@//:MODULE.bazel")).dirname)
+    res = repository_ctx.execute([str(py), str(ds)] + _CORE, working_directory = root)
+    if res.return_code != 0:
+        fail("·gen·sites: def_sites.py failed (%d): %s" % (res.return_code, res.stderr))
+    return [tuple(l.split("\t")) for l in res.stdout.splitlines() if "\t" in l]
+
 def _bib_repo_impl(repository_ctx):
     content = repository_ctx.read(repository_ctx.path(repository_ctx.attr.bib))
     proj = repository_ctx.attr.project
@@ -172,6 +212,10 @@ def _bib_repo_impl(repository_ctx):
         out.append('load("@@//tools:witness.bzl", "pk_proof", "pk_witness")')
     calc = repository_ctx.attr.calc
     emerge = repository_ctx.attr.emerge
+    # ·gen·sites — the def-mutable surface for the Ζ·mutant grid (emerge projects only).
+    sites = _def_sites(repository_ctx) if emerge else []
+    if emerge:
+        out.append("# ·gen·sites: %d core engine def-sites enumerated at fetch" % len(sites))
     if calc:
         csyms = ["pk_calc", "pk_grade", "pk_mem_learn", "pk_verdict"]
         if emerge:

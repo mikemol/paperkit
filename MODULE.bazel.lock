@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "2v6CXJNZbQ45GyEqkpPYZhjejd93C83AnliiTIBpw+o=",
+        "bzlTransitiveDigest": "yPgynuAv4iJZKoCCpHNACmWAKu9L0TJ+w9RQYDp4Uig=",
         "usagesDigest": "wEQOhntXZ4i6ecw/beI3vdwPEWlHpnJmqWC37TC1aVs=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "93054558f06af42ba714ebf2f1c61ffd29638f4b412805b6da337471cb5d4494",
@@ -167,7 +167,11 @@
           "@@//paperkit/project.py": "c6422b364946be80cbe8714eda7af0f460ff2ee9917e4fa4d2a6287c8d5683d9",
           "@@//paperkit/resolver.py": "805d8c48366bc522a6d889690091e7d22301d13a07fcfed0fbd79f6ae14ab71d",
           "@@//paperkit/rhetoric.py": "2b4ba52de01006ac87a87f48f5cd78c484afbc25a07be23e7b19e61c090a1518",
-          "@@//paperkit/tests/_fixture.py": "0ae5406fa289f9008551c17eb2e90f2ac15d27d41039d60ea89ddcbe50eeddb6"
+          "@@//paperkit/tests/_fixture.py": "0ae5406fa289f9008551c17eb2e90f2ac15d27d41039d60ea89ddcbe50eeddb6",
+          "@@//tools/closure.py": "a536ae660597973a44885d3f35fcbe05579b20b8646062875ee00a5b00ee367b",
+          "@@//tools/def_sites.py": "98eeebcc6738802cd352a72391f26585b641a4f3939707f1851d23c4a7a37e77",
+          "@@//tools/imports.py": "6ac11a54d654c8a0ea6b9a4053c7a1264df7c228da49e65372e0a5e07cee286b",
+          "@@//tools/sites.py": "a3ecada16bca4abee254e8f016ebe3732f85fffaeec3b608376081d56eea2db0"
         },
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -733,6 +737,7 @@
                 "local-ci\tpaperkit/gate.py",
                 "local-ci\tpaperkit/project.py",
                 "local-ci\tpaperkit/resolver.py",
+                "local-ci\tcontent-\t.githooks/pre-commit\tbazel test //:hook",
                 "min-strength\tpaperkit/tests/_fixture.py",
                 "min-strength\tpaperkit/discriminate.py",
                 "min-strength\tpaperkit/gate.py",

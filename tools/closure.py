@@ -88,43 +88,58 @@ def _roots_of(node, names, cli):
     return _imports(node, names) | _reads(node, names) | _fx_calls(node, cli)
 
 
+def _parents_prefix(node, parts):
+    """The sandbox prefix of a `Path(__file__).resolve().parents[N]` expression (parts = the check's
+    repo-relative path split), or None.  __file__ sits at the check's repo-relative path in the
+    hermetic sandbox, so parents[N] is that path with N+1 trailing components dropped: for
+    checks/readme.py parents[1] = "" (root); for paper/checks/claims.py parents[1] = "paper".  Handled
+    both as a module/function const (ROOT = …parents[1]) AND inline inside a path expression (local_ci:
+    …parents[2] / ".githooks" / "pre-commit")."""
+    if (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute)
+            and node.value.attr == "parents" and isinstance(node.slice, ast.Constant)
+            and isinstance(node.slice.value, int)
+            and any(isinstance(x, ast.Name) and x.id == "__file__" for x in ast.walk(node))):
+        return "/".join(parts[:-(node.slice.value + 1)])
+    return None
+
+
 def _dir_consts(relpath, stmts, pref=None):
-    """Path DIR constants in `stmts` → their sandbox-relative prefix.  The check runs with __file__
-    at its REPO-RELATIVE path in the hermetic sandbox, so `Path(__file__).resolve().parents[N]` is that
-    path with N+1 trailing components dropped: for checks/readme.py, parents[1] = "" (root); for
-    paper/checks/claims.py, parents[1] = "paper".  NAME / "sub" extends a known prefix (ENGINE =
-    ROOT / "paperkit" → "paperkit").  Called on the module body for the shared consts, then EXTENDED
-    per witness with its function-local ones (project_dag binds `root` inside the function)."""
+    """Path DIR constants in `stmts` → their sandbox-relative prefix.  `Path(__file__)….parents[N]`
+    (see _parents_prefix); NAME / "sub" extends a known prefix (ENGINE = ROOT / "paperkit" →
+    "paperkit").  Called on the module body for the shared consts, then EXTENDED per witness with its
+    function-local ones (project_dag binds `root` inside the function)."""
     parts = relpath.split("/")
     pref = dict(pref) if pref else {}
     for n in stmts:
         if not isinstance(n, ast.Assign) or not isinstance(n.targets[0], ast.Name):
             continue
         tgt, v = n.targets[0].id, n.value
-        if (isinstance(v, ast.Subscript) and isinstance(v.value, ast.Attribute)
-                and v.value.attr == "parents" and isinstance(v.slice, ast.Constant)
-                and isinstance(v.slice.value, int)
-                and any(isinstance(x, ast.Name) and x.id == "__file__" for x in ast.walk(v))):
-            pref[tgt] = "/".join(parts[:-(v.slice.value + 1)])       # Path(__file__)….parents[N]
+        pp = _parents_prefix(v, parts)
+        if pp is not None:
+            pref[tgt] = pp
         elif (isinstance(v, ast.BinOp) and isinstance(v.op, ast.Div) and isinstance(v.left, ast.Name)
               and v.left.id in pref and isinstance(v.right, ast.Constant) and isinstance(v.right.value, str)):
             pref[tgt] = "/".join(p for p in (pref[v.left.id], v.right.value) if p)   # NAME / "sub"
     return pref
 
 
-def _resolve_path(node, pref):
+def _resolve_path(node, pref, parts):
     """A Path EXPRESSION built from dir constants and string literals → its sandbox path, or None.
-    A bare dir constant (Name in pref) or `<expr> / "sub"` (nested, e.g. root / "report" / "gen.py")."""
+    A `Path(__file__)….parents[N]` base (inline), a bare dir constant (Name in pref), or `<expr> /
+    "sub"` (nested, e.g. root / "report" / "gen.py", or parents[2] / ".githooks" / "pre-commit")."""
+    pp = _parents_prefix(node, parts)
+    if pp is not None:
+        return pp
     if isinstance(node, ast.Name):
         return pref.get(node.id)
     if (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div)
             and isinstance(node.right, ast.Constant) and isinstance(node.right.value, str)):
-        base = _resolve_path(node.left, pref)
+        base = _resolve_path(node.left, pref, parts)
         return None if base is None else "/".join(p for p in (base, node.right.value) if p)
     return None
 
 
-def _exists_paths(node, pref):
+def _exists_paths(node, pref, parts):
     """Sandbox paths a witness tests via `(BASE / "leaf").exists()` — the EXISTS edges.  A claim
     asserting a file's presence/absence is falsifiable by TOGGLING that file (Ζ·mutant·struct·node-kinds):
     the file analog of the import+/- toggle.  Only plain-constant path leaves are resolved (not
@@ -132,13 +147,13 @@ def _exists_paths(node, pref):
     out = set()
     for c in ast.walk(node):
         if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "exists":
-            p = _resolve_path(c.func.value, pref)
+            p = _resolve_path(c.func.value, pref, parts)
             if p is not None:
                 out.add(p)
     return out
 
 
-def _content_edges(fn, pref):
+def _content_edges(fn, pref, parts):
     """(sandbox path, substring) pairs a witness tests via `"S" in F.read_text()` — the CONTENT edges.
     A claim asserting a substring's presence in a file (project-dag: `result:paper` in the README bib,
     `_delta("paper")`/`--json` in the report generator) is falsifiable by TOGGLING that substring — the
@@ -150,7 +165,7 @@ def _content_edges(fn, pref):
         if (isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name)
                 and isinstance(n.value, ast.Call) and isinstance(n.value.func, ast.Attribute)
                 and n.value.func.attr == "read_text"):
-            p = _resolve_path(n.value.func.value, pref)
+            p = _resolve_path(n.value.func.value, pref, parts)
             if p is not None:
                 reads[n.targets[0].id] = p
     out = set()
@@ -161,7 +176,7 @@ def _content_edges(fn, pref):
         comp = c.comparators[0]
         p = None
         if isinstance(comp, ast.Call) and isinstance(comp.func, ast.Attribute) and comp.func.attr == "read_text":
-            p = _resolve_path(comp.func.value, pref)      # inline `"S" in (root / "x").read_text()`
+            p = _resolve_path(comp.func.value, pref, parts)   # inline `"S" in (root / "x").read_text()`
         elif isinstance(comp, ast.Name):
             p = reads.get(comp.id)                         # `"S" in gen` (gen = F.read_text())
         if p is not None:
@@ -216,6 +231,7 @@ def main(argv):
     # it, falsifying "X does not exist" — rm-next's cli.py); a present file → file- (drop it, falsifying
     # "X exists").  No `not`-parsing needed: the counterfactual is simply the opposite of what is.
     relpath = a.relpath or a.check
+    parts = relpath.split("/")
     mod_pref = _dir_consts(relpath, tree.body)           # the module-level dir constants (shared)
 
     for key in sorted(claims):
@@ -223,14 +239,14 @@ def main(argv):
         pref = _dir_consts(relpath, fn.body, mod_pref)   # extend with the witness's function-local ones
         for stem in sorted(base | roots(claims[key], set())):
             print("{}\t{}".format(key, names[stem]))
-        for path in sorted(_exists_paths(fn, pref)):
+        for path in sorted(_exists_paths(fn, pref, parts)):
             op = "file-" if Path(path).exists() else "file+"
             print("{}\t{}:{}".format(key, op, path))
         # Ζ·mutant·struct·node-kinds (BIB/content) — a CONTENT edge, emitted as `claim<TAB>op<TAB>path
         # <TAB>substring` (4 fields; op = content- drop / content+ inject).  Polarity = the TOGGLE of
         # the substring's CURRENT presence (checked here, cwd = repo root): present → drop it, absent →
         # inject it.  Single-line substrings only (the line/tab-delimited transport).
-        for path, sub in sorted(_content_edges(fn, pref)):
+        for path, sub in sorted(_content_edges(fn, pref, parts)):
             here = Path(path).read_text() if Path(path).exists() else ""
             op = "content-" if sub in here else "content+"
             print("{}\t{}\t{}\t{}".format(key, op, path, sub))

@@ -184,6 +184,10 @@ def _surface(module_ctx, core):
     a def-drop (bare qualname) or an import+ inject (Ζ·mutant·struct — toggle presence, both polarities)."""
     py = _host_py(module_ctx, "·gen·surface")
     ds = module_ctx.path(Label("@@//tools:sites.py"))
+    # WATCH the generator + its imports, so editing the enumerator regenerates the surface (else the
+    # extension serves a STALE result — the tool is an INPUT like the core modules, [[bazel-action-idempotency]]).
+    for t in ("sites.py", "def_sites.py", "imports.py"):
+        module_ctx.watch(module_ctx.path(Label("@@//tools:" + t)))
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
     res = module_ctx.execute([str(py), str(ds)] + core, working_directory = root)
     if res.return_code != 0:
@@ -228,6 +232,10 @@ def _closures(module_ctx, project, core):
     fixture = module_ctx.path(Label("@@//paperkit:tests/_fixture.py"))
     py = _host_py(module_ctx, "·gen·closure")
     cl = module_ctx.path(Label("@@//tools:closure.py"))
+    # WATCH the enumerator + the fixture it reads (the fx CLI map), so editing either regenerates the
+    # closures (the tool is an INPUT, [[bazel-action-idempotency]] — else a stale closure output).
+    module_ctx.watch(cl)
+    module_ctx.watch(fixture)
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
     # --relpath — the check's REPO-RELATIVE path (paper/checks/claims.py, checks/readme.py), so
     # closure.py resolves Path(__file__).parents[N] to the SANDBOX prefix a file toggle must hit.

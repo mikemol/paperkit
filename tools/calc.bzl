@@ -174,8 +174,12 @@ pk_mutate = rule(
 # build DAG is a projection of the engine import DAG (paperkit/dag.bzl, AST-derived): a consumer that
 # stages a module's `closure` gets exactly that module's dependency cone, not the flat engine.
 PycInfo = provider(
-    doc = "Ξ·dag — the transitive .pyc closure of a compiled module (itself ∪ its imports' closures).",
-    fields = {"closure": "depset of .pyc File — this module plus every module it transitively imports"},
+    doc = "Ξ·dag — the transitive closure of a compiled module (itself ∪ its imports' closures), on " +
+          "BOTH paths: .pyc (the import path) and .py (findability / read_text / CLI subprocess entry).",
+    fields = {
+        "pyc": "depset of .pyc File — this module plus every module it transitively imports",
+        "py": "depset of .py File — the same module set as source (read_text, main-script spawn, unlink target)",
+    },
 )
 
 def _pyc_impl(ctx):
@@ -191,8 +195,10 @@ def _pyc_impl(ctx):
         mnemonic = "PkPyc",
         progress_message = "Ζ·pyc " + ctx.label.name,
     )
-    closure = depset([o], transitive = [d[PycInfo].closure for d in ctx.attr.deps])
-    return [DefaultInfo(files = depset([o])), PycInfo(closure = closure)]
+    return [DefaultInfo(files = depset([o])), PycInfo(
+        pyc = depset([o], transitive = [d[PycInfo].pyc for d in ctx.attr.deps]),
+        py = depset([ctx.file.src], transitive = [d[PycInfo].py for d in ctx.attr.deps]),
+    )]
 
 pk_pyc = rule(
     implementation = _pyc_impl,
@@ -214,15 +220,18 @@ def _eval_impl(ctx):
     mpy = ctx.file.mutated_py
     mpyc = ctx.file.mutated_pyc
     # The eval logic lives in tools/eval.py (a real script, not a shell blob in a string); here we
-    # only stage its inputs and pass args.  The engine RUNS OFF its .pyc artifacts (Ζ·pyc): we stage
-    # //paperkit:engine (the .py, for findability) + //paperkit:pyc (the precompiled bytecode) +
-    # the ONE mutated module's .pyc; eval.py places the .pyc in __pycache__ and swaps the mutant.
+    # only stage its inputs and pass args.  Ξ·dag·eval — stage the CELL's transitive CLOSURE (this
+    # check's PycInfo cone: the modules it imports + reaches via fx CLI subprocess, closure.py), NOT
+    # the flat engine — so editing a module invalidates only the cells whose closure contains it.  The
+    # engine RUNS OFF its .pyc (Ζ·pyc); the .py side is for findability / read_text / main-script spawn.
     # `"$(command -v python3)"` invokes the interpreter by ABSOLUTE path so eval.py's sys.executable
     # is populated — the check re-spawns the projector as [sys.executable, …], which execs '' (a
     # spurious flip) under bare `python3`.  No toolchain ⇒ command -v resolves the sandbox/OCI python.
+    closure_pyc = depset(transitive = [t[PycInfo].pyc for t in ctx.attr.closure])
+    closure_py = depset(transitive = [t[PycInfo].py for t in ctx.attr.closure])
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, mpy, mpyc] + ctx.files.engine + ctx.files.engine_pyc + ctx.files.project),
+        inputs = depset([ctx.file._tool, mpy, mpyc] + ctx.files.project, transitive = [closure_pyc, closure_py]),
         command = '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --engine-dir paperkit --module " + ctx.attr.module +
                   " --mutant-py " + mpy.path + " --mutant-pyc " + mpyc.path +
@@ -242,8 +251,7 @@ pk_eval = rule(
         "module": attr.string(mandatory = True, doc = "the engine module path mutated, e.g. paperkit/bib.py"),
         "mutated_py": attr.label(allow_single_file = [".py"], mandatory = True, doc = "the mutated module SOURCE (pk_mutate; identity for ∅) — the script-run path"),
         "mutated_pyc": attr.label(allow_single_file = [".pyc"], mandatory = True, doc = "the mutated module BYTECODE (pk_pyc of it) — the import path"),
-        "engine": attr.label_list(allow_files = True, mandatory = True, doc = "//paperkit:engine (the .py)"),
-        "engine_pyc": attr.label_list(allow_files = True, mandatory = True, doc = "//paperkit:pyc (the precompiled bytecode)"),
+        "closure": attr.label_list(providers = [PycInfo], mandatory = True, doc = "Ξ·dag·eval — the check's closure ROOTS (pk_pyc targets, closure.py); PycInfo expands the transitive .py/.pyc cone"),
         "project": attr.label_list(allow_files = True, doc = "the paper project files"),
         "_tool": attr.label(default = "//tools:eval.py", allow_single_file = True),
     },

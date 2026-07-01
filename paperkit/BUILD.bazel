@@ -67,6 +67,9 @@ _STEM_TO_TARGET = {m.rsplit("/", 1)[-1][:-len(".py")]: m[:-len(".py")] for m in 
         name = m[:-len(".py")],
         src = m,
         deps = [":" + _STEM_TO_TARGET[s] for s in IMPORTS.get(m, [])],
+        # Ξ·dag·eval — public: a cell's `closure` references these pk_pyc targets directly (not the
+        # flat //paperkit:pyc), and the emerge grid lives in a separate repo.
+        visibility = ["//visibility:public"],
     )
     for m in ENGINE_SRCS
 ]

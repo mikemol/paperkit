@@ -50,8 +50,8 @@ def main(argv):
     # main script's bytecode is never read from __pycache__, so an entry-point module like project.py
     # would otherwise escape the mutation).
     mod = pathlib.Path(a.module)
-    mod.unlink()
-    shutil.copyfile(a.mutant_py, mod)
+    mod.unlink(missing_ok=True)   # Ξ·dag·eval: D may lie outside its own check's closure .py (a
+    shutil.copyfile(a.mutant_py, mod)   # non-sensitive cell) → not staged; deliver the mutant anyway
     shutil.copyfile(a.mutant_pyc, slot(mod))
 
     flipped = subprocess.run([sys.executable, a.check, a.claim],

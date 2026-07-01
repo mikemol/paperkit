@@ -22,14 +22,14 @@ def main(argv):
     a = ap.parse_args(argv)
 
     base = json.load(open(a.baseline))
-    if base.get("flipped"):
-        sys.stderr.write(
-            "Ζ·sens: the ∅ BASELINE check flipped — the harness is broken (environment/delivery), "
-            "not the engine; every site would read as sensitive. Refusing to emit a sens set.\n")
-        return 1
-
+    # The ∅ eval gives the BASELINE verdict: the unmutated check passes iff ∅ did not flip.  This is
+    # the calc-record shape pk_cohere/read consume ({claim, baseline, sens}) — a drop-in for the old
+    # pk_calc __dcalc.  A flipped ∅ (baseline=false) means the check fails on the UNMUTATED engine
+    # (broken harness or broken claim); every site then reads sensitive, but baseline=false signals
+    # the sens is not to be trusted — the reading layer grades it broken, exactly as for a file-calc.
+    baseline = not base.get("flipped")
     sens = [r["site"] for r in (json.load(open(f)) for f in a.evals) if r["flipped"]]
-    print(json.dumps({"claim": base["claim"], "sens": sorted(sens)}))
+    print(json.dumps({"claim": base["claim"], "baseline": baseline, "sens": sorted(sens)}))
     return 0
 
 

@@ -135,6 +135,11 @@ def _membucket(mem, claim, res):
     learned entry — per-claim override > per-resolution default > 0 (calc.bzl's cold-start floor)."""
     return mem.get("claims", {}).get(claim, mem.get(res, 0))
 
+def _sitename(m, q):
+    """A unique, valid target-name fragment for a def-site (module, qualname): stem__qualname with
+    path/dot separators flattened (qualnames are dotted python identifiers)."""
+    return m[len("paperkit/"):-len(".py")].replace("/", "_") + "__" + q.replace(".", "_")
+
 # ·gen·surface — the def-mutable SURFACE is a property of the ENGINE, not any project.  It is
 # enumerated ONCE in the module extension (engine-side, below) and passed to each emerge bib_repo;
 # NOT per-project (a check that non-emerge "skips it" would be the tell of a misplaced engine
@@ -148,23 +153,76 @@ def _core_from_engine(build_text):
     srcs = [t.strip().strip('"').strip("'") for t in body.split(",")]
     return ["paperkit/" + s for s in srcs if s and not s.startswith(_BOUNDARY)]
 
-def _surface(module_ctx):
-    """·gen·surface — enumerate the engine def-site surface ONCE via def_sites.py over the core
-    modules derived from //paperkit:engine (host-python AST — build-graph metadata like the bib
-    parse, NOT check execution, so the hermetic-python principle holds).  Returns ["module\tqualname",
-    ...].  Watches the engine declaration + each module so a def added/removed re-generates."""
+def _core(module_ctx):
+    """The core engine module .py paths (ENGINE_SRCS minus boundary suites), watched so an add/remove
+    re-generates.  The SHARED input of ·gen·surface (def-sites) and ·gen·closure (witness closures) —
+    both project the same engine AST (def_sites.py / closure.py beside imports.py)."""
     module_ctx.watch(module_ctx.path(Label("@@//paperkit:BUILD.bazel")))
     core = _core_from_engine(module_ctx.read(module_ctx.path(Label("@@//paperkit:BUILD.bazel"))))
     for m in core:
         module_ctx.watch(module_ctx.path(Label("@@//paperkit:" + m[len("paperkit/"):])))
+    return core
+
+def _host_py(module_ctx, who):
     py = module_ctx.which("python3")
     if not py:
-        fail("·gen·surface: python3 not on PATH for def-site enumeration")
+        fail(who + ": python3 not on PATH")
+    return py
+
+def _surface(module_ctx, core):
+    """·gen·surface — enumerate the engine def-site surface ONCE via def_sites.py over the core
+    modules (host-python AST — build-graph metadata like the bib parse, NOT check execution, so the
+    hermetic-python principle holds).  Returns ["module\tqualname", ...]."""
+    py = _host_py(module_ctx, "·gen·surface")
     ds = module_ctx.path(Label("@@//tools:def_sites.py"))
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
     res = module_ctx.execute([str(py), str(ds)] + core, working_directory = root)
     if res.return_code != 0:
         fail("·gen·surface: def_sites.py failed (%d): %s" % (res.return_code, res.stderr))
+    return [l for l in res.stdout.splitlines() if "\t" in l]
+
+def _claim_script(module_ctx, project):
+    """The claim-WITNESS module a project's `claim:` type runs — the .py in its paper.toml
+    [checks.claim] cmd (paper → checks/claims.py, root → checks/readme.py; NOT hardcoded — the second
+    consumer, root's readme.py, proved the assumption).  None if the project declares no claim: type."""
+    lbl = "@@//:paper.toml" if project == "." else "@@//" + project + ":paper.toml"
+    p = module_ctx.path(Label(lbl))
+    if not p.exists:
+        return None
+    text = module_ctx.read(p)
+    module_ctx.watch(p)
+    i = text.find("[checks.claim]")
+    if i < 0:
+        return None
+    j = text.find("cmd", i)                      # the cmd = "python3 <script> {target}" line
+    line = text[j:text.find("\n", j)]
+    for tok in line.split(" "):
+        t = tok.strip('"').strip("'")
+        if t.endswith(".py"):
+            return t  # relative to the project dir, e.g. checks/claims.py
+    return None
+
+def _closures(module_ctx, project, core):
+    """Ξ·dag·eval — per emerge project, each claim WITNESS's closure ROOTS via closure.py over the
+    project's claim-witness module (paper.toml [checks.claim]) + the engine fixture + the core names.
+    Returns ["claim\tmodule", ...]; [] if the project declares no claim: type.  Unlike the def-site
+    SURFACE (engine-global), a witness's closure depends on the PROJECT's check module — so this runs
+    per emerge project, watching that module so an edited witness re-generates its cells' closures."""
+    script = _claim_script(module_ctx, project)
+    if not script:
+        return []
+    lbl = "@@//:" + script if project == "." else "@@//" + project + ":" + script
+    check = module_ctx.path(Label(lbl))
+    if not check.exists:
+        return []
+    module_ctx.watch(check)
+    fixture = module_ctx.path(Label("@@//paperkit:tests/_fixture.py"))
+    py = _host_py(module_ctx, "·gen·closure")
+    cl = module_ctx.path(Label("@@//tools:closure.py"))
+    root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
+    res = module_ctx.execute([str(py), str(cl), "--check", str(check), "--fixture", str(fixture)] + core, working_directory = root)
+    if res.return_code != 0:
+        fail("·gen·closure: closure.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]
 
 def _bib_repo_impl(repository_ctx):
@@ -207,14 +265,28 @@ def _bib_repo_impl(repository_ctx):
     # ·gen·surface — the def-mutable surface, enumerated ONCE engine-side and passed in (emerge repos
     # get it; non-emerge get [] because they build no grid — the surface is not conditional on them).
     sites = [l.split("\t") for l in repository_ctx.attr.sites]
+    closures = {}  # ·gen·closure — claim key → its witness's closure ROOT modules (Ξ·dag·eval)
+    for l in repository_ctx.attr.closures:
+        k, m = l.split("\t")
+        closures.setdefault(k, []).append(m)
     if emerge:
         out.append("# ·gen·surface: %d core engine def-sites (enumerated once, engine-side)" % len(sites))
     if calc:
         csyms = ["pk_calc", "pk_grade", "pk_mem_learn", "pk_verdict"]
         if emerge:
-            csyms.append("pk_cohere")
+            csyms += ["pk_cohere", "pk_mutate", "pk_pyc", "pk_eval", "pk_sens"]
         out.append('load("@@//tools:calc.bzl", ' + ", ".join([_lit(s) for s in csyms]) + ")")
     out.append("")
+    if emerge:
+        # Ζ·mutant·wire·gen·emit — the def-sweep GRID's shared PREP (once, claim-independent): per
+        # def-site D, pk_mutate(D)→pk_pyc(D) = D's mutated bytecode, reused by every claim's cell; plus
+        # the ∅ identity mutant = the baseline point.  Compile-once (Ζ·pyc·engine); shared across claims.
+        for m, q in sites:
+            sn = _sitename(m, q)
+            out.append('pk_mutate(name = "mut_%s", module = %s, site = %s, data = ["@@//paperkit:engine"])' % (sn, _lit(m), _lit(q)))
+            out.append('pk_pyc(name = "pyc_%s", src = ":mut_%s")' % (sn, sn))
+        out.append('pk_mutate(name = "mut_0", module = "paperkit/bib.py", site = "", data = ["@@//paperkit:engine"])')
+        out.append('pk_pyc(name = "pyc_0", src = ":mut_0")')
     recs = []
     calc_claims = {}
     for k, check, sib, reads, rests in parsed:
@@ -229,11 +301,27 @@ def _bib_repo_impl(repository_ctx):
                        ", data = [" + dl + "])")
             out.append("pk_verdict(name = " + _lit(k) + ", calc = " + _lit(":" + k + "__calc") + ")")
             calc_claims[k] = True
-            if emerge:
-                # Ζ·emerge·gate — a SEPARATE def-resolution calc (the engine joins the mutation
-                # surface → the precise CAUSAL fingerprint) feeds cohere.  The grade keeps its
-                # file-calc (the footprint-scoped floor) untouched: two ∂² faces, two resolutions,
-                # both needed — not one sweep run twice.
+            if emerge and closures.get(k):
+                # Ζ·mutant·wire·gen·emit — a WITNESS claim's ROW of the grid: one pk_eval CELL per
+                # def-site (the check run off its CLOSURE with D's bytecode swapped — parallel + cached,
+                # Ξ·dag·eval), the ∅-baseline cell, and pk_sens reading them → {claim, baseline, sens}
+                # (a drop-in for the old pk_calc __dcalc pk_cohere consumes).  The fanout IS the build
+                # graph — each cell a node — lifted from grader.sensitivity's in-process group-testing.
+                cl = ", ".join(['"@@//paperkit:%s"' % m[len("paperkit/"):-len(".py")] for m in closures[k]])
+                ev = "closure = [" + cl + "], project = [" + _lit(files) + "]"
+                for m, q in sites:
+                    sn = _sitename(m, q)
+                    out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, module = %s, mutated_py = ":mut_%s", mutated_pyc = ":pyc_%s", %s)' % (
+                        k, sn, _lit(k), _lit(m + "::" + q), _lit(m), sn, sn, ev))
+                out.append('pk_eval(name = "%s__0", claim = %s, site = "0", module = "paperkit/bib.py", mutated_py = ":mut_0", mutated_pyc = ":pyc_0", %s)' % (k, _lit(k), ev))
+                out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0")' % (k, ", ".join(['":%s__%s"' % (k, _sitename(m, q)) for m, q in sites]), k))
+            elif emerge:
+                # A calc claim with NO engine witness (a cmd:/result: check — e.g. a grep over a static
+                # asset).  It has no closure (closure.py enumerates only the witness module's CLAIMS), so
+                # no grid; its engine sensitivity is empty BY CONSTRUCTION.  The in-process def-sweep
+                # (pk_calc resolution=def) computes exactly that {claim, baseline, sens:∅}, so pk_cohere
+                # consumes a __dcalc for EVERY emerge calc claim uniformly (the grid just optimizes the
+                # witness subset — a projection, not a special case).
                 out.append("pk_calc(name = " + _lit(k + "__dcalc") + ", claim = " + _lit(k) +
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
                            str(_membucket(mem, k, "def")) + ", data = [" + dl + "])")
@@ -246,10 +334,9 @@ def _bib_repo_impl(repository_ctx):
         # committed projection consumed by the ladder above).  On-demand: build under
         # --config=memobserve in a clean output base, then copy bazel-bin .../mem.json to the source
         # mem.json beside this bib (NOT hook-gated — the observe is too costly and a stale manifest
-        # is a benign perf hint).  Aggregates file-calcs + (when emerge) def-calcs.
+        # is a benign perf hint).  Aggregates the file-calcs' peaks; the def-sweep is now a grid of
+        # pk_eval cells (Ζ·mutant·wire·gen), not a pk_calc with a peak output group, so it is not here.
         ml = [":" + k + "__calc" for k in calc_claims]
-        if emerge:
-            ml += [":" + k + "__dcalc" for k in calc_claims]
         out.append('pk_mem_learn(name = "mem_learn", calcs = [' +
                    ", ".join([_lit(t) for t in ml]) + '], visibility = ["//visibility:public"])')
 
@@ -351,16 +438,19 @@ bib_repo = repository_rule(
         "calc": attr.bool(default = False),  # Ζ·calc·interp: one cached pk_calc per claim → verdict + grade readings
         "emerge": attr.bool(default = False),  # Ζ·emerge·gate: a def-calc per claim + pk_cohere (∂² faces in //:hook)
         "sites": attr.string_list(default = []),  # ·gen·surface: the engine def-sites (enumerated once by the extension)
+        "closures": attr.string_list(default = []),  # ·gen·closure: per-claim witness closure roots (Ξ·dag·eval)
     },
 )
 
 def _bib_ext_impl(module_ctx):
-    # ·gen·surface — enumerate the engine def-site surface ONCE (engine-side), then hand it to each
-    # emerge repo.  The surface is a property of the engine, computed here, not in any project.
-    sites = _surface(module_ctx)
+    # ·gen·surface — the def-site surface is a property of the ENGINE (computed once here); ·gen·closure
+    # — each claim's witness closure is a property of the PROJECT's check module (computed per emerge
+    # project).  Both project the shared engine AST (core), beside the bib parse.
+    core = _core(module_ctx)
+    sites = _surface(module_ctx, core)
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, sites = sites if tag.emerge else [])
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [])
 
 bib = module_extension(
     implementation = _bib_ext_impl,

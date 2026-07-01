@@ -19,5 +19,9 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
   echo "[pre-commit] ok: $desc"
 }
 
-run "bazel test //:hook"   mise exec -- bazel test //:hook
+# --config=mutant: the hook includes each emerge project's :cohere, whose def-sweep GRID cells
+# (Ξ·dag·eval) run as counterfactuals in the HERMETIC linux-sandbox (else a check's resolve()
+# escapes to the source tree → the mutation is invisible → empty sens).  The gate/adequacy checks
+# pass identically under it, so the whole hook stays ONE Bazel target under one config.
+run "bazel test //:hook"   mise exec -- bazel test //:hook --config=mutant
 echo "[pre-commit] all checks passed"

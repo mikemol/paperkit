@@ -4,12 +4,14 @@
 The build graph is ONE mechanism (not per-project bespoke rules), and the local CI is COMPLETE:
 
   ⟨one mechanism⟩ every project is wired by the SAME bib.project extension tag, and //:hook is a
-                  single test_suite whose members are uniform @proj//:{gate,adequacy} targets —
+                  single test_suite whose members are uniform @proj//:{gate,adequacy,cohere} targets —
                   the recursive collapse, in the graph: a gate IS a check, one shape parameterized.
   ⟨hook complete⟩ //:hook contains, for every project GRADED in the hook (adequacy = True in
-                  MODULE.bazel), BOTH its gate AND its adequacy — so `bazel test //:hook` gates AND
-                  grades every document.  This is the guarantee local-ci delegates to the hook for:
-                  its witness asserts the pre-commit RUNS //:hook; THIS asserts //:hook is complete.
+                  MODULE.bazel), BOTH its gate AND its adequacy; and for every EMERGE project
+                  (emerge = True), its cohere — the ∂² coherence gate over the def-sweep grid (the
+                  Ξ·dag·eval closure cells).  So `bazel test //:hook` gates, grades, AND coheres every
+                  document.  This is the guarantee local-ci delegates to the hook for: its witness
+                  asserts the pre-commit RUNS //:hook; THIS asserts //:hook is complete.
 
     python3 paperkit/tests/boundaries_check.py
 """
@@ -30,23 +32,27 @@ def hook_tests(build: str) -> set:
 
 
 def projects(module: str) -> dict:
-    """{repo name: graded?} — every bib.project tag, and whether it declares adequacy = True."""
+    """{repo name: {graded, emerge}} — every bib.project tag, and whether it declares adequacy = True
+    (hook-graded) and/or emerge = True (contributes the ∂² coherence gate over the def-sweep grid)."""
     out = {}
     for line in module.splitlines():
         if "bib.project(" in line:
             n = re.search(r'name\s*=\s*"([^"]+)"', line)
             if n:
-                out[n.group(1)] = "adequacy = True" in line
+                out[n.group(1)] = {"graded": "adequacy = True" in line, "emerge": "emerge = True" in line}
     return out
 
 
 def incomplete(build: str, module: str) -> list:
-    """The gate/adequacy targets a graded project is MISSING from //:hook (empty = complete)."""
+    """The targets a project is MISSING from //:hook (empty = complete): a GRADED project owes its
+    gate AND adequacy; an EMERGE project owes its cohere (the def-sweep coherence gate)."""
     hook = hook_tests(build)
     miss = []
-    for name, graded in projects(module).items():
-        if graded:
+    for name, p in projects(module).items():
+        if p["graded"]:
             miss += [f"@{name}//:{suf}" for suf in ("gate", "adequacy") if f"@{name}//:{suf}" not in hook]
+        if p["emerge"] and f"@{name}//:cohere" not in hook:
+            miss.append(f"@{name}//:cohere")
     return miss
 
 
@@ -65,13 +71,15 @@ def main() -> int:
     check("every project is wired by the SAME bib.project tag (no bespoke per-project rule)",
           len(projs) >= 4 and MODULE.count("bib.project(") == len(projs))
     check("//:hook is a SINGLE test_suite", BUILD.count('name = "hook"') == 1)
-    check("the hook's members are uniform @proj//:{gate,adequacy} targets (one shape)",
-          bool(hook) and all(re.match(r"@\w+//:(gate|adequacy)$", t) for t in hook))
+    check("the hook's members are uniform @proj//:{gate,adequacy,cohere} targets (one shape)",
+          bool(hook) and all(re.match(r"@\w+//:(gate|adequacy|cohere)$", t) for t in hook))
 
     print("\n⟨hook complete⟩\n")
-    graded = [n for n, g in projs.items() if g]
+    graded = [n for n, p in projs.items() if p["graded"]]
+    emerge = [n for n, p in projs.items() if p["emerge"]]
     check(f"hook-graded projects discoverable from MODULE (adequacy=True): {', '.join(graded) or 'none'}", bool(graded))
-    check("//:hook contains each graded project's gate AND adequacy", not incomplete(BUILD, MODULE))
+    check(f"emerge projects discoverable from MODULE (emerge=True): {', '.join(emerge) or 'none'}", bool(emerge))
+    check("//:hook contains each graded project's gate+adequacy AND each emerge project's cohere", not incomplete(BUILD, MODULE))
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     victim = f"@{graded[0]}//:adequacy"
@@ -86,7 +94,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (5 behaviors, 1 delta)")
+    print("BOUNDARIES: PASS (6 behaviors, 1 delta)")
     return 0
 
 

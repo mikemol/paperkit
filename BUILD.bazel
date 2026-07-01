@@ -42,4 +42,9 @@ test_suite(name = "hook", tests = [
     "@paperkit_boundaries//:gate",
     "@paperkit_paper//:adequacy",
     "@paperkit_root//:adequacy",
+    # Ζ·emerge·gate — the ∂² coherence reading over each emerge project's def-sweep GRID (the
+    # Ξ·dag·eval closure cells).  Pulls the grid into //:hook, so the hook runs under --config=mutant
+    # (the hermetic sandbox the mutation cells require; .githooks/pre-commit passes it).
+    "@paperkit_paper//:cohere",
+    "@paperkit_root//:cohere",
 ])

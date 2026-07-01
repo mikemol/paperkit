@@ -553,19 +553,23 @@ def content_cache():
     # a Δ grade is cached PER CHECK on its READ footprint (the files it opens), over the
     # content key as the coarse soundness basis: a grade is a pure function of that content.
     import discriminate
-    import gate
+    import resolver
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text('[paper]\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n')
         (d / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:grep -q ZZZ w.bib}\n}\n")
         (d / "r.tsv").write_text("s\tSec\n")
-        # basis: content_key is stable, and moves when an input changes
+        # basis: content_key is stable, and moves when an input changes (a pure content hash — no strace)
         k1 = discriminate.content_key(d)
         assert k1 == discriminate.content_key(d), "content key not stable for unchanged inputs"
-        # refinement: the per-check cache key is the check's READ footprint — a SUBSET of
-        # content, so an unread file is not in it (the cache will not over-invalidate)
+        # refinement: the per-check cache key is the check's READ footprint — a SUBSET of content, so an
+        # unread file is not in it (the cache will not over-invalidate).  Φ·spawn·foot: test the footprint
+        # PARSE over the check's trace (reads w.bib only) hermetically; the strace CAPTURE is
+        # boundaries_footprint's (standard sandbox).  data.txt is written but never opened → not read.
         (d / "data.txt").write_text("unread by the check\n")
-        fp = gate.footprint("cmd:grep -q ZZZ w.bib", d, {})
+        trace = ('openat(AT_FDCWD, "/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = 3\n'
+                 'openat(AT_FDCWD, "w.bib", O_RDONLY) = 3\n')
+        fp = resolver.parse_reads(trace, d, d)
         assert fp == ["w.bib"], f"footprint is not exactly the file the check reads: {fp}"
         assert "data.txt" not in fp, "an unread file entered the footprint — the cache would over-invalidate"
         (d / "w.bib").write_text((d / "w.bib").read_text() + "\n% changed\n")
@@ -578,14 +582,23 @@ def footprint_scopes():
     # Δ traces each check's READ footprint (the files it opens), a SUPERSET of its
     # sensitivity set, so the footprint SCOPES the sweep — each check graded against what
     # it reads, not the whole repo.  An unread file is in neither the footprint nor the flip-set.
-    import gate
     import grader
+    import resolver
     d = Path(tempfile.mkdtemp())
     try:
         (d / "a.txt").write_text("FOO\n")
         (d / "b.txt").write_text("unread\n")
         chk = "cmd:grep -q FOO a.txt"
-        fp = gate.footprint(chk, d, {})
+        # Φ·spawn·foot — the footprint has a CAPTURE half (strace, a process op tested in the standard
+        # sandbox by boundaries_footprint) and a PARSE half (which opens count as inputs — paperkit's
+        # own logic).  A hermetic witness tests the PARSE over a representative trace: a real read
+        # (a.txt), a FAILED open, a WRITE-ONLY output, a libc read outside the project — only a.txt is
+        # an input.  (Running strace here would need the ptrace the hermetic mutation sandbox forbids.)
+        trace = ('openat(AT_FDCWD, "/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = 3\n'
+                 'openat(AT_FDCWD, "a.txt", O_RDONLY) = 3\n'
+                 'openat(AT_FDCWD, "nope.txt", O_RDONLY) = -1 ENOENT (No such file or directory)\n'
+                 'openat(AT_FDCWD, "out.md", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 4\n')
+        fp = resolver.parse_reads(trace, d, d)
         assert fp == ["a.txt"], f"footprint should be the one read file: {fp}"
         baseline, sens = grader.sensitivity(chk, d, {}, None, footprint=fp)
         assert baseline and set(sens) <= set(fp), f"sensitivity is not within the read footprint: {sens}"

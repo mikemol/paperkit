@@ -159,6 +159,32 @@ _OPEN_RE = re.compile(
     r'\s*=\s*(?P<rc>-?\d+)')
 
 
+def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> "list | None":
+    """Φ·footprint PARSE (pure) — the READ files in an strace openat/open trace, `scope`-relative:
+    a successful open (rc≥0) that is not write-only, of a real file under `scope`.  SPLIT from the
+    CAPTURE (the strace subprocess — a process op = Bazel's job, Φ·spawn·foot), so the parse (the
+    paperkit-owned logic: which opens count as inputs) is testable IN-PROCESS over a canned trace,
+    not by running strace.  Returns the sorted read set; None if the trace shows NO opens at all
+    (strace never attached — the Φ·degrade sentinel; [] would falsely mean 'reads nothing')."""
+    reads, traced = set(), False
+    for line in trace_text.splitlines():
+        m = _OPEN_RE.search(line)
+        if not m:
+            continue                                  # unparsed line
+        traced = True                                 # an open logged — strace DID attach (any real process opens libc)
+        if m.group("rc").startswith("-") or "O_WRONLY" in m.group("flags"):
+            continue                                  # failed open, or write-only = output, not an input
+        raw = m.group("path")
+        p = (Path(raw) if raw.startswith("/") else project_dir / raw).resolve()
+        if not p.is_file():
+            continue                                  # directories (O_DIRECTORY), /dev nodes, gone — not a hashable input
+        try:
+            reads.add(str(p.relative_to(scope)))
+        except ValueError:
+            continue                                  # outside the scope — not an input we track
+    return sorted(reads) if traced else None
+
+
 def footprint(check: str, project_dir: Path, custom: dict, scope: "Path | None" = None) -> list:
     """Φ·footprint — the READ footprint: the files this check OPENS for reading when it runs
     (traced with strace), relative to `scope` (default the project dir).  A SOUND basis for
@@ -186,30 +212,11 @@ def footprint(check: str, project_dir: Path, custom: dict, scope: "Path | None" 
             subprocess.run(["strace", "-f", "-qq", "-e", "trace=openat,open", "-o", str(trace),
                             "sh", "-c", cmd], cwd=project_dir, env=clean_env(), capture_output=True)
         except FileNotFoundError:
-            return None                                   # Φ·degrade: strace not installed (see below)
-        reads, traced = set(), False
-        for line in trace.read_text(errors="replace").splitlines():
-            m = _OPEN_RE.search(line)
-            if not m:
-                continue                                  # unparsed line
-            traced = True                                 # strace logged an open — it DID attach (any real process opens libc)
-            if m.group("rc").startswith("-") or "O_WRONLY" in m.group("flags"):
-                continue                                  # failed open, or write-only = output, not an input
-            raw = m.group("path")
-            p = (Path(raw) if raw.startswith("/") else project_dir / raw).resolve()
-            if not p.is_file():
-                continue                                  # directories (O_DIRECTORY), /dev nodes, gone — not a hashable input
-            try:
-                reads.add(str(p.relative_to(scope)))
-            except ValueError:
-                continue                                  # outside the scope — not an input we track
-        # Φ·degrade: when strace cannot trace — absent (above) or unable to ATTACH (no ptrace
-        # capability, e.g. a hardened container → an EMPTY trace, `traced` False) — return the
-        # SENTINEL None, never [].  [] means "reads nothing": it hashes stable (the cache would
-        # over-reuse a grade whose inputs we never saw) and scopes the sweep to nothing (a wrong
-        # vacuous grade).  None ⇒ don't-cache + full-surface sweep (sensitivity handles None).
-        if not traced:
-            return None
-        return sorted(reads)
+            return None                                   # Φ·degrade: strace not installed
+        # Φ·degrade: when strace cannot trace — absent (above) or unable to ATTACH (no ptrace, e.g. a
+        # hardened container → an EMPTY trace) — parse_reads returns None, never [].  [] means "reads
+        # nothing": it hashes stable (the cache would over-reuse a grade whose inputs we never saw) and
+        # scopes the sweep to nothing (a wrong vacuous grade).  None ⇒ don't-cache + full-surface sweep.
+        return parse_reads(trace.read_text(errors="replace"), project_dir, scope)
     finally:
         trace.unlink(missing_ok=True)

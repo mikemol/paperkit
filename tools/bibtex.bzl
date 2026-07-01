@@ -319,18 +319,28 @@ def _bib_repo_impl(repository_ctx):
                 # Ξ·dag·eval), the ∅-baseline cell, and pk_sens reading them → {claim, baseline, sens}
                 # (a drop-in for the old pk_calc __dcalc pk_cohere consumes).  The fanout IS the build
                 # graph — each cell a node — lifted from grader.sensitivity's in-process group-testing.
+                # ·surface·scope — a claim's PERTURBATION SURFACE is the mutations over its CLOSURE, not
+                # the engine globally: a site in a module the witness never touches (m ∉ closure) swaps a
+                # .pyc the check never loads, so its cell is a NO-OP == baseline BY CONSTRUCTION — pure
+                # grid waste.  Scoping the row to closure sites drops exactly those no-ops (sens is
+                # UNCHANGED: every module whose mutation could flip the check is imported/read by it, so
+                # it is in the closure).  This is the common structure of ·surface·scope AND file/bib node
+                # kinds: the surface is per-claim-READS, so a claim reading a file / bib-edge perturbs
+                # THAT artifact (a later rung, closure roots beyond .py) — through this same scoped row.
+                cset = {m: True for m in closures[k]}
+                csites = [s for s in sites if s[0] in cset]
                 cl = ", ".join(['"@@//paperkit:%s"' % m[len("paperkit/"):-len(".py")] for m in closures[k]])
                 # stage the claim's DECLARED reads (dl = _data(reads, files)), not just the project
                 # files — a witness may read cross-project inputs (local-ci reads .githooks/pre-commit,
                 # multi-project/report-live read siblings); the old pk_calc staged dl, so the grid ∅
                 # must too, else the unmutated check errors and the baseline flips (garbage sens).
                 ev = "check = " + _lit(wscript) + ", closure = [" + cl + "], project = [" + dl + "]"
-                for m, q in sites:
+                for m, q in csites:
                     sn = _sitename(m, q)
                     out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, module = %s, mutated_py = ":mut_%s", mutated_pyc = ":pyc_%s", %s)' % (
                         k, sn, _lit(k), _lit(m + "::" + q), _lit(m), sn, sn, ev))
                 out.append('pk_eval(name = "%s__0", claim = %s, site = "0", module = "paperkit/bib.py", mutated_py = ":mut_0", mutated_pyc = ":pyc_0", %s)' % (k, _lit(k), ev))
-                out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0")' % (k, ", ".join(['":%s__%s"' % (k, _sitename(m, q)) for m, q in sites]), k))
+                out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0")' % (k, ", ".join(['":%s__%s"' % (k, _sitename(m, q)) for m, q in csites]), k))
             elif emerge:
                 # A calc claim with NO engine witness (a cmd:/result: check — e.g. a grep over a static
                 # asset).  It has no closure (closure.py enumerates only the witness module's CLAIMS), so

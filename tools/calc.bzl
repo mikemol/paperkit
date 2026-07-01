@@ -235,11 +235,20 @@ def _eval_impl(ctx):
     mut = [ctx.file._tool] + ([mpy, mpyc] if mpy else [])
     marg = (" --module " + ctx.attr.module + " --mutant-py " + mpy.path +
             " --mutant-pyc " + mpyc.path) if mpy else ""
+    # A CONTENT cell (site = content-:/content+:) toggles a substring in the staged file at
+    # `content_path`.  Deliver the substring as a build artifact (ctx.actions.write) rather than a
+    # shell arg — arbitrary quotes/parens/colons, never escaped through the command string.
+    carg = ""
+    if ctx.attr.content_path:
+        cf = ctx.actions.declare_file(ctx.label.name + ".content.txt")
+        ctx.actions.write(cf, ctx.attr.content_text)
+        mut = mut + [cf]
+        carg = " --content-path " + ctx.attr.content_path + " --content-textfile " + cf.path
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset(mut + ctx.files.project, transitive = [closure_pyc, closure_py]),
         command = '"$(command -v python3)" ' + ctx.file._tool.path +
-                  " --engine-dir paperkit" + marg +
+                  " --engine-dir paperkit" + marg + carg +
                   " --check " + ctx.attr.check + " --claim " + ctx.attr.claim +
                   " --site '" + ctx.attr.site + "' --out " + o.path,
         mnemonic = "PkEval",
@@ -259,6 +268,8 @@ pk_eval = rule(
         "mutated_pyc": attr.label(allow_single_file = [".pyc"], doc = "the mutated module BYTECODE (pk_pyc of it) — the import path; absent for a file cell"),
         "closure": attr.label_list(providers = [PycInfo], mandatory = True, doc = "Ξ·dag·eval — the check's closure ROOTS (pk_pyc targets, closure.py); PycInfo expands the transitive .py/.pyc cone"),
         "project": attr.label_list(allow_files = True, doc = "the paper project files"),
+        "content_path": attr.string(default = "", doc = "a content cell's target file (its substring toggled in the sandbox); empty for a .py/file cell"),
+        "content_text": attr.string(default = "", doc = "the substring a content cell drops/injects — delivered via ctx.actions.write, so any chars are safe"),
         "_tool": attr.label(default = "//tools:eval.py", allow_single_file = True),
     },
 )

@@ -88,15 +88,16 @@ def _roots_of(node, names, cli):
     return _imports(node, names) | _reads(node, names) | _fx_calls(node, cli)
 
 
-def _dir_consts(relpath, tree):
-    """Module-level Path DIR constants → their sandbox-relative prefix.  The check runs with __file__
+def _dir_consts(relpath, stmts, pref=None):
+    """Path DIR constants in `stmts` → their sandbox-relative prefix.  The check runs with __file__
     at its REPO-RELATIVE path in the hermetic sandbox, so `Path(__file__).resolve().parents[N]` is that
     path with N+1 trailing components dropped: for checks/readme.py, parents[1] = "" (root); for
     paper/checks/claims.py, parents[1] = "paper".  NAME / "sub" extends a known prefix (ENGINE =
-    ROOT / "paperkit" → "paperkit").  A file toggle must hit exactly these sandbox paths."""
+    ROOT / "paperkit" → "paperkit").  Called on the module body for the shared consts, then EXTENDED
+    per witness with its function-local ones (project_dag binds `root` inside the function)."""
     parts = relpath.split("/")
-    pref = {}
-    for n in tree.body:
+    pref = dict(pref) if pref else {}
+    for n in stmts:
         if not isinstance(n, ast.Assign) or not isinstance(n.targets[0], ast.Name):
             continue
         tgt, v = n.targets[0].id, n.value
@@ -111,19 +112,60 @@ def _dir_consts(relpath, tree):
     return pref
 
 
+def _resolve_path(node, pref):
+    """A Path EXPRESSION built from dir constants and string literals → its sandbox path, or None.
+    A bare dir constant (Name in pref) or `<expr> / "sub"` (nested, e.g. root / "report" / "gen.py")."""
+    if isinstance(node, ast.Name):
+        return pref.get(node.id)
+    if (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div)
+            and isinstance(node.right, ast.Constant) and isinstance(node.right.value, str)):
+        base = _resolve_path(node.left, pref)
+        return None if base is None else "/".join(p for p in (base, node.right.value) if p)
+    return None
+
+
 def _exists_paths(node, pref):
-    """Sandbox paths a witness tests via `(BASE / "leaf").exists()` (BASE a known dir constant) — the
-    EXISTS edges.  A claim asserting a file's presence/absence is falsifiable by TOGGLING that file
-    (Ζ·mutant·struct·node-kinds): the file analog of the import+/- toggle.  Only plain string leaves
-    (not f-strings / loop vars) are resolved here."""
+    """Sandbox paths a witness tests via `(BASE / "leaf").exists()` — the EXISTS edges.  A claim
+    asserting a file's presence/absence is falsifiable by TOGGLING that file (Ζ·mutant·struct·node-kinds):
+    the file analog of the import+/- toggle.  Only plain-constant path leaves are resolved (not
+    f-strings / loop vars)."""
     out = set()
     for c in ast.walk(node):
-        if not (isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "exists"):
+        if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "exists":
+            p = _resolve_path(c.func.value, pref)
+            if p is not None:
+                out.add(p)
+    return out
+
+
+def _content_edges(fn, pref):
+    """(sandbox path, substring) pairs a witness tests via `"S" in F.read_text()` — the CONTENT edges.
+    A claim asserting a substring's presence in a file (project-dag: `result:paper` in the README bib,
+    `_delta("paper")`/`--json` in the report generator) is falsifiable by TOGGLING that substring — the
+    finest-grain content perturbation, a precise DAG-EDGE drop (not a whole-file corruption that flips
+    every reader identically).  Resolves the comparator when it is an inline `F.read_text()` or a
+    FUNCTION-LOCAL name bound to one (module-level SRC constants are a coarser, later rung)."""
+    reads = {}                                           # local name → file path (bound to X.read_text())
+    for n in ast.walk(fn):
+        if (isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name)
+                and isinstance(n.value, ast.Call) and isinstance(n.value.func, ast.Attribute)
+                and n.value.func.attr == "read_text"):
+            p = _resolve_path(n.value.func.value, pref)
+            if p is not None:
+                reads[n.targets[0].id] = p
+    out = set()
+    for c in ast.walk(fn):
+        if not (isinstance(c, ast.Compare) and len(c.ops) == 1 and isinstance(c.ops[0], ast.In)
+                and isinstance(c.left, ast.Constant) and isinstance(c.left.value, str)):
             continue
-        r = c.func.value
-        if (isinstance(r, ast.BinOp) and isinstance(r.op, ast.Div) and isinstance(r.left, ast.Name)
-                and r.left.id in pref and isinstance(r.right, ast.Constant) and isinstance(r.right.value, str)):
-            out.add((pref[r.left.id] + "/" + r.right.value).lstrip("/"))
+        comp = c.comparators[0]
+        p = None
+        if isinstance(comp, ast.Call) and isinstance(comp.func, ast.Attribute) and comp.func.attr == "read_text":
+            p = _resolve_path(comp.func.value, pref)      # inline `"S" in (root / "x").read_text()`
+        elif isinstance(comp, ast.Name):
+            p = reads.get(comp.id)                         # `"S" in gen` (gen = F.read_text())
+        if p is not None:
+            out.add((p, c.left.value))
     return out
 
 
@@ -173,14 +215,25 @@ def main(argv):
     # CURRENT state (checked here at analysis time, cwd = repo root): an absent file → file+ (inject
     # it, falsifying "X does not exist" — rm-next's cli.py); a present file → file- (drop it, falsifying
     # "X exists").  No `not`-parsing needed: the counterfactual is simply the opposite of what is.
-    pref = _dir_consts(a.relpath or a.check, tree)
+    relpath = a.relpath or a.check
+    mod_pref = _dir_consts(relpath, tree.body)           # the module-level dir constants (shared)
 
     for key in sorted(claims):
+        fn = funcs[claims[key]]
+        pref = _dir_consts(relpath, fn.body, mod_pref)   # extend with the witness's function-local ones
         for stem in sorted(base | roots(claims[key], set())):
             print("{}\t{}".format(key, names[stem]))
-        for path in sorted(_exists_paths(funcs[claims[key]], pref)):
+        for path in sorted(_exists_paths(fn, pref)):
             op = "file-" if Path(path).exists() else "file+"
             print("{}\t{}:{}".format(key, op, path))
+        # Ζ·mutant·struct·node-kinds (BIB/content) — a CONTENT edge, emitted as `claim<TAB>op<TAB>path
+        # <TAB>substring` (4 fields; op = content- drop / content+ inject).  Polarity = the TOGGLE of
+        # the substring's CURRENT presence (checked here, cwd = repo root): present → drop it, absent →
+        # inject it.  Single-line substrings only (the line/tab-delimited transport).
+        for path, sub in sorted(_content_edges(fn, pref)):
+            here = Path(path).read_text() if Path(path).exists() else ""
+            op = "content-" if sub in here else "content+"
+            print("{}\t{}\t{}\t{}".format(key, op, path, sub))
     return 0
 
 

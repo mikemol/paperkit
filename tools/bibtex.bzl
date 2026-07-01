@@ -279,12 +279,16 @@ def _bib_repo_impl(repository_ctx):
     sites = [l.split("\t") for l in repository_ctx.attr.sites]
     closures = {}  # ·gen·closure — claim key → its witness's closure ROOT modules (Ξ·dag·eval)
     fsites = {}    # Ζ·mutant·struct·node-kinds — claim key → its FILE toggle specs (file+:/file-:<path>)
+    contents = {}  # Ζ·mutant·struct·node-kinds — claim key → [(op, path, substring)] CONTENT toggles
     for l in repository_ctx.attr.closures:
-        k, m = l.split("\t")
-        if m.startswith("file+:") or m.startswith("file-:"):
-            fsites.setdefault(k, []).append(m)
+        parts = l.split("\t")
+        k = parts[0]
+        if len(parts) == 4 and parts[1] in ("content-", "content+"):
+            contents.setdefault(k, []).append((parts[1], parts[2], parts[3]))
+        elif parts[1].startswith("file+:") or parts[1].startswith("file-:"):
+            fsites.setdefault(k, []).append(parts[1])
         else:
-            closures.setdefault(k, []).append(m)
+            closures.setdefault(k, []).append(parts[1])
     # the claim-WITNESS script each pk_eval runs, EXEC-relative — the .py in THIS project's
     # [checks.claim] cmd (paper → paper/checks/claims.py, root → checks/readme.py), project-prefixed.
     # NOT hardcoded: root's readme.py is a different module than paper's claims.py, so a hardcoded
@@ -365,6 +369,16 @@ def _bib_repo_impl(repository_ctx):
                     fn = _filesitename(spec)
                     out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, %s)' % (k, fn, _lit(k), _lit(spec), ev))
                     cellnames.append(fn)
+                # CONTENT cells (Ζ·mutant·struct·node-kinds, BIB/content) — one per (op, path, substring)
+                # DAG-edge toggle.  Indexed target name (the substring is not a valid identifier); the
+                # readable site LABEL carries op:path:substring for the record.  The substring rides the
+                # content_text attr (→ ctx.actions.write in pk_eval), never a shell arg.
+                for i in range(len(contents.get(k, []))):
+                    op, path, sub = contents[k][i]
+                    cn = "content_%d" % i
+                    out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, content_path = %s, content_text = %s, %s)' % (
+                        k, cn, _lit(k), _lit(op + ":" + path + ":" + sub), _lit(path), _lit(sub), ev))
+                    cellnames.append(cn)
                 out.append('pk_eval(name = "%s__0", claim = %s, site = "0", module = "paperkit/bib.py", mutated_py = ":mut_0", mutated_pyc = ":pyc_0", %s)' % (k, _lit(k), ev))
                 out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0")' % (k, ", ".join(['":%s__%s"' % (k, c) for c in cellnames]), k))
             elif emerge:

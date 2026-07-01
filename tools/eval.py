@@ -42,6 +42,8 @@ def main(argv):
     ap.add_argument("--check", required=True, help="the check script, e.g. paper/checks/claims.py")
     ap.add_argument("--claim", required=True)
     ap.add_argument("--site", required=True, help="the def-site label, recorded in the result")
+    ap.add_argument("--content-path", default="", help="a content cell's target file (its substring toggled)")
+    ap.add_argument("--content-textfile", default="", help="the substring to drop/inject, delivered as a file (no shell escaping)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
 
@@ -67,6 +69,16 @@ def main(argv):
         p.write_text("")
     elif op == "file-":
         pathlib.Path(arg).unlink(missing_ok=True)      # DROP a present file — the counterfactual absence
+    elif op in ("content-", "content+"):
+        # Ζ·mutant·struct·node-kinds (content) — TOGGLE a substring's presence in a staged file: the
+        # precise DAG-EDGE perturbation (drop `result:paper` from the README bib → the "does the README
+        # import the paper" grep fails).  The substring arrives as a FILE (no shell-escaping of quotes/
+        # colons).  Unlink-then-write: remove the sandbox hardlink, never the source inode.
+        text = pathlib.Path(a.content_textfile).read_text()
+        f = pathlib.Path(a.content_path)
+        orig = f.read_text()
+        f.unlink(missing_ok=True)
+        f.write_text(orig.replace(text, "") if op == "content-" else orig + text)
     else:
         # … deliver the ONE mutated module on BOTH paths (∅ = identity = no-op): its .pyc (used when
         # the module is IMPORTED) AND its .py source (used when the module is run as a MAIN SCRIPT — a

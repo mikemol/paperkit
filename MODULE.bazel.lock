@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "qrvBJCQm/LjYpOw7XxlYpHiII/rE4i4q8jKhmiFqLCc=",
+        "bzlTransitiveDigest": "2v6CXJNZbQ45GyEqkpPYZhjejd93C83AnliiTIBpw+o=",
         "usagesDigest": "wEQOhntXZ4i6ecw/beI3vdwPEWlHpnJmqWC37TC1aVs=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "93054558f06af42ba714ebf2f1c61ffd29638f4b412805b6da337471cb5d4494",
@@ -794,6 +794,9 @@
                 "project-dag\tpaperkit/gate.py",
                 "project-dag\tpaperkit/project.py",
                 "project-dag\tpaperkit/resolver.py",
+                "project-dag\tcontent-\treport/gen.py\t--json",
+                "project-dag\tcontent-\treport/gen.py\t_delta(\"paper\")",
+                "project-dag\tcontent-\twarrants.bib\tresult:paper",
                 "projector-emits\tpaperkit/tests/_fixture.py",
                 "projector-emits\tpaperkit/gate.py",
                 "projector-emits\tpaperkit/project.py",
@@ -829,6 +832,9 @@
                 "report-live\tpaperkit/gate.py",
                 "report-live\tpaperkit/project.py",
                 "report-live\tpaperkit/resolver.py",
+                "report-live\tcontent-\treport/gen.py\t--json",
+                "report-live\tcontent-\treport/gen.py\tdiscriminate.py",
+                "report-live\tcontent-\treport/gen.py\tgate.py",
                 "resolve-passes\tpaperkit/tests/_fixture.py",
                 "resolve-passes\tpaperkit/gate.py",
                 "resolve-passes\tpaperkit/project.py",

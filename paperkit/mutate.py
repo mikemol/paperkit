@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
-"""Ζ·mutant — the PURE def-site mutation leaf: given a .py module and a def-site qualname, emit the
-module with exactly that definition's body replaced by an uncatchable raise (the rest byte-identical).
+"""Ζ·mutant — the PURE perturbation leaf: given a .py module and a mutation SPEC, emit the perturbed
+module.  A perturbation TOGGLES an element's PRESENCE between the actual source and a nearby
+counterfactual (Ζ·mutant·struct — drop the present, inject the absent):
 
-This is the mechanical primitive ONLY — the AST surgery — NOT the sensitivity interpretation (what a
-flip MEANS, the group-testing, the capability fingerprint), which stays in grader.py.  It is its own
-leaf so the Bazel-orchestrated mutant graph (pk_mutate prepares one mutated module per (module,site),
-pk_eval runs a check against it) builds on a pure function and never imports the grader's sweep
-machinery.  CLI: `mutate.py <module.py> <qualname>` prints the mutated module to stdout.
+    ""                the IDENTITY (∅): byte-identical, the baseline point of the mutation set — an
+                      eval against it measures the UNMUTATED check in the same sandbox (sens.py's
+                      validity witness).
+    <qualname>        DROP a def's BEHAVIOUR — its body → an uncatchable raise (present → absent),
+    or  def:<qualname>    the rest byte-identical, so a witness flips only if it EXERCISES that def.
+    import-:<name>    DROP `import <name>` / `from <name> import …` (a present import → absent) — a
+                      POSITIVE import-dependence flips.
+    import+:<name>    INJECT `import <name>` (an absent import → present) — the NEGATIVE polarity that
+                      falsifies a "module does NOT import X" assertion (the Π counter-fixture, as a
+                      grid mutation rather than a hand-written one).
+
+The mechanical AST surgery ONLY — not the sensitivity interpretation (what a flip MEANS, the
+group-testing, the fingerprint), which stays in grader.py.  A pure function, so the Bazel mutant
+graph (pk_mutate prepares one perturbed module per site, pk_eval runs a check against it) builds on
+it without importing the sweep.  Ν·loud (KeyError) on a spec that names no such element — a real miss
+is never a silent no-op.  CLI: `mutate.py <module.py> <spec>` prints the perturbed module to stdout.
 """
 from __future__ import annotations
 
@@ -15,7 +27,7 @@ import sys
 
 
 def _def_sites(text: str) -> list:
-    """Every def/method in a .py source as (qualname, node).  Mutation resolution for code is the
+    """Every def/method in a .py source as (qualname, node).  Mutation resolution for CODE is the
     DEFINITION, not the file: corrupting a whole file breaks its import and flips every witness
     identically; replacing one function's BODY leaves the module importable, so a witness flips only
     if it actually exercises that function.  A one-liner (`def f(): return 1`) shares its signature
@@ -42,32 +54,74 @@ def _def_sites(text: str) -> list:
 
 
 def _mutate_lines(text: str, nodes: list) -> str:
-    """Replace each given def's body line-span with an UNCATCHABLE raise, leaving the rest of the
-    file byte-identical (so a source-grep witness flips only when ITS grepped text lived in a mutated
-    body, not because the file was reformatted).  BaseException — not Exception — so a witness's own
-    `except Exception` cannot swallow the mutation (MONOTONE BY CONSTRUCTION)."""
+    """Replace each given def's body line-span with an UNCATCHABLE raise, leaving the rest of the file
+    byte-identical (so a source-grep witness flips only when ITS grepped text lived in a mutated body,
+    not because the file was reformatted).  BaseException — not Exception — so a witness's own
+    `except Exception` cannot swallow the mutation (MONOTONE BY CONSTRUCTION).  Takes a LIST of nodes:
+    grader.py's in-process group-testing mutates several def-sites at once."""
     lines = text.splitlines(keepends=True)
     for node in sorted(nodes, key=lambda n: n.body[0].lineno, reverse=True):
-        s, e = node.body[0].lineno, node.end_lineno
-        col = node.body[0].col_offset
+        s, e, col = node.body[0].lineno, node.end_lineno, node.body[0].col_offset
         lines[s - 1:e] = [" " * col + "raise BaseException('PAPERKIT_MUT')\n"]
     return "".join(lines)
 
 
-def emit_mutant(text: str, qualname: str) -> str:
-    """The module with exactly the def-site `qualname`'s body replaced by the uncatchable raise.
-    The EMPTY qualname is the IDENTITY mutation (∅): the module byte-for-byte, no def touched — the
-    baseline point of the mutation set, so an eval against it measures the UNMUTATED check in the very
-    same sandbox (its `flipped=false` is the harness's validity witness; see tools/sens.py).  Raises
-    KeyError (Ν·loud) for a NON-empty qualname that is not a def-site — a real miss is never a no-op."""
-    if qualname == "":
-        return text                                  # ∅ — the identity element of the mutation set
+def _drop_def(text: str, qualname: str) -> str:
+    """DROP one def-site's BEHAVIOUR — its body → the uncatchable raise (present → absent)."""
     for qn, node in _def_sites(text):
         if qn == qualname:
             return _mutate_lines(text, [node])
     raise KeyError(f"Ζ·mutant: '{qualname}' is not a def-site in the module")
 
 
+def _drop_import(text: str, name: str) -> str:
+    """Remove the top-level `import <name>` / `from <name> import …` (a PRESENT import → absent)."""
+    drop = set()
+    for node in ast.parse(text).body:
+        if isinstance(node, ast.Import) and any(a.name == name for a in node.names):
+            drop.update(range(node.lineno, node.end_lineno + 1))
+        elif isinstance(node, ast.ImportFrom) and node.module == name:
+            drop.update(range(node.lineno, node.end_lineno + 1))
+    if not drop:
+        raise KeyError(f"Ζ·mutant: '{name}' is not a top-level import in the module")
+    return "".join(l for i, l in enumerate(text.splitlines(keepends=True), 1) if i not in drop)
+
+
+def _inject_import(text: str, name: str) -> str:
+    """INJECT `import <name>` (an ABSENT import → present).  Placed AFTER the module docstring and any
+    `from __future__` imports (which must stay first), so the result is valid Python and the source
+    now CONTAINS the import — a "module does NOT import X" assertion flips."""
+    after = 0                                            # line to insert after (0 = top of file)
+    for node in ast.parse(text).body:
+        if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)):
+            after = node.end_lineno                      # module docstring
+        elif isinstance(node, ast.ImportFrom) and node.module == "__future__":
+            after = node.end_lineno                      # __future__ imports must remain first
+        else:
+            break
+    lines = text.splitlines(keepends=True)
+    lines.insert(after, f"import {name}  # PAPERKIT_MUT\n")
+    return "".join(lines)
+
+
+def emit_mutant(text: str, spec: str) -> str:
+    """The module perturbed by `spec` (see the module docstring).  The EMPTY spec is the IDENTITY (∅).
+    A bare qualname (no ':') is a def-drop, for backward compatibility with def_sites.py."""
+    if spec == "":
+        return text                                      # ∅ — the identity element of the mutation set
+    op, sep, arg = spec.partition(":")
+    if not sep:                                          # bare qualname ⇒ def-drop (def_sites.py output)
+        return _drop_def(text, spec)
+    if op == "def":
+        return _drop_def(text, arg)
+    if op == "import-":
+        return _drop_import(text, arg)
+    if op == "import+":
+        return _inject_import(text, arg)
+    raise KeyError(f"Ζ·mutant: unknown mutation op in spec '{spec}'")
+
+
 if __name__ == "__main__":
-    module, qualname = sys.argv[1], sys.argv[2]
-    sys.stdout.write(emit_mutant(open(module).read(), qualname))
+    module, spec = sys.argv[1], sys.argv[2]
+    sys.stdout.write(emit_mutant(open(module).read(), spec))

@@ -1,4 +1,5 @@
 load("//tools:calc.bzl", "pk_pyc")
+load("//paperkit:dag.bzl", "IMPORTS")
 
 # The engine — EXPLICIT srcs (no globs).  Every project's gate deps on //paperkit:engine.
 # The list is shared by the filegroup AND exports_files, so each module is also referenceable as
@@ -54,8 +55,19 @@ exports_files(ENGINE_SRCS)
 # tests/_fixture.pyc), so a consumer maps it to __pycache__/<stem>.<tag>.pyc by parallel structure.
 # //paperkit:pyc mirrors //paperkit:engine — the bytecode the engine runs off (pk_eval now; the gate
 # and checks at Ζ·pyc·run).  Compile ONCE, shared across the whole def-sweep fanout.
+#
+# Ξ·dag·build — each pk_pyc's deps ARE its imports (paperkit/dag.bzl, AST-derived): the build DAG is a
+# projection of the engine import DAG, so a consumer stages a module's transitive .pyc CLOSURE (its
+# dependency cone), not the flat engine.  IMPORTS keys stems by bare name; a tests/ module's target is
+# tests/<stem>, so map every imported stem back to its owning pk_pyc target name.
+_STEM_TO_TARGET = {m.rsplit("/", 1)[-1][:-len(".py")]: m[:-len(".py")] for m in ENGINE_SRCS}
+
 [
-    pk_pyc(name = m[:-len(".py")], src = m)
+    pk_pyc(
+        name = m[:-len(".py")],
+        src = m,
+        deps = [":" + _STEM_TO_TARGET[s] for s in IMPORTS.get(m, [])],
+    )
     for m in ENGINE_SRCS
 ]
 

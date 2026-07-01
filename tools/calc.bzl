@@ -170,6 +170,14 @@ pk_mutate = rule(
 # runtime never rechecks the source, so a mutated .pyc over an unchanged .py runs the mutation).  The
 # compile is a BUILD step here, not an import-time side effect; pk_eval runs off these .pyc, swapping
 # the one mutated module's .pyc rather than recompiling the engine on every counterfactual.
+# Ξ·dag — a module's TRANSITIVE .pyc closure: itself ∪ the closures of the modules it imports.  The
+# build DAG is a projection of the engine import DAG (paperkit/dag.bzl, AST-derived): a consumer that
+# stages a module's `closure` gets exactly that module's dependency cone, not the flat engine.
+PycInfo = provider(
+    doc = "Ξ·dag — the transitive .pyc closure of a compiled module (itself ∪ its imports' closures).",
+    fields = {"closure": "depset of .pyc File — this module plus every module it transitively imports"},
+)
+
 def _pyc_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".pyc")
     # Compile with the SANDBOX python (`command -v`, NOT the staged toolchain) — it MUST be the same
@@ -183,13 +191,15 @@ def _pyc_impl(ctx):
         mnemonic = "PkPyc",
         progress_message = "Ζ·pyc " + ctx.label.name,
     )
-    return [DefaultInfo(files = depset([o]))]
+    closure = depset([o], transitive = [d[PycInfo].closure for d in ctx.attr.deps])
+    return [DefaultInfo(files = depset([o])), PycInfo(closure = closure)]
 
 pk_pyc = rule(
     implementation = _pyc_impl,
     doc = "Ζ·pyc — compile one .py to its content-addressed .pyc build artifact (UNCHECKED_HASH).",
     attrs = {
         "src": attr.label(allow_single_file = [".py"], mandatory = True, doc = "the .py module to compile"),
+        "deps": attr.label_list(providers = [PycInfo], doc = "Ξ·dag — the modules this one imports (paperkit/dag.bzl)"),
         "_tool": attr.label(default = "//tools:pyc.py", allow_single_file = True),
     },
 )

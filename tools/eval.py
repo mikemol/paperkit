@@ -24,7 +24,8 @@ def main(argv):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine-dir", required=True, help="the staged engine dir, e.g. paperkit")
     ap.add_argument("--module", required=True, help="the mutated module's .py path, e.g. paperkit/bib.py")
-    ap.add_argument("--mutant", required=True, help="the mutated module's .pyc (identity for the ∅ baseline)")
+    ap.add_argument("--mutant-py", required=True, help="the mutated module SOURCE (pk_mutate; identity for ∅)")
+    ap.add_argument("--mutant-pyc", required=True, help="the mutated module BYTECODE (pk_pyc of it)")
     ap.add_argument("--check", required=True, help="the check script, e.g. paper/checks/claims.py")
     ap.add_argument("--claim", required=True)
     ap.add_argument("--site", required=True, help="the def-site label, recorded in the result")
@@ -44,8 +45,14 @@ def main(argv):
         if "__pycache__" in pyc.parts:
             continue
         shutil.move(str(pyc), str(slot(pyc.with_suffix(".py"))))
-    # … then overwrite the ONE mutated module's slot with the mutant bytecode (∅ = identity = no-op)
-    shutil.copyfile(a.mutant, slot(a.module))
+    # … then deliver the ONE mutated module on BOTH paths (∅ = identity = no-op): its .pyc (used when
+    # the module is IMPORTED) AND its .py source (used when the module is run as a MAIN SCRIPT — a
+    # main script's bytecode is never read from __pycache__, so an entry-point module like project.py
+    # would otherwise escape the mutation).
+    mod = pathlib.Path(a.module)
+    mod.unlink()
+    shutil.copyfile(a.mutant_py, mod)
+    shutil.copyfile(a.mutant_pyc, slot(mod))
 
     flipped = subprocess.run([sys.executable, a.check, a.claim],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0

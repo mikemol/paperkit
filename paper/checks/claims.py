@@ -26,15 +26,6 @@ ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or Path(__file__).resolve().pare
 PAPER_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
-import gate  # noqa: E402
-import project as P  # noqa: E402
-import discriminate  # noqa: E402  (Δ: the adequacy CLI)
-import layout  # noqa: E402  (project topology — sandbox roots, nested projects)
-import grade  # noqa: E402  (the grade ladder + interpretation — Μ·grade)
-import grader  # noqa: E402  (Δ's mutation sweep)
-import driver  # noqa: E402  (the pump/parse liveness driver)
-import rhetoric  # noqa: E402  (the move/scheme vocabulary)
-import coherence  # noqa: E402  (∂²: declared grounding vs measured sensitivity)
 import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
@@ -43,6 +34,7 @@ PROJECT_SRC = (ENGINE / "project.py").read_text()
 
 
 def _parse(bib_text):
+    import project as P
     """Parse one .bib through the real engine parser; return its record fields."""
     d = tempfile.mkdtemp()
     try:
@@ -67,6 +59,7 @@ def gate_dispatches():
 def new_domain_adds():
     # "a new domain adds verifiers, not editing the engine" — a type supplied only
     # in the custom registry resolves; an unregistered one does not
+    import gate
     assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
         "a registry-supplied check type does not resolve"
     assert gate.resolves("demo:x", ENGINE, {}) is False, \
@@ -84,6 +77,7 @@ def two_builtins():
 def agree_builtin():
     # agree CONCURS — ≥2 independent producers (split on |||) must all exit 0 and emit
     # IDENTICAL output; agreement across implementations rules out a shared bug.
+    import gate
     assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: of two concurring producers failed"
     assert gate.resolves("agree:printf 42 ||| printf 43", ENGINE, {}) is False, "agree: of two disagreeing producers passed"
     assert gate.resolves("agree:printf 42", ENGINE, {}) is False, "agree: with a single producer (no independence) passed"
@@ -93,12 +87,15 @@ def agree_builtin():
 def result_builtin():
     # result PARSES a sibling project's machine-readable gate verdict (gate --json): a
     # green sibling resolves True, a red one False — composition, not re-derivation.
+    import gate
+    import project as P
     d = Path(tempfile.mkdtemp())
     try:
         sib = d / "g"
         sib.mkdir()
 
         def write(check):
+            import project as P
             (sib / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
                                             'rubric = "r.tsv"\nout = "out.md"\n')
             (sib / "r.tsv").write_text("s\tSec\n")
@@ -117,6 +114,7 @@ def dataset_backed():
     # "a custom verifier may interpret a dataset the project SHIPS … a single edit can
     # falsify" — a check whose command reads a project file resolves true while the file
     # matches and flips false on a one-line edit to that shipped dataset.
+    import gate
     d = Path(tempfile.mkdtemp())
     try:
         custom = {"data": {"cmd": "python3 -c \"import json,sys; "
@@ -133,6 +131,7 @@ def dataset_fresh():
     # "the verifier re-runs the producer … and fails on drift" — fresh-by-construction:
     # a check that regenerates via the producer and compares passes on a matching
     # committed asset and fails once that asset drifts from what the producer yields.
+    import gate
     d = Path(tempfile.mkdtemp())
     try:
         (d / "producer.py").write_text("print('CANON-V1')")
@@ -149,12 +148,14 @@ def dataset_fresh():
 
 def file_builtin():
     # "file, that an artifact exists"
+    import gate
     assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: of an existing path failed"
     assert gate.resolves("file:does-not-exist.xyz", ENGINE, {}) is False, "file: of a missing path passed"
 
 
 def cmd_builtin():
     # "cmd, that a script exits zero"
+    import gate
     assert gate.resolves("cmd:true", ENGINE, {}) is True, "cmd:true did not pass"
     assert gate.resolves("cmd:false", ENGINE, {}) is False, "cmd:false did not fail"
 
@@ -162,6 +163,7 @@ def cmd_builtin():
 def cmd_escape():
     # "cmd is the hatch every other check reduces to" — a custom type resolves by
     # running its cmd template; a type with no cmd behind it does not resolve
+    import gate
     assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
         "a custom type did not reduce to its cmd"
     assert gate.resolves("demo:x", ENGINE, {}) is False, \
@@ -276,6 +278,7 @@ def node_is_claim():
 
 def claim_bears_check():
     # each claim carries a verifier, and the verifier is machine-checkable (the gate runs it)
+    import gate
     rec = _parse("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")["c"]
     assert rec.get("check") == "cmd:true", "the claim carries no check"
     assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("cmd:false", ENGINE, {}) is False, \
@@ -292,6 +295,7 @@ def paper_is_projection():
 
 def claims_are_warrants():
     # this paper's claims ARE its warrants: warrants.bib parses to the cited claim records
+    import project as P
     recs = P.entries(PAPER_DIR / "warrants.bib")
     assert recs.get("paper-is-projection", {}).get("claim"), "the paper's claims are not its warrants"
 
@@ -337,6 +341,7 @@ def fail_omits():
 
 def paper_is_paperkit():
     # this paper is itself a paperkit project: a well-formed config projecting to paper.md
+    import project as P
     cfg = P.load_config(PAPER_DIR)
     assert (PAPER_DIR / "paper.toml").exists() and cfg["bibs"] and cfg["rubric"].exists(), \
         "the paper is not a well-formed paperkit project"
@@ -345,12 +350,14 @@ def paper_is_paperkit():
 
 def prose_is_projection():
     # the paper's prose IS the projection of its warrants
+    import project as P
     cfg = P.load_config(PAPER_DIR)
     assert P.project(cfg) == cfg["out"].read_text(), "paper.md is not the projection of its warrants"
 
 
 def closes_gap():
     # closes the say/check gap: every claim in the ledger carries a verifier
+    import project as P
     F = P.entries(PAPER_DIR / "warrants.bib")
     missing = [k for k, f in F.items() if f.get("section") and f.get("claim") and not f.get("check")]
     assert not missing, f"claims without a verifier (the gap is open): {missing}"
@@ -387,6 +394,7 @@ def edge_rests_grounds():
     # along it (a behavioral thesis resting on a vacuous atom clamps to vacuous).  Π — this tests
     # the CLAMP (grade.clamp), the claim's subject; the premise grades are inputs other claims own
     # (the vacuous/behavioral examples), so they are GIVEN, not re-derived through the whole sweep.
+    import grade
     recs = grade.clamp([
         {"key": "atom", "grade": "vacuous", "rests-on": []},
         {"key": "thesis", "grade": "behavioral", "rests-on": ["atom"]},
@@ -400,6 +408,7 @@ def edge_chiral():
     # grounding is independent of prose adjacency: rests-on clamps even when the premise is NOT a
     # from-neighbor (the two graphs diverge / reverse).  Π — tests the CLAMP (grade.clamp) over
     # known grades: the thesis grounds on `atom` but is a prose-neighbor of `mid`, yet clamps to atom.
+    import grade
     recs = grade.clamp([
         {"key": "atom", "grade": "vacuous", "rests-on": []},
         {"key": "mid", "grade": "behavioral", "rests-on": []},               # the prose neighbor
@@ -415,6 +424,7 @@ def edge_chiral():
 def edge_move_types():
     # the `move` field names a typed relation; its KIND decides its role, and a
     # section's scheme admits only certain kinds
+    import rhetoric
     assert rhetoric.kind_of("consequence") == "entail", "consequence is not an entail move"
     assert rhetoric.kind_of("antithesis") == "turn", "antithesis is not a turn move"
     ok = rhetoric.check_scheme("ladder", ["a", "b"], ["consequence"])
@@ -542,6 +552,8 @@ def mutation_probes():
 def content_cache():
     # a Δ grade is cached PER CHECK on its READ footprint (the files it opens), over the
     # content key as the coarse soundness basis: a grade is a pure function of that content.
+    import discriminate
+    import gate
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text('[paper]\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n')
@@ -566,6 +578,8 @@ def footprint_scopes():
     # Δ traces each check's READ footprint (the files it opens), a SUPERSET of its
     # sensitivity set, so the footprint SCOPES the sweep — each check graded against what
     # it reads, not the whole repo.  An unread file is in neither the footprint nor the flip-set.
+    import gate
+    import grader
     d = Path(tempfile.mkdtemp())
     try:
         (d / "a.txt").write_text("FOO\n")
@@ -583,6 +597,8 @@ def footprint_scopes():
 def imported_grade():
     # a verdict-import sits OUTSIDE the falsifiability ladder: Δ grades result: "imported" —
     # adequacy delegated to a sibling the gate verifies on its own — run once, never swept.
+    import grader
+    import project as P
     d = Path(tempfile.mkdtemp())
     try:
         sib = d / "g"
@@ -618,6 +634,8 @@ def module_split():
 def sandbox_grade():
     # grading runs in a sandbox copy whose mutation surface excludes SIBLING projects
     # (a nested dir with its own paper.toml), so a project grades independently of them
+    import grader
+    import layout
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text("[paper]\n")
@@ -647,6 +665,7 @@ def min_strength():
 def pump_parse_witness():
     # a slow check is structured as pump()/parse(): pump advances state one increment
     # (no verdict), parse reads done?/progress; the driver only loads → pump → serialize
+    import driver
     class W:
         def initial(self): return {"c": 0}
         def pump(self, s): return {"c": s["c"] + 1}
@@ -662,6 +681,7 @@ def resumable():
     # under a budget the driver stops short and persists its state (exit 2 = resume,
     # not failure); resuming from the token completes — a resumed run equals an
     # uninterrupted one
+    import driver
     class W:
         def initial(self): return {"c": 0, "r": []}
         def pump(self, s): time.sleep(0.05); return {"c": s["c"] + 1, "r": s["r"] + [s["c"]]}
@@ -679,6 +699,7 @@ def resumable():
 def roundtrip_obligation():
     # the one soundness obligation is deserialize(serialize(state)) == state; the driver
     # asserts it, so a witness whose serialization loses state is rejected
+    import driver
     class Lossy:
         def initial(self): return {"c": 0, "keep": "x"}
         def pump(self, s): return {"c": s["c"] + 1, "keep": s["keep"]}
@@ -696,6 +717,7 @@ def roundtrip_obligation():
 def prosody():
     # the clause-attachment layer is PROSODY, not glue: a typed move whose KIND and
     # default connector are a data-driven vocabulary (a new device is a new row)
+    import rhetoric
     kinds = {rhetoric.kind_of(m) for m in rhetoric.MOVES}
     assert {"entail", "extend", "turn", "parallel", "restate"} <= kinds, f"missing move kinds ({kinds})"
     assert rhetoric.MOVES["consequence"][1] == "so ", "the consequence connector is not 'so '"
@@ -704,6 +726,7 @@ def prosody():
 
 def scheme_count():
     # a section's scheme constrains its claim COUNT (a period is one beat, a tricolon three)
+    import rhetoric
     assert rhetoric.check_scheme("period", ["a", "b"], ["addition"]), "period must reject two claims"
     assert rhetoric.check_scheme("tricolon", ["a", "b"], ["addition"]), "tricolon must reject two claims"
     assert rhetoric.check_scheme("tricolon", ["a", "b", "c"], ["addition", "addition"]) == [], \
@@ -713,6 +736,7 @@ def scheme_count():
 def scheme_opt_in():
     # schemes are OPT-IN: only a section that declares one in the rubric's 3rd column is
     # checked; a two-column row is unconstrained
+    import rhetoric
     d = Path(tempfile.mkdtemp())
     try:
         (d / "r.tsv").write_text("a\tAlpha\nb\tBeta\tladder\n")     # only b declares a scheme
@@ -725,6 +749,7 @@ def scheme_opt_in():
 def form_gate():
     # rhetoric makes FORM checkable like content: a section that declares a scheme is
     # gated — analyze flags a violation when its realized moves break it, none when they honor it
+    import rhetoric
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text('[paper]\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n')
@@ -743,6 +768,7 @@ def form_gate():
 def multi_project():
     # the repository is several paperkit projects — each a paper.toml directory that
     # projects a document — discovered by their paper.toml, not hard-coded
+    import project as P
     root = Path(__file__).resolve().parents[2]
     tomls = [p for p in root.rglob("paper.toml") if ".git" not in p.parts]
     assert len(tomls) >= 4, f"expected several projects, found {len(tomls)}"
@@ -773,6 +799,7 @@ def local_ci():
 def boundaries_project():
     # every engine tool ships a ⟨P, F, δ⟩ boundary suite, and those suites are gathered
     # as their own gated project (BOUNDARIES.md)
+    import project as P
     root = Path(__file__).resolve().parents[2]
     suites = list((root / "paperkit" / "tests").glob("boundaries_*.py"))
     assert len(suites) >= 6, f"expected the tool boundary suites, found {len(suites)}"
@@ -784,6 +811,7 @@ def boundaries_project():
 def report_live():
     # the report's figures are live pipeline output — rendered from gate/Δ --json, not
     # scraped from human text — and the report projects to its own document
+    import project as P
     root = Path(__file__).resolve().parents[2]
     gen = (root / "report" / "gen.py").read_text()
     assert "discriminate.py" in gen and "gate.py" in gen and "--json" in gen, \
@@ -856,6 +884,7 @@ def path_surface():
     # project dir being gated) — so a document cannot shadow a tool by planting it beside
     # itself.  Demonstrate: the planted tool resolves with its ABSOLUTE dir on PATH (the
     # host's trust), but NOT via a "." entry pointing at the project dir (dropped).
+    import gate
     d = Path(tempfile.mkdtemp())
     saved = os.environ.get("PATH", "")
     try:
@@ -879,6 +908,7 @@ def grounding_reflected():
     # disjoint (rhetorical, auto-discharged); a disjoint edge from a claim that DOES test
     # engine capability is a genuine miss, dischargeable by a `link`.  Shared test
     # scaffolding (claims.py / _fixture) does NOT count as engine grounding.
+    import coherence
     recs = [
         {"key": "y", "grade": "behavioral", "rests-on": [],
          "tests": ["paperkit/gate.py::resolves"]},
@@ -909,6 +939,7 @@ def emergence_collapse():
     # ⊆ its premises' (fp(X) ⊆ ∪rests-on) COLLAPSES (its witness emerges by consuming them); a
     # residual is an INCREMENT; no grounding is a LEAF axiom.  STRICTER than grounding — an edge can
     # OVERLAP yet the claim still test more, which coverage (not overlap) catches.
+    import coherence
     recs = [
         {"key": "ax", "rests-on": [], "tests": ["paperkit/gate.py::resolves"]},                # no grounding → leaf
         {"key": "col", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves"]},           # ⊆ premise → collapse
@@ -930,6 +961,7 @@ def collapse_safe():
     # discrimination — every input that flips it flips a premise (its fingerprint is covered), so the
     # premise's witness fails and blocks it; only an INCREMENT's residual escapes (no premise catches
     # it).  So emergence's collapse verdict is SOUND for deletion, its increment verdict a keep-warning.
+    import coherence
     by = {r["key"]: r for r in [
         {"key": "ax", "rests-on": [], "tests": ["paperkit/gate.py::resolves"]},
         {"key": "col", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves"]},

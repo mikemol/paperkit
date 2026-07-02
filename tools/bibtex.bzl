@@ -446,8 +446,17 @@ def _bib_repo_impl(repository_ctx):
             if not check:
                 continue
             if k in calc_claims:
-                # Ζ·calc·interp — the grade is a READING of the shared calc record (no re-sweep).
-                out.append("pk_grade(name = " + _lit(k + "__grade") + ", calc = " + _lit(":" + k + "__calc") +
+                # Ζ·pyc·run·collapse — the grade is a READING of the GRID (the __dcalc pk_sens record),
+                # not the file-resolution k__calc crutch: for a WITNESS claim (closures.get(k)) the grid
+                # IS the calculation — grade = _grade_from_sens over its measured sens.  This makes the
+                # grid GATE-RELEVANT (adequacy reads it), so a surface bug that forces a false ∅ (the
+                # ·surface·scope roots-vs-cone regression) now FAILS adequacy instead of hiding behind
+                # file-res ([[witness-the-live-path]]).  A NON-witness calc claim (a cmd: grep, no engine
+                # closure) has only the def-fallback __dcalc (sens ∅ by construction) — grading it off
+                # that would demote it to indeterminate, so it stays on k__calc until its content surface
+                # is wired (the last gap before k__calc fully retires).
+                gcalc = ":" + k + ("__dcalc" if closures.get(k) else "__calc")
+                out.append("pk_grade(name = " + _lit(k + "__grade") + ", calc = " + _lit(gcalc) +
                            ', data = ["@@//paperkit:engine", "@@//tools:read_grade.py"])')
             else:
                 out.append("pk_grade_claim(name = " + _lit(k + "__grade") + ", claim = " + _lit(k) +

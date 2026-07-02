@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "yPgynuAv4iJZKoCCpHNACmWAKu9L0TJ+w9RQYDp4Uig=",
+        "bzlTransitiveDigest": "W7K1Urv/9FpDJg5BQMqW8TpTCWRCRu/Hqt3mgNkSLT4=",
         "usagesDigest": "wEQOhntXZ4i6ecw/beI3vdwPEWlHpnJmqWC37TC1aVs=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "93054558f06af42ba714ebf2f1c61ffd29638f4b412805b6da337471cb5d4494",

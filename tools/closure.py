@@ -259,6 +259,8 @@ def main(argv):
         for stem in sorted(_cone(base | roots(claims[key], set()))):
             print("{}\t{}".format(key, names[stem]))
         for path in sorted(_exists_paths(fn, pref, parts)):
+            if Path(path).is_dir():
+                continue                                 # a dir-existence is not a single-artifact toggle
             op = "file-" if Path(path).exists() else "file+"
             print("{}\t{}:{}".format(key, op, path))
         # Ζ·mutant·struct·node-kinds (BIB/content) — a CONTENT edge, emitted as `claim<TAB>op<TAB>path

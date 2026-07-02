@@ -23,7 +23,6 @@ filegroup(name = "files", srcs = [
         "checks/readme.py",
         "paper.toml",
         "rubric.tsv",
-        "scripts/check-grades.sh",
         "warrants.bib",
         # Ξ·lint·wire — the .bzl + the lint tool, so the boundaries bnd-lint check can lint them.
         "//tools:lint_bzl.py",

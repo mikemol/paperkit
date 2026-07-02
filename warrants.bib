@@ -36,7 +36,7 @@
   section = {model}, from = {rm-model}, join = {. },
   claim   = {one entry reads like this},
   emit    = {assets/claim.bib},
-  check   = {cmd:grep -q check assets/claim.bib}
+  check   = {claim:rm-model-eg}
 }
 
 % ── commands ─────────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@
   section = {commands}, from = {rm-cmds}, join = {. },
   claim   = {you run them like this},
   emit    = {assets/commands.sh},
-  check   = {cmd:grep -q project.py assets/commands.sh}
+  check   = {claim:rm-cmds-eg}
 }
 @misc{rm-cmds-inv,
   section = {commands}, from = {rm-cmds-eg},
@@ -67,7 +67,7 @@
   section = {resolver}, from = {rm-resolver}, join = { --- },
   claim   = {the four built-ins are},
   emit    = {assets/resolver.md},
-  check   = {cmd:grep -q file: assets/resolver.md}
+  check   = {claim:rm-resolver-tbl}
 }
 @misc{rm-resolver-cmd,
   section = {resolver}, from = {rm-resolver-tbl},
@@ -78,7 +78,7 @@
   section = {resolver}, from = {rm-resolver-cmd}, join = {. },
   claim   = {a new domain declares them like this},
   emit    = {assets/resolver.toml},
-  check   = {cmd:python3 -c "import tomllib; tomllib.load(open('assets/resolver.toml','rb'))"}
+  check   = {claim:rm-resolver-eg}
 }
 
 % ── adequacy ─────────────────────────────────────────────────────────────────
@@ -91,13 +91,13 @@
   section = {adequacy}, from = {rm-delta}, join = { --- },
   claim   = {the grades are},
   emit    = {assets/grades.md},
-  check   = {cmd:sh scripts/check-grades.sh}
+  check   = {claim:rm-delta-tbl}
 }
 @misc{rm-delta-cmds,
   section = {adequacy}, from = {rm-delta-tbl}, join = {. },
   claim   = {you run it as a report or as a gate, like this},
   emit    = {assets/delta-cmds.sh},
-  check   = {cmd:grep -q discriminate.py assets/delta-cmds.sh}
+  check   = {claim:rm-delta-cmds}
 }
 @misc{rm-boundaries,
   section = {adequacy}, from = {rm-delta-cmds},
@@ -110,20 +110,20 @@
   section = {layout},
   claim   = {the repository is the engine, the self-hosting paper, and this generated README},
   emit    = {assets/layout.txt},
-  check   = {cmd:grep -q project.py assets/layout.txt}
+  check   = {claim:rm-layout}
 }
 
 % ── ci ───────────────────────────────────────────────────────────────────────
 @misc{rm-ci,
   section = {ci},
   claim   = {checks run locally as a pre-commit githook --- every commit runs bazel test //:hook (gating both documents as per-claim check targets) and the Delta adequacy grade, keeping the tool boundaries intact},
-  check   = {cmd:grep -q "bazel test //:hook" .githooks/pre-commit}
+  check   = {claim:rm-ci}
 }
 @misc{rm-ci-enable,
   section = {ci}, from = {rm-ci}, join = {. },
   claim   = {a fresh clone enables it once, since git cannot auto-enable a hook from a commit},
   emit    = {assets/enable-hooks.sh},
-  check   = {cmd:grep -q core.hooksPath assets/enable-hooks.sh}
+  check   = {claim:rm-ci-enable}
 }
 
 % ── status ───────────────────────────────────────────────────────────────────

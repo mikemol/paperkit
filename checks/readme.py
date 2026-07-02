@@ -129,11 +129,104 @@ def rm_next():
         "a roadmap 'next' item shipped — update the README"
 
 
+# ── the local-CI + example-asset claims: each EXERCISES its proposition against the engine's
+#    reality (parse the example, dispatch through the resolver, resolve real entrypoints), never a
+#    `cmd:grep TOKEN FILE` over the asset — a grep proves a string appears, not that the example is
+#    TRUE.  Each is falsifiable at the grid: a content-drop of the tabled token, a def-drop of the
+#    exercised parser/resolver, or a drop of the referenced file flips it.
+def rm_ci():
+    # the local CI is the pre-commit githook: every commit runs `bazel test //:hook` (the one gate)
+    hook = (ROOT / ".githooks" / "pre-commit").read_text()
+    assert "bazel test //:hook" in hook, "the pre-commit hook does not run `bazel test //:hook`"
+
+
+def rm_ci_enable():
+    # the enable script configures git's hooksPath at the .githooks dir, where the real hook lives
+    script = (ROOT / "assets" / "enable-hooks.sh").read_text()
+    assert "core.hooksPath" in script and ".githooks" in script, \
+        "the enable script does not configure core.hooksPath .githooks"
+    assert (ROOT / ".githooks" / "pre-commit").exists(), \
+        "the enabled hooks dir has no pre-commit hook"
+
+
+def rm_cmds_eg():
+    # the example commands invoke real engine entrypoints (project makes, gate verifies)
+    cmds = (ROOT / "assets" / "commands.sh").read_text()
+    assert "paperkit/project.py" in cmds and "paperkit/gate.py" in cmds, \
+        "the commands example does not show the project + gate entrypoints"
+    for tool in re.findall(r"paperkit/\S+\.py", cmds):
+        assert (ROOT / tool).exists(), f"the example runs a non-existent entrypoint {tool}"
+
+
+def rm_delta_cmds():
+    # the Δ example runs the real discriminate entrypoint with a flag it actually defines
+    cmds = (ROOT / "assets" / "delta-cmds.sh").read_text()
+    assert "paperkit/discriminate.py" in cmds, "the Δ example does not run discriminate.py"
+    assert (ENGINE / "discriminate.py").exists(), "discriminate.py (the Δ tool) is missing"
+    assert "--min-strength" in cmds and "--min-strength" in DISC_SRC, \
+        "the example uses a --min-strength flag discriminate.py does not define"
+
+
+def rm_layout():
+    # the layout doc names the real top-level components — each string is in the doc AND on disk
+    # (a FILE per component, so the on-disk half is a clean single-artifact toggle, not a dir)
+    layout = (ROOT / "assets" / "layout.txt").read_text()
+    assert "paperkit/" in layout and "paper/" in layout and "README.md" in layout, \
+        "the layout omits a top-level component"
+    assert (ROOT / "paperkit" / "gate.py").exists() and (ROOT / "README.md").exists(), \
+        "the layout describes components that are not on disk"
+
+
+def rm_model_eg():
+    # the example entry parses as a valid claim record through the engine's OWN bib parser
+    recs = _parse((ROOT / "assets" / "claim.bib").read_text())
+    assert len(recs) == 1, "the example is not a single claim record"
+    rec = next(iter(recs.values()))
+    for field in ("section", "from", "claim", "check"):
+        assert rec.get(field), f"the example claim record is missing its {field}"
+
+
+def rm_delta_tbl():
+    # the grade table lists the grades the engine's ladder actually defines (each is in the doc AND
+    # a real rung of grade.STRENGTH — drop one from the doc, or rename it in the ladder, and this fails)
+    import grade  # noqa: E402
+    tbl = (ROOT / "assets" / "grades.md").read_text()
+    assert "vacuous" in tbl and "existence" in tbl and "behavioral" in tbl and "indeterminate" in tbl, \
+        "the grade table omits a grade"
+    for g in ("vacuous", "existence", "behavioral", "indeterminate"):
+        assert g in grade.STRENGTH, f"the table lists {g} but the ladder does not define it"
+
+
+def rm_resolver_tbl():
+    # the table lists exactly the engine's built-in verbs, and each is a REAL dispatch (not table text)
+    tbl = (ROOT / "assets" / "resolver.md").read_text()
+    for typ in ("file:", "cmd:", "result:", "agree:"):
+        assert typ in tbl, f"the resolver table omits the {typ} verb"
+    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("file:gate.py", ENGINE, {}) is True, \
+        "the tabled built-in verbs do not dispatch"
+    assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "the built-in set is not closed"
+
+
+def rm_resolver_eg():
+    # the example config declares custom check types in the shape the resolver consumes, and the
+    # engine dispatches a type declared that way
+    import tomllib  # noqa: E402
+    checks = tomllib.loads((ROOT / "assets" / "resolver.toml").read_text()).get("checks", {})
+    assert checks, "the example declares no [checks.<type>]"
+    for typ, spec in checks.items():
+        assert "{target}" in spec.get("cmd", ""), f"[checks.{typ}] has no {{target}} cmd template"
+    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true {target}"}}) is True, \
+        "the resolver does not dispatch a config-declared custom type"
+
+
 CLAIMS = {
     "rm-pitch": rm_pitch, "rm-verifier": rm_verifier, "rm-noship": rm_noship,
     "rm-selfhost": rm_selfhost, "rm-model": rm_model, "rm-cmds": rm_cmds,
     "rm-cmds-inv": rm_cmds_inv, "rm-resolver": rm_resolver, "rm-resolver-cmd": rm_resolver_cmd,
     "rm-delta": rm_delta, "rm-next": rm_next,
+    "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,
+    "rm-delta-cmds": rm_delta_cmds, "rm-layout": rm_layout, "rm-model-eg": rm_model_eg,
+    "rm-delta-tbl": rm_delta_tbl, "rm-resolver-tbl": rm_resolver_tbl, "rm-resolver-eg": rm_resolver_eg,
 }
 
 

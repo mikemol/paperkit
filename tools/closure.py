@@ -23,6 +23,8 @@ import ast
 import sys
 from pathlib import Path
 
+from imports import imports as _mod_imports
+
 
 def _fx_cli(fixture_text, names):
     """helper name → {engine module stem it runs}, DERIVED from _fixture.py: its engine IMPORTS
@@ -194,6 +196,23 @@ def main(argv):
 
     names = {Path(p).stem: p for p in a.engine}      # stem → relpath
     cli = _fx_cli(Path(a.fixture).read_text(), names)
+    # Ξ·dag — the engine import graph (stem → direct engine imports), to expand a witness's closure
+    # ROOTS to its full TRANSITIVE cone: the modules the check actually LOADS (PycInfo stages exactly
+    # this cone), hence the modules whose def-drop can flip it.  Roots alone UNDER-scope — node-is-claim
+    # roots {gate,project,resolver} but exercises bib.parse via project's `entries = bib.parse`, so bib
+    # (transitively imported, not a root) must be in the perturbation surface or its flip is missed.
+    igraph = {s: _mod_imports(Path(p).read_text(), set(names)) for s, p in names.items()}
+
+    def _cone(seed):
+        seen = set(seed)
+        stack = list(seed)
+        while stack:
+            for imp in igraph.get(stack.pop(), ()):
+                if imp not in seen:
+                    seen.add(imp)
+                    stack.append(imp)
+        return seen
+
     tree = ast.parse(Path(a.check).read_text())
 
     funcs = {fn.name: fn for fn in tree.body if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))}
@@ -237,7 +256,7 @@ def main(argv):
     for key in sorted(claims):
         fn = funcs[claims[key]]
         pref = _dir_consts(relpath, fn.body, mod_pref)   # extend with the witness's function-local ones
-        for stem in sorted(base | roots(claims[key], set())):
+        for stem in sorted(_cone(base | roots(claims[key], set()))):
             print("{}\t{}".format(key, names[stem]))
         for path in sorted(_exists_paths(fn, pref, parts)):
             op = "file-" if Path(path).exists() else "file+"

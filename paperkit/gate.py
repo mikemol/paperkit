@@ -50,7 +50,10 @@ def cited_keys(prose: str) -> set:
     # Citations live in prose, not in emitted code blocks — strip fenced blocks so
     # an example containing `@misc{…}` is not misread as a citation [@misc].
     prose = re.sub(r"```.*?```", "", prose, flags=re.S)
-    return set(re.findall(r"@([A-Za-z0-9][\w.:-]*)", prose))
+    # A citation materializes as a pandoc/web [@key] OR a footnote-target [^key] marker
+    # (its document-end [^key]: definition names the same key) — count both as cited.
+    return (set(re.findall(r"@([A-Za-z0-9][\w.:-]*)", prose))
+            | set(re.findall(r"\[\^([A-Za-z0-9][\w.:-]*)\]", prose)))
 
 
 def main(argv: list) -> int:

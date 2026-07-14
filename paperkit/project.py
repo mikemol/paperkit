@@ -47,6 +47,13 @@ _LATEX = [
 
 
 def clean(s: str) -> str:
+    # Inline math $…$ is renderable CONTENT for the downstream engine (pandoc/MathJax), not
+    # LaTeX-prose to flatten — shield each span verbatim (its delimiters, macros, AND grouping
+    # braces) so neither the floor-flattening below nor the grouping-brace strip touches it. This
+    # is the same shield discipline as \{ \}, one level up: the whole math span is literal.
+    math: list = []
+    s = re.sub(r"(?<!\\)\$[^$]*\$",
+               lambda m: math.append(m.group(0)) or f"\x02{len(math) - 1}\x03", s)
     for pat, rep in _LATEX:
         s = re.sub(pat, rep, s)
     # Escaped braces \{ \} are LITERAL (e.g. set notation {1,2,3}); shield them
@@ -54,6 +61,7 @@ def clean(s: str) -> str:
     s = s.replace(r"\{", "\x00").replace(r"\}", "\x01")
     s = re.sub(r"[{}]", "", s)
     s = s.replace("\x00", "{").replace("\x01", "}")
+    s = re.sub(r"\x02(\d+)\x03", lambda m: math[int(m.group(1))], s)
     return s.strip().rstrip(".")
 
 
@@ -66,10 +74,31 @@ def short_author(a: str) -> str:
 
 
 def _anchor(key: str, body: str, target: str) -> str:
-    """A claim's own citation point: a pandoc [@key] tag (for citeproc), or a web ANCHOR that
-    other claims link to.  The grounding edges are the same `rests-on` DATA either way — only
-    how a citation MATERIALIZES differs by target (the projector's one job, never the prose's)."""
-    return f'<a id="{key}"></a>{body}' if target == "web" else f"{body} [@{key}]"
+    """A claim's own citation point: a pandoc [@key] tag (for citeproc), a web ANCHOR that other
+    claims link to, or NOTHING for the footnote target (where the marker + its verification note
+    are attached by the weaver instead).  The grounding edges are the same `rests-on` DATA either
+    way — only how a citation MATERIALIZES differs by target (the projector's one job)."""
+    if target == "web":
+        return f'<a id="{key}"></a>{body}'
+    if target == "footnote":
+        return body
+    return f"{body} [@{key}]"
+
+
+def _verify_note(check: str) -> str:
+    """The footnote target's provenance line: HOW this clause's claim is machine-verified, read
+    off its `check`.  A cmd: names the verifier to re-run; a claim:/file: names what is imported/
+    present.  This is the whole point of the footnote target — every clause cites its own proof."""
+    kind, _, tgt = check.partition(":")
+    if not check:
+        return "Asserted without a machine check"
+    if kind == "cmd":
+        return f"Machine-verified — `{tgt}`"
+    if kind == "claim":
+        return f"Verified claim `{tgt}`"
+    if kind == "file":
+        return f"Artifact present — `{tgt}`"
+    return "Machine-verified"
 
 
 def sentence(key: str, f: dict, primary: str, target: str = "pandoc") -> str:
@@ -174,6 +203,9 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
         link = F[k].get("link")
         if link and footnotes is not None:           # expound: link + citations → footnote
             footnotes[k] = clean(link) + ref
+            return s + f"[^{k}]"
+        if target == "footnote" and footnotes is not None:   # CITE floor as a provenance footnote
+            footnotes[k] = _verify_note(F[k].get("check", "")) + ref
             return s + f"[^{k}]"
         return s + ref                               # cite floor: inline parenthetical
     clauses = [clause(k) for k in text]

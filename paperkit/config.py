@@ -115,8 +115,9 @@ MIN_CORRO = Param("min-corroboration", "PAPERKIT_MIN_CORROBORATION", config="min
                   choices=("single", "independent"), help="Δ floor on the orthogonal CORROBORATION axis")
 RESOLUTION = Param("resolution", "PAPERKIT_RESOLUTION", config="resolution", default="file",
                    choices=("file", "def"), help="Δ mutation surface: file (project only) or def (+ engine)")
-TARGET = Param("target", "PAPERKIT_TARGET", config="target", default="pandoc", choices=("pandoc", "web"),
-               help="citation render target: pandoc ([@key] for citeproc/PDF) or web (intra-page hyperlinks + anchors, for a blog)")
+TARGET = Param("target", "PAPERKIT_TARGET", config="target", default="pandoc", choices=("pandoc", "web", "footnote"),
+               help="citation render target: pandoc ([@key] for citeproc/PDF), web (intra-page hyperlinks + anchors, for a blog), "
+                    "or footnote (each clause's provenance as a document-end footnote — self-contained, no bibliography)")
 STATE = Param("state", "PAPERKIT_STATE",
               help="resumable grading: the resumption-token file (persisted between calls)")
 BUDGET = Param("budget", "PAPERKIT_BUDGET",

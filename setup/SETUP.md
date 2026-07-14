@@ -25,4 +25,3 @@ To watch this happen on demand, experiment.py allocates twice its memory cap acr
 ## The data, and where it came from
 
 None of these numbers were retyped from memory: probe.py's pump() interned them from the live kernel, and the dataset records its own sources — every one a path under /proc or /sys [@prov-source]. And the shipped dataset is certified against this very box: a fresh capture's structural readings still match it, so the snapshot genuinely ran here — re-gate on other hardware and the body still verifies from the data while this provenance check, alone, fails. The claims travel; the proof that they are mine stays home [@prov-fresh].
-

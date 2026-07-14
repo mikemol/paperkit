@@ -93,4 +93,3 @@ git config core.hooksPath .githooks   # enable the local-CI pre-commit hook (onc
 ## Status
 
 A working spike — the engine projects and gates, the self-hosting paper is green, discriminate.py grades check adequacy, and this README is itself a projection [@rm-status]. Next are render-to-PDF (pandoc/docx) and a packaged CLI (paperkit init/project/gate/build) [@rm-next].
-

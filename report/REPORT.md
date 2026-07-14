@@ -116,4 +116,3 @@ Walking the paper's GROUNDING DAG (rests-on, distinct from prose order; the pape
 ![the foundational atoms on the left, the theses they ground on the right, the effective grade on the vertical axis](assets/dag.svg)
 
 A claim is no better grounded than its weakest premise, so each node sits at its effective (clamped) grade, with a ghost rising to its self-check grade wherever premises drag it down [@rpt-clamp], and the terminal theses — the claims nothing else rests on, the document's payload — are ringed [@rpt-terminal]. The figure is rendered from the pipeline data and gated fresh, never placed by hand [@rpt-fig-data], and is mechanically accessible: its colours are the Okabe-Ito colour-blind-safe palette [@rpt-fig-palette], all its text is dark on a light ground [@rpt-fig-contrast], and it is well-formed vector SVG [@rpt-fig-svg].
-

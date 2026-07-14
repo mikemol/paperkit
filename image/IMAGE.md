@@ -13,4 +13,3 @@ The toolchain base is pinned by content digest, not a moving tag, so the proof r
 ## The Paper Hosts Itself (HTTP)
 
 The same immutable image that PROVES the paper also PRESENTS it: run in serve mode it hosts the repository over HTTP, and the paper fetched from it is byte-for-byte the paper that was gated — the proof object serves itself, no host webserver [@img-serve].
-

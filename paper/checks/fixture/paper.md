@@ -5,4 +5,3 @@
 A fixture claim that always verifies [@demo-claim].
 
 ## References
-

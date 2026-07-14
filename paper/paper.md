@@ -68,4 +68,3 @@ By making every claim a verifier and the document their projection, paperkit clo
 [^grounding-reflected]: Grounded by the relevance gap it narrows (crash-sensitive-limit), stated several claims earlier — a grounding link counter to prose order (grounded above in [@crash-sensitive-limit])
 
 ## References
-

@@ -274,7 +274,7 @@ def project(cfg: dict, target: str = "pandoc") -> str:
         lines += [f"[^{k}]: {v[:1].upper() + v[1:]}" for k, v in footnotes.items()] + [""]
     if cfg["references"]:
         lines += ["## References", ""]
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines).rstrip("\n") + "\n"          # exactly one trailing newline (MD012-clean)
 
 
 def main(argv: list) -> int:

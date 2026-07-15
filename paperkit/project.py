@@ -94,11 +94,13 @@ def _verify_note(check: str) -> str:
         return "Asserted without a machine check"
     if kind == "cmd":
         return f"Machine-verified — `{tgt}`"
+    if kind == "agda":
+        return f"Agda-proved — `{tgt}`"
     if kind == "claim":
         return f"Verified claim `{tgt}`"
     if kind == "file":
         return f"Artifact present — `{tgt}`"
-    return "Machine-verified"
+    return f"Machine-verified — `{tgt}`" if tgt else "Machine-verified"
 
 
 def sentence(key: str, f: dict, primary: str, target: str = "pandoc") -> str:

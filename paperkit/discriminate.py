@@ -107,6 +107,10 @@ def main(argv: list) -> int:
 
     out = cfg["out"]
     cited = G.cited_keys(out.read_text()) if out.exists() else set()
+    if config.resolve(config.TARGET, pol) == "plain":
+        # plain surfaces no citation marker, but the projection weaves every section-tagged claim — so each
+        # is placed-in-prose and must be graded (identical scope to the footnote target, which marked all).
+        cited |= {k for k, f in F.items() if f.get("section")}
 
     only = config.resolve(config.ONLY)
     if only:

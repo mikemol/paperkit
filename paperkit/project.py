@@ -80,7 +80,7 @@ def _anchor(key: str, body: str, target: str) -> str:
     way — only how a citation MATERIALIZES differs by target (the projector's one job)."""
     if target == "web":
         return f'<a id="{key}"></a>{body}'
-    if target == "footnote":
+    if target in ("footnote", "plain"):
         return body
     return f"{body} [@{key}]"
 
@@ -208,6 +208,12 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
     floor — the inline parenthetical.  `target` selects how citations materialize."""
     def clause(k: str) -> str:
         s = sentence(k, F[k], primary, target)
+        link = F[k].get("link")
+        if target == "plain":                        # SUBMISSION view: no PROVENANCE surfaced, but an
+            if link and footnotes is not None:       # authored `link` footnote survives — the technical NAME,
+                footnotes[k] = clean(link)           # defocused out of the inline reading so the computations
+                return s + f"[^{k}]"                  # lead. (The proof backend stays the author-side gate.)
+            return s
         ref = references(k, (reduced or {}).get(k, F[k].get("rests-on", [])), pos or {}, target)
         link = F[k].get("link")
         if link and footnotes is not None:           # expound: link + citations → footnote

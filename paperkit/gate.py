@@ -96,11 +96,17 @@ def main(argv: list) -> int:
         print(f"paperkit-gate: {out.name} not built — run paperkit-project", file=sys.stderr)
         return 1
     prose = out.read_text()
+    target = config.resolve(config.TARGET, pol)
     cited = cited_keys(prose)
+    if target == "plain":
+        # plain surfaces NO citation marker, but the projection WEAVES every section-tagged claim — each is
+        # placed-in-prose by construction. Treat them as cited so RESOLVE + COVERAGE still bite (identical
+        # verification to footnote, which marked every claim; only the rendered marker is gone).
+        cited |= {k for k, f in F.items() if f.get("section")}
     rc = 0
 
     # PROJECT — committed prose is the projection (for the project's declared render target)
-    proj_ok = prose == P.project(cfg, config.resolve(config.TARGET, pol))
+    proj_ok = prose == P.project(cfg, target)
     if not proj_ok:
         print(f"paperkit-gate: {out.name} ≠ projection — regenerate (paperkit-project)", file=sys.stderr)
         rc = 1

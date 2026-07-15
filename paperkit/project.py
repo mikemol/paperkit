@@ -285,28 +285,52 @@ def project(cfg: dict, target: str = "pandoc") -> str:
         if not keys:
             lines += ["<!-- structural section: connective prose, no required claim atom -->", ""]
             continue
-        # Walk the section in dependency order, interleaving woven-prose runs with
-        # placed asset blocks: a run of claims weaves into one paragraph; an emit:
-        # warrant flushes that paragraph then drops its verbatim block in place.
+        # Walk the section in dependency order, interleaving woven-prose runs with placed asset blocks and
+        # NESTED PROOF STEPS: a run of (depthless) claims weaves into one paragraph; an emit: warrant flushes
+        # it then drops its block; a claim carrying `depth = N` is a proof step, rendered as a Markdown list
+        # item indented by N (so a decomposed proof reads as an outline, not interleaved flat prose).
         run: list = []
+        in_list = [False]
+
+        def _blank():
+            if lines and lines[-1] != "":
+                lines.append("")
+
+        def _flush():
+            if run:
+                lines.append(weave(run, F, primary, pos, reduced, footnotes, target))
+                run.clear()
+
+        def _close_list():
+            if in_list[0]:
+                _blank()
+                in_list[0] = False
+
         for k in keys:
             f = F[k]
-            if f.get("emit"):
-                # A healthy example is CITED: if the warrant also carries a claim,
-                # its sentence (with its [@key]) closes the current paragraph and
-                # introduces the block, so the placement is referenced, not orphaned.
+            if f.get("depth"):                       # a nested proof step → indented list item (tight)
+                if not in_list[0]:
+                    _flush()
+                    _blank()
+                    in_list[0] = True
+                item = weave([k], F, primary, pos, reduced, footnotes, target)
+                lines.append("  " * (int(f["depth"]) - 1) + "- " + item)
+            elif f.get("emit"):
+                _close_list()
                 if f.get("claim") or f.get("title"):
                     run.append(k)
-                if run:
-                    lines += [weave(run, F, primary, pos, reduced, footnotes, target), ""]
-                    run = []
-                lines += emit_block(pdir, f) + [""]
+                _flush()
+                _blank()
+                lines += emit_block(pdir, f)
+                _blank()
             elif f.get("check", "").startswith("figure:"):
                 continue
             else:
+                _close_list()
                 run.append(k)
-        if run:
-            lines += [weave(run, F, primary, pos, reduced, footnotes, target), ""]
+        _close_list()
+        _flush()
+        _blank()
     # the expound rung: a claim's `link` materialized as a document-end footnote
     # (the marker rode the sentence; the explanation + its citations land here).
     if footnotes:

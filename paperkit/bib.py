@@ -23,7 +23,7 @@ import re
 
 # scalar fields carried verbatim (the projector + checks read these)
 _SCALAR = ("title", "author", "year", "note", "section", "claim",
-           "check", "glue", "join", "move", "emit", "mem", "link")
+           "check", "glue", "join", "move", "emit", "mem", "link", "depth")
 # list-valued fields.  `from` = prose-order edge (dep_order + glue); `rests-on` =
 # grounding/entailment edge (adequacy clamping, NOT prose) — the two are often
 # reversed (prose runs general→specific, grounding specific→general); `reads` =

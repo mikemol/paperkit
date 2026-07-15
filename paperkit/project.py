@@ -173,7 +173,12 @@ def references(k: str, targets: list, pos: dict, target: str = "pandoc") -> str:
         return ""
 
     def tok(y: str) -> str:
-        return f"[{y.replace('-', ' ').replace('_', ' ')}](#{y})" if target == "web" else f"[@{y}]"
+        human = y.replace('-', ' ').replace('_', ' ')
+        if target == "web":
+            return f"[{human}](#{y})"
+        if target == "footnote":
+            return human            # a footnote body cannot host a [@key]/anchor — name the claim in prose
+        return f"[@{y}]"
     back, fwd = [], []
     for y in targets:
         yp = pos.get(y)

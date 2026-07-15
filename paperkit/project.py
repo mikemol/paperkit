@@ -96,6 +96,8 @@ def _verify_note(check: str) -> str:
         return f"Machine-verified — `{tgt}`"
     if kind == "agda":
         return f"Agda-proved — `{tgt}`"
+    if kind == "premise":
+        return f"Classical premise (not machine-checked) — `{tgt}`"
     if kind == "claim":
         return f"Verified claim `{tgt}`"
     if kind == "file":

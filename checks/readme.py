@@ -113,6 +113,19 @@ def rm_resolver_cmd():
     assert gate.resolves("demo:x", ENGINE, {}) is False, "an unregistered type resolved"
 
 
+def rm_resolver_premise():
+    # `premise` is a PROVENANCE kind the footnote/plain render reads off a check (project._verify_note),
+    # NOT one of the built-in resolving verbs — it surfaces an honest "not machine-checked" note and does
+    # NOT dispatch in the gate's CLOSED built-in set.  Behavioral: drop the premise branch from
+    # _verify_note, or let premise sneak in as a resolving verb, and this flips.
+    assert "not machine-checked" in P._verify_note("premise:the-axiom"), \
+        "the premise provenance note does not surface 'not machine-checked'"
+    assert "Machine-verified" in P._verify_note("cmd:true"), "the cmd provenance note regressed"
+    assert "Agda-proved" in P._verify_note("agda:Foo.bar"), "the agda provenance note regressed"
+    assert gate.resolves("premise:x", ENGINE, {}) is False, \
+        "premise resolved as a built-in gate verb — it must be a provenance KIND, not a verb"
+
+
 def rm_delta():
     # discriminate grades how much a check can actually fail (the four grades, by mutation);
     # Μ·grade: the grade LADDER (the rungs + interpretation) is grade.py, the grader SWEEPS
@@ -223,6 +236,7 @@ CLAIMS = {
     "rm-pitch": rm_pitch, "rm-verifier": rm_verifier, "rm-noship": rm_noship,
     "rm-selfhost": rm_selfhost, "rm-model": rm_model, "rm-cmds": rm_cmds,
     "rm-cmds-inv": rm_cmds_inv, "rm-resolver": rm_resolver, "rm-resolver-cmd": rm_resolver_cmd,
+    "rm-resolver-premise": rm_resolver_premise,
     "rm-delta": rm_delta, "rm-next": rm_next,
     "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,
     "rm-delta-cmds": rm_delta_cmds, "rm-layout": rm_layout, "rm-model-eg": rm_model_eg,

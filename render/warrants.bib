@@ -35,6 +35,11 @@
   claim   = {the paper's two kinds of citation RESOLVE in the render: an internal warrant becomes an inline machine-checked marker (cite_split, before pandoc), an external source renders author-date with a References list (--citeproc over references.bib), and no bracketed citation marker is left as bare text --- a render-time projection that leaves the gated paper.md untouched},
   check   = {cmd:python3 checks/bib.py}
 }
+@misc{rnd-plain,
+  section = {cite}, from = {rnd-bib}, join = {. },
+  claim   = {which of these a citation MATERIALIZES as is the projector's render TARGET --- pandoc emits an inline citeproc marker, web an intra-page anchor, footnote a document-end provenance note, and plain surfaces NO citation marker at all: a clean SUBMISSION view that presents the same verified prose with the machinery removed, while the claim-DAG stays the author-side gate},
+  check   = {cmd:python3 checks/plain.py}
+}
 @misc{rnd-pdf,
   section = {deliver},
   claim   = {the paper renders END-TO-END to a PDF deliverable --- cite_split, then citeproc, then docx, then PDF: the human-readable artifact a reader actually receives --- gated to be complete and polished: no citation is left as a bare marker, the References list renders, and the paper's content is present in the PDF},

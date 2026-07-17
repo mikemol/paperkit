@@ -20,7 +20,7 @@ The reader's EYE sees the paper, not just a screen reader: rendered to a PDF and
 
 ## Citations: Warrants Inline, Sources Referenced
 
-The paper's two kinds of citation RESOLVE in the render: an internal warrant becomes an inline machine-checked marker (cite_split, before pandoc), an external source renders author-date with a References list (–citeproc over references.bib), and no bracketed citation marker is left as bare text — a render-time projection that leaves the gated paper.md untouched [@rnd-bib].
+The paper's two kinds of citation RESOLVE in the render: an internal warrant becomes an inline machine-checked marker (cite_split, before pandoc), an external source renders author-date with a References list (–citeproc over references.bib), and no bracketed citation marker is left as bare text — a render-time projection that leaves the gated paper.md untouched [@rnd-bib]. Which of these a citation MATERIALIZES as is the projector's render TARGET — pandoc emits an inline citeproc marker, web an intra-page anchor, footnote a document-end provenance note, and plain surfaces NO citation marker at all: a clean SUBMISSION view that presents the same verified prose with the machinery removed, while the claim-DAG stays the author-side gate [@rnd-plain].
 
 ## The PDF Deliverable
 

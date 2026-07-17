@@ -80,6 +80,11 @@
   emit    = {assets/resolver.toml},
   check   = {claim:rm-resolver-eg}
 }
+@misc{rm-resolver-premise,
+  section = {resolver}, from = {rm-resolver-eg}, join = {. },
+  claim   = {a check ALSO names how a claim is verified, which the footnote and plain render targets read as a provenance note --- a cmd is machine-verified, an agda claim Agda-proved, and a premise a classical premise carried WITHOUT a machine check, surfaced honestly as not-machine-checked rather than dressed as a passing verb --- so premise is a provenance KIND, not a fifth resolving verb, and the built-in verb set stays closed},
+  check   = {claim:rm-resolver-premise}
+}
 
 % ── adequacy ─────────────────────────────────────────────────────────────────
 @misc{rm-delta,

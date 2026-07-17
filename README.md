@@ -50,6 +50,8 @@ cmd = "agda --safe {target}"
 cmd = "pytest -k {target}"
 ```
 
+A check ALSO names how a claim is verified, which the footnote and plain render targets read as a provenance note — a cmd is machine-verified, an agda claim Agda-proved, and a premise a classical premise carried WITHOUT a machine check, surfaced honestly as not-machine-checked rather than dressed as a passing verb — so premise is a provenance KIND, not a fifth resolving verb, and the built-in verb set stays closed [@rm-resolver-premise].
+
 ## Grading check adequacy (Δ)
 
 A passing check only proves a sentence named a verifier, not that the verifier entails it — so discriminate.py grades how much each check can actually fail [@rm-delta] --- the grades are [@rm-delta-tbl].

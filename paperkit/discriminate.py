@@ -111,6 +111,10 @@ def main(argv: list) -> int:
         # plain surfaces no citation marker, but the projection weaves every section-tagged claim — so each
         # is placed-in-prose and must be graded (identical scope to the footnote target, which marked all).
         cited |= {k for k, f in F.items() if f.get("section")}
+    # GROUNDING closure — grade every claim the considered set RESTS ON, transitively: a cited
+    # claim's grounding premises are load-bearing whether or not a citation marker for them
+    # survives in the rendered prose (the gate's rests_closure twin — same scope, same edges).
+    cited |= bib.rests_closure(cited & set(F), F)[0]
 
     only = config.resolve(config.ONLY)
     if only:

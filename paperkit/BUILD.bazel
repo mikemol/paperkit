@@ -33,6 +33,7 @@ ENGINE_SRCS = [
     "tests/boundaries_env.py",
     "tests/boundaries_footprint.py",
     "tests/boundaries_gate_json.py",
+    "tests/boundaries_grounding.py",
     "tests/boundaries_jobs.py",
     "tests/boundaries_memoize.py",
     "tests/boundaries_path.py",

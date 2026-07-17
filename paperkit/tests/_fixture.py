@@ -37,8 +37,9 @@ PROJECT, GATE, DISCRIMINATE = ENGINE / "project.py", ENGINE / "gate.py", ENGINE 
 def entry(key, *, claim=None, emit=None, frm=None, rests=None, glue=None, join=None,
           move=None, check="file:w.bib", section="s", mem=None):
     """A valid multi-line bibliography entry.  The parser requires the closing
-    brace on its own line, so this never silently fails to parse."""
-    fs = [f"  section = {{{section}}}"]
+    brace on its own line, so this never silently fails to parse.  section=None
+    omits the field — a SECTIONLESS node (grounding-only, reachable via rests-on)."""
+    fs = [f"  section = {{{section}}}"] if section else []
     if frm:
         fs.append(f"  from = {{{frm}}}")
     if rests:

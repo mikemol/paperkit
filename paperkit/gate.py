@@ -3,7 +3,11 @@
 
 Three invariants, all from the warrant set:
   RESOLVE   every [@key] cited in the prose resolves — a claim whose `check`
-            passes, or a reference (no `check`) that is at least defined.
+            passes, or a reference (no `check`) that is at least defined.  The
+            resolved set is CLOSED under `rests-on`: a cited/placed claim's
+            grounding premises must resolve too, transitively (a marker for them
+            need not survive in the rendered prose), and a rests-on edge to an
+            undefined key fails the gate.
   COVERAGE  every rubric section appears in the prose, and every claim tagged
             for a section is cited within it.  A PLACEMENT (emit:/figure) tagged
             to a section but cited by no prose is a postulate — advised against by
@@ -115,10 +119,17 @@ def main(argv: list) -> int:
 
     # RESOLVE — every cited claim's check passes; references at least defined.
     # Placed warrants (emit:/figure) carry no citation but ARE in the document by
-    # construction, so their checks must pass too.
+    # construction, so their checks must pass too.  And a claim's GROUNDING
+    # (rests-on) premises are load-bearing whether or not any citation marker for
+    # them survives in the rendered prose (plain/footnote render none; adjacent and
+    # cross-scope edges render none on any target) — so the verified set is the
+    # TRANSITIVE CLOSURE of cited|placed under rests-on.  A rests-on edge to an
+    # undefined key is a broken grounding: it fails the gate like an undefined
+    # citation does.
     warrants = {k for k, f in F.items() if f.get("check")}
     placed = {k for k, f in F.items() if bib.is_placed(f)}
-    to_verify = (cited | placed) & warrants
+    grounded, dangling = bib.rests_closure((cited & set(F)) | placed, F)
+    to_verify = (cited | placed | grounded) & warrants
     undefined = sorted(cited - set(F))
     # Resolve each DISTINCT check exactly once (shared witnesses run one time), concurrently.
     # A memory-heavy check declares `mem` in the bib — the makefile's resource manifest, which
@@ -145,14 +156,19 @@ def main(argv: list) -> int:
     if undefined:
         print(f"paperkit-gate: undefined citations: {', '.join(undefined)}", file=sys.stderr)
         rc = 1
+    if dangling:
+        for k, y in sorted(dangling):
+            print(f"paperkit-gate: dangling rests-on: [@{k}] rests on undefined [@{y}]",
+                  file=sys.stderr)
+        rc = 1
     if bad:
         for k in bad:
             print(f"paperkit-gate: check FAILED for [@{k}]: {F[k]['check']}", file=sys.stderr)
         rc = 1
     if inv_only:
         info(f"paperkit-gate: invariants node — {len(to_verify)} claim check(s) deferred to the leaf targets")
-    elif not undefined and not bad:
-        info(f"paperkit-gate: {len(to_verify)} cited/placed claim(s) all resolve to passing checks")
+    elif not undefined and not bad and not dangling:
+        info(f"paperkit-gate: {len(to_verify)} cited/placed/grounded claim(s) all resolve to passing checks")
 
     # WITHOUT-K — proof-relevance.  The gate reduces each check to a boolean, so it
     # silently identifies distinct cited claims that share one witness (Axiom K /
@@ -205,6 +221,7 @@ def main(argv: list) -> int:
         print(json.dumps({
             "document": out.name, "pass": rc == 0, "project_ok": proj_ok,
             "verified": len(to_verify), "undefined": undefined, "bad": bad,
+            "dangling": sorted(list(e) for e in dangling),
             "sections": secs, "gaps": gaps,
             "postulates": sorted(k for k, f in F.items()
                                  if f.get("section") and k not in cited and bib.is_placed(f)),

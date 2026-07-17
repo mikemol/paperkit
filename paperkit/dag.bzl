@@ -24,6 +24,7 @@ IMPORTS = {
     "tests/boundaries_env.py": ["resolver"],
     "tests/boundaries_footprint.py": ["_fixture", "resolver"],
     "tests/boundaries_gate_json.py": ["_fixture"],
+    "tests/boundaries_grounding.py": ["_fixture"],
     "tests/boundaries_jobs.py": ["_fixture"],
     "tests/boundaries_memoize.py": ["_fixture", "discriminate"],
     "tests/boundaries_path.py": ["config", "resolver"],

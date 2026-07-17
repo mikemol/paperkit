@@ -99,3 +99,29 @@ def is_placed(f: dict) -> bool:
     """A warrant projected as a block (emit:) or a figure — placed verbatim, not
     woven into prose, and so covered by its placement rather than a citation."""
     return bool(f.get("emit")) or f.get("check", "").startswith("figure:")
+
+
+def rests_closure(seed: set, F: dict) -> tuple:
+    """The transitive closure of `seed` under `rests-on` (grounding) edges.
+
+    A cited/placed claim's grounding premises are part of the argument whether or
+    not a marker for them survives in the rendered prose (plain/footnote render no
+    [@key]; adjacent and cross-scope edges render nothing on ANY target) — so the
+    verified set must include every claim REACHABLE from the seed along rests-on,
+    recursively.  Cycles are handled (each key is visited once).  Returns
+    (reachable, dangling): reachable ⊇ seed ∩ F; dangling is the set of
+    (claim, target) edges whose target is defined in no bib — a broken grounding.
+    """
+    seen, dangling = set(), set()
+    stack = [k for k in seed if k in F]
+    while stack:
+        k = stack.pop()
+        if k in seen:
+            continue
+        seen.add(k)
+        for y in F[k].get("rests-on", []):
+            if y not in F:
+                dangling.add((k, y))
+            elif y not in seen:
+                stack.append(y)
+    return seen, dangling

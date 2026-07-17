@@ -84,7 +84,7 @@ def main(argv: list) -> int:
     config.apply_args(argv)          # Ω·config: fold args into PAPERKIT_* env (arg overrides env)
     pos = config.positionals(argv)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
-    _sandbox_root(project_dir)       # resolve+validate the sandbox root up front (home-guard) — clean exit before any sweep
+    sandbox_root = _sandbox_root(project_dir)   # resolve+validate the sandbox root up front (home-guard) — clean exit before any sweep
     cfg = bib.load_config(project_dir)
     raw = tomllib.loads((project_dir / "paper.toml").read_text())
     pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
@@ -167,7 +167,12 @@ def main(argv: list) -> int:
     no_cache = config.resolve(config.NO_CACHE)
     engine = _engine_hash()
     cached = {} if no_cache else _load_cache(project_dir)
-    valid = cached.get("engine") == engine and cached.get("resolution") == resolution
+    # A grade is a function of the check's inputs AND the sandbox UNIVERSE it reran in: a root
+    # change (declared or re-inferred) changes what the pristine copy contains, which can flip a
+    # baseline without touching any footprint file — so the root is part of the cache validity,
+    # exactly like `resolution`.
+    valid = (cached.get("engine") == engine and cached.get("resolution") == resolution
+             and cached.get("root") == str(sandbox_root))
     entries = cached.get("checks", {}) if valid else {}
 
     reuse, stale = {}, []
@@ -211,7 +216,8 @@ def main(argv: list) -> int:
         new_entries[c] = {"grade": fresh[c], "footprint": fp, "fp": _footprint_hash(project_dir, fp)}
 
     if not no_cache:
-        _save_cache(project_dir, {"engine": engine, "resolution": resolution, "checks": new_entries})
+        _save_cache(project_dir, {"engine": engine, "resolution": resolution,
+                                  "root": str(sandbox_root), "checks": new_entries})
 
     if stale:
         print(f"paperkit-discriminate: graded by {fresh_grader} "

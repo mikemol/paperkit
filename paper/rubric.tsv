@@ -11,7 +11,7 @@ projection	The Projector: Weave, Connectors, and Placement
 gate	The Gate: Resolution and Its Strict Modes
 adequacy	Adequacy: How Δ Grades a Check
 liveness	Liveness: Resumable Witnesses
-rhetoric	Rhetoric: Typed Moves and Checkable Schemes
+rhetoric	Rhetoric: Typed Moves and Checkable Schemes	enumeration
 projects	The Repository: A Family of Verified Projects
 implications	Implications: What Follows, and the Honest Limits
 related	Related Work

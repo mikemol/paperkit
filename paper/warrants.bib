@@ -354,17 +354,17 @@
   check   = {claim:prosody}
 }
 @misc{scheme-count,
-  section = {rhetoric}, from = {prosody}, join = {. },
+  section = {rhetoric}, from = {prosody}, join = {. }, move = {addition},
   claim   = {a section may declare a scheme that constrains its claim count --- a period is one balanced beat, a distich two, a tricolon exactly three, while an enumeration or a ladder takes two or more},
   check   = {claim:scheme-count}
 }
 @misc{scheme-opt-in,
-  section = {rhetoric}, from = {scheme-count}, join = {. },
+  section = {rhetoric}, from = {scheme-count}, join = {. }, move = {addition},
   claim   = {schemes are opt-in: a scheme lives in the rubric's third column and only a section that declares one is checked, so existing prose is never retroactively constrained},
   check   = {claim:scheme-opt-in}
 }
 @misc{form-gate,
-  section = {rhetoric}, from = {scheme-opt-in}, join = {, and so },
+  section = {rhetoric}, from = {scheme-opt-in}, join = {, and so }, move = {climax},
   claim   = {form becomes checkable the way the claim-DAG made content checkable --- a declared section whose realized moves break its scheme fails the rhetoric gate, so intentional use of language stops being prose you hope for and becomes structure you specify and verify},
   check   = {claim:form-gate}
 }

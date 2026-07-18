@@ -793,6 +793,11 @@ def form_gate():
         assert next(r[4] for r in rhetoric.analyze(d) if r[0] == "s") == [], "an all-entail ladder should be clean"
     finally:
         shutil.rmtree(d, ignore_errors=True)
+    # and THIS paper practices it: the rhetoric section declares a scheme (rubric 3rd column)
+    # and its realized moves honor it, so the declaration is load-bearing, not decorative.
+    rows = {r[0]: r for r in rhetoric.analyze(PAPER_DIR)}
+    assert "rhetoric" in rows, "the rhetoric section should declare a scheme (rubric 3rd column)"
+    assert rows["rhetoric"][4] == [], f"the paper's own rhetoric section violates its scheme: {rows['rhetoric'][4]}"
 
 
 # ── projects: the repository as a family of verified documents ───────────────

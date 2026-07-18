@@ -8,7 +8,7 @@
 @misc{rnd-agree,
   section = {agree},
   claim   = {the rendered document PRESENTS the verified paper: the plain text a reader sees in the .docx is byte-for-byte the plain text of paper.md, so the render preserves the content --- presentation agreement extends prose≡projection down the render stack, from the gated source to the delivered document},
-  check   = {cmd:sh checks/agree.sh}
+  check   = {agree:sh checks/agree_md.sh|||sh checks/agree_docx.sh}
 }
 @misc{rnd-wf,
   section = {integrity},

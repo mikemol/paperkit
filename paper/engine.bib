@@ -1,0 +1,55 @@
+% engine.bib — the engine — projection and gate
+% A concept module of the paper's warrant library; composed by paper.toml.
+
+@misc{projector-emits,
+  section = {engine}, from = {prose-projected},
+  claim   = {the projector emits the whole document from the warrant set},
+  check   = {claim:projector-emits}
+}
+
+@misc{prose-is-artifact,
+  section = {engine}, from = {projector-emits}, join = {, so },
+  claim   = {the committed prose is a build artifact, not a source any hand should edit},
+  rests-on = {projector-emits, prose-projected},
+  check   = {claim:prose-is-artifact}
+}
+
+@misc{gate-rejects-drift,
+  section = {engine}, from = {prose-is-artifact}, join = {. },
+  claim   = {the gate rejects any prose that has drifted from its projection},
+  rests-on = {prose-is-artifact},
+  check   = {claim:gate-rejects-drift}
+}
+
+@misc{edit-cant-survive,
+  section = {engine}, from = {gate-rejects-drift, projector-emits}, join = {, so },
+  claim   = {a hand-edit cannot survive a build},
+  rests-on = {gate-rejects-drift, projector-emits},
+  check   = {claim:edit-cant-survive}
+}
+
+@misc{coverage-both-sides,
+  section = {engine}, from = {gate-rejects-drift}, join = {. },
+  claim   = {coverage is enforced from both sides},
+  rests-on = {every-section-appears, every-claim-cited},
+  link    = {grounded by its two halves (every section appears, every claim is cited), which the prose states just after --- a grounding link counter to prose order},
+  check   = {claim:coverage-both-sides}
+}
+
+@misc{every-section-appears,
+  section = {engine}, from = {coverage-both-sides}, join = { — },
+  claim   = {every required section must appear},
+  check   = {claim:every-section-appears}
+}
+
+@misc{every-claim-cited,
+  section = {engine}, from = {coverage-both-sides}, join = {, and },
+  claim   = {every claim tagged for a section must be cited within it},
+  check   = {claim:every-claim-cited}
+}
+
+@misc{module-split,
+  section = {engine}, from = {every-claim-cited}, join = {. },
+  claim   = {the engine is not a monolith but a handful of small single-responsibility modules --- a resolver that runs a check, a grader that sweeps it for sensitivity, a grade ladder that interprets the sweep, a cache, a topology --- each importable and tested on its own, so a change to one carries a small blast radius},
+  check   = {claim:module-split}
+}

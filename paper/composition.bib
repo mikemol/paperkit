@@ -1,0 +1,79 @@
+% composition.bib — composition — self-hosting and the family of verified projects
+% A concept module of the paper's warrant library; composed by paper.toml.
+
+@misc{paper-is-paperkit,
+  section = {selfhost}, from = {paper-is-projection},
+  claim   = {this paper is itself a paperkit project},
+  rests-on = {paper-is-projection},
+  check   = {claim:paper-is-paperkit}
+}
+
+@misc{claims-are-warrants,
+  section = {selfhost}, from = {paper-is-paperkit, record-is-bibentry}, join = { — },
+  claim   = {its claims are these warrants},
+  rests-on = {claim-is-record, record-is-bibentry},
+  check   = {claim:claims-are-warrants}
+}
+
+@misc{prose-is-projection,
+  section = {selfhost}, from = {paper-is-paperkit, prose-projected}, join = {, },
+  claim   = {its prose is their projection},
+  rests-on = {prose-projected, paper-is-paperkit},
+  check   = {claim:prose-is-projection}
+}
+
+@misc{gate-is-subject,
+  section = {selfhost}, from = {paper-is-paperkit, gate-rejects-drift}, join = {, and },
+  claim   = {the gate that accepts it is the very subject it describes},
+  rests-on = {gate-rejects-drift, paper-is-paperkit},
+  check   = {claim:gate-is-subject}
+}
+
+@misc{paperkit-on-paperkit,
+  section = {selfhost}, from = {gate-is-subject, gate-rejects-drift}, join = {. },
+  claim   = {the verifiers behind this section run paperkit on paperkit --- projecting a fixture, drifting it, and confirming the gate rejects the drift},
+  rests-on = {gate-is-subject, gate-rejects-drift, prose-is-projection},
+  check   = {claim:paperkit-on-paperkit}
+}
+
+@misc{one-green-check,
+  section = {selfhost}, from = {paperkit-on-paperkit, gate-is-subject}, join = {, so },
+  claim   = {the document's correctness and the tool's are one green check},
+  rests-on = {paperkit-on-paperkit, gate-is-subject},
+  check   = {claim:one-green-check}
+}
+
+@misc{multi-project,
+  section = {projects},
+  claim   = {the engine is domain-free, so the repository is several paperkit projects at once --- each a directory with a paper.toml that projects its own document --- discovered by that file, never hard-coded},
+  check   = {claim:multi-project},
+  reads   = {., boundaries, config, setup}
+}
+
+@misc{project-dag,
+  section = {projects}, from = {multi-project}, join = {. },
+  claim   = {the projects form a dependency DAG over the shared engine: the paper and the tool boundaries rest on the engine alone, while the README's gate runs the paper's and the report ingests the paper's machine-readable grades},
+  check   = {claim:project-dag},
+  reads   = {., report}
+}
+
+@misc{local-ci,
+  section = {projects}, from = {project-dag}, join = {. },
+  claim   = {a pre-commit githook is the local CI --- every commit runs bazel test //:hook, the single Bazel target that gates every document (each claim a per-claim check target plus the project invariants, --safe --without-K) and grades it behaviorally adequate (Delta --min-strength), so the repository is never committed in a broken state},
+  check   = {claim:local-ci},
+  reads   = {.}
+}
+
+@misc{boundaries-project,
+  section = {projects}, from = {local-ci}, join = {. },
+  claim   = {every engine tool ships its behavioral boundaries as a ⟨P, F, δ⟩ suite, and those suites are themselves gathered into a gated project that projects to BOUNDARIES.md},
+  check   = {claim:boundaries-project},
+  reads   = {boundaries}
+}
+
+@misc{report-live,
+  section = {projects}, from = {boundaries-project}, join = {, and },
+  claim   = {the verification report is a fourth project whose figures are live pipeline output --- rendered from the gate and Δ --json data, never scraped --- so a stale report fails its own freshness gate},
+  check   = {claim:report-live},
+  reads   = {report}
+}

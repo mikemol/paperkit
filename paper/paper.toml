@@ -3,7 +3,7 @@ adequacy = true
 title = "Paperkit: A Paper Is a Projection of a Verified Claim-DAG"
 subtitle = "A self-hosting document toolkit — this paper is projected and gated by the tool it describes."
 rubric = "rubric.tsv"
-warrants = ["warrants.bib", "references.bib"]
+warrants = ["model.bib", "engine.bib", "resolver.bib", "projection.bib", "gate.bib", "adequacy.bib", "liveness.bib", "rhetoric.bib", "composition.bib", "implications.bib", "conclusion.bib", "references.bib"]
 out = "paper.md"
 
 # Custom check type: `claim:<key>` runs the per-claim witness in checks/claims.py,

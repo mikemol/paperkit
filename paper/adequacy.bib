@@ -1,0 +1,44 @@
+% adequacy.bib — adequacy — how Δ grades a check
+% A concept module of the paper's warrant library; composed by paper.toml.
+
+@misc{grade-ladder,
+  section = {adequacy},
+  claim   = {a passing check only proves a sentence named a verifier, not that the verifier entails it --- so Δ grades each check on a ladder by how much it can fail: a presupposed file is vacuous, a contingent one existence, and a content-sensitive command behavioral},
+  check   = {claim:grade-ladder}
+}
+
+@misc{mutation-probes,
+  section = {adequacy}, from = {grade-ladder}, join = {. }, depth = {1},
+  claim   = {the grade is empirical, not declared --- Δ corrupts each input in turn and watches whether the check flips from pass to fail, and the inputs whose corruption flips it are its sensitivity set},
+  check   = {claim:mutation-probes}
+}
+
+@misc{content-cache,
+  section = {adequacy}, from = {mutation-probes}, join = {. }, depth = {1},
+  claim   = {a grade is a pure function of the content a check reads, so it is cached PER CHECK on that read footprint --- the files the check opens --- over a shared engine epoch, and the expensive mutation sweep reruns only for the checks a change actually touches; the whole-project content key is the coarse soundness basis the per-check key refines},
+  check   = {claim:content-cache}
+}
+
+@misc{sandbox-grade,
+  section = {adequacy}, from = {content-cache}, join = {. }, depth = {1},
+  claim   = {the sweep runs in a sandbox copy whose mutation surface excludes sibling projects (a nested directory with its own paper.toml), so each project grades independently of the others},
+  check   = {claim:sandbox-grade}
+}
+
+@misc{min-strength,
+  section = {adequacy}, from = {sandbox-grade}, join = {, and },
+  claim   = {--min-strength turns the grades into a gate --- a project fails if any cited claim's check grades below the threshold, which is how this paper enforces its own proof-relevance in CI},
+  check   = {claim:min-strength}
+}
+
+@misc{footprint-scopes,
+  section = {adequacy}, from = {min-strength}, join = {. },
+  claim   = {Δ traces each check's READ footprint --- the project files it opens when it runs, a superset of its sensitivity set --- and beyond keying the per-check cache, that footprint SCOPES the sweep: each check is graded against the files it reads, never the whole repository},
+  check   = {claim:footprint-scopes}
+}
+
+@misc{imported-grade,
+  section = {adequacy}, from = {footprint-scopes}, join = {. },
+  claim   = {one grade sits outside the falsifiability ladder: a verdict-import is graded imported --- its adequacy delegated to a sibling project the gate verifies on its own, run once and never mutation-swept --- the way one paper rests on another it does not re-derive},
+  check   = {claim:imported-grade}
+}

@@ -1,0 +1,26 @@
+% gate.bib — the gate — resolution and its strict modes
+% A concept module of the paper's warrant library; composed by paper.toml.
+
+@misc{resolve-passes,
+  section = {gate},
+  claim   = {RESOLVE is the gate's second invariant --- a cited claim whose check fails blocks the gate, so the verdict is the conjunction of every cited claim's check},
+  check   = {claim:resolve-passes}
+}
+
+@misc{safe-rejects-postulates,
+  section = {gate}, from = {resolve-passes}, join = {. },
+  claim   = {an uncited placement --- a block the document carries but no prose cites --- is a postulate: advised against by default and rejected under --safe, the zero-postulate mode},
+  check   = {claim:safe-rejects-postulates}
+}
+
+@misc{without-k-distinct,
+  section = {gate}, from = {safe-rejects-postulates}, join = {. },
+  claim   = {because the gate reduces each check to a boolean it cannot tell two cited claims that share one witness apart (proof-irrelevance, Axiom K) --- so --without-K forbids the collapse, demanding a distinct witness per claim},
+  check   = {claim:without-k-distinct}
+}
+
+@misc{jobs-parallel,
+  section = {gate}, from = {without-k-distinct}, join = {. },
+  claim   = {the gate resolves a project's distinct checks concurrently (the bib is its makefile), and the verdict is independent of the worker count --- parallel equals serial},
+  check   = {claim:jobs-parallel}
+}

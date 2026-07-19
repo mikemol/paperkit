@@ -1,0 +1,20 @@
+% liveness.bib — liveness — resumable witnesses
+% A concept module of the paper's warrant library; composed by paper.toml.
+
+@misc{pump-parse-witness,
+  section = {liveness},
+  claim   = {a slow but sound check need not block --- it is structured as a pump/parse witness, where pump advances opaque state one increment with no verdict and parse reads the meaning (done, progress), and the driver only ever loads, pumps, serializes, and persists},
+  check   = {claim:pump-parse-witness}
+}
+
+@misc{resumable,
+  section = {liveness}, from = {pump-parse-witness}, join = {. },
+  claim   = {under a budget the driver stops after an increment and persists the resumption token, exiting with a resume code rather than a failure --- so a slow witness reads as resume me, not as a falsified claim, and resuming completes exactly the run an uninterrupted one would},
+  check   = {claim:resumable}
+}
+
+@misc{roundtrip-obligation,
+  section = {liveness}, from = {resumable}, join = {, on the strength of },
+  claim   = {a single soundness obligation --- that deserializing a serialized state returns that same state --- which the driver asserts on every run, so a witness whose token loses information is rejected outright},
+  check   = {claim:roundtrip-obligation}
+}

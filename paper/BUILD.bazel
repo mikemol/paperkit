@@ -6,6 +6,17 @@ filegroup(name = "files", srcs = [
         "paper.toml",
         "references.bib",
         "rubric.tsv",
-        "warrants.bib",
+        # the warrant claim-DAG, authored as a concept library (composed by paper.toml)
+        "model.bib",
+        "engine.bib",
+        "resolver.bib",
+        "projection.bib",
+        "gate.bib",
+        "adequacy.bib",
+        "liveness.bib",
+        "rhetoric.bib",
+        "composition.bib",
+        "implications.bib",
+        "conclusion.bib",
         "//paper/checks/fixture:files",
     ], visibility = ["//visibility:public"])

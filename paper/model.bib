@@ -1,0 +1,96 @@
+% model.bib — the model — a paper as a projected claim-DAG (intro, model, the two graphs)
+% A concept module of the paper's warrant library; composed by paper.toml.
+
+@misc{paper-is-projection,
+  section = {intro},
+  claim   = {paperkit treats a scholarly paper as the projection of a claim-DAG},
+  rests-on = {fail-omits, gate-rejects-drift, prose-projected},
+  link    = {the thesis is stated first, but it rests on the projector and gate mechanisms proved in the sections that follow --- grounding runs counter to prose order here},
+  check   = {claim:paper-is-projection}
+}
+
+@misc{node-is-claim,
+  section = {intro}, from = {paper-is-projection}, join = { — },
+  claim   = {each node a single claim},
+  check   = {claim:node-is-claim}
+}
+
+@misc{claim-bears-check,
+  section = {intro}, from = {node-is-claim}, join = {, },
+  claim   = {each claim carrying a machine-checkable verifier},
+  rests-on = {node-is-claim},
+  check   = {claim:claim-bears-check}
+}
+
+@misc{fail-omits,
+  section = {intro}, from = {claim-bears-check, paper-is-projection}, join = {; and },
+  claim   = {a claim whose verifier fails simply does not appear in the prose},
+  rests-on = {claim-bears-check, prose-projected, gate-rejects-drift},
+  check   = {claim:fail-omits}
+}
+
+@misc{claim-is-record,
+  section = {model}, from = {node-is-claim, claim-bears-check},
+  claim   = {a claim is a single record --- a statement, the rubric section it belongs to, its dependencies, and its verifier},
+  rests-on = {node-is-claim, claim-bears-check},
+  check   = {claim:claim-is-record}
+}
+
+@misc{record-is-bibentry,
+  section = {model}, from = {claim-is-record}, join = { — },
+  claim   = {which is exactly the shape of a bibliography entry},
+  rests-on = {claim-is-record},
+  check   = {claim:record-is-bibentry}
+}
+
+@misc{prose-projected,
+  section = {model}, from = {paper-is-projection}, join = {. },
+  claim   = {the prose is projected, not authored},
+  rests-on = {projector-emits, ordered-by-deps, joined-by-glue},
+  check   = {claim:prose-projected}
+}
+
+@misc{ordered-by-deps,
+  section = {model}, from = {prose-projected}, join = {: },
+  claim   = {within each section the claims are ordered by their dependency edges},
+  rests-on = {projector-emits},
+  check   = {claim:ordered-by-deps}
+}
+
+@misc{joined-by-glue,
+  section = {model}, from = {ordered-by-deps}, join = { and },
+  claim   = {joined by connective glue},
+  rests-on = {projector-emits},
+  check   = {claim:joined-by-glue}
+}
+
+@misc{deterministic,
+  section = {model}, from = {ordered-by-deps, joined-by-glue}, join = {, },
+  claim   = {the same warrant set always giving the same document},
+  rests-on = {ordered-by-deps, joined-by-glue},
+  check   = {claim:deterministic}
+}
+
+@misc{edge-from-orders,
+  section = {edges},
+  claim   = {a claim's from-edges fix its place in the prose --- the projector emits a claim only after the claims it lists, so document order is a topological sort of the from-graph},
+  check   = {claim:edge-from-orders}
+}
+
+@misc{edge-rests-grounds,
+  section = {edges}, from = {edge-from-orders}, join = {. },
+  claim   = {rests-on is a separate grounding edge --- a claim's effective grade is clamped to the weakest grade along it, regardless of prose order},
+  check   = {claim:edge-rests-grounds}
+}
+
+@misc{edge-chiral,
+  section = {edges}, from = {edge-rests-grounds}, join = {, and },
+  claim   = {the two graphs are independent and often reversed: prose runs general to specific while grounding runs specific to general, so one pair of claims is at once a forward prose edge and a backward grounding edge},
+  check   = {claim:edge-chiral}
+}
+
+@misc{edge-move-types,
+  section = {edges}, from = {edge-chiral}, join = {. },
+  claim   = {the move field names the typed rhetorical relation binding a claim to the prior beat --- its kind decides its role (an entail move also grounds; turn, extend, parallel, and restate moves are prose only) and a section's declared scheme admits only certain move-kinds},
+  check   = {claim:edge-move-types}
+}

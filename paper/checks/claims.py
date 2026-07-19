@@ -308,7 +308,9 @@ def paper_is_projection():
 def claims_are_warrants():
     # this paper's claims ARE its warrants: warrants.bib parses to the cited claim records
     import project as P
-    recs = P.entries(PAPER_DIR / "warrants.bib")
+    recs = {}                                             # bib-list-aware: claims may be authored across modules
+    for b in P.load_config(PAPER_DIR)["bibs"]:
+        recs.update(P.entries(b))
     assert recs.get("paper-is-projection", {}).get("claim"), "the paper's claims are not its warrants"
 
 
@@ -376,8 +378,13 @@ def prose_is_projection():
 def closes_gap():
     # closes the say/check gap: every claim in the ledger carries a verifier
     import project as P
-    F = P.entries(PAPER_DIR / "warrants.bib")
-    missing = [k for k, f in F.items() if f.get("section") and f.get("claim") and not f.get("check")]
+    F = {}                                                # bib-list-aware: claims may be authored across modules
+    for b in P.load_config(PAPER_DIR)["bibs"]:
+        F.update(P.entries(b))
+    # an entry with an `author` is an external reference (resolves by being defined), not an
+    # assertion the paper makes — only the paper's OWN claims owe a verifier.
+    missing = [k for k, f in F.items()
+               if f.get("section") and f.get("claim") and not f.get("check") and not f.get("author")]
     assert not missing, f"claims without a verifier (the gap is open): {missing}"
 
 

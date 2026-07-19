@@ -10,7 +10,11 @@ from pathlib import Path
 # marker per warrant = its verification, from the check TYPE (the field the gate runs)
 MARK = {"file": "(present)", "result": "(verdict imported)"}
 markers = {}
-for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", Path("../paper/warrants.bib").read_text(), re.S):
+# bib-list-aware: the paper's warrants may be authored across modules (concept library); read
+# every ../paper/*.bib.  References (references.bib) carry no `check`, so the `if c:` guard below
+# excludes them automatically — only internal warrants become inline markers.
+_bibtext = "".join(p.read_text() for p in sorted(Path("../paper").glob("*.bib")))
+for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", _bibtext, re.S):
     c = re.search(r"\bcheck\s*=\s*\{(\w+):", m.group(2))
     if c:
         markers[m.group(1)] = MARK.get(c.group(1), "(machine-checked)")

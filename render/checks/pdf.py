@@ -8,7 +8,10 @@ from pathlib import Path
 
 MARK = {"file": "(present)", "result": "(verdict imported)"}
 mk = {}
-for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", Path("../paper/warrants.bib").read_text(), re.S):
+# bib-list-aware: read every ../paper/*.bib (the warrants may be authored across concept modules);
+# references carry no `check`, so the `if c:` guard below excludes them.
+_bibtext = "".join(p.read_text() for p in sorted(Path("../paper").glob("*.bib")))
+for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", _bibtext, re.S):
     c = re.search(r"\bcheck\s*=\s*\{(\w+):", m.group(2))
     if c:
         mk[m.group(1)] = MARK.get(c.group(1), "(machine-checked)")

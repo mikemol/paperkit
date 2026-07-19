@@ -50,6 +50,17 @@ def parse(path: Path) -> dict:
     return out
 
 
+def _bibpath(project: Path, b: str) -> Path:
+    """Resolve a warrants token to a path.  A bare basename is relative to the project dir; a Bazel
+    LABEL (//pkg:file, //:path/file, @repo//…) is a bib imported from the concept library, resolved
+    repo-root-relative — correct when the importer IS the root project (project == repo root, the
+    README-import case).  Mirrors the generator's label branch so ONE warrants list drives both."""
+    if b.startswith("//") or ":" in b or b.startswith("@"):
+        pkg, _, name = b.split("//", 1)[1].partition(":")
+        return project / (f"{pkg}/{name}" if pkg else name)
+    return project / b
+
+
 def load_config(project: Path) -> dict:
     cfg = project / "paper.toml"
     if not cfg.exists():
@@ -59,7 +70,7 @@ def load_config(project: Path) -> dict:
         "title": p.get("title", "Untitled"),
         "subtitle": p.get("subtitle", ""),
         "rubric": project / p.get("rubric", "rubric.tsv"),
-        "bibs": [project / b for b in p.get("warrants", ["warrants.bib"])],
+        "bibs": [_bibpath(project, b) for b in p.get("warrants", ["warrants.bib"])],
         "out": project / p.get("out", "paper.md"),
         "numbered": p.get("numbered", True),
         "references": p.get("references", True),

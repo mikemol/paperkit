@@ -285,7 +285,13 @@ def _bib_repo_impl(repository_ctx):
         warrants = [bibp.basename]
     parsed = []
     for w in warrants:
-        wp = bibp.dirname.get_child(w)
+        # A bare basename is a LOCAL sibling of the anchor (get_child, one segment).  A LABEL token
+        # (//pkg:file, //:path/file, @repo//…) is a bib IMPORTED from another package — the composing
+        # project (a VIEW) pulling a claim authored in the concept library.  get_child cannot express a
+        # `..` or multi-segment path; path(Label(...)) can (already the idiom at the anchor read + the
+        # module extension).  A POSIX basename never contains ':', so the discriminator is safe and
+        # every existing basename token stays on the unchanged get_child branch.
+        wp = repository_ctx.path(Label(w)) if (":" in w or w.startswith("@")) else bibp.dirname.get_child(w)
         repository_ctx.watch(wp)
         parsed = parsed + _entries(repository_ctx.read(wp))
 

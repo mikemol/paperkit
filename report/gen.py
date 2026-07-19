@@ -12,6 +12,7 @@ regenerates and diffs, so a stale report fails its own gate.
     python3 report/gen.py --check    # exit 1 if any committed asset is stale
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -34,44 +35,74 @@ def _delta(project):
 
 
 def _gate(project, *flags):
-    """gate --json — structured result (pass, project_ok, verified, sections, collapses)."""
+    """gate --json — structured result (pass, project_ok, verified, sections, collapses).  Robust to
+    a document whose gate can't RUN here: a missing toolchain (podman/pandoc/systemd) or a runaway
+    check is caught and reported as an ERROR, distinct from a verification FAIL — so an on-demand
+    document is never falsely accused of failing verification when the real cause is the environment."""
     key = (project, flags)
     if key not in _GATE:
-        r = subprocess.run([sys.executable, "paperkit/gate.py", "--json", *flags, project],
-                           cwd=ROOT, capture_output=True, text=True)
-        _GATE[key] = json.loads(r.stdout or "{}")
+        try:
+            r = subprocess.run([sys.executable, "paperkit/gate.py", "--json", *flags, project],
+                               cwd=ROOT, capture_output=True, text=True, timeout=300)
+            _GATE[key] = json.loads(r.stdout) if r.stdout.strip() else {"error": (r.stderr.strip() or "no output").splitlines()[-1][:60]}
+        except subprocess.TimeoutExpired:
+            _GATE[key] = {"error": "timed out (>300s)"}
+        except json.JSONDecodeError:
+            _GATE[key] = {"error": "no verdict"}
     return _GATE[key]
 
 
-def _projects():
-    """The paperkit projects this report covers: every dir with a paper.toml,
-    EXCLUDING nested fixtures (a paper.toml inside another project's subtree) and
-    the report itself (its own checks regenerate this report, so gating/grading it
-    here would recurse).  Discovered, not hard-coded — new projects join the report
-    automatically.  Paper first (the flagship), then the rest by name."""
+def _all_docs():
+    """EVERY document in the repository (a dir with a paper.toml), excluding nested fixtures and the
+    report itself.  The gate-status table covers all of them with their REAL status on THIS machine —
+    so the report is environment-dependent for the on-demand documents (render/image/setup need
+    pandoc/podman/systemd), BY DESIGN: it reports what this run could actually verify, honestly, and
+    the CI-tier column says which documents the reproducible local CI gates vs which gate on-demand."""
     tomls = sorted(p.parent for p in ROOT.rglob("paper.toml") if ".git" not in p.parts)
     out = []
     for d in tomls:
-        # skip the report itself, and any project nested inside ANOTHER NON-ROOT
-        # project (a fixture — every project is trivially under the root project, so
-        # the root must not count as the container).
         if d == HERE or any(o not in (d, ROOT) and o in d.parents for o in tomls):
             continue
-        name = "README" if d == ROOT else d.name
-        out.append((name, "." if d == ROOT else str(d.relative_to(ROOT))))
+        out.append(("README" if d == ROOT else d.name, "." if d == ROOT else str(d.relative_to(ROOT))))
     out.sort(key=lambda nr: (nr[0] != "paper", nr[0]))
     return out
 
 
+def _hook_names():
+    block = re.search(r'test_suite\(name = "hook".*?tests = \[(.*?)\]',
+                      (ROOT / "BUILD.bazel").read_text(), re.S).group(1)
+    return {"README" if n == "root" else n for n in re.findall(r'@paperkit_(\w+)//:gate\b', block)}
+
+
+def _wired_names():
+    return {"README" if p == "." else p
+            for p in re.findall(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"', (ROOT / "MODULE.bazel").read_text())}
+
+
+def _graded():
+    """The documents with a REPRODUCIBLE Δ grade — the //:hook set.  The deep grade/proof tables cover
+    these; mutation-grading the on-demand documents is impractical (it re-runs pandoc/podman/systemd
+    per mutation site, per claim), so the gate-status table above covers all documents but the Δ and
+    proof analyses cover the CI-gated ones."""
+    hook = _hook_names()
+    return [(n, p) for n, p in _all_docs() if n in hook]
+
+
+def _tier(name):
+    if name in _hook_names():
+        return "//:hook"
+    return "wired" if name in _wired_names() else "on-demand"
+
+
 def gate_md():
     rows = []
-    for name, proj in _projects():
+    for name, proj in _all_docs():
         g = _gate(proj, "--safe")
-        rows.append(f"| {name} | {'PASS' if g.get('pass') else 'FAIL'} | "
-                    f"{'yes' if g.get('project_ok') else 'NO'} | "
-                    f"{g.get('verified', 0)} | {g.get('sections', 0)} |")
-    return ("| document | gate (--safe) | prose ≡ projection | checks verified | sections |\n"
-            "| --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
+        status = f"n/a — {g['error']}" if "error" in g else ("PASS" if g.get("pass") else "FAIL")
+        rows.append(f"| {name} | {status} | {'yes' if g.get('project_ok') else '—'} | "
+                    f"{g.get('verified', 0)} | {g.get('sections', 0)} | {_tier(name)} |")
+    return ("| document | gate (--safe) | prose ≡ projection | checks verified | sections | CI tier |\n"
+            "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
 
 
 def _delta_section(name, recs):
@@ -99,12 +130,12 @@ def _delta_section(name, recs):
 
 
 def delta_md():
-    return "\n".join(_delta_section(name, _delta(proj)) for name, proj in _projects())
+    return "\n".join(_delta_section(name, _delta(proj)) for name, proj in _graded())
 
 
 def without_k_md():
     parts = []
-    for name, proj in _projects():
+    for name, proj in _graded():
         groups = _gate(proj).get("collapses", {})
         if not groups:
             parts.append(f"**{name}** — every cited claim carries a distinct witness; "

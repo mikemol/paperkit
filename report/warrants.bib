@@ -8,7 +8,7 @@
 % ── status ───────────────────────────────────────────────────────────────────
 @misc{rpt-status,
   section = {status},
-  claim   = {every document in the repository passes the gate with zero postulates},
+  claim   = {every document the local CI gates passes the gate with zero postulates},
   check   = {cmd:for d in ../paper .. ../boundaries; do python3 ../paperkit/gate.py --safe "$d" >/dev/null 2>&1 || exit 1; done}
 }
 @misc{rpt-status-out,

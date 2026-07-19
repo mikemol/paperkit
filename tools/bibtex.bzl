@@ -92,6 +92,22 @@ def _custom(content):
             out[cur] = val
     return out
 
+def _warrants(content):
+    """The project's WARRANTS LIST from paper.toml ([paper] warrants = ["a.bib", "b.bib"]).  Starlark
+    has no toml parser, so string ops on the single-line array shape (the same discipline as _custom).
+    Empty ⇒ [] ⇒ caller falls back to the anchor bib's basename (a single-bib project is unchanged)."""
+    for raw in content.splitlines():
+        s = raw.strip()
+        if s.startswith("warrants") and "=" in s and "[" in s and "]" in s:
+            inner = s[s.find("[") + 1:s.rfind("]")]
+            out = []
+            for part in inner.split(","):
+                p = part.strip()
+                if len(p) >= 2 and p[0] == '"' and p[-1] == '"':
+                    out.append(p[1:-1])
+            return out
+    return []
+
 def _body(check, custom):
     """The witness BODY — the shell command behind a cmd:/custom check (exit 0 = the claim holds).
     file:/result:/agree: have no single-command body (handled by the verb gate, not the proof DAG yet)."""
@@ -246,19 +262,32 @@ def _closures(module_ctx, project, core):
     return [l for l in res.stdout.splitlines() if "\t" in l]
 
 def _bib_repo_impl(repository_ctx):
-    content = repository_ctx.read(repository_ctx.path(repository_ctx.attr.bib))
+    bibp = repository_ctx.path(repository_ctx.attr.bib)
     proj = repository_ctx.attr.project
     files = "@@//:files" if proj == "." else "@@//%s:files" % proj
-    parsed = _entries(content)
     local = repository_ctx.attr.local
 
-    # Custom check types resolve from the project's paper.toml [checks.X] templates (watched, so a
-    # template edit re-fetches).
+    # Custom check types AND the project's WARRANTS LIST both come from paper.toml (watched, so an
+    # edit re-fetches).  Multi-bib composition is the same thing project.py does over `warrants`
+    # (bib.load_config), lifted to the generator so a project's claims may be authored across modules
+    # (the concept-library reconstitution).  The `bib` attr is the ANCHOR that locates the project dir;
+    # a single-bib project (empty/1-element list) is byte-for-byte unchanged.  Check-less claims (bib
+    # references) contribute no target — every parsed loop below skips `if not check`.
     custom = {}
-    tomlp = repository_ctx.path(repository_ctx.attr.bib).dirname.get_child("paper.toml")
+    warrants = []
+    tomlp = bibp.dirname.get_child("paper.toml")
     if tomlp.exists:
         repository_ctx.watch(tomlp)
-        custom = _custom(repository_ctx.read(tomlp))
+        toml = repository_ctx.read(tomlp)
+        custom = _custom(toml)
+        warrants = _warrants(toml)
+    if not warrants:
+        warrants = [bibp.basename]
+    parsed = []
+    for w in warrants:
+        wp = bibp.dirname.get_child(w)
+        repository_ctx.watch(wp)
+        parsed = parsed + _entries(repository_ctx.read(wp))
 
     # Τ·mem·learn — the per-project learned reservation manifest (a projection of observed peaks,
     # mem.json beside the bib; regenerated on-demand by //:mem-learn).  Resolved per claim down the

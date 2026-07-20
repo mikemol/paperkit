@@ -552,17 +552,10 @@ def jobs_parallel():
 
 
 # ── adequacy: how Δ grades a check ───────────────────────────────────────────
-def grade_ladder():
-    # Δ grades each check on a ladder by how much it can fail: a presupposed file: is
-    # vacuous (no change removes it), a content-sensitive cmd: is behavioral
-    recs = json.loads(fx.discriminate(
-        [fx.entry("vac", claim="v", check="file:w.bib"),
-         fx.entry("beh", claim="b", check="cmd:grep -q TOKEN a.txt", frm="vac")],
-        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
-    g = {r["key"]: r["grade"] for r in recs}
-    assert g["vac"] == "vacuous" and g["beh"] == "behavioral", f"grade ladder wrong: {g}"
-
-
+# grade-ladder's witness is OWNED by the concept library (library/concepts.py) and imported here as
+# `concept:grade-ladder` — the pitch face (README) imports the identical certificate.  It was
+# byte-for-byte this module's old grade_ladder(), so the concept is now authored, graded, and proved
+# ONCE, and this view inherits the owner's engine fingerprint rather than re-deriving it.
 def mutation_probes():
     # the grade is empirical: Δ corrupts each input and sees if the check flips from
     # pass to fail; the inputs whose corruption flips it are its sensitivity set
@@ -1047,7 +1040,6 @@ CLAIMS = {
     "pump-parse-witness": pump_parse_witness,
     "resumable": resumable,
     "roundtrip-obligation": roundtrip_obligation,
-    "grade-ladder": grade_ladder,
     "mutation-probes": mutation_probes,
     "content-cache": content_cache,
     "footprint-scopes": footprint_scopes,

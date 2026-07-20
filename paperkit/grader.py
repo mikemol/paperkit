@@ -246,6 +246,22 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
                 "not_higher": "imported is a delegation, not a falsifiability tier",
                 "not_lower": "the sibling is gated independently in the hook; the gate, not Δ, "
                              "resolves the import live, so a broken sibling fails there"}
+    if typ == "concept":
+        # Λ·witness — a concept: check IMPORTS a witness the concept LIBRARY owns, grades ONCE (a
+        # def-sweep whose sensitivity fingerprint IS the engine) and gates in //:hook.  Graded
+        # "imported" BY DELEGATION, exactly like result: above — an imported witness lives OUTSIDE this
+        # project's mutation surface (sandbox_files never reaches it), so a local sweep is blind to it
+        # and could only ever read `indeterminate`: re-deriving here is not just wasteful, it is
+        # STRUCTURALLY unable to see the proof.  Sound by COMPOSITION: the library carries its own gate
+        # AND Δ in //:hook, so a weak or broken concept fails THERE.  The Bazel path additionally
+        # imports the certificate's measured engine fingerprint into this view's adequacy and :cohere
+        # (pk_grade over @paperkit_library//:<key>__dcalc), so the proof itself travels with the import.
+        return {"grade": "imported", "tests": [f"library/{target}"],
+                "why": f"adequacy delegated to the concept library, which owns, grades and gates the "
+                       f"'{target}' witness (composition, not re-derivation)",
+                "not_higher": "imported is a delegation, not a falsifiability tier",
+                "not_lower": "the library is gated independently in the hook; a weak or broken concept "
+                             "fails there, and the Bazel path imports its measured engine fingerprint"}
     if typ == "file":
         resolved = (project_dir / target).resolve()
         if resolved in presupposed:

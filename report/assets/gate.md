@@ -5,5 +5,6 @@
 | boundaries | PASS | yes | 21 | 3 | //:hook |
 | config | PASS | yes | 4 | 2 | wired |
 | image | on-demand | — | — | — | on-demand |
+| library | PASS | yes | 2 | 1 | //:hook |
 | render | on-demand | — | — | — | on-demand |
 | setup | on-demand | — | — | — | wired |

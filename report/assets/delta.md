@@ -1,6 +1,6 @@
 ### paper
 
-_80 cited claims — self-grade: 80 behavioral; effective (clamped by entailment): 80 behavioral; 0 clamped below self._
+_80 cited claims — self-grade: 79 behavioral; effective (clamped by entailment): 79 behavioral; 0 clamped below self._
 
 | claim | self → effective | witness | why this grade | why not higher | why not lower |
 | --- | --- | --- | --- | --- | --- |
@@ -46,7 +46,7 @@ _80 cited claims — self-grade: 80 behavioral; effective (clamped by entailment
 | `safe-rejects-postulates` | behavioral | `claim:safe-rejects-postulates` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
 | `without-k-distinct` | behavioral | `claim:without-k-distinct` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
 | `jobs-parallel` | behavioral | `claim:jobs-parallel` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
-| `grade-ladder` | behavioral | `claim:grade-ladder` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `grade-ladder` | imported | `concept:grade-ladder` | adequacy delegated to the concept library, which owns, grades and gates the 'grade-ladder' witness (composition, not re-derivation) | imported is a delegation, not a falsifiability tier | the library is gated independently in the hook; a weak or broken concept fails there, and the Bazel path imports its measured engine fingerprint |
 | `mutation-probes` | behavioral | `claim:mutation-probes` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
 | `content-cache` | behavioral | `claim:content-cache` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
 | `sandbox-grade` | behavioral | `claim:sandbox-grade` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
@@ -87,7 +87,7 @@ _80 cited claims — self-grade: 80 behavioral; effective (clamped by entailment
 
 ### README
 
-_23 cited claims — self-grade: 21 behavioral; effective (clamped by entailment): 21 behavioral; 0 clamped below self._
+_23 cited claims — self-grade: 20 behavioral; effective (clamped by entailment): 20 behavioral; 0 clamped below self._
 
 | claim | self → effective | witness | why this grade | why not higher | why not lower |
 | --- | --- | --- | --- | --- | --- |
@@ -113,7 +113,7 @@ _23 cited claims — self-grade: 21 behavioral; effective (clamped by entailment
 | `rm-ci-enable` | behavioral | `claim:rm-ci-enable` | falsifiable — corrupting 9 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 9 input(s)) |
 | `rm-status` | imported | `result:paper` | adequacy delegated to the separately-gated sibling project 'paper' (composition, not re-derivation — its own gate + Δ are the guarantee) | imported is a delegation, not a falsifiability tier | the sibling is gated independently in the hook; the gate, not Δ, resolves the import live, so a broken sibling fails there |
 | `rm-next` | behavioral | `claim:rm-next` | falsifiable — corrupting 8 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 8 input(s)) |
-| `adequacy-pitch` | behavioral | `concept:adequacy-pitch` | falsifiable — corrupting 15 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 15 input(s)) |
+| `adequacy-pitch` | imported | `concept:adequacy-pitch` | adequacy delegated to the concept library, which owns, grades and gates the 'adequacy-pitch' witness (composition, not re-derivation) | imported is a delegation, not a falsifiability tier | the library is gated independently in the hook; a weak or broken concept fails there, and the Bazel path imports its measured engine fingerprint |
 
 ### boundaries
 
@@ -142,3 +142,12 @@ _21 cited claims — self-grade: 21 indeterminate; effective (clamped by entailm
 | `bnd-check` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_check.py` | corrupting EVERY project input AT ONCE leaves it green — it is blind to all project content: it reads only external/live state, or asserts the absence of content no corruption supplies; Δ cannot falsify it by mutation | to rise: read a PROJECT input a mutation can corrupt (a captured dataset — the dataset-backed pattern), or supply a Π counter-fixture (only the latter helps a negative assertion; an external read needs the former) | not provably vacuous: it runs a cmd:, not a presupposed file: |
 | `bnd-lint` | indeterminate | `cmd:python3 ../tools/lint_bzl.py ../tools/calc.bzl ../tools/verb.bzl ../tools/grade.bzl ../tools/bibtex.bzl ../tools/witness.bzl` | corrupting EVERY project input AT ONCE leaves it green — it is blind to all project content: it reads only external/live state, or asserts the absence of content no corruption supplies; Δ cannot falsify it by mutation | to rise: read a PROJECT input a mutation can corrupt (a captured dataset — the dataset-backed pattern), or supply a Π counter-fixture (only the latter helps a negative assertion; an external read needs the former) | not provably vacuous: it runs a cmd:, not a presupposed file: |
 | `bnd-grounding` | indeterminate | `cmd:python3 ../paperkit/tests/boundaries_grounding.py` | corrupting EVERY project input AT ONCE leaves it green — it is blind to all project content: it reads only external/live state, or asserts the absence of content no corruption supplies; Δ cannot falsify it by mutation | to rise: read a PROJECT input a mutation can corrupt (a captured dataset — the dataset-backed pattern), or supply a Π counter-fixture (only the latter helps a negative assertion; an external read needs the former) | not provably vacuous: it runs a cmd:, not a presupposed file: |
+
+### library
+
+_2 cited claims — self-grade: 2 behavioral; effective (clamped by entailment): 2 behavioral; 0 clamped below self._
+
+| claim | self → effective | witness | why this grade | why not higher | why not lower |
+| --- | --- | --- | --- | --- | --- |
+| `adequacy-pitch` | behavioral | `cmd:python3 concepts.py adequacy-pitch` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
+| `grade-ladder` | behavioral | `cmd:python3 concepts.py grade-ladder` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |

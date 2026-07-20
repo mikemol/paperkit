@@ -8,11 +8,14 @@ EFFECTIVE (clamped) grade (filled), and where that is below its self-contained
 grade a drop-line rises to a hollow ghost at the self grade — the delta is the gap.
 Edges are the entailment links.  Pure-stdlib, deterministic SVG.
 """
-GRADE_ORDER = ["behavioral", "existence", "indeterminate", "vacuous", "broken"]
+# Descending strength (grade.py STRENGTH/RANK_C): `imported` tops the ladder — a delegation to a
+# separately-gated owner (result: a sibling's verdict, concept: the library's certificate), not a
+# falsifiability tier.  It was absent until a paper claim first imported one, which crashed the plot.
+GRADE_ORDER = ["imported", "behavioral", "existence", "indeterminate", "vacuous", "broken"]
 # Okabe-Ito colour-blind-safe palette (per mat260's figure doctrine); grade is also
 # encoded by vertical position, so colour is never the sole channel.
-COLOR = {"behavioral": "#009E73", "existence": "#E69F00", "indeterminate": "#0072B2",
-         "vacuous": "#D55E00", "broken": "#000000"}
+COLOR = {"imported": "#CC79A7", "behavioral": "#009E73", "existence": "#E69F00",
+         "indeterminate": "#0072B2", "vacuous": "#D55E00", "broken": "#000000"}
 INK = "#1a1a1a"   # all text is dark-on-light
 
 

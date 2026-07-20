@@ -32,3 +32,4 @@ The knobs, each with its flag, environment variable, config key, and default —
 | `check` (flag) | `--check` | `PAPERKIT_CHECK` | — | `—` |
 | `only` (value) | `--only` | `PAPERKIT_ONLY` | — | `—` |
 | `invariants` (flag) | `--invariants` | `PAPERKIT_INVARIANTS` | — | `—` |
+| `mutant` (value) | `--mutant` | `PAPERKIT_MUTANT` | — | `—` |

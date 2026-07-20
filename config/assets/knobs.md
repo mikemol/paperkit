@@ -20,3 +20,4 @@
 | `check` (flag) | `--check` | `PAPERKIT_CHECK` | — | `—` |
 | `only` (value) | `--only` | `PAPERKIT_ONLY` | — | `—` |
 | `invariants` (flag) | `--invariants` | `PAPERKIT_INVARIANTS` | — | `—` |
+| `mutant` (value) | `--mutant` | `PAPERKIT_MUTANT` | — | `—` |

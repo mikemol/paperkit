@@ -18,8 +18,9 @@ consequence of taking that sentence literally and recursively:
 - **project.py** *projects* the DAG into prose (README.md, paper.md, …). The prose passes
   the gate *by construction*.
 - **gate.py** *verifies* the prose against four invariants (RESOLVE / COVERAGE /
-  without-K / PROJECT). A claim's `check` is a verifier string (`file:` / `cmd:` /
-  `result:` / `agree:` / custom).
+  without-K / PROJECT). A claim's `check` is a verifier string whose type prefix selects a
+  verb from `resolver.VERBS` (the engine's one declaration of the built-in set), or a
+  project-declared custom type.
 - **discriminate.py** *grades* each check by **falsifiability**: can the check actually
   fail? (mutation testing over the engine). This is the Δ machinery.
 - **coherence.py** reads the **boundary of the boundary** (∂²): does a project's declared
@@ -47,7 +48,7 @@ so it runs both as a script and as a Bazel-staged `.pyc` closure.
 | `grade.py` | Μ·grade — pure grade LADDER + interpretation (rungs, clamp/strength/corroboration orders, flip-set→grade). No engine imports, so a grade can be *read* cheaply. | stdlib | discriminate, grader, `checks/readme.py`, `tools/read_grade.py`, paper checks |
 | `mutate.py` | Ζ·mutant — pure AST perturbation leaf (drop def body→uncatchable raise, drop/inject import). Loud on a spec naming nothing. | stdlib (`ast`) | grader; `tools/calc.bzl` (`pk_mutate`), sites/sens/eval |
 | `layout.py` | Project file TOPOLOGY — which files Δ may read/corrupt, where the sandbox roots (`$HOME`-or-above refusal), which nested dirs are OTHER projects. | stdlib, `config`, filesystem | cache, grader, `boundaries_sandbox`, paper checks |
-| `resolver.py` | Check-RESOLUTION core: verb registry (`file:`/`cmd:`/`result:`/`agree:`/custom), env sanitization (`clean_env`, sshd-style default-deny + PATH pin), footprint tracing via strace. | stdlib, `config`; subprocess→`gate.py` (`result:`) | gate, grader, footdeps, many tests, paper checks |
+| `resolver.py` | Check-RESOLUTION core: **owns `VERBS`**, the one declaration of the built-in verb set (every doc/witness derives from it) + one dispatch branch each, plus custom types; env sanitization (`clean_env`, sshd-style default-deny + PATH pin), footprint tracing via strace. | stdlib, `config`; subprocess→`gate.py` (`result:`), `library/concepts.py` (`concept:`) | gate, grader, footdeps, many tests, paper checks |
 | `rhetoric.py` | Rhetorical-scheme layer: names inter-clause MOVES + gates each section against a declared SCHEME (rubric col 3). Imports `bib` not `project` (breaks the old cycle). | stdlib, `bib` | project (`MOVES`), coherence test, paper checks |
 | `cache.py` | Δ grade CACHE — content hashing + on-disk `.delta-cache.json`. A grade is a pure function of a check's read footprint over a global engine EPOCH. | stdlib, `layout` | discriminate, `boundaries_degrade` |
 | `driver.py` | Domain-free liveness driver for pump()/parse() witnesses — advances a resumable witness in budgeted steps, persists a token. Slow-but-sound reads as "resume me." | stdlib, `--state` file | discriminate (`D.drive`), `boundaries_driver`, paper checks |
@@ -98,7 +99,7 @@ authority `verdict.py`; `//:hook` runs each project's `gate`/`adequacy`/`cohere`
 | File | Defines / Purpose | Consumed by |
 |---|---|---|
 | `bibtex.bzl` | The GENERATOR — `bib` module extension + `bib_repo` repo rule. Reads bib/toml/mem.json at fetch, writes a BUILD instantiating all pk_* rules (verbs, calc/verdict/grade, the emerge mutation grid, cohere, gate+adequacy+footaudit, proof/witness). | `MODULE.bazel` `bib.project(...)` for boundaries/config/paper/root/setup |
-| `verb.bzl` | `pk_file` (EXISTS), `pk_cmd` (EXECS), `pk_result` (PARSES sibling verdict), `pk_agree` (CONCURS ≥2 producers), `pk_gate` (aggregate→verdict). | generated project BUILDs; `verb_demo` |
+| `verb.bzl` | `pk_file` (EXISTS), `pk_cmd` (EXECS), `pk_result` (PARSES sibling verdict), `pk_agree` (CONCURS ≥2 producers), `pk_gate` (aggregate→verdict). No `pk_concept`: `concept:` IMPORTS a certificate, which is reading a sibling's record, so `bibtex.bzl` wires it through `pk_result`. | generated project BUILDs; `verb_demo` |
 | `grade.bzl` | `pk_grade` (mutate-flavored), `pk_grade_claim` (one claim via `discriminate --only`), `pk_adequacy` (≥behavioral floor), `pk_footprint`/`pk_footaudit`. | generated adequacy/foot targets; `pi_demo` |
 | `calc.bzl` | The calc/interp split + mutation grid: `pk_calc` (cached sweep→`{baseline,sens}` w/ `resource_set`), `pk_pyc`/`pk_mutate`/`pk_eval`/`pk_sens`, `pk_mem_learn`, `pk_cohere`, `pk_verdict`, `pk_grade`, `pk_mutant`; providers `PycInfo`/`ObserveInfo`; `observe_setting`. | generated calc/emerge targets; `calc_demo`; `paperkit/BUILD.bazel` (`pk_pyc`) |
 | `witness.bzl` | `pk_witness` (claim as build artifact iff `holds` exits 0, consuming premise witnesses), `pk_proof` (building it proves the paper). | generated compose targets; `witness_demo` |

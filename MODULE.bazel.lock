@@ -144,10 +144,10 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "yPlzZAlpq9LrVBHF56xkqwZ9wW16tjTOhVcDQlag2VE=",
+        "bzlTransitiveDigest": "zEHWecTbk06PBL9pIA6lGa6Sciy3s6WLy6ScqR5mj7k=",
         "usagesDigest": "b56tq+VLFr1a+OX6wEYhI5FEv1Ff+J2i9mPrWhX58kw=",
         "recordedFileInputs": {
-          "@@//checks/readme.py": "44b9f64e42964a7f1f86f27d7e54742e1fdad5ce01c0dada7454904601d1097c",
+          "@@//checks/readme.py": "3257cd989c7a2a9ff35f56f8a3dbae54ea29b12714aa747f4dc7a6fb31dd4d97",
           "@@//library/paper.toml": "abe305540f0d6df80ebcd536f2b097d7c665399b844678ee9ce3179bd6ba8b95",
           "@@//paper.toml": "5f9ad08942219d85ba68074f848bddd43096ee9321b93333b698ca3c02e6e0c4",
           "@@//paper/checks/claims.py": "95cb107e41ef267cfe4900947a49486d4c565ef923f21d7714c727484f78b2e1",
@@ -160,13 +160,13 @@
           "@@//paperkit/discriminate.py": "3cc8aa9a04250a200711914cf05f8fb8c88a22b84eb3bad471d57f65ae72ffd4",
           "@@//paperkit/driver.py": "f102c6efb796e846d68b55a78a12a869d27157b84472efa35183b77537da136e",
           "@@//paperkit/footdeps.py": "7d39ecbbf7d8c1bd85b56c8939b43b39072d606fc2ead39e4a5c3d55b71e8457",
-          "@@//paperkit/gate.py": "ec7742893f6d8a3ff517e63dba7ffc31f84b1c7927497d803aeea69dd6092e57",
+          "@@//paperkit/gate.py": "e69bac52d0793b5ff371401a537c443d39482199f7c220069f314b4af9a3cdb6",
           "@@//paperkit/grade.py": "47645b12f3da9ddb024cfc81be5e746bf47a726e8ccef317a09c98f1a9e535ce",
           "@@//paperkit/grader.py": "b19a6ae7ef9ecceeec800627b7de75e35f514089aeb1174f678f7340ac111876",
           "@@//paperkit/layout.py": "99f119baff6edd294b9bda94ae73bd1bc0fb6eaf2efeb124dfbea001408ce26f",
           "@@//paperkit/mutate.py": "f609f1a2667a94d2a8008c43801c253bcc44c22b46e93e4afd8941f9ef0bd504",
           "@@//paperkit/project.py": "5f28c603071a11e491b3b72888df62910a28966920fd6f82f9dc4a8f9f8d7c63",
-          "@@//paperkit/resolver.py": "4b24c77087f00c90338ca97ad13614e9cf2efd725d954f51e7fac83ddfbecd66",
+          "@@//paperkit/resolver.py": "eaa42918f89e5c1b4380a9b97d435a9a0c40a56ee8813bac7f4b9359a1b2003b",
           "@@//paperkit/rhetoric.py": "2b4ba52de01006ac87a87f48f5cd78c484afbc25a07be23e7b19e61c090a1518",
           "@@//paperkit/tests/_fixture.py": "cb6038817815d72efc4dc34dee95853711ff9ad4eaed338a8fa74e0c2b0309e1",
           "@@//tools/closure.py": "637c99070a73235e9b89eee8ddabe4de38159fb8a308d391eb66cefc88084d60",

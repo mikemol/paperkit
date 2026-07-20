@@ -5,8 +5,8 @@ that rests-on others takes their witness artifacts as INPUTS.  So the bib's grou
 build DAG: a dependent cannot build unless every premise's witness was produced (the premise was
 proven).  build-success = proven — the Agda model, where a proof of B consumes the proof of A as a
 term.  A premise is just a label — `//:local` (rests-on) or `@other-paper//:witness` (importing a
-paper's results = treating it as a library); the package boundary is not semantic, so there is no
-`result:` special case.  pk_proof builds the whole DAG (every witness); building it proves the paper.
+paper's results = treating it as a library); the package boundary is not semantic, so the verbs that
+CROSS one (`result:`, `concept:`) get no special case here.  pk_proof builds the whole DAG (every witness); building it proves the paper.
 """
 
 _PY = "@bazel_tools//tools/python:toolchain_type"

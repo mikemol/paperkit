@@ -17,9 +17,9 @@ Three invariants, all from the warrant set:
             it would otherwise identify distinct claims that share one check.
   PROJECT   the committed prose equals the projection (paperkit-project --check).
 
-A claim's verifier is `<type>:<target>`.  Built-in types (no config needed):
-  file:<path>   the artifact exists, relative to the project
-  cmd:<script>  run `<target>` from the project dir; exit 0 = pass
+A claim's verifier is `<type>:<target>`.  The built-in types (no config needed) are declared
+ONCE, as data, in resolver.VERBS — one verb per resolution kind — and are not re-listed here:
+this text would drift, and did (it named two verbs long after there were five).
 Custom types come from paper.toml as `[checks.<type>] cmd = "... {target} ..."`,
 run from the project dir, exit 0 = pass.  `cmd:` is the universal escape hatch
 every check reduces to; the registry just gives recurring ones a name.

@@ -12,8 +12,10 @@ Starlark, not a general python script.
 Each target's `data` is its own project's files + the engine, plus the claim's DECLARED `reads`
 (Ζ·foot, declare+audit): a bib field naming the cross-package projects the check touches
 (`.` = root files like .githooks, or a sibling project).  A custom check type resolves from the
-project's paper.toml [checks.X] cmd template; a `result:<sibling>` check is a real cross-repo dep
-on the sibling's gate_rec record (records-as-deps, Ξ·result-imported); a host-coupled project
+project's paper.toml [checks.X] cmd template; the two BOUNDARY-CROSSING verbs are real cross-repo
+deps on the owner's record (records-as-deps): `result:<sibling>` on its gate_rec (Ξ·result-imported),
+and `concept:<key>` on the library's per-concept verdict + `__dcalc` certificate (Λ·witness — it
+reuses pk_result, since importing a certificate IS reading a sibling's record); a host-coupled project
 (setup, `local`) runs its pk_cmd on the host, unsandboxed (Ζ·resist).  adequacy (the Δ sweep) is
 still an engine sh_test (discriminate.py) until Ζ·nest.
 
@@ -113,7 +115,8 @@ def _warrants(content):
 
 def _body(check, custom):
     """The witness BODY — the shell command behind a cmd:/custom check (exit 0 = the claim holds).
-    file:/result:/agree: have no single-command body (handled by the verb gate, not the proof DAG yet)."""
+    Only cmd:/custom have one; the other resolver.VERBS entries (file:/result:/agree:/concept:) are
+    handled by the verb gate, not the proof DAG yet — each resolves through machinery, not a shell line."""
     i = check.find(":")
     typ, target = check[:i], check[i + 1:]
     if typ == "cmd":

@@ -20,6 +20,7 @@ ENGINE = ROOT / "paperkit"
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
+import resolver  # noqa: E402  — for VERBS, the engine's OWN verb set (never re-listed here)
 import project as P  # noqa: E402
 import _fixture as fx  # noqa: E402
 
@@ -97,13 +98,19 @@ def rm_cmds_inv():
 
 
 def rm_resolver():
-    # a verifier is NAMED type:target (the type prefix selects the verb), and built-in verbs ship —
-    # file EXISTS, cmd EXECS, agree CONCURS (result PARSES a sibling — rm-resolver's sibling test);
-    # an unregistered type resolves through none (the set is closed).  Behavioral (Ε·behavioral).
+    # a verifier is NAMED type:target (the type prefix selects the verb), one verb ships per
+    # resolution KIND, and an unregistered type resolves through none (the set is CLOSED).
+    # Λ·registry: the verbs are READ from resolver.VERBS — no count, no list, nothing to drift.
+    # Behavioral (Ε·behavioral).
     assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("file:true", ENGINE, {}) is False, \
         "the type prefix does not select the verb (a verifier is named type:target)"
     assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: verb"
     assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: verb"
+    # every DECLARED verb is a real dispatch: an unknown target under a declared verb must come back
+    # False (resolved and failed), never crash — whereas an undeclared TYPE is refused outright.
+    for typ in resolver.VERBS:
+        assert gate.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}) is False, \
+            f"{typ}: is declared in VERBS but does not dispatch to a real branch"
     assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "an unregistered type resolved — the built-in set is not closed"
 
 
@@ -206,10 +213,21 @@ def rm_delta_tbl():
 
 
 def rm_resolver_tbl():
-    # the table lists exactly the engine's built-in verbs, and each is a REAL dispatch (not table text)
+    # the table lists EXACTLY the engine's built-in verbs, and each is a REAL dispatch (not table text).
+    # Λ·registry: the set is READ from resolver.VERBS, never re-listed here.  A witness that hardcodes
+    # its own copy of the set it guards certifies a TAUTOLOGY — it stays green through exactly the drift
+    # it exists to catch (this one did: after concept: shipped, deleting its table row kept it green).
+    # So the assertion is set-EQUALITY, which fails on an omitted row AND on a row for a dead verb.
     tbl = (ROOT / "assets" / "resolver.md").read_text()
-    for typ in ("file:", "cmd:", "result:", "agree:"):
-        assert typ in tbl, f"the resolver table omits the {typ} verb"
+    tabled = set(re.findall(r"\|\s*`(\w+):", tbl))
+    assert tabled == set(resolver.VERBS), \
+        f"the resolver table and the engine's verb set disagree: {tabled ^ set(resolver.VERBS)}"
+    # every COLUMN is derived too, not just the key — otherwise VERBS' arg/passes would be declared
+    # data that nothing reads, and the table's gloss could drift while the row stayed present.
+    for typ, spec in resolver.VERBS.items():
+        arg = spec["arg"].replace("|", r"\|")          # markdown escapes agree:'s ||| separator
+        row = f"| `{typ}:{arg}` | {spec['verb']} | {spec['passes']} |"
+        assert row in tbl, f"the table's {typ}: row does not match the engine's declaration\n  want: {row}"
     assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("file:gate.py", ENGINE, {}) is True, \
         "the tabled built-in verbs do not dispatch"
     assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "the built-in set is not closed"

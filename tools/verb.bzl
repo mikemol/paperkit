@@ -1,6 +1,8 @@
 """Ζ·verb — each check KIND is a SPECIFIC TYPED Starlark action emitting a RECORD, not a free-form
-script.  The resolver's four verbs (resolver.py resolves()) become four rules, and the gate an
-aggregate over their records:
+script.  The resolver's verbs (declared as data in resolver.VERBS) become typed rules, and the
+gate an aggregate over their records.  No count is named here — the set grows, this file cannot
+see it, and `concept:` is deliberately absent below: it wires through pk_result (bibtex.bzl),
+because importing a certificate IS reading a sibling's record.
 
     pk_file   EXISTS  — a path is present in the staged inputs
     pk_cmd    EXECS   — a command exits 0 (the one irreducibly-shell oracle: run arbitrary `cmd`)

@@ -2,18 +2,20 @@
 """The check RESOLVER — paperkit's check-resolution core, factored out of the gate so it
 can be imported and tested with a SMALL blast radius (no projector, no parallel gate loop,
 no config/CLI).  A verifier is named `type:target`; this module is the registry that
-dispatches it, one branch per VERB:
+dispatches it, one branch per VERB.
 
-    file:<path>       EXISTS  — the artifact is present (no subprocess)
-    cmd:<script>      EXECS   — the script exits 0 (the universal escape hatch)
-    result:<project>  PARSES  — a sibling project's machine-readable gate verdict parses green
-    agree:<p>|||<q>   CONCURS — N independent producers all exit 0 and emit identical output
-    <custom>:<target> EXECS   — a config-declared cmd template (domain types add here)
+The built-in verb SET is not written in this docstring: it is the DATA in VERBS below, the one
+place paperkit declares it.  Every consumer — the README's resolver table, the gate's --help,
+the Bazel verb rules, the prose, the witnesses — DERIVES from VERBS or is gated against it,
+because an enumeration re-declared beside its owner drifts.  A witness that re-declares the set
+it guards is the worst case: it certifies a tautology and stays green through exactly the drift
+it exists to catch (Λ·registry).  A `<custom>:<target>` type is declared per-project instead, in
+paper.toml as `[checks.<custom>] cmd = "…"`, and resolves as a cmd template.
 
 It also sanitizes the environment a check runs in (clean_env, sshd-style default-deny) and
 traces a check's READ footprint (footprint, Φ — the files it opens, the sound key to cache a
-grade on).  Deps: only the stdlib + gate.py-as-a-subprocess (for result:), never the rest of
-the engine.
+grade on).  Deps: only the stdlib + two of paperkit's own scripts as subprocesses (gate.py for
+result:, the library's concepts.py for concept:), never the rest of the engine.
 """
 from __future__ import annotations
 
@@ -29,6 +31,27 @@ import config
 
 _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
 _LIBRARY = Path(__file__).resolve().parent.parent / "library"  # the concept-witness library (concept:)
+
+
+# Λ·registry — THE built-in verb set.  This dict OWNS the enumeration: `resolves` dispatches one
+# branch per key, and no other file may re-declare the set — docs render it, witnesses assert
+# set-EQUALITY against it, and prose that would name a COUNT ("four verbs") or an ORDINAL ("the
+# third verb") says neither, because both hardcode a set's size into a place that cannot see it.
+# `arg` is the target's shape, `verb` the one word for what resolution MEANS, `passes` the
+# condition — together exactly the columns of the README's resolver table, which is why that
+# table can be checked against this and not maintained beside it.
+VERBS = {
+    "file":    {"arg": "<path>",      "verb": "exists",
+                "passes": "the artifact exists"},
+    "cmd":     {"arg": "<script>",    "verb": "execs",
+                "passes": "the script exits `0`"},
+    "result":  {"arg": "<project>",   "verb": "parses",
+                "passes": "the sibling project's gate verdict parses green"},
+    "agree":   {"arg": "<p>|||<q>",   "verb": "concurs",
+                "passes": "the independent producers all exit `0` and emit identical output"},
+    "concept": {"arg": "<key>",       "verb": "imports",
+                "passes": "the concept library's certificate for that key reads pass"},
+}
 
 
 # A check is arbitrary code (cmd: is the universal escape hatch), so it must not run in
@@ -94,8 +117,8 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
     if typ == "file":
         return (project_dir / target).exists()        # EXISTS — no subprocess → no lease
     if typ == "result":
-        # Ξ·seam — the third resolver verb: file EXISTS, cmd EXECS, result PARSES.  It
-        # imports a sibling project's machine-readable gate VERDICT (gate --json) and
+        # Ξ·seam — result PARSES (VERBS names every verb; no ordinal here, an ordinal would
+        # hardcode the set's size).  It imports a sibling project's gate VERDICT (gate --json) and
         # PARSES it — green iff the parsed verdict reports pass — rather than re-deriving
         # what the sibling owns and separately gates.  cwd = this project's dir, so the
         # target is the sibling's path relative to it.  Δ grades it "imported" (run once),
@@ -121,8 +144,8 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
         except Exception:
             return False
     if typ == "agree":
-        # Δ·agree (Ε·agree) — the fourth verb: file EXISTS, cmd EXECS, result PARSES, agree
-        # CONCURS.  The SAME fact established by N INDEPENDENT producers (split on |||) that
+        # Δ·agree (Ε·agree) — agree CONCURS (see VERBS; no ordinal, no count).
+        # The SAME fact established by N INDEPENDENT producers (split on |||) that
         # must AGREE — every one exits 0 AND emits identical output.  Where cmd: trusts one
         # implementation, agreement across independent producers rules out a shared bug a
         # single check cannot catch: stronger evidence, a distinct KIND.

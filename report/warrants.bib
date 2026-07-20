@@ -18,6 +18,18 @@
   check   = {fresh:all}
 }
 
+@misc{rpt-reproducible,
+  section = {status}, from = {rpt-status-out}, join = {. },
+  claim   = {gate reproducibility splits the documents, and the report CHARACTERIZES the split rather than merely scoping around it --- the sandbox-clean set gates deterministically and is run above, while render, image, and setup gate non-reproducibly because named checks shell named external toolchains: render's shell pandoc and libreoffice, image's shell podman whose build fetches over the network, and setup's shell systemd-run, so each on-demand verdict varies with build-cache and network state --- determinism.py names the exact command behind each, so the non-reproducibility is itself reproducible on demand},
+  check   = {cmd:python3 determinism.py}
+}
+
+@misc{rpt-mitigation,
+  section = {status}, from = {rpt-reproducible}, join = {. },
+  claim   = {and the variance is bounded and disclosed, both mitigations proven in place --- image's img-stable gates that two independent --no-cache builds yield the SAME content digest, so the proof object is reproducible even when building it is not, confining the non-determinism to build cost and availability rather than to what is verified; and the report's own gate runner bounds each on-demand gate with a timeout and labels a document it cannot verify here as on-demand or n/a, never a false verification FAIL},
+  check   = {cmd:python3 mitigation.py}
+}
+
 % ── adequacy ─────────────────────────────────────────────────────────────────
 @misc{rpt-delta,
   section = {adequacy},

@@ -79,6 +79,25 @@ def _wired_names():
             for p in re.findall(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"', (ROOT / "MODULE.bazel").read_text())}
 
 
+def _local_names():
+    out = set()
+    for line in (ROOT / "MODULE.bazel").read_text().splitlines():
+        m = re.search(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"', line)
+        if m and "local = True" in line:
+            out.add("README" if m.group(1) == "." else m.group(1))
+    return out
+
+
+def _ondemand_names():
+    """Documents whose gate is NON-reproducible, so the report lists but does not RUN them: a project
+    that is not Bazel-wired (render/image — external toolchains) or is host-coupled `local` (setup —
+    its experiment is non-deterministic).  A `wired && !local` document gates sandbox-clean and
+    deterministically, so it is run and recorded with real status.  See the rpt-reproducible claim
+    and determinism.py — the reproducibility boundary is itself a checked claim, not a silent scope."""
+    wired, local = _wired_names(), _local_names()
+    return {n for n, _ in _all_docs() if n not in wired or n in local}
+
+
 def _graded():
     """The documents with a REPRODUCIBLE Δ grade — the //:hook set.  The deep grade/proof tables cover
     these; mutation-grading the on-demand documents is impractical (it re-runs pandoc/podman/systemd
@@ -95,8 +114,12 @@ def _tier(name):
 
 
 def gate_md():
+    ondemand = _ondemand_names()
     rows = []
     for name, proj in _all_docs():
+        if name in ondemand:   # non-reproducible gate — listed, not run (see rpt-reproducible)
+            rows.append(f"| {name} | on-demand | — | — | — | {_tier(name)} |")
+            continue
         g = _gate(proj, "--safe")
         status = f"n/a — {g['error']}" if "error" in g else ("PASS" if g.get("pass") else "FAIL")
         rows.append(f"| {name} | {status} | {'yes' if g.get('project_ok') else '—'} | "

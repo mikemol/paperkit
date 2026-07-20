@@ -34,22 +34,45 @@ def _delta(project):
     return _DELTA[project]
 
 
+def _gate_once(project, *flags):
+    """One gate --json run.  Robust to a document whose gate can't RUN here: a missing toolchain
+    (podman/pandoc/systemd) or a runaway check is caught and reported as an ERROR, distinct from a
+    verification FAIL — so an on-demand document is never falsely accused of failing verification
+    when the real cause is the environment."""
+    try:
+        r = subprocess.run([sys.executable, "paperkit/gate.py", "--json", *flags, project],
+                           cwd=ROOT, capture_output=True, text=True, timeout=300)
+        return json.loads(r.stdout) if r.stdout.strip() else {"error": (r.stderr.strip() or "no output").splitlines()[-1][:60]}
+    except subprocess.TimeoutExpired:
+        return {"error": "timed out (>300s)"}
+    except json.JSONDecodeError:
+        return {"error": "no verdict"}
+
+
 def _gate(project, *flags):
-    """gate --json — structured result (pass, project_ok, verified, sections, collapses).  Robust to
-    a document whose gate can't RUN here: a missing toolchain (podman/pandoc/systemd) or a runaway
-    check is caught and reported as an ERROR, distinct from a verification FAIL — so an on-demand
-    document is never falsely accused of failing verification when the real cause is the environment."""
     key = (project, flags)
     if key not in _GATE:
-        try:
-            r = subprocess.run([sys.executable, "paperkit/gate.py", "--json", *flags, project],
-                               cwd=ROOT, capture_output=True, text=True, timeout=300)
-            _GATE[key] = json.loads(r.stdout) if r.stdout.strip() else {"error": (r.stderr.strip() or "no output").splitlines()[-1][:60]}
-        except subprocess.TimeoutExpired:
-            _GATE[key] = {"error": "timed out (>300s)"}
-        except json.JSONDecodeError:
-            _GATE[key] = {"error": "no verdict"}
+        _GATE[key] = _gate_once(project, *flags)
     return _GATE[key]
+
+
+def _gate_stable(project, *flags, tries=3, runner=None):
+    """Retry to a WARM-CACHE FIXPOINT.  An on-demand gate's FIRST (cache-populating) run can differ
+    from later ones — podman builds its layers, apk fetches over the network, libreoffice writes its
+    profile — so rerun WHILE the verdict changes and return the converged (warm) result; convergence
+    is two consecutive runs agreeing.  If it never converges within `tries`, the variance is NOT
+    cache-warmth but a clock/threshold cause: return it flagged `_stable=False` for separate
+    characterization, never laundering an unstable verdict as reproducible.  `runner` is injectable so
+    the fixpoint logic is proven deterministically (mitigation.py) without running the flaky builds."""
+    run = runner or (lambda: _gate_once(project, *flags))
+    prev = last = None
+    for i in range(tries):
+        last = run()
+        k = (last.get("pass"), last.get("verified"), last.get("error"))
+        if k == prev:
+            return {**last, "_stable": True, "_tries": i + 1}
+        prev = k
+    return {**last, "_stable": False, "_tries": tries}
 
 
 def _all_docs():

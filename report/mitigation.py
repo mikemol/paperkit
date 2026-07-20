@@ -47,9 +47,29 @@ def _disclosure_mitigation():
         pass
 
 
+def _fixpoint_mitigation():
+    # the cache-warmth variance is stabilized by retrying to a warm fixpoint — proven deterministically
+    # by driving the runner's fixpoint over synthetic verdict sequences (no flaky build needed):
+    sys.path.insert(0, str(ROOT / "report"))
+    import gen
+    # cold→warm→warm: a verdict that changes once (cold build too slow) then holds (cache hit) must
+    # converge to the WARM result, marked stable:
+    warm_seq = iter([{"error": "timed out (>300s)"}, {"pass": True, "verified": 5}, {"pass": True, "verified": 5}])
+    warm = gen._gate_stable("image", "--safe", runner=lambda: next(warm_seq))
+    assert warm.get("pass") and warm.get("_stable"), \
+        f"retry did not converge to the warm verdict (cache-warmth not mitigated): {warm}"
+    # a verdict that never settles is NOT cache-warmth (a clock/threshold cause) — it must be FLAGGED,
+    # not laundered as reproducible:
+    osc_seq = iter([{"pass": True}, {"pass": False}, {"pass": True}])
+    flaky = gen._gate_stable("x", runner=lambda: next(osc_seq))
+    assert flaky.get("_stable") is False, \
+        "a non-converging (clock/threshold) verdict must be flagged for characterization, not accepted"
+
+
 def main() -> int:
     _content_mitigation()
     _disclosure_mitigation()
+    _fixpoint_mitigation()
     print("mitigations proven in place: (1) content digest-reproducibility (image img-stable — two "
           "--no-cache builds → same digest); (2) deterministic disclosure (runner timeout → n/a, "
           "reproduced here; on-demand labels; never a false FAIL) — variance confined to build cost")

@@ -26,7 +26,7 @@
 
 @misc{rpt-mitigation,
   section = {status}, from = {rpt-reproducible}, join = {. },
-  claim   = {and the variance is bounded and disclosed, both mitigations proven in place --- image's img-stable gates that two independent --no-cache builds yield the SAME content digest, so the proof object is reproducible even when building it is not, confining the non-determinism to build cost and availability rather than to what is verified; and the report's own gate runner bounds each on-demand gate with a timeout and labels a document it cannot verify here as on-demand or n/a, never a false verification FAIL},
+  claim   = {and the variance is bounded and disclosed, three mitigations proven in place --- image's img-stable gates that two independent --no-cache builds yield the SAME content digest, so the artifact is reproducible even when building it is not, confining the non-determinism to build cost rather than to what is verified; the report's gate runner labels a document it cannot verify here as on-demand or n/a, never a false verification FAIL; and the cache-warmth variance is itself stabilized by retrying to a warm-cache fixpoint --- rerun while the verdict changes, return the converged warm result --- while a verdict that never converges is flagged as a non-cache clock or threshold cause for separate characterization, not laundered as reproducible},
   check   = {cmd:python3 mitigation.py}
 }
 

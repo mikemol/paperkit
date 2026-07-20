@@ -55,10 +55,13 @@ def _entries(content):
         out.append((key, check, sib, reads, rests))
     return out
 
-def _data(tokens, files):
-    """own files + engine (always) + each DECLARED read token → its project's filegroup
-    (`.` → the root project's files; a sibling name → that project's files)."""
+def _data(tokens, files, imports = []):
+    """own files + engine (always) + the IMPORTED concept-bib packages' files (a view composes bibs
+    from other packages, and the runtime engine re-reads them when it gates/grades) + each DECLARED
+    read token → its project's filegroup (`.` → the root project's files; a sibling → its files)."""
     out = {files: True, "@@//paperkit:engine": True}
+    for i in imports:
+        out[i] = True
     for t in tokens:
         if t == "paperkit":
             continue
@@ -119,7 +122,7 @@ def _body(check, custom):
         return custom[typ].replace("{target}", target)
     return None
 
-def _verb_rule(name, check, proj, files, reads, custom, local):
+def _verb_rule(name, check, proj, files, reads, custom, local, imports = []):
     """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
     script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd (the exit-code
     oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `local` marks
@@ -127,7 +130,7 @@ def _verb_rule(name, check, proj, files, reads, custom, local):
     i = check.find(":")
     typ = check[:i]
     target = check[i + 1:]
-    dl = ", ".join([_lit(d) for d in _data(reads, files)])
+    dl = ", ".join([_lit(d) for d in _data(reads, files, imports)])
     pj = "" if proj == "." else ", project = " + _lit(proj)
     lc = ", local = True" if local else ""
     if typ == "cmd":
@@ -283,6 +286,15 @@ def _bib_repo_impl(repository_ctx):
         warrants = _warrants(toml)
     if not warrants:
         warrants = [bibp.basename]
+    # Ζ·import·stage — the IMPORTED concept-bib packages (label tokens in warrants): their :files must
+    # be staged in this project's runtime actions, because the engine RE-READS the composed bibs when
+    # it gates/grades (the fetch-time compose in the loop below alone leaves them out of the sandbox).
+    imports = {}
+    for w in warrants:
+        if w.startswith("//") and ":" in w:
+            pkg = w[2:].split(":", 1)[0]
+            imports["@@//:files" if pkg == "" else "@@//%s:files" % pkg] = True
+    imports = [k for k in sorted(imports) if k != files]
     parsed = []
     for w in warrants:
         # A bare basename is a LOCAL sibling of the anchor (get_child, one segment).  A LABEL token
@@ -367,7 +379,7 @@ def _bib_repo_impl(repository_ctx):
         if calc and _body(check, custom) != None:
             # Ζ·calc·interp — ONE cached sweep (pk_calc) feeds the verdict reading here (and the grade
             # reading below); the redundant verdict run + the adequacy re-sweep collapse into it.
-            dl = ", ".join([_lit(d) for d in _data(reads, files)])
+            dl = ", ".join([_lit(d) for d in _data(reads, files, imports)])
             out.append("pk_calc(name = " + _lit(k + "__calc") + ", claim = " + _lit(k) +
                        ", project = " + _lit(proj) + ", mem = " + str(_membucket(mem, k, "file")) +
                        ", data = [" + dl + "])")
@@ -435,7 +447,7 @@ def _bib_repo_impl(repository_ctx):
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
                            str(_membucket(mem, k, "def")) + ", data = [" + dl + "])")
         else:
-            out.append(_verb_rule(k, check, proj, files, reads, custom, local))
+            out.append(_verb_rule(k, check, proj, files, reads, custom, local, imports))
         recs.append('":%s"' % k)
 
     if calc_claims:
@@ -455,7 +467,7 @@ def _bib_repo_impl(repository_ctx):
         # def-sweep is the cost (in //:hook by the owner's call); the reading itself is ~0.1s.
         cc = ", ".join([_lit(":" + k + "__dcalc") for k in calc_claims])
         out.append('pk_cohere(name = "cohere_rec", project = ' + _lit(proj) + ", calcs = [" + cc +
-                   '], data = ["@@//paperkit:engine", ' + _lit(files) + "])")
+                   '], data = ["@@//paperkit:engine", ' + _lit(files) + "".join([", " + _lit(i) for i in imports]) + "])")
         out.append('sh_test(name = "cohere", srcs = ["@@//tools:assert_pass.sh"], ' +
                    'args = ["$(rootpath :cohere_rec)"], data = [":cohere_rec"], size = "small", ' +
                    'visibility = ["//visibility:public"])')
@@ -464,7 +476,7 @@ def _bib_repo_impl(repository_ctx):
     # GENERAL oracle, kept as a cmd: drop (Ζ·resist).
     lc = ", local = True" if local else ""
     inv = "\"$(command -v python3)\" paperkit/gate.py --invariants --safe --without-K " + proj
-    out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + ', "@@//paperkit:engine"])')
+    out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + "".join([", " + _lit(i) for i in imports]) + ', "@@//paperkit:engine"])')
     recs.append('":invariants"')
 
     # pk_gate aggregates the records → the project verdict; the assert-test puts it in the live gate.
@@ -496,7 +508,7 @@ def _bib_repo_impl(repository_ctx):
             else:
                 out.append("pk_grade_claim(name = " + _lit(k + "__grade") + ", claim = " + _lit(k) +
                            ", project = " + _lit(proj) + ", data = [" +
-                           ", ".join([_lit(d) for d in _data(reads, files)]) + "])")
+                           ", ".join([_lit(d) for d in _data(reads, files, imports)]) + "])")
             grades.append('":%s__grade"' % k)
         out.append('pk_adequacy(name = "adequacy_rec", grades = [%s], visibility = ["//visibility:public"])' % ", ".join(grades))
         out.append('sh_test(name = "adequacy", srcs = ["@@//tools:assert_pass.sh"], ' +
@@ -540,7 +552,7 @@ def _bib_repo_impl(repository_ctx):
                     continue
             out.append("pk_witness(name = " + _lit(k + "__witness") + ", holds = " + _lit(body) + pj +
                        ", premises = [" + ", ".join(prem) + "], data = [" +
-                       ", ".join([_lit(d) for d in _data(reads, files)]) + "])")
+                       ", ".join([_lit(d) for d in _data(reads, files, imports)]) + "])")
             wits.append('":%s__witness"' % k)
         out.append('pk_proof(name = "proof", witnesses = [%s], visibility = ["//visibility:public"])' % ", ".join(wits))
     repository_ctx.file("BUILD.bazel", "\n".join(out) + "\n")

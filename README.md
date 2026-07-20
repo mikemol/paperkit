@@ -54,7 +54,7 @@ A check ALSO names how a claim is verified, which the footnote and plain render 
 
 ## Grading check adequacy (Δ)
 
-A passing check only proves a sentence named a verifier, not that the verifier entails it — so discriminate.py grades how much each check can actually fail [@rm-delta] --- the grades are [@rm-delta-tbl].
+A passing check only proves a sentence named a verifier, not that the verifier entails it — so discriminate.py grades how much each check can actually fail [@adequacy-pitch] --- the grades are [@rm-delta-tbl].
 
 | grade | meaning |
 | --- | --- |

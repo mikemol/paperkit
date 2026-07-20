@@ -1,0 +1,11 @@
+% adequacy_pitch.bib — a PITCH face of the adequacy concept, authored in the library and imported by
+% VIEWS that want the shallow one-line pitch (the README) rather than the paper's deep treatment.
+% Not listed in paper/paper.toml's warrants — paper composes the deep adequacy.bib, not this.  Its
+% check resolves against the shared concept-witness (checks/concepts.py), the same witness the deep
+% claim will use, so the concept's proof is single-authored.
+
+@misc{adequacy-pitch,
+  section = {adequacy},
+  claim   = {a passing check only proves a sentence named a verifier, not that the verifier entails it --- so discriminate.py grades how much each check can actually fail},
+  check   = {concept:adequacy-pitch}
+}

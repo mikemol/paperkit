@@ -2,7 +2,7 @@
 adequacy = true
 title = "paperkit"
 subtitle = "A paper is a projection of a verified claim-DAG — write claims, not prose."
-warrants = ["warrants.bib"]
+warrants = ["warrants.bib", "//paper:adequacy_pitch.bib"]
 rubric = "rubric.tsv"
 out = "README.md"
 numbered = false      # README sections read better unnumbered
@@ -13,3 +13,9 @@ references = false    # a README has no bibliography section
 # --min-strength behavioral hold), just as paper/ does.
 [checks.claim]
 cmd = "python3 checks/readme.py {target}"
+
+# concept:<key> resolves against the SHARED concept-witness library (checks/concepts.py) — a concept
+# IMPORTED from the library (its pitch record composed via //paper:*_pitch.bib) is witnessed once
+# there, not re-authored per view.  The README's adequacy pitch is the first such import.
+[checks.concept]
+cmd = "python3 checks/concepts.py {target}"

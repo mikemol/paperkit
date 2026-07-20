@@ -126,14 +126,9 @@ def rm_resolver_premise():
         "premise resolved as a built-in gate verb — it must be a provenance KIND, not a verb"
 
 
-def rm_delta():
-    # discriminate grades how much a check can actually fail (the four grades, by mutation);
-    # Μ·grade: the grade LADDER (the rungs + interpretation) is grade.py, the grader SWEEPS
-    for g in ("vacuous", "existence", "behavioral", "indeterminate"):
-        assert g in GRADE_SRC, f"the grade ladder does not define the {g} grade"
-    assert "flips it red" in GRADE_SRC, "the ladder does not grade by mutation"
-    assert "def sensitivity" in GRADER_SRC, "the grader does not define the mutation sweep"
-
+# rm_delta REMOVED — the adequacy pitch is now imported from the concept library as [@adequacy-pitch]
+# and witnessed by the SHARED checks/concepts.py (which RUNS the grader over a fixture, a stronger
+# witness than this used to be by grepping engine source).
 
 def rm_next():
     # the roadmap is still pending: no packaged CLI or PDF renderer yet (when one ships,
@@ -237,7 +232,7 @@ CLAIMS = {
     "rm-selfhost": rm_selfhost, "rm-model": rm_model, "rm-cmds": rm_cmds,
     "rm-cmds-inv": rm_cmds_inv, "rm-resolver": rm_resolver, "rm-resolver-cmd": rm_resolver_cmd,
     "rm-resolver-premise": rm_resolver_premise,
-    "rm-delta": rm_delta, "rm-next": rm_next,
+    "rm-next": rm_next,
     "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,
     "rm-delta-cmds": rm_delta_cmds, "rm-layout": rm_layout, "rm-model-eg": rm_model_eg,
     "rm-delta-tbl": rm_delta_tbl, "rm-resolver-tbl": rm_resolver_tbl, "rm-resolver-eg": rm_resolver_eg,

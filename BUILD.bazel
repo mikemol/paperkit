@@ -21,6 +21,7 @@ filegroup(name = "files", srcs = [
         "assets/resolver.md",
         "assets/resolver.toml",
         "checks/readme.py",
+        "checks/concepts.py",   # the shared concept-witness library (concept: checks resolve here)
         "paper.toml",
         "rubric.tsv",
         "warrants.bib",

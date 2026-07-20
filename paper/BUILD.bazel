@@ -18,5 +18,6 @@ filegroup(name = "files", srcs = [
         "composition.bib",
         "implications.bib",
         "conclusion.bib",
+        "adequacy_pitch.bib",   # a PITCH face imported by the README (not composed by paper itself)
         "//paper/checks/fixture:files",
     ], visibility = ["//visibility:public"])

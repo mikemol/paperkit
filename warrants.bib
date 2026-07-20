@@ -87,13 +87,11 @@
 }
 
 % ── adequacy ─────────────────────────────────────────────────────────────────
-@misc{rm-delta,
-  section = {adequacy},
-  claim   = {a passing check only proves a sentence named a verifier, not that the verifier entails it --- so discriminate.py grades how much each check can actually fail},
-  check   = {claim:rm-delta}
-}
+% the adequacy pitch (a passing check proves only a NAMING, so Δ grades falsifiability) is now
+% IMPORTED from the concept library as [@adequacy-pitch] (//paper:adequacy_pitch.bib), witnessed by
+% the shared checks/concepts.py — the README no longer re-authors it.
 @misc{rm-delta-tbl,
-  section = {adequacy}, from = {rm-delta}, join = { --- },
+  section = {adequacy}, from = {adequacy-pitch}, join = { --- },
   claim   = {the grades are},
   emit    = {assets/grades.md},
   check   = {claim:rm-delta-tbl}

@@ -75,9 +75,12 @@ def new_domain_adds():
 
 def two_builtins():
     import gate
-    # four verbs ship built in (file EXISTS, cmd EXECS, agree CONCURS; result PARSES a sibling —
-    # result_builtin), each resolving through its OWN branch, and an UNREGISTERED type resolves through
-    # NONE — the built-in set is CLOSED (a 5th verb needs the [checks.X] registry).  Behavioral.
+    # a verb per resolution kind ships built in (file EXISTS, cmd EXECS, agree CONCURS; result PARSES a
+    # sibling — result_builtin; concept IMPORTS the library's certificate — Λ·witness), each resolving
+    # through its OWN branch, and an UNREGISTERED type resolves through NONE.  NOTE this witness asserts
+    # only that the named verbs resolve and an unregistered one does not — it does NOT pin the SET, which
+    # is why adding concept: silently left "four types ship built in" false in the prose (Λ·verbcount).
+    # Λ·registry's enumerative closure assertion is the fix.  Behavioral.
     assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: verb"
     assert gate.resolves("cmd:true", ENGINE, {}) is True, "cmd: verb"
     assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: verb"

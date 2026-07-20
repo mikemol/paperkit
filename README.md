@@ -31,7 +31,7 @@ The gate enforces three invariants: the committed prose equals its projection, e
 
 ## The check-resolver
 
-A verifier is named type:target, and four types ship built in, one per verb — exists, execs, parses, concurs [@rm-resolver] --- the four built-ins are [@rm-resolver-tbl].
+A verifier is named type:target, and one type ships built in per verb — exists, execs, parses, concurs, imports [@rm-resolver] --- the built-ins are [@rm-resolver-tbl].
 
 | type | verb | passes when |
 | --- | --- | --- |
@@ -39,6 +39,7 @@ A verifier is named type:target, and four types ship built in, one per verb — 
 | `cmd:<script>` | execs | the script exits `0` |
 | `result:<project>` | parses | the sibling project's gate verdict parses green |
 | `agree:<p>\|\|\|<q>` | concurs | the independent producers all exit `0` and emit identical output |
+| `concept:<key>` | imports | the concept library's certificate for that key reads pass |
 
 Cmd is the universal escape hatch every check reduces to, and a new domain adds named types in paper.toml without touching the engine [@rm-resolver-cmd]. A new domain declares them like this [@rm-resolver-eg].
 
@@ -50,7 +51,7 @@ cmd = "agda --safe {target}"
 cmd = "pytest -k {target}"
 ```
 
-A check ALSO names how a claim is verified, which the footnote and plain render targets read as a provenance note — a cmd is machine-verified, an agda claim Agda-proved, and a premise a classical premise carried WITHOUT a machine check, surfaced honestly as not-machine-checked rather than dressed as a passing verb — so premise is a provenance KIND, not a fifth resolving verb, and the built-in verb set stays closed [@rm-resolver-premise].
+A check ALSO names how a claim is verified, which the footnote and plain render targets read as a provenance note — a cmd is machine-verified, an agda claim Agda-proved, and a premise a classical premise carried WITHOUT a machine check, surfaced honestly as not-machine-checked rather than dressed as a passing verb — so premise is a provenance KIND, not a resolving verb at all, and the built-in verb set stays closed against it [@rm-resolver-premise].
 
 ## Grading check adequacy (Δ)
 

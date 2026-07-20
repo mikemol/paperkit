@@ -60,12 +60,12 @@
 % ── resolver ─────────────────────────────────────────────────────────────────
 @misc{rm-resolver,
   section = {resolver},
-  claim   = {a verifier is named type:target, and four types ship built in, one per verb --- exists, execs, parses, concurs},
+  claim   = {a verifier is named type:target, and one type ships built in per verb --- exists, execs, parses, concurs, imports},
   check   = {claim:rm-resolver}
 }
 @misc{rm-resolver-tbl,
   section = {resolver}, from = {rm-resolver}, join = { --- },
-  claim   = {the four built-ins are},
+  claim   = {the built-ins are},
   emit    = {assets/resolver.md},
   check   = {claim:rm-resolver-tbl}
 }
@@ -82,7 +82,7 @@
 }
 @misc{rm-resolver-premise,
   section = {resolver}, from = {rm-resolver-eg}, join = {. },
-  claim   = {a check ALSO names how a claim is verified, which the footnote and plain render targets read as a provenance note --- a cmd is machine-verified, an agda claim Agda-proved, and a premise a classical premise carried WITHOUT a machine check, surfaced honestly as not-machine-checked rather than dressed as a passing verb --- so premise is a provenance KIND, not a fifth resolving verb, and the built-in verb set stays closed},
+  claim   = {a check ALSO names how a claim is verified, which the footnote and plain render targets read as a provenance note --- a cmd is machine-verified, an agda claim Agda-proved, and a premise a classical premise carried WITHOUT a machine check, surfaced honestly as not-machine-checked rather than dressed as a passing verb --- so premise is a provenance KIND, not a resolving verb at all, and the built-in verb set stays closed against it},
   check   = {claim:rm-resolver-premise}
 }
 

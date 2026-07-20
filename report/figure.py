@@ -8,14 +8,23 @@ EFFECTIVE (clamped) grade (filled), and where that is below its self-contained
 grade a drop-line rises to a hollow ghost at the self grade — the delta is the gap.
 Edges are the entailment links.  Pure-stdlib, deterministic SVG.
 """
-# Descending strength (grade.py STRENGTH/RANK_C): `imported` tops the ladder — a delegation to a
-# separately-gated owner (result: a sibling's verdict, concept: the library's certificate), not a
-# falsifiability tier.  It was absent until a paper claim first imported one, which crashed the plot.
-GRADE_ORDER = ["imported", "behavioral", "existence", "indeterminate", "vacuous", "broken"]
-# Okabe-Ito colour-blind-safe palette (per mat260's figure doctrine); grade is also
-# encoded by vertical position, so colour is never the sole channel.
-COLOR = {"imported": "#CC79A7", "behavioral": "#009E73", "existence": "#E69F00",
-         "indeterminate": "#0072B2", "vacuous": "#D55E00", "broken": "#000000"}
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "paperkit"))
+import grade as _grade  # noqa: E402  (Μ·grade — the ladder LEAF; a plot reads it, never re-lists it)
+
+# Ζ·ladder — the y axis IS the ladder, so DERIVE it (descending: `imported` on top, a delegation to
+# a separately-gated owner rather than a falsifiability tier).  This was a hand-written list once,
+# and `imported` was missing from it until a paper claim first imported one — which crashed the plot
+# with KeyError rather than mis-drawing it, the one mercy of a list used as a lookup key.
+GRADE_ORDER = _grade.rungs()
+# Okabe-Ito colour-blind-safe palette (per mat260's figure doctrine); grade is also encoded by
+# vertical position, so colour is never the sole channel.  Keyed by rung, with a neutral fallback
+# so a rung added upstream PLOTS (greyed, visibly unstyled) instead of crashing the report.
+_PALETTE = {"imported": "#CC79A7", "behavioral": "#009E73", "existence": "#E69F00",
+            "indeterminate": "#0072B2", "vacuous": "#D55E00", "broken": "#000000"}
+COLOR = {g: _PALETTE.get(g, "#999999") for g in GRADE_ORDER}
 INK = "#1a1a1a"   # all text is dark-on-light
 
 

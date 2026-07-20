@@ -35,6 +35,27 @@ GRADE_C = {v: k for k, v in RANK_C.items()}
 CORRO_C = {"single": 0, "independent": 1}
 
 
+# Ζ·ladder — the two DERIVATIONS every consumer needs, so none re-declares the rungs.  A ladder
+# re-listed downstream drifts silently and in the WORST direction: a display order that omits a
+# rung SILENTLY DROPS claims from its own total (report/gen.py counted 79 of 80), and an adequacy
+# gate written as a BLACKLIST of failing grades PASSES any rung added after it was written — the
+# gate fails open, which is the one direction a gate must never fail.  Both are stated here as a
+# function of RANK_C instead, so a new rung reaches every consumer by being added ONCE, above.
+
+def rungs(descending: bool = True) -> list:
+    """Every grade the ladder defines, in rank order — the display order for any summary.  Listing
+    rungs by hand is how a report comes to omit one and quietly under-count its own population."""
+    return sorted(RANK_C, key=lambda g: RANK_C[g], reverse=descending)
+
+
+def below(floor: str) -> list:
+    """The grades that FAIL a `floor` — derived, so the adequacy gate fails CLOSED.  Stated as a
+    blacklist it would admit every future rung by default; stated as `rank < rank(floor)` a new
+    rung is judged the moment it exists.  `floor` must be a defined rung (KeyError if it is not —
+    a typo'd floor must not silently grade everything green)."""
+    return [g for g in rungs(descending=False) if RANK_C[g] < RANK_C[floor]]
+
+
 def _grade_from_sens(baseline: bool, sens: list) -> dict:
     """The cmd/custom verdict as a pure function of (baseline-passes, flip-set) — shared
     by the per-check path (grade_check → sensitivity) and the flat work-queue grader."""

@@ -21,6 +21,8 @@ import figure  # report/figure.py — the claim-DAG adequacy plot
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+sys.path.insert(0, str(ROOT / "paperkit"))
+import grade  # noqa: E402  (Μ·grade — the ladder LEAF; the summary DERIVES its rungs, never lists them)
 ASSETS = HERE / "assets"
 _DELTA, _GATE = {}, {}
 
@@ -152,7 +154,10 @@ def gate_md():
 
 
 def _delta_section(name, recs):
-    order = ["behavioral", "existence", "indeterminate", "vacuous", "broken"]
+    # Ζ·ladder — DERIVED from the engine's ladder, never re-listed: this line used to omit
+    # `imported`, so a view importing a concept certificate had its claim dropped from the
+    # summary's own total ("80 cited claims — self-grade: 79 behavioral", the 80th unaccounted).
+    order = grade.rungs()
     counts, eff_counts, clamped = {}, {}, 0
     for r in recs:
         counts[r["grade"]] = counts.get(r["grade"], 0) + 1

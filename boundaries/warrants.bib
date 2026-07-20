@@ -121,3 +121,9 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_dispatch.py},
   reads   = {.}
 }
+@misc{bnd-ladder,
+  section = {engine}, from = {bnd-dispatch}, join = {, and }, rests-on = {bnd-dispatch},
+  claim   = {the grade LADDER's boundary is the same shape --- the rungs are declared once (grade.RANK_C) and every consumer that orders, displays or gates on them DERIVES, because a re-declared ladder drifts in two opposite directions at once: a display order missing a rung silently under-counts its own population, and an adequacy floor written as a BLACKLIST of failing grades fails OPEN, admitting every rung added after the list was written --- so the floor is named and its failing set derived, which judges a new rung the moment it exists},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_ladder.py},
+  reads   = {.}
+}

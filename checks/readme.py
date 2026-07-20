@@ -202,14 +202,15 @@ def rm_model_eg():
 
 
 def rm_delta_tbl():
-    # the grade table lists the grades the engine's ladder actually defines (each is in the doc AND
-    # a real rung of grade.STRENGTH — drop one from the doc, or rename it in the ladder, and this fails)
+    # the grade table lists EXACTLY the rungs the engine's ladder defines, in RANK ORDER.
+    # Ζ·ladder: read from grade.py, never re-listed here.  The old form hardcoded its own 4-tuple
+    # and asserted only membership, so it was green while the table omitted `broken` and
+    # `imported` — a witness that carries its own copy of the set it guards proves a tautology.
     import grade  # noqa: E402
     tbl = (ROOT / "assets" / "grades.md").read_text()
-    assert "vacuous" in tbl and "existence" in tbl and "behavioral" in tbl and "indeterminate" in tbl, \
-        "the grade table omits a grade"
-    for g in ("vacuous", "existence", "behavioral", "indeterminate"):
-        assert g in grade.STRENGTH, f"the table lists {g} but the ladder does not define it"
+    tabled = re.findall(r"\| `(\w+)` \|", tbl)
+    assert tabled == grade.rungs(), \
+        f"the grade table and the engine's ladder disagree: table={tabled} ladder={grade.rungs()}"
 
 
 def rm_resolver_tbl():

@@ -31,6 +31,12 @@ filegroup(name = "files", srcs = [
         "//tools:grade.bzl",
         "//tools:bibtex.bzl",
         "//tools:witness.bzl",
+        # Ζ·ladder·wire — the ladder's downstream consumers, so bnd-ladder can read them and prove
+        # none re-declares the rungs.  The report is on-demand (not in //:hook), but its summary is
+        # exactly where an omitted rung last went unnoticed, so it is gated as a READER here.
+        "//tools:verdict.py",
+        "//report:gen.py",
+        "//report:figure.py",
     ], visibility = ["//visibility:public"])
 
 # The local CI: `bazel test //:hook` IS the pre-commit (Ζ·hook / Ζ·foot·hook) — it gates AND grades

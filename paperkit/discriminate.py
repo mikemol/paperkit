@@ -77,7 +77,7 @@ from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
                    footprint_hash as _footprint_hash, load as _load_cache, save as _save_cache)
 from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness,  # noqa: E402,F401
                     _grade_parallel, _sandbox_root, mutate_one)
-from grade import STRENGTH, ORDER, CORRO_C, clamp, mark_content_sensitive  # noqa: E402,F401  (Μ·grade — the ladder + interpretation leaf)
+from grade import STRENGTH, ORDER, RANK_C, CORRO_C, clamp, mark_content_sensitive  # noqa: E402,F401  (Μ·grade — the ladder + interpretation leaf)
 
 
 def main(argv: list) -> int:
@@ -283,8 +283,8 @@ def report(records, share, graded, n_cited, n_checked, consider_all):
     scope = "all checked" if consider_all else f"of {n_cited} cited"
     print(f"paperkit-discriminate (Δ): {n_checked} {scope} warrant(s) carry a "
           f"check, {len(share)} distinct check(s)\n")
-    order = {"broken": 0, "vacuous": 1, "indeterminate": 2, "existence": 3,
-             "behavioral": 4, "imported": 5}
+    # Ζ·ladder — the ladder's own total order (grade.RANK_C), not a second copy of it.
+    order = RANK_C
     for r in sorted(records, key=lambda r: (order.get(r["grade"], 9), r["key"])):
         share_n = len(r["shared_with"]) + 1
         dil = f"  (shared by {share_n} claims)" if share_n > 1 else ""

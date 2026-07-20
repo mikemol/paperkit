@@ -15,9 +15,9 @@ Subcommands — each writes one compact {verb, verdict} record to <out>:
   exists <verb> <path> <out>                       — pass iff <path> is present (pk_file)
   agg    <verb> <out> <field> <bad> <record>...    — pass iff NO record has record[field] in <bad>
                                                      (a comma list).  The ONE aggregator: pk_gate /
-                                                     pk_result = (verdict, fail); pk_adequacy =
-                                                     (grade, vacuous,existence,indeterminate,broken);
-                                                     pk_footaudit = (ok, false).
+                                                     pk_result = (verdict, fail); pk_footaudit =
+                                                     (ok, false).  For an ADEQUACY floor use
+                                                     `<bad>` = `below:<grade>` (see below).
   agree  <verb> <out> <produced>...                — pass iff >=2 produced outputs, all byte-equal, none failed
   calc   <verb> <calc.json> <out>                  — pass iff the calc record's baseline holds (pk_verdict)
   cohere <verb> <project> <out> <calc>...          — pass iff coherence.py passes over the calcs (pk_cohere)
@@ -65,7 +65,19 @@ def main(argv):
     elif a.cmd == "exists":
         _write(a.out, a.verb, pathlib.Path(a.path).exists())
     elif a.cmd == "agg":
-        bad = {b.lower() for b in a.bad.split(",")}
+        # Ζ·ladder — `below:<floor>` DERIVES the failing set from the engine's ladder instead of
+        # naming it.  This used to be a literal list of the failing grades, which makes an adequacy
+        # gate FAIL OPEN: every rung added to the ladder afterwards is absent from the list, so it
+        # passes by default — the one direction a gate must never fail.  (The list is not repeated
+        # here either; enumerating a set this file cannot see is how it went stale in the first
+        # place.)  Asking grade.below() judges a new rung the moment it exists, and a floor that is
+        # not a rung raises rather than quietly grading everything green.
+        if a.bad.startswith("below:"):
+            sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "paperkit"))
+            import grade
+            bad = set(grade.below(a.bad.split(":", 1)[1]))
+        else:
+            bad = {b.lower() for b in a.bad.split(",")}
 
         def field_val(r):
             return str(json.loads(pathlib.Path(r).read_text()).get(a.field)).lower()

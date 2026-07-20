@@ -13,3 +13,7 @@ filegroup(name = "files", srcs = [
         "rubric.tsv",
         "warrants.bib",
     ], visibility = ["//visibility:public"])
+
+# Ζ·ladder·wire — the ladder's downstream readers, referenceable as individual file targets so the
+# root manifest can stage them for boundaries' bnd-ladder check (mirrors tools/BUILD.bazel).
+exports_files(["gen.py", "figure.py"])

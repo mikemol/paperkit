@@ -18,6 +18,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+import grade  # Μ·grade — the ladder LEAF (pure data, no engine imports of its own, so this is acyclic)
+
 
 @dataclass(frozen=True)
 class Param:
@@ -109,10 +111,13 @@ JOBS = Param("jobs", "PAPERKIT_JOBS", config="jobs",
              help="gate worker count (default all cores; 1 = serial)")
 JSON = Param("json", "PAPERKIT_JSON", flag=True,
              help="emit structured results to stdout (human lines suppressed)")
+# Ζ·ladder — the valid FLOORS are the ladder's, so both choice-sets are DERIVED from grade.py
+# (the pure leaf; config→grade is acyclic, and a floor is by definition a rung).  Listing them
+# here would let the knob and the ladder disagree — a floor the ladder cannot rank.
 MIN_STRENGTH = Param("min-strength", "PAPERKIT_MIN_STRENGTH", config="min_strength",
-                     choices=("existence", "behavioral"), help="Δ adequacy floor on the FALSIFIABILITY axis")
+                     choices=tuple(grade.ORDER), help="Δ adequacy floor on the FALSIFIABILITY axis")
 MIN_CORRO = Param("min-corroboration", "PAPERKIT_MIN_CORROBORATION", config="min_corroboration",
-                  choices=("single", "independent"), help="Δ floor on the orthogonal CORROBORATION axis")
+                  choices=tuple(grade.CORRO_C), help="Δ floor on the orthogonal CORROBORATION axis")
 RESOLUTION = Param("resolution", "PAPERKIT_RESOLUTION", config="resolution", default="file",
                    choices=("file", "def"), help="Δ mutation surface: file (project only) or def (+ engine)")
 TARGET = Param("target", "PAPERKIT_TARGET", config="target", default="pandoc", choices=("pandoc", "web", "footnote", "plain"),

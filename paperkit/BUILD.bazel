@@ -28,6 +28,7 @@ ENGINE_SRCS = [
     "tests/boundaries_corroboration.py",
     "tests/boundaries_degrade.py",
     "tests/boundaries_discriminate.py",
+    "tests/boundaries_dispatch.py",
     "tests/boundaries_driver.py",
     "tests/boundaries_emit.py",
     "tests/boundaries_env.py",

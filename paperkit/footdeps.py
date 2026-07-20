@@ -78,10 +78,12 @@ def build(repo_root: Path, names: list) -> dict:
         F = {}
         for b in cfg["bibs"]:
             F.update(bib.parse(b))
-        # result: is an EDGE (no leaf target) — its footprint is never used, and stracing it
-        # reruns a whole sibling gate; skip it.  strace is I/O-bound, so trace the rest CONCURRENTLY.
+        # A BOUNDARY-CROSSING check (resolver.CROSSING — result:, concept:) is an EDGE, not a leaf:
+        # its footprint is never used, and stracing it would rerun a whole sibling gate or library
+        # witness.  Skip by asking the VERB (crosses=True), never by re-listing the verbs here.
+        # strace is I/O-bound, so trace the rest CONCURRENTLY.
         items = [(k, f["check"]) for k, f in sorted(F.items())
-                 if f.get("check") and not f["check"].startswith("result:")]
+                 if f.get("check") and not f["check"].startswith(resolver.CROSSING)]
 
         def deps(chk):
             fp = resolver.footprint(chk, pdir, custom, scope=repo_root)
@@ -137,8 +139,8 @@ def audit_one(proj: str, claim: str) -> dict:
     for b in bib.load_config(project_dir)["bibs"]:
         F.update(bib.parse(b))
     f = F.get(claim)
-    if not f or not f.get("check") or f["check"].startswith("result:"):
-        return {"claim": claim, "ok": True, "skip": True}     # result: is an edge — no footprint
+    if not f or not f.get("check") or f["check"].startswith(resolver.CROSSING):
+        return {"claim": claim, "ok": True, "skip": True}     # a crossing verb is an edge — no footprint
     fp = resolver.footprint(f["check"], project_dir, custom, scope=repo_root)
     if fp is None:
         return {"claim": claim, "ok": True, "degraded": True}  # strace blocked — over-declare, never fail

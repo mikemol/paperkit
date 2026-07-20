@@ -40,18 +40,30 @@ _LIBRARY = Path(__file__).resolve().parent.parent / "library"  # the concept-wit
 # `arg` is the target's shape, `verb` the one word for what resolution MEANS, `passes` the
 # condition — together exactly the columns of the README's resolver table, which is why that
 # table can be checked against this and not maintained beside it.
+#
+# `crosses` is the STRUCTURAL bit, and the reason this is data rather than prose: it says the verb
+# resolves against something ANOTHER project owns and separately gates.  Three sites downstream
+# must agree about that — Δ delegates the grade instead of sweeping locally (grader.grade_check),
+# the footprint audit skips it rather than stracing a whole sibling gate (footdeps), and the
+# generator wires it to a cross-repo RECORD dep instead of a local action (bibtex.bzl).  Before
+# this field each site carried its own hardcoded list, and adding `concept:` updated two of the
+# three — the footprint audit still read `result:` alone.  Now they ask the verb.
 VERBS = {
-    "file":    {"arg": "<path>",      "verb": "exists",
+    "file":    {"arg": "<path>",      "verb": "exists",  "crosses": False,
                 "passes": "the artifact exists"},
-    "cmd":     {"arg": "<script>",    "verb": "execs",
+    "cmd":     {"arg": "<script>",    "verb": "execs",   "crosses": False,
                 "passes": "the script exits `0`"},
-    "result":  {"arg": "<project>",   "verb": "parses",
+    "result":  {"arg": "<project>",   "verb": "parses",  "crosses": True,
                 "passes": "the sibling project's gate verdict parses green"},
-    "agree":   {"arg": "<p>|||<q>",   "verb": "concurs",
+    "agree":   {"arg": "<p>|||<q>",   "verb": "concurs", "crosses": False,
                 "passes": "the independent producers all exit `0` and emit identical output"},
-    "concept": {"arg": "<key>",       "verb": "imports",
+    "concept": {"arg": "<key>",       "verb": "imports", "crosses": True,
                 "passes": "the concept library's certificate for that key reads pass"},
 }
+
+# The `type:` prefixes of the boundary-crossing verbs — startswith()-ready, DERIVED so a consumer
+# never re-lists them.  A new crossing verb reaches every site by declaring crosses=True above.
+CROSSING = tuple(f"{v}:" for v, spec in VERBS.items() if spec["crosses"])
 
 
 # A check is arbitrary code (cmd: is the universal escape hatch), so it must not run in

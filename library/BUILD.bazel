@@ -3,6 +3,7 @@
 # witness (concepts.py) and grades it once, exporting the certificate views import.
 filegroup(name = "files", srcs = [
         "concepts.py",
+        "prove.py",     # the self-proving face (concepts.py --prove); the build reuses the cached __dcalc
         "concepts.bib",
         "paper.toml",
         "rubric.tsv",

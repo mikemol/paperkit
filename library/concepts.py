@@ -49,9 +49,19 @@ CONCEPTS = {
 
 
 def main(argv) -> int:
+    prove_mode = "--prove" in argv
+    argv = [a for a in argv if a != "--prove"]
     if not argv or argv[0] not in CONCEPTS:
-        print(f"usage: concepts.py <{'|'.join(CONCEPTS)}>", file=sys.stderr)
+        print(f"usage: concepts.py <{'|'.join(CONCEPTS)}> [--prove]", file=sys.stderr)
         return 2
+    if prove_mode:
+        # Λ·witness — the SELF-PROVING face: emit this witness's own certificate ⟨verdict, sensitivity
+        # fingerprint⟩ instead of a bare pass/fail, so the proof travels with the witness to every view
+        # that imports it.  The same measurement the build caches as <key>__dcalc (see prove.py).
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import prove
+        print(json.dumps(prove.certificate(argv[0]), indent=2))
+        return 0
     try:
         CONCEPTS[argv[0]]()
     except AssertionError as e:

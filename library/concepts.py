@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""checks/concepts.py — the SHARED concept-witness library.
+"""library/concepts.py — the concept-witness LIBRARY (the owner of each concept's proof).
 
-A concept is authored ONCE — its records in the concept bibs, its witness here — and every VIEW that
-imports it (paper, deep; README, pitch; later a guide/advocacy view) resolves its `concept:<key>`
-check against this one module, instead of each view re-authoring a parallel — and often weaker —
-witness.  (The README's old rm_delta GREPPED engine source; the shared witness below RUNS the real
-grader, so importing the concept also upgrades the pitch's proof.)
+A concept is authored ONCE — its record in the library's concepts.bib, its witness here — and the
+library GRADES each witness once (a def-sweep, engine fingerprint) and exports that as a certificate.
+Every VIEW that cites the concept (paper, deep; README, pitch; later a guide) resolves its
+`concept:<key>` check by IMPORTING the certificate (verdict + fingerprint), instead of re-authoring a
+parallel — and often weaker — witness.  (The README's old rm_delta GREPPED engine source; this witness
+RUNS the real grader, so importing the concept also upgrades the pitch's proof.)
 
-Paths derive from __file__, so this runs from any project's cwd: README's `[checks.concept]` calls
-`python3 checks/concepts.py <key>` (cwd = repo root); a paper-side importer calls
-`python3 ../checks/concepts.py <key>` (cwd = paper/).  PAPERKIT_ENGINE (a paperkit knob, survives
-clean_env) points the engine at a mutated variant during Δ's def-sweep, exactly as claims.py does.
+The library runs the witness as a plain `cmd:python3 concepts.py <key>` (cwd = library/).  Paths derive
+from __file__: ROOT = the repo root (parents[1]), ENGINE = ROOT/paperkit.  PAPERKIT_ENGINE (a paperkit
+knob, survives clean_env) points the engine at a mutated variant during Δ's def-sweep, so mutating an
+engine def-site flips the witness → the certificate's sensitivity fingerprint IS the engine.
 """
 from __future__ import annotations
 
@@ -40,7 +41,10 @@ def adequacy_pitch():
 
 
 CONCEPTS = {
+    # one witness, two keys: the README's pitch face and paper's deep grade-ladder face resolve to the
+    # SAME grader run — the adequacy concept is authored once here, each view imports the certificate.
     "adequacy-pitch": adequacy_pitch,
+    "grade-ladder": adequacy_pitch,
 }
 
 

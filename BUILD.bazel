@@ -21,7 +21,6 @@ filegroup(name = "files", srcs = [
         "assets/resolver.md",
         "assets/resolver.toml",
         "checks/readme.py",
-        "checks/concepts.py",   # the shared concept-witness library (concept: checks resolve here)
         "paper.toml",
         "rubric.tsv",
         "warrants.bib",
@@ -42,6 +41,11 @@ test_suite(name = "hook", tests = [
     "@paperkit_boundaries//:gate",
     "@paperkit_paper//:adequacy",
     "@paperkit_root//:adequacy",
+    # Λ·witness — the concept LIBRARY: it self-grades each concept witness (adequacy) and gates its
+    # own coherence; views' concept: checks import its certificates.  Ζ·delegate-cover keeps it here.
+    "@paperkit_library//:gate",
+    "@paperkit_library//:adequacy",
+    "@paperkit_library//:cohere",
     # Ζ·emerge·gate — the ∂² coherence reading over each emerge project's def-sweep GRID (the
     # Ξ·dag·eval closure cells).  Pulls the grid into //:hook, so the hook runs under --config=mutant
     # (the hermetic sandbox the mutation cells require; .githooks/pre-commit passes it).

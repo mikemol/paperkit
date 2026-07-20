@@ -373,8 +373,22 @@ def _bib_repo_impl(repository_ctx):
         out.append('pk_pyc(name = "pyc_0", src = ":mut_0")')
     recs = []
     calc_claims = {}
+    imported_cert = {}   # Λ·witness — k → the owner library's __dcalc cert label (a concept: import edge)
+    owns = repository_ctx.attr.owns_concepts
+    vis = ', visibility = ["//visibility:public"]'  # the owner EXPORTS per-concept records for views to import
     for k, check, sib, reads, rests in parsed:
         if not check:
+            continue
+        if check.startswith("concept:"):
+            # Λ·witness — a concept: check IMPORTS a concept authored + GRADED once in the library.  The
+            # VERDICT is the library's per-concept verdict record (pk_result, records-as-deps, like
+            # result:); the GRADE + :cohere read the library's def-sweep certificate (__dcalc = verdict +
+            # engine fingerprint), so the PROOF travels WITH the import — the view neither re-sweeps
+            # (Λ·grid's cost) nor drops the fingerprint (naive-delegate's :cohere break).
+            key = check[len("concept:"):]
+            out.append("pk_result(name = " + _lit(k) + ', sibling_verdict = "@paperkit_library//:' + key + '")')
+            imported_cert[k] = "@paperkit_library//:" + key + "__dcalc"
+            recs.append('":%s"' % k)
             continue
         if calc and _body(check, custom) != None:
             # Ζ·calc·interp — ONE cached sweep (pk_calc) feeds the verdict reading here (and the grade
@@ -383,7 +397,7 @@ def _bib_repo_impl(repository_ctx):
             out.append("pk_calc(name = " + _lit(k + "__calc") + ", claim = " + _lit(k) +
                        ", project = " + _lit(proj) + ", mem = " + str(_membucket(mem, k, "file")) +
                        ", data = [" + dl + "])")
-            out.append("pk_verdict(name = " + _lit(k) + ", calc = " + _lit(":" + k + "__calc") + ")")
+            out.append("pk_verdict(name = " + _lit(k) + ", calc = " + _lit(":" + k + "__calc") + (vis if owns else "") + ")")
             calc_claims[k] = True
             if emerge and closures.get(k):
                 # Ζ·mutant·wire·gen·emit — a WITNESS claim's ROW of the grid: one pk_eval CELL per
@@ -445,7 +459,7 @@ def _bib_repo_impl(repository_ctx):
                 # witness subset — a projection, not a special case).
                 out.append("pk_calc(name = " + _lit(k + "__dcalc") + ", claim = " + _lit(k) +
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
-                           str(_membucket(mem, k, "def")) + ", data = [" + dl + "])")
+                           str(_membucket(mem, k, "def")) + ", data = [" + dl + "]" + (vis if owns else "") + ")")
         else:
             out.append(_verb_rule(k, check, proj, files, reads, custom, local, imports))
         recs.append('":%s"' % k)
@@ -461,11 +475,14 @@ def _bib_repo_impl(repository_ctx):
         out.append('pk_mem_learn(name = "mem_learn", calcs = [' +
                    ", ".join([_lit(t) for t in ml]) + '], visibility = ["//visibility:public"])')
 
-    if emerge and calc_claims:
+    if emerge and (calc_claims or imported_cert):
         # Ζ·emerge·gate — the ∂² coherence faces (grounding/emergence) as a CHEAP READING over the
         # def-calcs (coherence --from-calcs): grounding soundness gated with no re-sweep.  The
         # def-sweep is the cost (in //:hook by the owner's call); the reading itself is ~0.1s.
-        cc = ", ".join([_lit(":" + k + "__dcalc") for k in calc_claims])
+        # Λ·witness — an imported concept: contributes the LIBRARY's def-cert (its real engine
+        # fingerprint), so the view's ∂² reading sees the concept's grounding, not an empty node.
+        cc = ", ".join([_lit(":" + k + "__dcalc") for k in calc_claims] +
+                       [_lit(imported_cert[k]) for k in imported_cert])
         out.append('pk_cohere(name = "cohere_rec", project = ' + _lit(proj) + ", calcs = [" + cc +
                    '], data = ["@@//paperkit:engine", ' + _lit(files) + "".join([", " + _lit(i) for i in imports]) + "])")
         out.append('sh_test(name = "cohere", srcs = ["@@//tools:assert_pass.sh"], ' +
@@ -492,7 +509,13 @@ def _bib_repo_impl(repository_ctx):
         for k, check, sib, reads, rests in parsed:
             if not check:
                 continue
-            if k in calc_claims:
+            if k in imported_cert:
+                # Λ·witness — grade = the IMPORTED library certificate, read via read_grade → behavioral
+                # WITH the owner's engine fingerprint (tests), so it passes adequacy (behavioral ≥ floor)
+                # AND the same cert feeds the view's :cohere.  No local re-sweep, no dropped fingerprint.
+                out.append("pk_grade(name = " + _lit(k + "__grade") + ", calc = " + _lit(imported_cert[k]) +
+                           ', data = ["@@//paperkit:engine", "@@//tools:read_grade.py"])')
+            elif k in calc_claims:
                 # Ζ·pyc·run·collapse — the grade is a READING of the GRID (the __dcalc pk_sens record),
                 # not the file-resolution k__calc crutch: for a WITNESS claim (closures.get(k)) the grid
                 # IS the calculation — grade = _grade_from_sens over its measured sens.  This makes the
@@ -522,7 +545,7 @@ def _bib_repo_impl(repository_ctx):
         # (not in //:hook); host-coupled projects (local) skip it — their footprint needs the host.
         foots = []
         for k, check, sib, reads, rests in parsed:
-            if not check or sib:        # result: is an edge — no footprint
+            if not check or sib or check.startswith("concept:"):  # result:/concept: are import edges — no local footprint
                 continue
             out.append("pk_footprint(name = " + _lit(k + "__foot") + ", claim = " + _lit(k) +
                        ", project = " + _lit(proj) + ", data = [" + _ALL_DATA + "])")
@@ -569,6 +592,7 @@ bib_repo = repository_rule(
         "emerge": attr.bool(default = False),  # Ζ·emerge·gate: a def-calc per claim + pk_cohere (∂² faces in //:hook)
         "sites": attr.string_list(default = []),  # ·gen·surface: the engine def-sites (enumerated once by the extension)
         "closures": attr.string_list(default = []),  # ·gen·closure: per-claim witness closure roots (Ξ·dag·eval)
+        "owns_concepts": attr.bool(default = False),  # Λ·witness: the concept LIBRARY — its per-concept verdict + def-cert are PUBLIC, imported by views' concept: checks
     },
 )
 
@@ -580,7 +604,7 @@ def _bib_ext_impl(module_ctx):
     sites = _surface(module_ctx, core)
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [])
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [])
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -594,6 +618,7 @@ bib = module_extension(
             "compose": attr.bool(default = False),
             "calc": attr.bool(default = False),
             "emerge": attr.bool(default = False),
+            "owns_concepts": attr.bool(default = False),
         }),
     },
 )

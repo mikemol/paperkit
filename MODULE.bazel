@@ -24,5 +24,8 @@ bib.project(name = "paperkit_config", bib = "//config:warrants.bib", project = "
 # Each target's data is footprint-derived (footprints.json, Ζ·foot) — no hand-declared extra_data.
 bib.project(name = "paperkit_paper", bib = "//paper:model.bib", project = "paper", adequacy = True, compose = True, calc = True, emerge = True)  # Ζ·emerge·gate (bib = anchor; the full warrants list is composed from paper.toml)
 bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adequacy = True, compose = True, calc = True, emerge = True)  # Ζ·emerge·gate
+# Λ·witness — the concept LIBRARY owns each concept's witness + self-graded certificate; views import
+# it via concept: checks.  owns_concepts ⇒ its per-concept verdict + def-cert records are PUBLIC.
+bib.project(name = "paperkit_library", bib = "//library:concepts.bib", project = "library", adequacy = True, calc = True, emerge = True, owns_concepts = True)
 bib.project(name = "paperkit_setup", bib = "//setup:warrants.bib", project = "setup", local = True)  # Ζ·resist: host-coupled
-use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_paper", "paperkit_root", "paperkit_setup")
+use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_library", "paperkit_paper", "paperkit_root", "paperkit_setup")

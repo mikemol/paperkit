@@ -1,0 +1,17 @@
+% concepts.bib — the concept-witness LIBRARY's own records: one entry per concept FACE, each a
+% cmd: witness the library GRADES once (a def-sweep → the certificate every VIEW imports).  The
+% prose faces (the README pitch, the paper deep exposition) are authored in their own views; these
+% are the minimal grading records that OWN the certificate.  Two keys share one witness
+% (concepts.py maps both to adequacy_pitch) so each view imports under the key it cites.
+
+@misc{adequacy-pitch,
+  section = {adequacy},
+  claim   = {the adequacy witness runs the real grader over a fixture, so mutating an engine def-site flips it --- the certificate's sensitivity fingerprint IS the engine, which every importing view inherits},
+  check   = {cmd:python3 concepts.py adequacy-pitch}
+}
+
+@misc{grade-ladder,
+  section = {adequacy},
+  claim   = {the same witness under the deep key certifies the grade ladder --- a presupposed file grades vacuous, a content-sensitive command behavioral --- so the paper's deep exposition imports the identical proof the pitch does},
+  check   = {cmd:python3 concepts.py grade-ladder}
+}

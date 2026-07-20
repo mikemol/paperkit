@@ -1,0 +1,9 @@
+[paper]
+adequacy = true
+title = "The Paperkit Concept Library"
+subtitle = "Each concept's witness is authored and GRADED here once; every view imports the certificate (verdict + engine fingerprint) rather than re-authoring a parallel proof."
+warrants = ["concepts.bib"]
+rubric = "rubric.tsv"
+out = "library.md"
+numbered = false
+references = false

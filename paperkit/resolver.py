@@ -28,6 +28,7 @@ from pathlib import Path
 import config
 
 _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
+_LIBRARY = Path(__file__).resolve().parent.parent / "library"  # the concept-witness library (concept:)
 
 
 # A check is arbitrary code (cmd: is the universal escape hatch), so it must not run in
@@ -106,6 +107,19 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
             return bool(json.loads(r.stdout or "{}").get("pass"))
         except Exception:
             return False
+    if typ == "concept":
+        # Λ·witness — a concept: check IMPORTS a concept authored and GRADED once in the library.
+        # For the LIVE verdict (the direct-CLI gate path; the Bazel //:hook path reads the library's
+        # records via pk_result/pk_grade), RUN the library witness by ABSOLUTE path — the concept is
+        # OWNED and separately gated by the library, so this is COMPOSITION (like result:), not
+        # re-authoring.  The witness resolves its own engine via __file__, so the importing view needs
+        # nothing staged; its adequacy is the imported certificate (verdict + engine fingerprint).
+        try:
+            argv = [sys.executable, str(_LIBRARY / "concepts.py"), target]
+            return subprocess.run(argv, cwd=_LIBRARY, env=clean_env(),
+                                  capture_output=True).returncode == 0
+        except Exception:
+            return False
     if typ == "agree":
         # Δ·agree (Ε·agree) — the fourth verb: file EXISTS, cmd EXECS, result PARSES, agree
         # CONCURS.  The SAME fact established by N INDEPENDENT producers (split on |||) that
@@ -144,6 +158,8 @@ def _check_cmd(check: str, custom: dict) -> str | None:
         return None
     if typ == "result":
         return f"{sys.executable} {_GATE} --json --safe --without-K {target}"
+    if typ == "concept":
+        return f"{sys.executable} {_LIBRARY / 'concepts.py'} {target}"
     if typ == "agree":   # trace every producer's reads — the footprint is their union
         return "; ".join(p.strip() for p in target.split("|||") if p.strip())
     if typ == "cmd":

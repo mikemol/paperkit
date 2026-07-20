@@ -1,0 +1,10 @@
+# Hand-maintained file manifest (Ζ·sunset) — a data dep of the Ζ·starlark-generated
+# @paperkit_library check graph.  The concept-witness LIBRARY: it owns each concept's
+# witness (concepts.py) and grades it once, exporting the certificate views import.
+filegroup(name = "files", srcs = [
+        "concepts.py",
+        "concepts.bib",
+        "paper.toml",
+        "rubric.tsv",
+        "library.md",
+    ], visibility = ["//visibility:public"])

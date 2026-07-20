@@ -14,8 +14,7 @@ references = false    # a README has no bibliography section
 [checks.claim]
 cmd = "python3 checks/readme.py {target}"
 
-# concept:<key> resolves against the SHARED concept-witness library (checks/concepts.py) — a concept
-# IMPORTED from the library (its pitch record composed via //paper:*_pitch.bib) is witnessed once
-# there, not re-authored per view.  The README's adequacy pitch is the first such import.
-[checks.concept]
-cmd = "python3 checks/concepts.py {target}"
+# concept:<key> is a BUILTIN import verb (Λ·witness): it imports a concept authored + GRADED once in
+# the //library project (its pitch record composed via //paper:adequacy_pitch.bib), resolving to the
+# library's certificate — verdict + engine fingerprint — not a per-view re-authored witness.  No
+# [checks.concept] template: the verb is builtin (like result:), owned by the library.

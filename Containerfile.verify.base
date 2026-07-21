@@ -1,0 +1,43 @@
+# Κ·image·build — the pinned BUILD toolchain for the verification image.
+#
+# Distinct from Containerfile.base ON PURPOSE.  That one is the PROOF object's base: minimal,
+# alpine/musl, COPY-only, byte-reproducible, and its digest IS the proof's content address.
+# Loading bazel + a JDK + a fetch cache into it would bloat the proof object and churn its digest
+# for reasons unrelated to the proof it carries.  So the builder is its own pinned image.
+#
+# glibc, not musl: bazel targets glibc and ships a dynamically-linked binary; alpine cannot run it.
+#
+# apt's install-db ordering is irreducibly non-deterministic, so the apt layer is ISOLATED here as
+# a pinned dependency — exactly the move Containerfile.base makes for apk, and the reason THIS file
+# exists separately from Containerfile.verify: the verification build below stays a function of its
+# inputs because everything non-deterministic was spent here, once, behind a digest.
+#
+#   podman build -t paperkit-verify-base:8.7.0 -f Containerfile.verify.base .
+FROM docker.io/library/debian@sha256:63a496b5d3b99214b39f5ed70eb71a61e590a77979c79cbee4faf991f8c0783e
+
+# python3 runs the engine; strace backs Φ·footprint (without it the surface silently degrades to
+# the flat tree — Ζ·degrade·roots); bash is the action shell for the Ζ·mutant counterfactuals;
+# zip/unzip and ca-certificates are bazel's own requirements.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      python3 strace bash ca-certificates curl zip unzip \
+ && rm -rf /var/lib/apt/lists/*
+
+# Bazel pinned by VERSION and CONTENT.  The sha256 below was confirmed against two independent
+# sources: bazel's published .sha256 for the release, and the binary already in use on the host
+# (mise 8.7.0) — they are byte-identical.  .bazelversion in the repo pins the same 8.7.0.
+ARG BAZEL_VERSION=8.7.0
+ARG BAZEL_SHA256=d7606e679b78067c811096fb3d6cf135225b528835ca396e3a4dddf957859544
+RUN curl -fsSLo /usr/local/bin/bazel \
+      "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64" \
+ && echo "${BAZEL_SHA256}  /usr/local/bin/bazel" | sha256sum -c - \
+ && chmod +x /usr/local/bin/bazel
+
+# rules_python REFUSES to fetch its hermetic interpreter as root, and a container build is root by
+# default (bazelbuild/rules_python#713).  So the toolchain image carries a non-root build user --
+# which is the right posture anyway: the verification should not need privilege it does not use.
+RUN useradd --create-home --uid 1000 --shell /bin/bash verify \
+ && mkdir -p /work /verify \
+ && chown -R verify:verify /work /verify
+USER verify
+RUN bazel --version

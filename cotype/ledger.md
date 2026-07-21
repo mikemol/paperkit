@@ -1,0 +1,92 @@
+# Ledger
+
+Seeded 2026-07-21 from the working plan's accumulated AI list (regroundings 20g–20m).
+One line per item. Full detail and retrospectives live in the working plan; this is the
+durable index. Append-only, retirement-logged (see README).
+
+## The two live threads
+
+1. **Container / sandbox** — the Ζ·idempotent arc's forward edge: `Κ·image·sandbox`
+   (R3/R4/R5) + `Ζ·canary·v2` (delivery-independent degradation detector).
+2. **Reconstitution** (the original goal) — `Λ·resolver → Λ·full → Σ·step5`, a concept
+   authored once and imported by every view; stalled behind the container detour.
+
+## Live
+
+- **Κ·image·sandbox** `[owner: R3|R4|R5]` — resolve-escape-proof sandbox in a rootless
+  `podman build`. R1 (eval.py fix) refuted. R3 gate-only image (sound, narrower); R4
+  nested-userns for real linux-sandbox (host caps OK, needs the RUN-step probe); R5
+  `--config=mutant-oci` (host test).
+- **Ζ·canary·v2** `[ship regardless]` — sound `pk_eval` positive control that co-degrades
+  by construction; `pk_canary` rule + `verdict.py canary` + `//canary:canary` hook member;
+  same-commit generalization of the `boundaries_check.py` hook-completeness guard (highest
+  blast radius). No longer coupled to any eval.py fix (none exists).
+- **Λ·probe-isolation** `[G7]` — probe on an isolated copy; never mutate-and-restore a
+  tracked file (an interruption leaves the tree dirty).
+- **Λ·push** `[a48cfdc, OUTWARD, needs go]`.
+- **Κ·inbox·vcs** `[in progress]` — inbox split into ephemeral drop-zone + tracked
+  `inbox/archive/`; letters promoted. Push held pending cassian consent for the raw exchange.
+- **Σ·cotype** `[in progress]` — this ledger. Step 2 = the `cotype-monotone` gate.
+- **cotype-monotone** `[planned gate]` — enforce append-only+retirement-log on `ledger.md`.
+- **Ζ·evidence·prune** `[near-moot]` — the ~1GB frozen layer is already gone; 250MB podman
+  images remain, safely prunable (finding banked).
+- **Ζ·bnd·gate** — `boundaries` is compose-only; no adequacy floor enforces its honest grades.
+- **Ζ·measure·site** — re-site the gate-able practice memories from memory to a hook/gate.
+- **Ζ·positive-control** `[class]` — every degradable mechanism (sandbox, strace, footprint)
+  needs a control that fails loud on degradation. Generalizes Ζ·canary.
+- **Ζ·degrade·roots** — the strace footprint measures imports, not dependencies.
+- **Ζ·gen·coupling** — generator coupling flagged in the Ξ·compose investigation.
+- **Λ·verbcount·chain** — the `concept-builtin` claim + witness in `paper/resolver.bib`.
+- **Ζ·knobs → Ζ·hook-rot** — `gen_knobs.py` cwd-fragile (`parents[2]`); then add
+  `@paperkit_config//:gate` to `//:hook` (config/setup rot silently).
+- **Λ·resolver → Λ·full → Σ·step5** — the ~15–25 concept lift; library holds 2 today, so
+  Λ·full is the constraint on Σ·step5.
+- **Ζ·prove-gate** — gate the `--prove` envelope without re-running the sweep.
+- **Θ·step3** — fold `boundaries` test-faces (20 suites ↔ 21 claims).
+- **Λ·stash** — drop the obsolete `stash@{0}` (Λ·deep first-pass).
+- **root paper.toml:5** — decide explicitly whether to repoint the pitch warrant to
+  `//library:adequacy_pitch.bib` (arguably unnecessary; the pitch RECORD is view-side prose).
+- **Λ·location** `[class]` — nothing gates the only out-of-repo consumer; the inbox is a
+  human relay, not a gate.
+- **Λ·commit·atomic** — small semantic commits, atomic not merely topical.
+- **Λ·cite·unchecked** — `references.bib` entries carry no check; a cite asserting another
+  project's behaviour is a stronger unchecked claim than citing Knuth.
+- **Θ·charges** — carried from the downstream report (their A52).
+- **Λ·enumerable** — choose the side you can enumerate (allowlist over blocklist).
+
+## Closed
+
+- **Λ·witness / Λ·library** `[1587578 2615582 0490c27]` — proof-carrying witness; concept
+  authored + graded once at its owner, views import the certificate.
+- **Λ·prove** `[ab386b4]` — the witness proves itself; `--prove` byte-equal to `__dcalc`.
+- **Λ·verbcount** `[71315f0]` — de-counted the false "four builtins" prose.
+- **Λ·registry·data** `[0627c56]` — `resolver.VERBS` owns the verb set; witness derives.
+- **Λ·registry·gate** `[3e60cb1]` — `VERBS.crosses`; every dispatch site derives from VERBS.
+- **Ζ·ladder** `[b2d313c]` — the grade ladder gets one owner; its floor fails CLOSED.
+- **Ζ·surface·{land,iface,kind,suffix}** `[4e74917 8f823b8 fd402a8]` — a claim graded
+  against its SUBJECT; a grade also says how much it looked at; `.json`/`.bzl` admitted.
+- **Λ·library·seam / Ρ·emit·missing / Ζ·ladder·sentinel / Λ·prove·resolution** `[501c4cd
+  38860c9 d1f9131]` — the seam owned by VERBS; a placement that did not happen is a finding;
+  a resolution names its frame.
+- **Λ·cite / Λ·doc·concept** `[444c031]` — cite the downstream field report with their
+  attribution correction.
+- **Κ·verify·commit** `[a48cfdc]` — `.base` committed sound; `.verify` committed with its
+  KNOWN-LIMITATION caveat; neither wired into `//:hook`.
+- **Ζ·idempotent** `[RESOLVED]` + **Ζ·idempotent·mechanism** `[experiment run]` — the Δ
+  sweep needs a sandbox that blocks `resolve()` symlink-escape; processwrapper lets checks
+  resolve out to the real unmutated tree. Mechanism CONFIRMED; agent's eval.py:90 fix REFUTED.
+
+## Practice (banked as memory)
+
+Λ·contact · Λ·outward · Λ·rationale · Λ·risk · Λ·act · Λ·iface · Λ·evidence · Ζ·pipestatus ·
+Λ·instrument-vs-gate · Λ·standing-vs-construct · Λ·artifact-state.
+
+## Retired
+
+- **Ζ·image·hermetic** — RETIRED: subsumed by Κ·image·build (per-action toolchain declaration
+  is the lower rung of pinning the ambient environment).
+- **Λ·grid** — RETIRED: re-derives the proof per view — the anti-pattern `result:` refuses.
+- **Λ·delegate (naive)** — RETIRED: a scalar `imported` stamp with `tests=[project]` breaks
+  `:cohere`; the proof must travel with the witness (→ Λ·witness).
+- **R1 (eval.py:90 unlink-then-write)** — RETIRED: refuted by the Ζ·idempotent·mechanism
+  experiment; the mutant `.pyc` lands fine both ways, so it was never a delivery bug.

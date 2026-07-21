@@ -7,6 +7,8 @@ setup/.loadtest.lock
 /bazel-*
 
 # inbox/ — a drop point for OTHER sessions' findings and bug reports, deliberately outside this
-# session's live git state.  Its README is tracked (it explains the convention); nothing else is.
+# session's live git state.  Its README is tracked; incoming drops stay ignored; SETTLED
+# correspondence is promoted into inbox/archive/ (tracked) by a deliberate human act.
 /inbox/*
 !/inbox/README.md
+!/inbox/archive/

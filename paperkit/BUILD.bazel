@@ -41,6 +41,7 @@ ENGINE_SRCS = [
     "tests/boundaries_path.py",
     "tests/boundaries_references.py",
     "tests/boundaries_sandbox.py",
+    "tests/boundaries_surface.py",
     "tests/boundaries_target.py",
     "tests/boundaries_without_k.py",
 ]

@@ -109,6 +109,43 @@ def surface_of(footprint: list | None, sandbox_project: Path, root_copy: Path | 
     return out
 
 
+def unmeasured_reads(footprint: list | None, root_copy: Path | None) -> list:
+    """Ζ·surface·kind — the files a claim READS that the sweep cannot MUTATE.
+
+    A grade is only as complete as the surface it was measured over, and `indeterminate` was
+    carrying two incompatible meanings: "every input was corrupted and none flipped it" (a real
+    falsifiability verdict) and "an input this claim depends on was never corrupted at all" (no
+    verdict — we did not look).  The second is the sentinel move one level down: *not measurable
+    from here* is not *not falsifiable*, exactly as *no such claim* is not *broken*.
+
+    Three independently-found cases turn out to be ONE set difference, `reads \\ mutable`:
+      · `setup/reference.json` — read, but `.json` is not a MUTABLE_SUFFIX, so corrupting the
+        DATA was impossible and the claims were behavioral only by crashing the INTERPRETER,
+        while the project's own prose asserted the opposite (a downstream consumer's finding);
+      · `tools/grade.bzl` — read by bnd-ladder, which ASSERTS things about it, but `.bzl` is not
+        a mutable suffix either, so that assertion cannot be falsified (found by this function,
+        in a check written the day before);
+      · a check invoking a tool OUTSIDE the project entirely (a downstream consumer's
+        `../scripts/check`) — read, unreachable by any mutation of the project.
+    Whether the file is excluded by SUFFIX or by LOCATION, the epistemic position is identical.
+
+    This is an ORTHOGONAL AXIS, never a rung — the same shape as content_sensitive and
+    corroboration.  A grade says how falsifiable a claim is; this says how much of the claim the
+    grade actually looked at.  Derived artifacts are excluded via SKIP_DIRS (a __pycache__/*.pyc
+    is a build product of a .py that IS in the surface — its source is measured, so it is not a
+    gap; see the pyc-is-a-build-artifact reading)."""
+    if footprint is None or root_copy is None:
+        return []                                     # Φ·degrade: no trace ⇒ no claim either way
+    out = []
+    for p in footprint:
+        f = root_copy / p
+        if any(part in SKIP_DIRS for part in Path(p).parts):
+            continue                                  # a derived artifact; its SOURCE is measured
+        if f.is_file() and not _mutable(f):
+            out.append(p)
+    return sorted(out)
+
+
 def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None,
          root_copy: Path | None = None) -> str:
     """Label a corrupted file: relative to the project, or tagged engine/<…> when it is the engine
@@ -440,6 +477,9 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
             fp = sorted(p[len(pre):] for p in sweep_fp if p.startswith(pre))
         rec = grade_check(chk, project_dir, presupposed, custom, sandbox, engine, sweep_fp, root_copy)
         rec["_footprint"] = fp
+        # Ζ·surface·kind — how much of the claim the grade actually LOOKED AT.  Orthogonal to the
+        # rung: a grade over an incomplete surface is not a weaker grade, it is a narrower one.
+        rec["unmeasured"] = unmeasured_reads(sweep_fp, root_copy)
         return rec
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

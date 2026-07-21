@@ -127,3 +127,8 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_ladder.py},
   reads   = {.}
 }
+@misc{bnd-surface,
+  section = {engine}, from = {bnd-ladder}, join = {. },
+  claim   = {the mutation SURFACE has a boundary of its own, and the grade must say where it runs --- a claim's falsifiability is measured over the inputs the sweep can corrupt, so an input it merely READS and cannot mutate (excluded by suffix, or living outside the project entirely) leaves the grade narrower than it looks, and reporting that gap is what keeps indeterminate meaning ONE thing: every input was corrupted and none flipped it, never we did not look --- an orthogonal axis like corroboration, never a rung, since incompleteness is not a weaker grade and no adequacy floor may fail a claim for it},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_surface.py}
+}

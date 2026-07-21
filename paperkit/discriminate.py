@@ -299,6 +299,11 @@ def report(records, share, graded, n_cited, n_checked, consider_all):
         dil = f"  (shared by {share_n} claims)" if share_n > 1 else ""
         crash = (r["grade"] == "behavioral" and not r.get("content_sensitive"))
         tag = "  ⚠ config/crash-sensitive only" if crash else ""
+        # Ζ·surface·kind — a grade is only as complete as the surface it was measured over.  Say so
+        # NEXT TO the grade, because the number of inputs the sweep could not touch is exactly what
+        # a reader would otherwise assume was zero.  Orthogonal to the rung, like crash-sensitivity.
+        un = r.get("unmeasured") or []
+        tag += f"  ⚠ {len(un)} unmeasured input(s): {', '.join(un[:3])}" if un else ""
         corro = f"  + {r['corroboration']} ({r.get('producers','?')} producers)" if r.get("corroboration") == "independent" else ""
         print(f"  {r['grade']:13} [@{r['key']}]{dil}{tag}{corro}")
         print(f"  {'':13} check: {r['check']}")

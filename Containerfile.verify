@@ -1,45 +1,43 @@
-# Κ·image·build — THE BUILD *IS* THE EVALUATION.
+# Κ·image·build — THE BUILD *IS* THE EVALUATION (R3: the SOUND gate-only image).
 #
-# ⚠️ KNOWN LIMITATION (Κ·image·sandbox, unsolved) — DO NOT TRUST A RED FROM THIS BUILD YET.
-# A non-root `podman build` cannot obtain bazel's hermetic `linux-sandbox`; it silently degrades to
-# `processwrapper-sandbox`, under which the Δ mutation sweep does NOT bite (a mutant .pyc is staged
-# but not honoured), so every locally-graded claim reads a false `indeterminate` and adequacy
-# FALSE-REDS on a green tree.  This was proven, not guessed (host green under linux-sandbox /
-# container red under processwrapper, same commit; the known-sensitive bib.py::parse cell reports
-# flipped=false).  So THIS file is committed as a WORK-IN-PROGRESS INSTRUMENT with its unsoundness
-# NAMED — it found the Ζ·idempotent bug and is the right shape — NOT as a trustworthy gate.  A GREEN
-# from it would require linux-sandbox in the build (privileged build / --cap-add, or a mutation
-# delivery robust to processwrapper); until then a RED is a HARNESS artifact, not a repo failure.
-# See the plan's Κ·image·sandbox.  (Containerfile.verify.base is sound and reusable as-is.)
+# This image runs the four gate targets.  A gate's PASS/FAIL is a VERDICT — each check run once,
+# pass/fail — which is mutation-INDEPENDENT: it produces the identical result under any spawn
+# strategy.  The Ζ·idempotent degradation (a rootless `podman build` cannot obtain bazel's hermetic
+# `linux-sandbox`, silently falls back to `processwrapper-sandbox`, under which a check's `resolve()`
+# follows a staged symlink OUT to the real unmutated tree) corrupts the mutation GRADE, not the
+# verdict.  The gate targets DO transitively build ~101 per-claim FILE-resolution calc records (the
+# grade column of their reports), and under processwrapper those grades DO degrade to a false
+# `indeterminate` — but the gate VERDICT does not depend on them, which is why this image is GREEN
+# under processwrapper, the exact strategy that REDS the full sweep.  Proven, not assumed: the build
+# ran 246 of 259 actions under processwrapper and all four gates passed.  The authoritative
+# falsifiability GRADE — the def-resolution Δ grid `:adequacy`/`:cohere` (~31k actions) — is NOT run
+# here.  So a RED here is a REAL gate failure, never a sandbox artifact — the soundness the earlier
+# full-grade recipe (committed caveated at a48cfdc, then superseded) could not offer in a rootless build.
 #
-# There is no `run` step here.  `podman build` executes the whole verification workflow, and if it
-# fails the build fails and THE IMAGE DOES NOT EXIST.  Success is not something a process reports;
-# it is denoted by an image existing at a digest.
+# WHAT IS AND IS NOT ATTESTED (co-located with the claim, per Λ·instrument-vs-gate):
+#   attested here      — every document GATES green at this commit (each check's verdict passes).
+#   NOT attested here  — falsifiability GRADE (`:adequacy`/`:cohere`, the Δ mutation sweep).  That
+#                        needs a hermetic sandbox a rootless build cannot get; it is attested on the
+#                        host `//:hook` under `--config=mutant` (linux-sandbox).  Carrying the grade
+#                        INTO the image is the open Κ·image·sandbox upgrade (R4 nested-userns for a
+#                        real linux-sandbox in the build; R5 `--config=mutant-oci` docker-sandbox).
 #
-# This is paperkit's own thesis applied to its own build.  The engine holds that an unverified
-# sentence does not project; this holds that an unverified repository does not produce an image.
-# (Containerfile — the proof object — is one level weaker: it makes the proof a RUNTIME event,
-# `podman run … # exit 0 == proof`.  Here the proof is a build precondition.)
+# There is no `run` step.  `podman build` executes the verification, and if it fails the build
+# fails and THE IMAGE DOES NOT EXIST.  Success is not something a process reports; it is denoted by
+# an image existing at a digest — paperkit's own thesis applied to its own build.
 #
-# The cache question dissolves rather than being managed: the LAYER CHAIN is the cache, and it is
-# keyed on the parent layer, which IS the environment.  A different base is a different chain, so a
-# result computed under one environment can never be served under another (Ζ·idempotent).  Bazel's
-# own action cache lives inside the image and dies with it.
+# The cache question dissolves: the LAYER CHAIN is the cache, keyed on the parent layer, which IS
+# the environment.  A different base is a different chain, so a result computed under one
+# environment can never be served under another (Ζ·idempotent).  Bazel's action cache lives inside
+# the image and dies with it.
 #
-# The build CONTEXT is an ALLOWLIST, and not a new one: `git archive HEAD` is exactly the tracked
-# set, an enumeration git already maintains.  A .containerignore would be a BLOCKLIST — it
-# quantifies over every way for junk to enter the context, which is not enumerable, so each patch
-# invites the next counterexample (the repo's own .containerignore omits `bazel-*`, symlinks into a
-# multi-GB cache, for exactly that reason).  The allowlist quantifies over what EXISTS: 184 files,
-# 1.2M, carrying no bazel-* and no .delta-cache because they were never tracked, not because they
-# were foreseen.  Choose the side you can enumerate (Λ·enumerable).
-#
-# It also makes the context content-addressed BY COMMIT: this image verifies a named commit, not a
-# working tree, so its digest and the commit it attests are bound together.
+# The build CONTEXT is an ALLOWLIST, not a new one: `git archive HEAD` is exactly the tracked set,
+# an enumeration git already maintains (Λ·enumerable).  It binds the image to a named COMMIT: this
+# image verifies a commit, not a working tree, so its digest and the commit it attests are bound.
 #
 #   podman build -t paperkit-verify-base:8.7.0 -f Containerfile.verify.base .   # once, pinned
 #   git archive --format=tar --add-file=Containerfile.verify HEAD \
-#     | podman build -t paperkit-verify:hook -f Containerfile.verify -
+#     | podman build -t paperkit-verify:gate -f Containerfile.verify -
 #   ^ that command IS the verification.  Its success is the verdict.
 FROM localhost/paperkit-verify-base:8.7.0
 
@@ -52,23 +50,23 @@ ENV PAPERKIT_NO_MEMBUDGET=1
 WORKDIR /work
 COPY --chown=verify:verify . /work
 
-# THE EVALUATION.  Split deliberately into CAPTURE then ASSERT:
-#
-#   The capture step ALWAYS SUCCEEDS, so its layer is retained and addressable — the log, the exit
-#   code, and the test logs survive as a durable artifact even when the verification failed.  The
-#   assert step then fails the build.  Without this split a red build discards its own evidence,
-#   which is exactly the failure that left Ζ·idempotent unreproducible: diagnosing by re-running
-#   overwrote the only copy of the state that failed (Λ·evidence).  Here the freeze is structural —
-#   `podman run` into this stage to inspect a failure, or `podman commit` it to name the state.
+# THE EVALUATION — the four gate targets only.  No `--config=mutant`: the gate VERDICT is
+# strategy-independent, so forcing the hermetic sandbox a rootless build cannot get would only
+# degrade the incidental grade column, with no effect on the verdict this image asserts.  Split
+# into CAPTURE then ASSERT so a red build
+# retains its own evidence in an addressable layer (Λ·evidence, made structural): the capture step
+# always succeeds, so the log survives even when the verification failed; the assert step then fails
+# the build.  `podman run` into the capture stage to inspect a failure, or `podman commit` to name it.
 RUN mkdir -p /verify \
- && bazel test //:hook --config=mutant >/verify/hook.log 2>&1; \
+ && bazel test @paperkit_root//:gate @paperkit_paper//:gate @paperkit_boundaries//:gate \
+        @paperkit_library//:gate >/verify/hook.log 2>&1; \
     echo $? >/verify/rc; \
     cp -a bazel-testlogs /verify/testlogs 2>/dev/null || true; \
     tail -30 /verify/hook.log
 
 RUN rc="$(cat /verify/rc)"; \
     if [ "$rc" != 0 ]; then \
-      echo "VERIFY FAILED (bazel exit $rc) — artifacts retained in the previous layer at /verify"; \
+      echo "VERIFY FAILED (bazel exit $rc) — a REAL gate failure; artifacts retained at /verify"; \
       exit "$rc"; \
     fi; \
-    echo "VERIFY PASSED — this image's existence is the verdict"
+    echo "VERIFY PASSED — every document gates green at this commit; this image's existence is the verdict"

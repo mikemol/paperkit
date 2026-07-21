@@ -75,13 +75,56 @@ def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path 
     return out
 
 
-def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None) -> str:
-    """Label a corrupted file: relative to the project, or tagged engine/<…> when it is
-    the engine (outside the project, e.g. the paper's ../paperkit)."""
+def surface_of(footprint: list | None, sandbox_project: Path, root_copy: Path | None,
+               engine_dir: Path | None = None) -> list:
+    """Ζ·surface — the candidate files a claim's falsifiability is measured against: its SUBJECT,
+    CONSTRUCTED from the check's root-scoped read footprint.
+
+    The footprint used only to FILTER a hardcoded candidate set (the project tree, plus the engine
+    iff resolution was "def").  Intersection cannot introduce what the left operand lacks, so a
+    claim ABOUT another tree could never be sensitive to it however precisely it was traced: an
+    engine-claim filed in `boundaries` graded `indeterminate` not because it was unfalsifiable but
+    because the engine was not a candidate.  Here the footprint CONSTRUCTS the set instead.
+
+    This also unwelds two axes `resolution` had fused: GRANULARITY (whole-file corruption vs
+    def-body mutation — a cost/precision knob) and ROOT SCOPE (which trees are candidates — a
+    property of the CLAIM).  Scope is decided here, from the subject; granularity stays a knob.
+
+    Φ·degrade: no footprint (strace absent/blocked) falls back to the flat tree — over-sweeping is
+    the safe direction, and the caller's under-report guard still covers a partial trace."""
+    if footprint is None:
+        return sandbox_files(sandbox_project, set(), engine_dir)
+    base = root_copy or sandbox_project
+    named = {(base / p).resolve() for p in footprint}
+    out, seen = [], set()
+    for f in sorted(base.rglob("*")):
+        if not _mutable(f) or any(part in SKIP_DIRS for part in f.parts):
+            continue
+        if f.suffix == ".sh" and "checks" in f.parts:
+            continue                      # a verifier script; its corruption tests itself
+        r = f.resolve()
+        if r in named and r not in seen:
+            seen.add(r)
+            out.append(f)
+    return out
+
+
+def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None,
+         root_copy: Path | None = None) -> str:
+    """Label a corrupted file: relative to the project, or tagged engine/<…> when it is the engine
+    (outside the project, e.g. the paper's ../paperkit).  Ζ·surface: a constructed surface can also
+    name a THIRD tree (a claim about a sibling's content), labelled root-relative — the engine's own
+    label is left byte-identical so existing fingerprints do not move."""
     try:
         return str(f.relative_to(sandbox_project))
     except ValueError:
-        return f"{engine_dir.name}/{f.relative_to(engine_dir)}"
+        pass
+    if engine_dir is not None:
+        try:
+            return f"{engine_dir.name}/{f.relative_to(engine_dir)}"
+        except ValueError:
+            pass
+    return str(f.relative_to(root_copy)) if root_copy else str(f)
 
 
 # Ζ·mutant — _def_sites / _mutate_lines (the pure AST mutation primitives) now live in their own leaf
@@ -90,15 +133,16 @@ def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None) -> str:
 # capability fingerprint) stays here.
 
 
-def _sites(sandbox_project: Path, engine_dir: Path | None) -> list:
+def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = None,
+           root_copy: Path | None = None) -> list:
     """Every def-resolution mutation SITE as (file, node | None, label): a .py file's
     DEFINITIONS (label `path::qualname`, body→uncatchable-raise) and any other file as one
     whole-file site (label `path`, corrupted).  The unit set the group-testing sweep bisects
     AND the single-site probe (flip_one) selects from — shared so both label sites identically
     (a per-site Bazel action and the in-process sweep agree by construction)."""
     sites = []
-    for f in sandbox_files(sandbox_project, set(), engine_dir):
-        label = _rel(f, sandbox_project, engine_dir)
+    for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
+        label = _rel(f, sandbox_project, engine_dir, root_copy)
         if f.suffix == ".py":
             for qn, node in _def_sites(f.read_text()):
                 sites.append((f, node, f"{label}::{qn}"))
@@ -130,7 +174,8 @@ def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
 
 
 def sensitivity(chk: str, sandbox_project: Path, custom: dict,
-                engine_dir: Path | None = None, footprint: list | None = None) -> tuple[bool, list]:
+                engine_dir: Path | None = None, footprint: list | None = None,
+                root_copy: Path | None = None) -> tuple[bool, list]:
     """The sensitivity set — the mutations that flip chk red — found by BINARY-SPLIT
     GROUP TESTING, not a linear scan over every site.  Mutate a whole group of sites
     at once: if it does NOT flip, the entire group is proven clear in ONE run (the
@@ -163,15 +208,16 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
                 finally:
                     f.write_bytes(orig)
                 if flipped:
-                    hits.append(_rel(f, sandbox_project, engine_dir))
+                    hits.append(_rel(f, sandbox_project, engine_dir, root_copy))
             return hits
 
         if footprint is None:
             return True, sorted(scan(files))
-        fp = set(footprint)
-        scoped = [f for f in files if str(f.relative_to(sandbox_project)) in fp]
+        # Ζ·surface — CONSTRUCT the candidate set from the subject rather than intersecting the
+        # project tree with it.  `files` stays only as the under-report guard's remainder.
+        scoped = surface_of(footprint, sandbox_project, root_copy, engine_dir)
         sens = scan(scoped)
-        if not sens and len(scoped) < len(files):
+        if not sens and set(scoped) != set(files):
             # the scoped scan found nothing — scan the rest too, in case the (best-effort)
             # read footprint under-reported; a real flip there means behavioral, not vacuous.
             sens = scan([f for f in files if f not in set(scoped)])
@@ -205,9 +251,12 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     # (footprint None) sweeps the full surface.
     if footprint is None:
         return True, run(sites)
-    root_copy = engine_dir.parent
-    fp = set(footprint)
-    scoped = [s for s in sites if str(s[0].relative_to(root_copy)) in fp]
+    root = root_copy or engine_dir.parent
+    # Ζ·surface — same construction at def granularity: the subject decides the ROOTS, the
+    # granularity knob decides that each candidate contributes its def-sites rather than one
+    # whole-file site.  The two axes are now set independently.
+    scoped = _sites(sandbox_project, engine_dir,
+                    surface_of(footprint, sandbox_project, root, engine_dir), root)
     flips = run(scoped)
     if not flips and len(scoped) < len(sites):
         keep = {s[2] for s in scoped}
@@ -231,7 +280,7 @@ def flip_one(chk: str, sandbox_project: Path, custom: dict,
 
 def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
                 sandbox_project: Path, engine_dir: Path | None = None,
-                footprint: list | None = None) -> dict:
+                footprint: list | None = None, root_copy: Path | None = None) -> dict:
     typ, _, target = chk.partition(":")
     if typ == "result":
         # Ξ·result-imported: a verdict-import is adequacy DELEGATED to a separately-gated sibling.
@@ -286,7 +335,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
                        "iteration order / network?), so a single-sample mutation sweep is noise",
                 "not_higher": "to rise: make the check a pure function of project content, then Δ can grade it",
                 "not_lower": "—"}
-    baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir, footprint)
+    baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir, footprint, root_copy)
     rec = _grade_from_sens(baseline, sens)
     rec["baseline"] = baseline   # Ζ·calc — the measured baseline (the verdict), part of the CALCULATION
     if rec["grade"] == "indeterminate":
@@ -375,18 +424,21 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
         # the trace sees ENGINE reads ("paperkit/x.py", "<proj>/checks/y.py"); the cache key stays
         # PROJECT-scoped, derived from the same trace (no second strace) — engine entries aren't
         # project inputs (the engine-epoch hash covers them).  File resolution traces project-scoped.
-        if engine:
-            sweep_fp = resolver.footprint(chk, sandbox, custom, scope=root_copy)
-            if sweep_fp is None:
-                fp = None
-            elif sandbox == root_copy:
-                fp = sweep_fp                                    # the root project: its scope IS root
-            else:
-                pre = str(sandbox.relative_to(root_copy)) + "/"
-                fp = sorted(p[len(pre):] for p in sweep_fp if p.startswith(pre))
+        # Ζ·surface — trace at ROOT scope at BOTH granularities.  The trace's scope used to be welded
+        # to the granularity too (file resolution traced project-scoped), which is what made the
+        # subject unrepresentable there: a project-relative footprint cannot NAME the engine, so a
+        # constructed surface had nothing to construct from and the claim could only read
+        # indeterminate.  The cache key stays PROJECT-scoped, derived from the same trace (no second
+        # strace) — engine entries aren't project inputs (the engine-epoch hash covers them).
+        sweep_fp = resolver.footprint(chk, sandbox, custom, scope=root_copy)
+        if sweep_fp is None:
+            fp = None
+        elif sandbox == root_copy:
+            fp = sweep_fp                                        # the root project: its scope IS root
         else:
-            fp = sweep_fp = resolver.footprint(chk, sandbox, custom)
-        rec = grade_check(chk, project_dir, presupposed, custom, sandbox, engine, sweep_fp)
+            pre = str(sandbox.relative_to(root_copy)) + "/"
+            fp = sorted(p[len(pre):] for p in sweep_fp if p.startswith(pre))
+        rec = grade_check(chk, project_dir, presupposed, custom, sandbox, engine, sweep_fp, root_copy)
         rec["_footprint"] = fp
         return rec
     finally:

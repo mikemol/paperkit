@@ -9,8 +9,8 @@ Every document the local CI gates passes the gate with zero postulates [@rpt-sta
 | document | gate (--safe) | prose ≡ projection | checks verified | sections | CI tier |
 | --- | --- | --- | --- | --- | --- |
 | paper | PASS | yes | 80 | 15 | //:hook |
-| README | FAIL | yes | 23 | 8 | //:hook |
-| boundaries | FAIL | yes | 24 | 3 | //:hook |
+| README | PASS | yes | 23 | 8 | //:hook |
+| boundaries | PASS | yes | 24 | 3 | //:hook |
 | config | PASS | yes | 4 | 2 | wired |
 | image | on-demand | — | — | — | on-demand |
 | library | PASS | yes | 2 | 1 | //:hook |
@@ -142,7 +142,7 @@ _23 cited claims — self-grade: 3 imported, 20 behavioral; effective (clamped b
 
 ### boundaries
 
-_24 cited claims — self-grade: 23 behavioral, 1 broken; effective (clamped by entailment): 23 behavioral, 1 broken; 0 clamped below self._
+_24 cited claims — self-grade: 24 behavioral; effective (clamped by entailment): 24 behavioral; 0 clamped below self._
 
 | claim | self → effective | witness | why this grade | why not higher | why not lower |
 | --- | --- | --- | --- | --- | --- |
@@ -169,7 +169,7 @@ _24 cited claims — self-grade: 23 behavioral, 1 broken; effective (clamped by 
 | `bnd-grounding` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_grounding.py` | falsifiable — corrupting 15 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 15 input(s)) |
 | `bnd-dispatch` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_dispatch.py` | falsifiable — corrupting 9 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 9 input(s)) |
 | `bnd-ladder` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_ladder.py` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
-| `bnd-surface` | broken | `cmd:python3 ../paperkit/tests/boundaries_surface.py` | check does not pass in a pristine sandbox — repo is not green | — | — |
+| `bnd-surface` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_surface.py` | falsifiable — corrupting 7 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 7 input(s)) |
 
 ### library
 

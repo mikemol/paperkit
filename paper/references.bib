@@ -25,3 +25,11 @@
   booktitle = {Proc. ACM on Programming Languages (ICFP)}, year = {2018},
   doi     = {10.1145/3236774}
 }
+@misc{cassian-fresh,
+  glue    = {and from outside this repository,},
+  section = {related}, from = {mokhov-build},
+  claim   = {an independent consumer of this engine reports the limit of a freshness check --- re-running the producer that built an artifact and comparing establishes DETERMINISM, not correctness --- and the report separates its two halves honestly: the observation belongs to a reviewer in that project, who asked mid-implementation whether a generated table was undergoing the same claim rigor the prose would, while the confirming evidence is the project's own, where a generator was wrong twice (it read a label as a tier, and let an epilogue's exit status leak into a claim that never sets one) and the freshness check passed cleanly through both, because it only ever compared the committed copy against what that same generator had just emitted --- so a SECOND, independent oracle catches what a self-comparison structurally cannot, which is this paper's agreement argument reached from the outside},
+  author  = {cassian-observability},
+  title   = {Field report: a freshness check proves determinism, not correctness},
+  year    = {2026}
+}

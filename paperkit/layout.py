@@ -13,7 +13,21 @@ from pathlib import Path
 
 import config
 
-MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt"}
+# Ζ·surface·admit — the suffixes Δ may corrupt.  This is a PROXY for the real property ("could
+# this file's content change a claim's truth"), and every proxy carries an error term: a file the
+# proxy excludes is unfalsifiable BY CONSTRUCTION, however precisely the claim names it.  `.json`
+# and `.bzl` were absent, which the unmeasured-reads axis (Ζ·surface·kind) then MEASURED as two
+# live gaps: `setup/reference.json`, whose project prose asserts "Δ can corrupt it and flip the
+# verdict" while Δ could not, and `tools/grade.bzl`, which bnd-ladder makes assertions about and
+# could not falsify.  Admitted deliberately, off a measurement, rather than guessed.
+MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt", ".json", ".bzl"}
+# ...except DERIVED files, which are outputs rather than inputs.  A .pyc is excluded by SKIP_DIRS
+# (it lives in __pycache__); a Δ cache is not in any skip dir, so it is named here.  Corrupting an
+# output cannot falsify a claim — it only makes the sweep measure its own bookkeeping (and a cache
+# entering the surface the moment `.json` was admitted is exactly the kind of quiet coupling the
+# admission had to be measured for).  See [[pyc-is-a-build-artifact]]: a derived file is a BUILD
+# ARTIFACT, and the input is its source.
+DERIVED_NAMES = {".delta-cache.json"}
 # `bazel-*` are convenience symlinks into the multi-GB Bazel cache; a glob (ignore_patterns
 # is fnmatch) keeps _copy_sandbox from following them and exploding the Δ sandbox (Ζ·skip).
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out", "bazel-*"}
@@ -84,7 +98,8 @@ def _nested_roots(base: Path) -> list:
 def _mutable(f: Path) -> bool:
     """A text input Δ may corrupt: a known source suffix, or a versioned git hook
     (no suffix, but a checked artifact — the README's ci claim names it)."""
-    return f.is_file() and (f.suffix in MUTABLE_SUFFIXES or ".githooks" in f.parts)
+    return (f.is_file() and f.name not in DERIVED_NAMES
+            and (f.suffix in MUTABLE_SUFFIXES or ".githooks" in f.parts))
 
 
 def _copy_sandbox(root: Path, dest: Path) -> None:

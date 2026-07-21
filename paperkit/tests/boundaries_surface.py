@@ -36,24 +36,34 @@ def main() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     print("Ζ·surface·kind — measured vs merely read\n")
+    # The gap-suffix is DELIBERATELY not a real one.  A first version of this check used `.json`
+    # — and then `.json` was admitted to MUTABLE_SUFFIXES the next day, so the fixture's premise
+    # evaporated and the check went red.  "Synthetic fixture, not the live instance" was the right
+    # instinct applied to the wrong half: the FILES were synthetic, the PROPERTY under test was
+    # borrowed from the real suffix set.  A test of a mechanism must not depend on a policy value
+    # that the mechanism exists to help change.  The assert below is the guard: if this suffix ever
+    # becomes real, this says so loudly instead of silently passing on a hollow premise.
+    GAP = ".not-a-paperkit-input"
+    assert GAP not in layout.MUTABLE_SUFFIXES, "the fixture's gap-suffix became a real input"
+
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
         (root / "proj").mkdir()
-        (root / "proj" / "doc.md").write_text("x\n")          # mutable   — measured
-        (root / "proj" / "data.json").write_text("{}\n")      # NOT mutable — a gap
+        (root / "proj" / "doc.md").write_text("x\n")           # mutable     — measured
+        (root / "proj" / f"data{GAP}").write_text("{}\n")      # NOT mutable — a gap
         (root / "proj" / "__pycache__").mkdir()
         (root / "proj" / "__pycache__" / "m.cpython-313.pyc").write_bytes(b"\x00")
-        reads = ["proj/doc.md", "proj/data.json", "proj/__pycache__/m.cpython-313.pyc"]
+        reads = ["proj/doc.md", f"proj/data{GAP}", "proj/__pycache__/m.cpython-313.pyc"]
         un = grader.unmeasured_reads(reads, root)
 
         print("⟨the axis⟩\n")
         check("a file the claim READS but the sweep CANNOT MUTATE is reported",
-              "proj/data.json" in un)
+              f"proj/data{GAP}" in un)
         check("a file that IS mutable is not reported (it was measured)",
               "proj/doc.md" not in un)
         check("a DERIVED artifact is not reported — its source is in the surface",
               not any("__pycache__" in u for u in un))
-        check("exactly the gap, nothing else", un == ["proj/data.json"])
+        check("exactly the gap, nothing else", un == [f"proj/data{GAP}"])
 
         print("\n⟨it is an axis, not a rung⟩\n")
         # The whole point of the sentinel lesson: incompleteness is not a weaker grade.  If this
@@ -75,15 +85,15 @@ def main() -> int:
         # closing it is a deliberate, measurable act rather than a silent proxy decision.
         was = set(layout.MUTABLE_SUFFIXES)
         try:
-            layout.MUTABLE_SUFFIXES.add(".json")
+            layout.MUTABLE_SUFFIXES.add(GAP)
             closed = grader.unmeasured_reads(reads, root)
         finally:
             layout.MUTABLE_SUFFIXES.clear()
             layout.MUTABLE_SUFFIXES.update(was)
-        ok = un == ["proj/data.json"] and closed == []
+        ok = un == [f"proj/data{GAP}"] and closed == []
         fails.append("surface-delta") if not ok else None
         print(f"  {'ok ' if ok else 'XX '}admitting the suffix CLOSES the gap, and the axis says so")
-        print("      P (as shipped): data.json is read, not mutable → reported as unmeasured")
+        print(f"      P (as shipped): data{GAP} is read, not mutable → reported as unmeasured")
         print("      F (suffix added): the same file becomes measurable → the gap is empty")
         print("      δ (min delta): one entry in MUTABLE_SUFFIXES\n")
 

@@ -163,7 +163,7 @@
           "@@//paperkit/gate.py": "2aeb71afc345afba4d983f488170665550353bcd4158466081b8247d08891dd5",
           "@@//paperkit/grade.py": "e7ff39b98918096675a7f021bc5c8759ca18344efc0a0f89f4c98c0892774dd1",
           "@@//paperkit/grader.py": "ba82d0e21360ef300341d990bf19f77790777da17cae8996d9a3a7761a503791",
-          "@@//paperkit/layout.py": "99f119baff6edd294b9bda94ae73bd1bc0fb6eaf2efeb124dfbea001408ce26f",
+          "@@//paperkit/layout.py": "0ca58f8850655167f4a6d5e361d7e87d5a0388d05cf59c594b59badc91719e51",
           "@@//paperkit/mutate.py": "f609f1a2667a94d2a8008c43801c253bcc44c22b46e93e4afd8941f9ef0bd504",
           "@@//paperkit/project.py": "5f28c603071a11e491b3b72888df62910a28966920fd6f82f9dc4a8f9f8d7c63",
           "@@//paperkit/resolver.py": "1edf72e3e19ac9b8f35b625b711c7b077f209f6f7a8531f366203d533d76d8c3",

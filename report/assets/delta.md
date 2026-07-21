@@ -117,7 +117,7 @@ _23 cited claims — self-grade: 3 imported, 20 behavioral; effective (clamped b
 
 ### boundaries
 
-_23 cited claims — self-grade: 23 behavioral; effective (clamped by entailment): 23 behavioral; 0 clamped below self._
+_24 cited claims — self-grade: 23 behavioral, 1 broken; effective (clamped by entailment): 23 behavioral, 1 broken; 0 clamped below self._
 
 | claim | self → effective | witness | why this grade | why not higher | why not lower |
 | --- | --- | --- | --- | --- | --- |
@@ -142,8 +142,9 @@ _23 cited claims — self-grade: 23 behavioral; effective (clamped by entailment
 | `bnd-check` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_check.py` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
 | `bnd-lint` | behavioral | `cmd:python3 ../tools/lint_bzl.py ../tools/calc.bzl ../tools/verb.bzl ../tools/grade.bzl ../tools/bibtex.bzl ../tools/witness.bzl` | falsifiable — corrupting 1 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 1 input(s)) |
 | `bnd-grounding` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_grounding.py` | falsifiable — corrupting 15 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 15 input(s)) |
-| `bnd-dispatch` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_dispatch.py` | falsifiable — corrupting 8 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 8 input(s)) |
-| `bnd-ladder` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_ladder.py` | falsifiable — corrupting 3 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 3 input(s)) |
+| `bnd-dispatch` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_dispatch.py` | falsifiable — corrupting 9 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 9 input(s)) |
+| `bnd-ladder` | behavioral | `cmd:python3 ../paperkit/tests/boundaries_ladder.py` | falsifiable — corrupting 4 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 4 input(s)) |
+| `bnd-surface` | broken | `cmd:python3 ../paperkit/tests/boundaries_surface.py` | check does not pass in a pristine sandbox — repo is not green | — | — |
 
 ### library
 

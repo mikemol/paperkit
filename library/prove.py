@@ -31,8 +31,15 @@ def certificate(key: str) -> dict:
     re-runs the witness; the sites whose mutation flips it are its sensitivity fingerprint — which, for
     a witness that exercises the grader, IS the engine.  That is what makes the certificate worth
     importing: it carries the measured ground of the claim, not a bare verdict."""
+    # Λ·prove·resolution — the fingerprint's GROUND is the resolution that measured it, so the
+    # certificate must carry it.  Def-resolution is structurally unavailable to a downstream consumer
+    # (the engine is a compiler on the box, not a directory in their repo, so _sandbox_setup's Ν·loud
+    # refusal fires — correctly), which means downstream certificates are FILE-resolution.  An
+    # unlabelled fingerprint read as a def fingerprint OVERSTATES the ground it carries; a labelled
+    # one is honestly weaker.  Reported by a downstream consumer who now records it explicitly.
+    resolution = "def"
     argv = [sys.executable, str(ENGINE / "discriminate.py"), "--only", key,
-            "--calc", "--resolution", "def", str(OWNER)]
+            "--calc", "--resolution", resolution, str(OWNER)]
     r = subprocess.run(argv, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"prove {key}: the def-sweep failed — {r.stderr.strip()[-400:]}")
@@ -43,6 +50,7 @@ def certificate(key: str) -> dict:
     return {
         "concept": key,
         "owner": OWNER.name,
+        "resolution": resolution,     # the frame the fingerprint was measured in — never implicit
         "claim": calc.get("claim", key),
         "verdict": "pass" if baseline else "fail",
         "baseline": baseline,

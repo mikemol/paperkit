@@ -195,6 +195,17 @@ def main(argv: list) -> int:
         if title.lower() not in headings.lower():
             gaps.append(f"section '{title}' absent")
     advisories = []
+    # Ρ·emit·missing — a placement that DID NOT HAPPEN is a finding, not silence.  project.py renders
+    # an absent emit: asset as `<!-- emit: missing … -->`, so the committed prose and its projection
+    # agree ON THE COMMENT and the gate passed: green and visibly broken at once.  The asymmetry was
+    # the tell — an UNCITED placement is already rejected under --safe as a postulate, so a placement
+    # whose artifact is absent is at least as strong a signal.  Absence gets denoted, never defaulted.
+    # (Reported by a downstream consumer whose `out` lived outside the project dir, so the generator
+    # and the projector resolved the asset to two different paths.)
+    for k, f in F.items():
+        if f.get("emit") and not (cfg["out"].parent / f["emit"]).exists():
+            gaps.append(f"placement [@{k}] emits {f['emit']} — the artifact is ABSENT, so the "
+                        f"document renders a placeholder comment where the evidence should be")
     for k, f in F.items():
         if f.get("section") and k not in cited:
             if bib.is_placed(f):

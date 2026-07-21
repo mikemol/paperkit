@@ -5,3 +5,8 @@ setup/.loadtest.lock
 
 # Bazel convenience symlinks (point into the GB-scale cache; must never enter git or the Δ sandbox)
 /bazel-*
+
+# inbox/ — a drop point for OTHER sessions' findings and bug reports, deliberately outside this
+# session's live git state.  Its README is tracked (it explains the convention); nothing else is.
+/inbox/*
+!/inbox/README.md

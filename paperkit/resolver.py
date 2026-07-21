@@ -30,7 +30,29 @@ from pathlib import Path
 import config
 
 _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
-_LIBRARY = Path(__file__).resolve().parent.parent / "library"  # the concept-witness library (concept:)
+_LIBRARY = Path(__file__).resolve().parent.parent / "library"  # the ENGINE's own concept library
+
+
+def _library_for(project_dir: Path | None) -> Path:
+    """Λ·library·seam — WHOSE concept library resolves a `concept:<key>`?  The CONSUMING project's,
+    if it has one; only then the engine's.
+
+    This was engine-relative alone, which is invisible from inside this repo (every project here
+    happens to sit beside the engine) and fatal outside it: paperkit is used as a COMPILER from an
+    external checkout, and a downstream `concept:` then ran THIS repo's library, which has none of
+    their keys.  `concept:` is a builtin, so it dispatches ahead of a project's `[checks.concept]` —
+    their override was silently shadowed, and the verb built to REMOVE per-citation sweep cost was
+    unusable by exactly the consumers who need it (they fall back to a custom type that re-RUNS the
+    witness instead of importing its certificate).  An absent project library must resolve to the
+    engine's BY FALLBACK, never by assumption.  Λ·location: the eight in-repo projects establish the
+    kernel is DOMAIN-free; only an out-of-repo consumer tests whether it is LOCATION-free."""
+    if project_dir is not None:
+        p = Path(project_dir).resolve()
+        for base in (p, p.parent):                    # the project's own, then its repo root's
+            cand = base / "library"
+            if (cand / "concepts.py").is_file():
+                return cand
+    return _LIBRARY
 
 
 # Λ·registry — THE built-in verb set.  This dict OWNS the enumeration: `resolves` dispatches one
@@ -150,8 +172,9 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
         # re-authoring.  The witness resolves its own engine via __file__, so the importing view needs
         # nothing staged; its adequacy is the imported certificate (verdict + engine fingerprint).
         try:
-            argv = [sys.executable, str(_LIBRARY / "concepts.py"), target]
-            return subprocess.run(argv, cwd=_LIBRARY, env=clean_env(),
+            lib = _library_for(project_dir)
+            argv = [sys.executable, str(lib / "concepts.py"), target]
+            return subprocess.run(argv, cwd=lib, env=clean_env(),
                                   capture_output=True).returncode == 0
         except Exception:
             return False
@@ -184,7 +207,7 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
     return run_ok(cmd, project_dir)
 
 
-def _check_cmd(check: str, custom: dict) -> str | None:
+def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str | None:
     """The shell command a check RUNS — or None for file:, which opens only its target.
     The single source of the command behind cmd:/custom/result:, so footprint() traces
     exactly what resolves() runs."""
@@ -194,7 +217,7 @@ def _check_cmd(check: str, custom: dict) -> str | None:
     if typ == "result":
         return f"{sys.executable} {_GATE} --json --safe --without-K {target}"
     if typ == "concept":
-        return f"{sys.executable} {_LIBRARY / 'concepts.py'} {target}"
+        return f"{sys.executable} {_library_for(project_dir) / 'concepts.py'} {target}"
     if typ == "agree":   # trace every producer's reads — the footprint is their union
         return "; ".join(p.strip() for p in target.split("|||") if p.strip())
     if typ == "cmd":
@@ -253,7 +276,7 @@ def footprint(check: str, project_dir: Path, custom: dict, scope: "Path | None" 
     typ, _, target = check.partition(":")
     if typ == "file":
         return [target] if (project_dir / target).exists() else []   # opens only its target
-    cmd = _check_cmd(check, custom)
+    cmd = _check_cmd(check, custom, project_dir)
     if cmd is None:
         return []
     with tempfile.NamedTemporaryFile("w+", suffix=".strace", delete=False) as tf:

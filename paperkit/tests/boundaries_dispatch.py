@@ -20,6 +20,7 @@ from __future__ import annotations
 import inspect
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
@@ -98,6 +99,25 @@ def main() -> int:
               f'startswith("{v}:")' in BIBTEX_SRC)
     check("...and skips their local footprint, as footdeps does",
           all(f'"{v}:"' in BIBTEX_SRC for v in CROSSING) and "no local footprint" in BIBTEX_SRC)
+
+    print("\n⟨location-free dispatch⟩\n")
+    # Λ·location — paperkit is used as a COMPILER from an external checkout, but all nine of its own
+    # projects sit beside the engine, so a path the engine resolves relative to ITSELF looks correct
+    # from in here forever.  The eight-project argument establishes the kernel is DOMAIN-free; it
+    # never varies LOCATION.  The fixtures do run projects from a tempdir — but none of them uses
+    # `concept:`, which is exactly why `_LIBRARY` stayed engine-relative until a downstream consumer
+    # hit it.  So: a project OUTSIDE this repo, with its own library, must dispatch to ITS OWN.
+    with tempfile.TemporaryDirectory() as d:
+        far = Path(d) / "their-repo"
+        (far / "library").mkdir(parents=True)
+        (far / "library" / "concepts.py").write_text("CONCEPTS = {}\n")
+        (far / "doc").mkdir()
+        check("a project outside this repo resolves concept: to ITS OWN library, not the engine's",
+              resolver._library_for(far / "doc") == far / "library")
+        check("...and one with NO library falls back to the engine's (fallback, never assumption)",
+              resolver._library_for(Path(d)) == resolver._LIBRARY)
+    check("in-repo resolution is UNCHANGED by the seam (every project here shares the root library)",
+          resolver._library_for(ROOT / "paper") == ROOT / "library")
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # The exact drift that shipped: a new crossing verb whose skip-set was never updated.  F is

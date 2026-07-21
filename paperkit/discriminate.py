@@ -123,8 +123,17 @@ def main(argv: list) -> int:
         # SWEEP is the build graph — not the loop below, which stays for direct/on-demand use.
         f = F.get(only)
         if not f or not f.get("check"):
-            print(json.dumps({"claim": only, "grade": "broken"}))
-            return 0
+            # Ζ·ladder·sentinel — "there is no such claim" is NOT A GRADE.  The ladder totally orders
+            # MEASUREMENTS; an absent claim was never measured, so placing it on the ladder is a
+            # category error — and the rung it borrowed, `broken`, MEANS "does not pass in a pristine
+            # sandbox", i.e. the repo is red.  Two states collapsed to one alarming word, and because
+            # `grade.below("behavioral")` includes `broken`, a mistyped key silently FAILED adequacy
+            # while this path exited 0.  Absence gets its own denotation (an `error` record) and its
+            # own loud exit: a key that names nothing is a caller bug, not a measurement.
+            # (Reported by a downstream consumer, who lost a debugging cycle reading it as "repo red".)
+            print(json.dumps({"claim": only,
+                              "error": "no-check" if f else "no-such-claim"}), file=sys.stderr)
+            return 2
         chk = f["check"]
         mutant = config.resolve(config.MUTANT)
         if mutant:

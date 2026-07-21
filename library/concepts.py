@@ -52,7 +52,18 @@ def main(argv) -> int:
     prove_mode = "--prove" in argv
     argv = [a for a in argv if a != "--prove"]
     if not argv or argv[0] not in CONCEPTS:
-        print(f"usage: concepts.py <{'|'.join(CONCEPTS)}> [--prove]", file=sys.stderr)
+        # Λ·doc·concept — name WHICH library answered.  `concept:` resolves to the consuming
+        # project's library and falls back to the ENGINE's (resolver._library_for), and the
+        # fallback is silent by design.  Without this path in the message, a downstream reader
+        # whose library is missing or differently named sees "unknown concept key" listing keys
+        # they never wrote, and reads it as a bug in their OWN bib rather than as resolution
+        # having landed somewhere else.  The message borrowed the wrong denotation; now it says
+        # where it stands.  (Asked for by a downstream consumer, who predicted this exact symptom.)
+        print(f"usage: concepts.py <{'|'.join(CONCEPTS)}> [--prove]\n"
+              f"  this library: {Path(__file__).resolve()}\n"
+              f"  if that is not the library you meant, `concept:` fell back to the engine's — "
+              f"a project's own library is <project>/library/concepts.py or <repo>/library/concepts.py",
+              file=sys.stderr)
         return 2
     if prove_mode:
         # Λ·witness — the SELF-PROVING face: emit this witness's own certificate ⟨verdict, sensitivity

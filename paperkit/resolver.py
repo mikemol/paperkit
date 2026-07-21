@@ -80,7 +80,7 @@ VERBS = {
     "agree":   {"arg": "<p>|||<q>",   "verb": "concurs", "crosses": False,
                 "passes": "the independent producers all exit `0` and emit identical output"},
     "concept": {"arg": "<key>",       "verb": "imports", "crosses": True,
-                "passes": "the concept library's certificate for that key reads pass"},
+                "passes": "the project's concept library --- else the engine's --- certifies that key"},
 }
 
 # The `type:` prefixes of the boundary-crossing verbs — startswith()-ready, DERIVED so a consumer

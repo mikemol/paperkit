@@ -39,7 +39,7 @@ A verifier is named type:target, and one type ships built in per verb — exists
 | `cmd:<script>` | execs | the script exits `0` |
 | `result:<project>` | parses | the sibling project's gate verdict parses green |
 | `agree:<p>\|\|\|<q>` | concurs | the independent producers all exit `0` and emit identical output |
-| `concept:<key>` | imports | the concept library's certificate for that key reads pass |
+| `concept:<key>` | imports | the project's concept library --- else the engine's --- certifies that key |
 
 Cmd is the universal escape hatch every check reduces to, and a new domain adds named types in paper.toml without touching the engine [@rm-resolver-cmd]. A new domain declares them like this [@rm-resolver-eg].
 

@@ -19,11 +19,15 @@ durable index. Append-only, retirement-logged (see README).
      edges; bibtex.bzl extension re-pointed from BUILD-text-parsing to the owner).
    - **Μ·kernel·cells — MEASURED 2026-07-22, verdict reshapes the rung.** Probe: a
      docstring edit to coherence.py (ZERO in-engine dependents) re-ran 25,813/26,650
-     actions (97%, 32 min). Mechanism: the pk_eval cone plumbing ALREADY exists and is
-     correct (closure_pyc/py depsets, not the flat engine) — but witness CLOSURES are
-     honestly whole-engine because view witnesses import _fixture → discriminate/gate/
-     project → everything. Footprint-based staging is UNSOUND (under-approximates what
-     a check could read); the two honest levers:
+     actions (97%, 32 min). DIAGNOSIS CORRECTED (saturation agent, verified vs my aquery):
+     the dominant mechanism was NOT closure width — every pk_eval cell ALSO staged the
+     FLAT ENGINE via its `project` attr (bibtex.bzl _data "engine (always)" baked into the
+     ev at :429), so the cone machinery bought zero locality; closures alone would explain
+     ~900 coherence cells, not 25,813. FIXED by Μ·kernel·fixture·unstage (drop the flat
+     engine from eval cells; the closure stages the engine modules). Closure width remains
+     the SECOND-order limiter (witnesses → _fixture → discriminate/gate/project).
+     Footprint-based staging is UNSOUND (under-approximates what a check could read);
+     the two follow-on levers:
      (1) **Μ·kernel·certs** — each concept: lift DELETES the claim's def-grid from its
      views (graded once at the library); the cell-count reduction IS Λ·full continuing.
      (2) **Μ·kernel·fixture** — split _fixture's hub imports into per-capability

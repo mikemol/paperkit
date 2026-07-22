@@ -57,15 +57,21 @@ def _entries(content):
         out.append((key, check, sib, reads, rests))
     return out
 
-def _data(tokens, files, imports = []):
+def _data(tokens, files, imports = [], engine = True):
     """own files + engine (always) + the IMPORTED concept-bib packages' files (a view composes bibs
     from other packages, and the runtime engine re-reads them when it gates/grades) + each DECLARED
     read token → its project's filegroup (`.` → the root project's files; a sibling → its files)."""
-    out = {files: True, "@@//paperkit:engine": True}
+    out = {files: True}
+    if engine:
+        out["@@//paperkit:engine"] = True
     for i in imports:
         out[i] = True
     for t in tokens:
         if t == "paperkit":
+            # Μ·kernel·fixture·unstage — a DECLARED engine read: a witness that runs a sibling
+            # GATE (boundaries-project) genuinely reads the whole engine tree, and says so here;
+            # with engine=False (the eval cells) this declaration is what stages it.
+            out["@@//paperkit:engine"] = True
             continue
         out["@@//:files" if t == "." else "@@//%s:files" % t] = True
     return sorted(out.keys())
@@ -426,7 +432,18 @@ def _bib_repo_impl(repository_ctx):
                 # files — a witness may read cross-project inputs (local-ci reads .githooks/pre-commit,
                 # multi-project/report-live read siblings); the old pk_calc staged dl, so the grid ∅
                 # must too, else the unmutated check errors and the baseline flips (garbage sens).
-                ev = "check = " + _lit(wscript) + ", closure = [" + cl + "], project = [" + dl + "]"
+                # Μ·kernel·fixture·unstage — but NOT the flat engine: the cell's CLOSURE (PycInfo
+                # cones, .py + .pyc) already stages every engine module the check can load, so
+                # "@@//paperkit:engine" here made every engine edit invalidate every cell (the
+                # measured 25.8k storm) while buying nothing.  Dropping it is what makes a module
+                # edit invalidate only the cells whose closure contains it.  An under-staged dynamic
+                # load fails LOUD: the unmutated check errors, the ∅-baseline flips, pk_sens refuses.
+                # …except a result:-checked row, which runs a whole SIBLING GATE in the cell — the
+                # sibling's checks (bnd-components' partition-totality among them) legitimately read
+                # the full engine tree, so its row keeps the flat staging.
+                edl = ", ".join([_lit(d) for d in _data(reads, files, imports, engine = False)])
+                ev = ("check = " + _lit(wscript) + ", closure = [" + cl + "], project = [" +
+                      (dl if check.startswith("result:") else edl) + "]")
                 cellnames = []
                 for m, q in csites:
                     sn = _sitename(m, q)

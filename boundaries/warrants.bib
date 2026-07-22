@@ -104,8 +104,14 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_check.py},
   reads   = {.}
 }
-@misc{bnd-lint,
+@misc{bnd-components,
   section = {engine}, from = {bnd-check}, join = {. },
+  claim   = {the engine itself is partitioned into components (Μ·kernel·bounds) --- kernel, model, resolver, project, gate, delta, tests --- declared once in components.bzl, TOTAL and DISJOINT over the real tree by set-equality, with an acyclic allowed-import DAG that every real import edge is verified against, the committed import map (dag.bzl) first re-derived through its owning tool so the discipline is never judged on a stale copy},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_components.py},
+  reads   = {.}
+}
+@misc{bnd-lint,
+  section = {engine}, from = {bnd-components}, join = {. },
   claim   = {the build rules hold to the same boundary --- every .bzl action INVOKES a tool rather than embedding a script, so a bare interpreter (which leaves sys.executable empty), a printf-built JSON record, or a grep-parsed JSON field cannot enter a command string, and the verdict record has one owner (tools/verdict.py); Ξ·lint blocks all three across every .bzl},
   check   = {cmd:python3 ../tools/lint_bzl.py ../tools/calc.bzl ../tools/verb.bzl ../tools/grade.bzl ../tools/bibtex.bzl ../tools/witness.bzl},
   reads   = {.}

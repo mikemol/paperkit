@@ -177,18 +177,21 @@ def _filesitename(spec):
 # single source, no glob), minus the boundary suites no check imports.
 _BOUNDARY = "tests/boundaries_"
 
-def _core_from_engine(build_text):
-    i = build_text.find("ENGINE_SRCS = [")
-    body = build_text[i + len("ENGINE_SRCS = ["):build_text.find("]", i)]
-    srcs = [t.strip().strip('"').strip("'") for t in body.split(",")]
-    return ["paperkit/" + s for s in srcs if s and not s.startswith(_BOUNDARY)]
+def _core_from_engine(components_text):
+    # Μ·kernel·bounds — the engine file list's ONE owner is paperkit/components.bzl (BUILD.bazel
+    # derives ENGINE_SRCS from the same literal).  Every quoted *.py token in it is a partition
+    # member (component names carry no ".py"; comments are never a lone quoted filename), so the
+    # core is the sorted union minus the boundary suites no check imports.
+    srcs = [t for t in components_text.split('"') if t.endswith(".py") and "\n" not in t and " " not in t]
+    return sorted(["paperkit/" + s for s in srcs if not s.startswith(_BOUNDARY)])
 
 def _core(module_ctx):
-    """The core engine module .py paths (ENGINE_SRCS minus boundary suites), watched so an add/remove
-    re-generates.  The SHARED input of ·gen·surface (def-sites) and ·gen·closure (witness closures) —
-    both project the same engine AST (def_sites.py / closure.py beside imports.py)."""
-    module_ctx.watch(module_ctx.path(Label("@@//paperkit:BUILD.bazel")))
-    core = _core_from_engine(module_ctx.read(module_ctx.path(Label("@@//paperkit:BUILD.bazel"))))
+    """The core engine module .py paths (the component partition minus boundary suites), watched so
+    an add/remove re-generates.  The SHARED input of ·gen·surface (def-sites) and ·gen·closure
+    (witness closures) — both project the same engine AST (def_sites.py / closure.py beside
+    imports.py)."""
+    module_ctx.watch(module_ctx.path(Label("@@//paperkit:components.bzl")))
+    core = _core_from_engine(module_ctx.read(module_ctx.path(Label("@@//paperkit:components.bzl"))))
     for m in core:
         module_ctx.watch(module_ctx.path(Label("@@//paperkit:" + m[len("paperkit/"):])))
     return core

@@ -37,6 +37,11 @@ filegroup(name = "files", srcs = [
         "//tools:verdict.py",
         "//report:gen.py",
         "//report:figure.py",
+        # Μ·kernel·wire — the component partition, the import DAG, and their deriving tool, so
+        # bnd-components can verify the engine's boundary from the owners (never a copy).
+        "//paperkit:components.bzl",
+        "//paperkit:dag.bzl",
+        "//tools:imports.py",
     ], visibility = ["//visibility:public"])
 
 # The local CI: `bazel test //:hook` IS the pre-commit (Ζ·hook / Ζ·foot·hook) — it gates AND grades

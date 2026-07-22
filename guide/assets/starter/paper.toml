@@ -1,0 +1,5 @@
+[paper]
+title = "A Note"
+warrants = ["warrants.bib"]
+rubric = "rubric.tsv"
+out = "note.md"

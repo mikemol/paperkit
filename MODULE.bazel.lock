@@ -145,7 +145,7 @@
     "//tools:bibtex.bzl%bib": {
       "general": {
         "bzlTransitiveDigest": "zEHWecTbk06PBL9pIA6lGa6Sciy3s6WLy6ScqR5mj7k=",
-        "usagesDigest": "b56tq+VLFr1a+OX6wEYhI5FEv1Ff+J2i9mPrWhX58kw=",
+        "usagesDigest": "ferZnsrS7mhDsGaHTHyimpD6mricmwD4voJQNZYF3hw=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "f0097136ce948421dd017d9515ad2a8377d727d0c5e6777baed7e1ed5e226a0e",
           "@@//library/paper.toml": "abe305540f0d6df80ebcd536f2b097d7c665399b844678ee9ce3179bd6ba8b95",
@@ -2539,6 +2539,21 @@
                 "paperkit/tests/_fixture.py\timport+:resolver",
                 "paperkit/tests/_fixture.py\timport+:rhetoric"
               ],
+              "closures": []
+            }
+          },
+          "paperkit_guide": {
+            "repoRuleId": "@@//tools:bibtex.bzl%bib_repo",
+            "attributes": {
+              "bib": "@@//guide:guide.bib",
+              "project": "guide",
+              "adequacy": true,
+              "local": false,
+              "compose": false,
+              "calc": true,
+              "emerge": false,
+              "owns_concepts": false,
+              "sites": [],
               "closures": []
             }
           },

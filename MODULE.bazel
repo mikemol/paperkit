@@ -27,5 +27,6 @@ bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adeq
 # Λ·witness — the concept LIBRARY owns each concept's witness + self-graded certificate; views import
 # it via concept: checks.  owns_concepts ⇒ its per-concept verdict + def-cert records are PUBLIC.
 bib.project(name = "paperkit_library", bib = "//library:concepts.bib", project = "library", adequacy = True, calc = True, emerge = True, owns_concepts = True)
+bib.project(name = "paperkit_guide", bib = "//guide:guide.bib", project = "guide", adequacy = True, calc = True)  # Σ·step5: a view composed from library certificates — zero witness code
 bib.project(name = "paperkit_setup", bib = "//setup:warrants.bib", project = "setup", local = True)  # Ζ·resist: host-coupled
-use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_library", "paperkit_paper", "paperkit_root", "paperkit_setup")
+use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_guide", "paperkit_library", "paperkit_paper", "paperkit_root", "paperkit_setup")

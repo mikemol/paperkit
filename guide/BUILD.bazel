@@ -1,0 +1,13 @@
+# Hand-maintained file manifest (Ζ·sunset) — a data dep of the Ζ·starlark-generated
+# @paperkit_guide check graph.  Σ·step5: the GUIDE view is composed entirely from library
+# concept certificates plus a self-verifying starter — it owns NO witness code.
+filegroup(name = "files", srcs = [
+        "guide.bib",
+        "paper.toml",
+        "rubric.tsv",
+        "GUIDE.md",
+        "assets/starter/paper.toml",
+        "assets/starter/warrants.bib",
+        "assets/starter/rubric.tsv",
+        "assets/starter/note.md",
+    ], visibility = ["//visibility:public"])

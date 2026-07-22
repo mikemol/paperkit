@@ -1,0 +1,56 @@
+% guide.bib — Σ·step5: an advocacy VIEW composed from the concept library.  Every conceptual
+% claim's check is a concept: IMPORT of a certificate the library authored and graded once; the
+% starter section's claims are certified by running paperkit's own gate on the starter project.
+% This file plus a rubric and a paper.toml is the WHOLE view — no witness module exists here.
+
+@misc{g-model,
+  section = {model},
+  claim   = {a document is built from claims, not prose --- each claim is a single bibliography entry: a statement, the section it belongs to, the claims it depends on, and its check},
+  check   = {concept:rm-model}
+}
+@misc{g-verifier,
+  section = {model}, from = {g-model}, join = {, and },
+  claim   = {each claim carries a machine-checkable verifier the gate actually runs},
+  check   = {concept:rm-verifier}
+}
+
+@misc{g-noship,
+  section = {gate},
+  claim   = {an unverified sentence does not ship --- a claim whose check fails blocks the gate, so the document cannot overclaim},
+  check   = {concept:rm-noship}
+}
+@misc{g-invariants,
+  section = {gate}, from = {g-noship}, join = {. },
+  claim   = {the gate enforces its invariants mechanically: the committed prose equals its projection, and every cited claim's check passes},
+  check   = {concept:rm-cmds-inv}
+}
+
+@misc{g-extend,
+  section = {extend},
+  claim   = {cmd is the universal escape hatch every check reduces to, and a new domain adds named check types in its own config without touching the engine},
+  check   = {concept:rm-resolver-cmd}
+}
+
+@misc{g-adequacy,
+  section = {adequacy},
+  claim   = {beyond pass/fail, the mutation sweep grades how much each check can actually fail --- a presupposed file grades vacuous, a content-sensitive command behavioral --- so a green gate also says how hard its greens are to fake},
+  check   = {concept:adequacy-pitch}
+}
+
+@misc{g-starter,
+  section = {starter},
+  claim   = {a complete project is a paper.toml, a warrants bibliography, and a rubric --- the starter below is not pseudocode, it gates green exactly as shown (this claim's check RUNS paperkit's gate on it)},
+  check   = {cmd:python3 ../paperkit/gate.py assets/starter}
+}
+@misc{g-starter-toml,
+  section = {starter}, from = {g-starter}, join = {. },
+  claim   = {its paper.toml declares the document},
+  emit    = {assets/starter/paper.toml},
+  check   = {cmd:python3 ../paperkit/project.py --check assets/starter}
+}
+@misc{g-starter-bib,
+  section = {starter}, from = {g-starter-toml}, join = {, and },
+  claim   = {its warrants bibliography is the document's one claim},
+  emit    = {assets/starter/warrants.bib},
+  check   = {cmd:python3 ../paperkit/gate.py --only ships-verified assets/starter}
+}

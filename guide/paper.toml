@@ -1,0 +1,9 @@
+[paper]
+adequacy = true
+title = "The Paperkit Guide"
+subtitle = "Every sentence below is certified by a concept the library authored and GRADED once --- this view adds NO witness code; it imports certificates and runs the gate on its own starter."
+warrants = ["guide.bib"]
+rubric = "rubric.tsv"
+out = "GUIDE.md"
+numbered = false
+references = false

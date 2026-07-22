@@ -52,6 +52,10 @@ test_suite(name = "hook", tests = [
     "@paperkit_library//:gate",
     "@paperkit_library//:adequacy",
     "@paperkit_library//:cohere",
+    # Σ·step5 — the GUIDE: a view composed entirely from library concept certificates plus a
+    # self-verifying starter (its check runs the gate on the starter).  Zero witness code.
+    "@paperkit_guide//:gate",
+    "@paperkit_guide//:adequacy",
     # Ζ·emerge·gate — the ∂² coherence reading over each emerge project's def-sweep GRID (the
     # Ξ·dag·eval closure cells).  Pulls the grid into //:hook, so the hook runs under --config=mutant
     # (the hermetic sandbox the mutation cells require; .githooks/pre-commit passes it).

@@ -22,7 +22,6 @@ sys.path.insert(0, str(ENGINE / "tests"))
 import gate  # noqa: E402
 import resolver  # noqa: E402  — for VERBS, the engine's OWN verb set (never re-listed here)
 import project as P  # noqa: E402
-import _fixture as fx  # noqa: E402
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
 RESOLVER_SRC = (ENGINE / "resolver.py").read_text()   # the check-resolution core (split out of gate)

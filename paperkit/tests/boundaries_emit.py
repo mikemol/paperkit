@@ -14,7 +14,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture import entry, gate, project_text  # noqa: E402
+from _fixture_gate import gate  # noqa: E402
+from _fixture_model import entry  # noqa: E402
+from _fixture_project import project_text  # noqa: E402
 
 C = entry("c", claim="a cited claim")                                       # base prose
 P_CITE = entry("p", claim="an example", emit="x.sh", frm="c", check="file:x.sh")  # derived term

@@ -39,7 +39,10 @@ COMPONENTS = {
         "mutate.py",
     ],
     "tests": [
-        "tests/_fixture.py",
+        "tests/_fixture_delta.py",
+        "tests/_fixture_gate.py",
+        "tests/_fixture_model.py",
+        "tests/_fixture_project.py",
         "tests/boundaries_agree.py",
         "tests/boundaries_check.py",
         "tests/boundaries_coherence.py",

@@ -4,62 +4,26 @@ from which the build stages the transitive .pyc/.py closure (PycInfo, paperkit/d
 the flat engine.  Two AST-derived edge kinds (NEVER grep — a grep matches the name in prose/strings):
 
   IMPORT     — a bare `import X` / `from X import` (module-level, shared by every witness; and per
-               witness body, de-lazied per Ξ·dag·check).
-  SUBPROCESS — an `fx.<helper>(...)` call → the CLI entrypoint _fixture spawns (project/gate/
-               discriminate).  The helper→CLI map is DERIVED from _fixture.py (its property, not
-               hardcoded here): the module-level NAME = ENGINE / "x.py" constants, then which of
-               those each helper references.
+               witness body, de-lazied per Ξ·dag·check).  A per-capability fixture import
+               (`from _fixture_gate import gate`, Μ·kernel·fixture·split) is an ordinary IMPORT
+               root: the _fixture_* modules are engine modules whose module-top imports carry the
+               honest capability cone, so no fx-facade special-casing exists here any more.
   READ       — a `"x.py"` string constant (claims.py reads gate/resolver/project sources via
                read_text at MODULE level) → that module must be staged as .py.
 
 Intra-claims.py calls are followed (a witness calling the local _parse helper inherits its `import
 project`).  Emits `claim<TAB>paperkit/<relpath>.py` per (claim, root); the codegen maps each root to
 its //paperkit:<target> pk_pyc target and PycInfo expands the transitive cone.  The check module's
-module-level roots are shared by every claim (claims.py imports _fixture + read_texts three sources).
+module-level roots are shared by every claim (claims.py imports _fixture_model + read_texts three
+sources).
 
-Usage: closure.py --check paper/checks/claims.py --fixture paperkit/tests/_fixture.py <engine.py>…"""
+Usage: closure.py --check paper/checks/claims.py <engine.py>…"""
 import argparse
 import ast
 import sys
 from pathlib import Path
 
 from imports import imports as _mod_imports
-
-
-def _fx_cli(fixture_text, names):
-    """helper name → {engine module stem it runs}, DERIVED from _fixture.py: its engine IMPORTS
-    (Φ·spawn — gate.main/project.main run in-process) UNION the engine .py PATH-CONSTANTS it references
-    (the grade helpers still SPAWN discriminate by its DISCRIMINATE = ENGINE/"discriminate.py" path —
-    Φ·spawn·sweep).  Follows intra-fixture calls (gate() → _projected() → project)."""
-    tree = ast.parse(fixture_text)
-    const = {}  # NAME → stem, from module-level PROJECT/GATE/DISCRIMINATE = ENGINE / "x.py"
-    for n in tree.body:
-        if isinstance(n, ast.Assign):
-            tgts = n.targets[0].elts if isinstance(n.targets[0], ast.Tuple) else [n.targets[0]]
-            vals = n.value.elts if isinstance(n.value, ast.Tuple) else [n.value]
-            for t, v in zip(tgts, vals):
-                if not isinstance(t, ast.Name):
-                    continue
-                for s in ast.walk(v):
-                    if isinstance(s, ast.Constant) and isinstance(s.value, str) and s.value.endswith(".py"):
-                        stem = Path(s.value).stem
-                        if stem in names:
-                            const[t.id] = stem
-    funcs = {fn.name: fn for fn in tree.body if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))}
-
-    def roots(name, seen):
-        if name in seen or name not in funcs:
-            return set()
-        seen.add(name)
-        fn = funcs[name]
-        r = _imports(fn, names)
-        r |= {const[x.id] for x in ast.walk(fn) if isinstance(x, ast.Name) and x.id in const}
-        for c in ast.walk(fn):
-            if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in funcs:
-                r |= roots(c.func.id, seen)
-        return r
-
-    return {name: roots(name, set()) for name in funcs}
 
 
 def _imports(node, names):
@@ -78,16 +42,8 @@ def _reads(node, names):
             and n.value.endswith(".py") and Path(n.value).stem in names}
 
 
-def _fx_calls(node, cli):
-    out = set()
-    for n in ast.walk(node):
-        if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "fx":
-            out |= cli.get(n.attr, set())
-    return out
-
-
-def _roots_of(node, names, cli):
-    return _imports(node, names) | _reads(node, names) | _fx_calls(node, cli)
+def _roots_of(node, names):
+    return _imports(node, names) | _reads(node, names)
 
 
 def _parents_prefix(node, parts):
@@ -189,13 +145,11 @@ def _content_edges(fn, pref, parts):
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", required=True, help="the check module, e.g. paper/checks/claims.py")
-    ap.add_argument("--fixture", required=True, help="the fixture module, e.g. paperkit/tests/_fixture.py")
     ap.add_argument("--relpath", default="", help="the check's REPO-RELATIVE path (for parents[N] resolution); defaults to --check")
     ap.add_argument("engine", nargs="+", help="the engine module .py paths (the resolvable names)")
     a = ap.parse_args(argv)
 
     names = {Path(p).stem: p for p in a.engine}      # stem → relpath
-    cli = _fx_cli(Path(a.fixture).read_text(), names)
     # Ξ·dag — the engine import graph (stem → direct engine imports), to expand a witness's closure
     # ROOTS to its full TRANSITIVE cone: the modules the check actually LOADS (PycInfo stages exactly
     # this cone), hence the modules whose def-drop can flip it.  Roots alone UNDER-scope — node-is-claim
@@ -217,19 +171,19 @@ def main(argv):
 
     funcs = {fn.name: fn for fn in tree.body if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))}
 
-    # BASE — the module-level roots, run on EVERY witness (claims.py imports _fixture + read_texts
+    # BASE — the module-level roots, run on EVERY witness (claims.py imports _fixture_model + read_texts
     # gate/resolver/project at import).  Top-level statements only (defs handled per-witness).
     base = set()
     for stmt in tree.body:
         if not isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            base |= _roots_of(stmt, names, cli)
+            base |= _roots_of(stmt, names)
 
     def roots(fnname, seen):
         if fnname in seen or fnname not in funcs:
             return set()
         seen.add(fnname)
         fn = funcs[fnname]
-        r = _roots_of(fn, names, cli)
+        r = _roots_of(fn, names)
         for c in ast.walk(fn):        # follow intra-claims.py calls (a witness → local _parse helper)
             if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in funcs:
                 r |= roots(c.func.id, seen)

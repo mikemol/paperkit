@@ -19,7 +19,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture import discriminate, entry, gate, gate_json  # noqa: E402
+from _fixture_delta import discriminate  # noqa: E402
+from _fixture_gate import gate, gate_json  # noqa: E402
+from _fixture_model import entry  # noqa: E402
 
 # a plain-target paper.toml (overrides the fixture default via assets)
 PLAIN = {"paper.toml": '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'

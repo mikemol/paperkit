@@ -64,7 +64,7 @@ def apply_args(argv) -> None:
     """Capture this CLI invocation's args (process-local, not env), so an explicit arg OVERRIDES
     the env.  Call ONCE at a CLI entry, before resolving.  Child checks do not inherit these.  REPLACES
     (not accumulates): a flag/value absent from argv is absent from _ARGS — so repeated IN-PROCESS
-    invocations (a hermetic def-sweep cell, or fx calling gate.main then discriminate.main; Φ·spawn)
+    invocations (a hermetic def-sweep cell, or a fixture helper calling gate.main then discriminate.main; Φ·spawn)
     each see only their own args, never a prior invocation's leaked --safe/--without-K."""
     _ARGS.clear()
     for p in REGISTRY:

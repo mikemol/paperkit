@@ -1,27 +1,29 @@
-"""Validated fixture builder for paperkit tests — the one place that knows how to
-construct a minimal paperkit project correctly.
+"""The fixture MODEL — the capability-free kernel of the validated fixture builder
+(Μ·kernel·fixture·split): build a minimal paperkit project and run an engine main()
+in-process, with NO engine import (dag cone: ∅).
 
 Every boundary suite used to build a project inline, and each slipped a different
 detail (a single-line .bib entry that the parser won't match; gating without
 projecting out.md first; no citation so nothing is gated).  This module encodes
 those invariants once:
 
-  entry()         a VALID multi-line .bib entry (closing brace on its own line)
-  project_text()  the projection, as text (project -o -)
-  gate()          PROJECTS out.md, then gates  (out=… overrides the projection,
-                  for tests that need to control citations directly)
-  discriminate()  PROJECTS out.md, then runs Δ
+  entry()   a VALID multi-line .bib entry (closing brace on its own line)
+  _write()  the minimal project directory (paper.toml / rubric / warrants / assets)
+  _call()   run an engine main(argv) IN-PROCESS, os.environ saved/restored
 
-All three manage their own tempdir and return plain values.
+The capability modules layer the engine-facing helpers on top — _fixture_project
+(project_text/_projected), _fixture_gate (gate/gate_json), _fixture_delta
+(discriminate/discriminate_stderr) — each importing its OWN engine module at module
+top, so the import DAG (tools/imports.py → paperkit/dag.bzl) carries the honest
+per-capability cone instead of one wide hub, and a witness stages exactly the
+subsystem it exercises.
 """
 from __future__ import annotations
 
 import contextlib
 import io
-import json
 import os
 import sys
-import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent.parent
@@ -30,7 +32,7 @@ if str(ENGINE) not in sys.path:                  # Φ·spawn: the helpers import
                                                  # here — self-contained, not reliant on the caller's setup
 # The engine CLI paths — for the few boundary suites that genuinely test CROSS-PROCESS behaviour
 # (memoize: a Δ grade cached across processes) and so spawn a real process (under the standard
-# boundaries gate, not the hermetic grid).  The fx helpers below run IN-PROCESS, not via these.
+# boundaries gate, not the hermetic grid).  The capability helpers run IN-PROCESS, not via these.
 PROJECT, GATE, DISCRIMINATE = ENGINE / "project.py", ENGINE / "gate.py", ENGINE / "discriminate.py"
 
 
@@ -81,9 +83,7 @@ def _call(main, argv, env=None):
     (config.apply_args, Ω·config) — process-isolated when spawned, but in-process it would LEAK into
     the witness and later calls (the recursive-check leak).  env=None inherits the current environment
     (saved/restored); env=<dict> replaces it for the call, as a subprocess env= would.  A main() that
-    returns None or raises SystemExit yields its exit code.  The engine is imported LAZILY by each
-    helper (not at module level) so a witness's def-closure isn't widened to discriminate's whole cone
-    (Ξ·dag·eval incrementality) — closure.py maps fx.<helper> → its module from these imports."""
+    returns None or raises SystemExit yields its exit code."""
     o, e = io.StringIO(), io.StringIO()
     saved = os.environ.copy()
     if env is not None:
@@ -104,62 +104,3 @@ def _call(main, argv, env=None):
         os.environ.clear()
         os.environ.update(saved)
     return (rc or 0), o.getvalue(), e.getvalue()
-
-
-def project_text(warrants, *, assets=None, rubric=(("s", "Sec"),),
-                 title="t", numbered=False, references=False) -> str:
-    import project
-    with tempfile.TemporaryDirectory() as d:
-        proj = _write(d, warrants, assets, rubric, title, numbered, references)
-        return _call(project.main, ["-o", "-", str(proj)])[1]
-
-
-def _projected(proj, out):
-    if out is None:                       # faithful: out.md IS the projection
-        import project
-        _call(project.main, [str(proj)])
-    else:                                 # caller controls out.md (e.g. citations)
-        (proj / "out.md").write_text(out)
-
-
-def gate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
-         title="t", numbered=False, references=False):
-    """(returncode, stderr).  Projects out.md before gating (or writes `out`)."""
-    import gate as _gate
-    with tempfile.TemporaryDirectory() as d:
-        proj = _write(d, warrants, assets, rubric, title, numbered, references)
-        _projected(proj, out)
-        rc, _o, e = _call(_gate.main, [*flags, str(proj)])
-        return rc, e
-
-
-def discriminate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
-                 title="t", numbered=False, references=False, env=None):
-    """(returncode, stdout).  Projects out.md before grading (or writes `out`).
-    `env` overrides the child environment for the grade run."""
-    import discriminate as _disc
-    with tempfile.TemporaryDirectory() as d:
-        proj = _write(d, warrants, assets, rubric, title, numbered, references)
-        _projected(proj, out)
-        rc, o, _e = _call(_disc.main, [*flags, str(proj)], env=env)
-        return rc, o
-
-
-def discriminate_stderr(warrants, *flags, assets=None, rubric=(("s", "Sec"),), env=None):
-    """The grade run's STDERR (the Δ·pulse heartbeat lives here)."""
-    import discriminate as _disc
-    with tempfile.TemporaryDirectory() as d:
-        proj = _write(d, warrants, assets, rubric, "t", False, False)
-        _projected(proj, None)
-        return _call(_disc.main, [*flags, str(proj)], env=env)[2]
-
-
-def gate_json(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
-              title="t", numbered=False, references=False):
-    """(returncode, parsed gate --json dict).  Projects out.md first (or writes `out`)."""
-    import gate as _gate
-    with tempfile.TemporaryDirectory() as d:
-        proj = _write(d, warrants, assets, rubric, title, numbered, references)
-        _projected(proj, out)
-        rc, o, _e = _call(_gate.main, ["--json", *flags, str(proj)])
-        return rc, json.loads(o or "{}")

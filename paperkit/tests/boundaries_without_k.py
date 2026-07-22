@@ -15,7 +15,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture import entry, gate  # noqa: E402
+from _fixture_gate import gate  # noqa: E402
+from _fixture_model import entry  # noqa: E402
 
 # Two cited claims; DISTINCT witnesses vs a SHARED one (both files exist in the proj).
 DISTINCT = [entry("a", claim="alpha", check="file:w.bib"),

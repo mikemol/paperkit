@@ -26,20 +26,22 @@ ROOT = Path(__file__).resolve().parents[1]
 ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or ROOT / "paperkit")
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
-import _fixture as fx  # noqa: E402  (the validated fixture builder)
+from _fixture_model import entry  # noqa: E402  (the validated fixture kernel; capability helpers
+#   are imported FUNCTION-LOCALLY per witness — the minimal-capability discipline of Μ·kernel·fixture·split)
 import project as P  # noqa: E402  — the bib parser (Μ·model), for the claim-is-record witness
 import gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
 import resolver  # noqa: E402  — VERBS, the engine's OWN verb set (never re-listed here; Λ·registry)
 
 
 def adequacy_pitch():
+    from _fixture_delta import discriminate
     # the Δ grade ladder, the PITCH face — a passing check only proves a sentence named a verifier,
     # not that the verifier ENTAILS it, so Δ grades how much each check can actually fail.  Witnessed
     # the STRONG way (run the real grader over a fixture, not grep the engine source): a presupposed
     # file: grades vacuous, a content-sensitive cmd: grades behavioral.
-    recs = json.loads(fx.discriminate(
-        [fx.entry("vac", claim="v", check="file:w.bib"),
-         fx.entry("beh", claim="b", check="cmd:grep -q TOKEN a.txt", frm="vac")],
+    recs = json.loads(discriminate(
+        [entry("vac", claim="v", check="file:w.bib"),
+         entry("beh", claim="b", check="cmd:grep -q TOKEN a.txt", frm="vac")],
         "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
     g = {r["key"]: r["grade"] for r in recs}
     assert g["vac"] == "vacuous" and g["beh"] == "behavioral", f"grade ladder wrong: {g}"
@@ -86,25 +88,29 @@ def custom_type_resolves():
 
 
 def failing_check_blocks():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # an unverified sentence cannot ship: a claim whose check FAILS blocks the gate.  The gate is
     # engine, so mutating its resolution/projection def-sites flips this — the fingerprint is the gate.
-    ok = [fx.entry("x", claim="present", check="cmd:true")]
-    bad = [fx.entry("x", claim="present", check="cmd:false")]
-    good = fx.project_text(ok)
-    assert fx.gate(ok, out=good)[0] == 0, "a claim with a passing verifier did not ship"
-    assert fx.gate(bad, out=good)[0] != 0, "a claim with a FAILING verifier still shipped"
+    ok = [entry("x", claim="present", check="cmd:true")]
+    bad = [entry("x", claim="present", check="cmd:false")]
+    good = project_text(ok)
+    assert gate(ok, out=good)[0] == 0, "a claim with a passing verifier did not ship"
+    assert gate(bad, out=good)[0] != 0, "a claim with a FAILING verifier still shipped"
 
 
 def gate_enforces_invariants():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # the gate ENFORCES its invariants — the committed prose equals its projection, and every cited
     # claim's check passes — so violating each makes it RED.  The gate is the engine's, so its
     # def-sites (projection-equality, check-resolution) are the certificate's fingerprint.
-    w = [fx.entry("x", claim="content", check="cmd:true")]
-    good = fx.project_text(w)
-    assert fx.gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
-    assert fx.gate(w, out=good + "\nDRIFT\n")[0] != 0, "projection-equality not enforced"
-    bad = [fx.entry("x", claim="content", check="cmd:false")]
-    assert fx.gate(bad, out=fx.project_text(bad))[0] != 0, "check-resolution not enforced"
+    w = [entry("x", claim="content", check="cmd:true")]
+    good = project_text(w)
+    assert gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
+    assert gate(w, out=good + "\nDRIFT\n")[0] != 0, "projection-equality not enforced"
+    bad = [entry("x", claim="content", check="cmd:false")]
+    assert gate(bad, out=project_text(bad))[0] != 0, "check-resolution not enforced"
 
 
 def resolver_dispatches():
@@ -127,13 +133,14 @@ def resolver_dispatches():
 
 
 def document_is_projection():
+    from _fixture_project import project_text
     # the PROJECTOR component's certificate: a document IS the projection of its claim-DAG — the
     # title, EVERY rubric section (populated or not), and every claim's prose appear in the emitted
     # document, which leads with a heading.  The superset of the three view faces (README pitch,
     # paper thesis, paper projector-emits).
-    t = fx.project_text([fx.entry("a", claim="alpha thesis"),
-                         fx.entry("b", claim="beta point", frm="a")],
-                        rubric=(("s", "Sec One"), ("t", "Sec Two")), title="Doc")
+    t = project_text([entry("a", claim="alpha thesis"),
+                      entry("b", claim="beta point", frm="a")],
+                     rubric=(("s", "Sec One"), ("t", "Sec Two")), title="Doc")
     low = t.lower()
     assert t.startswith("#"), "the projection does not lead with a document heading"
     for needle in ("# doc", "## sec one", "## sec two", "alpha thesis", "beta point"):
@@ -141,13 +148,15 @@ def document_is_projection():
 
 
 def project_then_gate():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # two commands do the work — PROJECT makes the document, GATE verifies it: the exact projection
     # passes, and hand-edited drift is rejected.
-    w = [fx.entry("x", claim="content")]
-    doc = fx.project_text(w)
+    w = [entry("x", claim="content")]
+    doc = project_text(w)
     assert doc.startswith("#"), "project did not make a document"
-    assert fx.gate(w, out=doc)[0] == 0, "gate rejected a faithful document"
-    assert fx.gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
+    assert gate(w, out=doc)[0] == 0, "gate rejected a faithful document"
+    assert gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
 
 
 CONCEPTS = {

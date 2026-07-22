@@ -248,10 +248,12 @@ def _claim_script(module_ctx, project):
 
 def _closures(module_ctx, project, core):
     """Ξ·dag·eval — per emerge project, each claim WITNESS's closure ROOTS via closure.py over the
-    project's claim-witness module (paper.toml [checks.claim]) + the engine fixture + the core names.
-    Returns ["claim\tmodule", ...]; [] if the project declares no claim: type.  Unlike the def-site
-    SURFACE (engine-global), a witness's closure depends on the PROJECT's check module — so this runs
-    per emerge project, watching that module so an edited witness re-generates its cells' closures."""
+    project's claim-witness module (paper.toml [checks.claim]) + the core names (which include the
+    per-capability _fixture_* modules, Μ·kernel·fixture·split — a fixture import is an ordinary
+    IMPORT root, no facade plumbing).  Returns ["claim\tmodule", ...]; [] if the project declares no
+    claim: type.  Unlike the def-site SURFACE (engine-global), a witness's closure depends on the
+    PROJECT's check module — so this runs per emerge project, watching that module so an edited
+    witness re-generates its cells' closures."""
     script = _claim_script(module_ctx, project)
     if not script:
         return []
@@ -260,18 +262,17 @@ def _closures(module_ctx, project, core):
     if not check.exists:
         return []
     module_ctx.watch(check)
-    fixture = module_ctx.path(Label("@@//paperkit:tests/_fixture.py"))
     py = _host_py(module_ctx, "·gen·closure")
     cl = module_ctx.path(Label("@@//tools:closure.py"))
-    # WATCH the enumerator + the fixture it reads (the fx CLI map), so editing either regenerates the
-    # closures (the tool is an INPUT, [[bazel-action-idempotency]] — else a stale closure output).
+    # WATCH the enumerator, so editing it regenerates the closures (the tool is an INPUT,
+    # [[bazel-action-idempotency]] — else a stale closure output).  The _fixture_* capability
+    # modules are core modules, already watched by _core.
     module_ctx.watch(cl)
-    module_ctx.watch(fixture)
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
     # --relpath — the check's REPO-RELATIVE path (paper/checks/claims.py, checks/readme.py), so
     # closure.py resolves Path(__file__).parents[N] to the SANDBOX prefix a file toggle must hit.
     relpath = script if project == "." else project + "/" + script
-    res = module_ctx.execute([str(py), str(cl), "--check", str(check), "--fixture", str(fixture), "--relpath", relpath] + core, working_directory = root)
+    res = module_ctx.execute([str(py), str(cl), "--check", str(check), "--relpath", relpath] + core, working_directory = root)
     if res.return_code != 0:
         fail("·gen·closure: closure.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]

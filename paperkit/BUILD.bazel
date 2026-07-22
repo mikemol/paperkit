@@ -34,8 +34,8 @@ exports_files(ENGINE_SRCS)
 exports_files(["components.bzl", "dag.bzl"])
 
 # Ζ·pyc·engine — the engine's COMPILED form: one pk_pyc per module (one .cc → one .o), so editing a
-# module recompiles only its .pyc.  The output preserves the module's path (tests/_fixture.py →
-# tests/_fixture.pyc), so a consumer maps it to __pycache__/<stem>.<tag>.pyc by parallel structure.
+# module recompiles only its .pyc.  The output preserves the module's path (tests/_fixture_model.py →
+# tests/_fixture_model.pyc), so a consumer maps it to __pycache__/<stem>.<tag>.pyc by parallel structure.
 # //paperkit:pyc mirrors //paperkit:engine — the bytecode the engine runs off (pk_eval now; the gate
 # and checks at Ζ·pyc·run).  Compile ONCE, shared across the whole def-sweep fanout.
 #

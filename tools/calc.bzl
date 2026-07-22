@@ -221,7 +221,8 @@ def _eval_impl(ctx):
     mpyc = ctx.file.mutated_pyc
     # The eval logic lives in tools/eval.py (a real script, not a shell blob in a string); here we
     # only stage its inputs and pass args.  Ξ·dag·eval — stage the CELL's transitive CLOSURE (this
-    # check's PycInfo cone: the modules it imports + reaches via fx CLI subprocess, closure.py), NOT
+    # check's PycInfo cone: the modules it imports, per closure.py — fixture capability imports are
+    # ordinary IMPORT roots since Μ·kernel·fixture·split), NOT
     # the flat engine — so editing a module invalidates only the cells whose closure contains it.  The
     # engine RUNS OFF its .pyc (Ζ·pyc); the .py side is for findability / read_text / main-script spawn.
     # `"$(command -v python3)"` invokes the interpreter by ABSOLUTE path so eval.py's sys.executable

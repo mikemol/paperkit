@@ -26,7 +26,8 @@ ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or Path(__file__).resolve().pare
 PAPER_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
-import _fixture as fx  # noqa: E402  (the validated fixture builder — counter-fixtures)
+from _fixture_model import entry  # noqa: E402  (the validated fixture kernel — counter-fixtures;
+#   capability helpers are imported FUNCTION-LOCALLY per witness, so closure.py's BASE stays model-only)
 
 GATE_SRC = (ENGINE / "gate.py").read_text()
 RESOLVER_SRC = (ENGINE / "resolver.py").read_text()   # the check-resolution core (split out of gate)
@@ -142,12 +143,14 @@ def prose_is_artifact():
 
 
 def edit_cant_survive():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # "a hand-edit cannot survive a build" — only the exact projection passes the gate
-    w = [fx.entry("x", claim="anchored")]
-    canonical = fx.project_text(w)
-    assert fx.gate(w, out=canonical)[0] == 0
+    w = [entry("x", claim="anchored")]
+    canonical = project_text(w)
+    assert gate(w, out=canonical)[0] == 0
     for edit in ("PREPENDED\n" + canonical, canonical + "\nAPPENDED\n", canonical + "x"):
-        assert edit != canonical and fx.gate(w, out=edit)[0] != 0, "a hand-edit survived the build"
+        assert edit != canonical and gate(w, out=edit)[0] != 0, "a hand-edit survived the build"
 
 
 def coverage_both_sides():
@@ -176,34 +179,38 @@ def record_is_bibentry():
 
 
 def prose_projected():
+    from _fixture_project import project_text
     # "the prose is projected, not authored" — the prose tracks the warrants
-    a = fx.project_text([fx.entry("x", claim="zzfirst wording")]).lower()
-    b = fx.project_text([fx.entry("x", claim="zzsecond wording")]).lower()
+    a = project_text([entry("x", claim="zzfirst wording")]).lower()
+    b = project_text([entry("x", claim="zzsecond wording")]).lower()
     assert "zzfirst" in a and "zzsecond" in b and a != b, \
         "prose does not track the warrants (it is authored, not projected)"
 
 
 def ordered_by_deps():
+    from _fixture_project import project_text
     # "within each section the claims are ordered by their dependency edges"
-    t = fx.project_text([fx.entry("b", claim="zzbeta", frm="a"),
-                         fx.entry("a", claim="zzalpha")]).lower()
+    t = project_text([entry("b", claim="zzbeta", frm="a"),
+                      entry("a", claim="zzalpha")]).lower()
     assert t.index("zzalpha") < t.index("zzbeta"), "claims are not ordered by dependency edges"
 
 
 def joined_by_glue():
+    from _fixture_project import project_text
     # "joined by connective glue" — an explicit glue connector is woven between edges
-    t = fx.project_text([fx.entry("a", claim="zzalpha"),
-                         fx.entry("b", claim="zzbeta", frm="a", glue="BECAUSE")]).lower()
+    t = project_text([entry("a", claim="zzalpha"),
+                      entry("b", claim="zzbeta", frm="a", glue="BECAUSE")]).lower()
     assert "because zzbeta" in t, "explicit glue is not woven between dependent claims"
 
 
 def deterministic():
+    from _fixture_project import project_text
     # "the same warrant set always giving the same document"
-    w1 = [fx.entry("a", claim="zzalpha")]
-    w2 = [fx.entry("a", claim="zzomega")]
-    assert fx.project_text(w1) == fx.project_text(w1), "same warrants gave different documents"
-    assert fx.project_text(w1) != fx.project_text(w2), "the document is independent of its warrants"
-    assert "zzalpha" in fx.project_text(w1).lower()
+    w1 = [entry("a", claim="zzalpha")]
+    w2 = [entry("a", claim="zzomega")]
+    assert project_text(w1) == project_text(w1), "same warrants gave different documents"
+    assert project_text(w1) != project_text(w2), "the document is independent of its warrants"
+    assert "zzalpha" in project_text(w1).lower()
 
 
 # ── Π·foundations: the vacuous atoms the grounding DAG rests on ───────────────
@@ -225,24 +232,28 @@ def claims_are_warrants():
 
 # ── Π·selfhost: the drift-caught negative-assertions, as Φ counter-fixtures ───
 def paperkit_on_paperkit():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # run paperkit on paperkit: project a fixture, confirm the gate ACCEPTS the
     # faithful projection and REJECTS a drift of it
-    w = [fx.entry("x", claim="self applied")]
-    good = fx.project_text(w)
-    assert fx.gate(w, out=good)[0] == 0, "the gate rejected paperkit's own faithful projection"
-    assert fx.gate(w, out=good + "\nHAND-EDITED DRIFT\n")[0] != 0, "the gate accepted a drifted projection"
+    w = [entry("x", claim="self applied")]
+    good = project_text(w)
+    assert gate(w, out=good)[0] == 0, "the gate rejected paperkit's own faithful projection"
+    assert gate(w, out=good + "\nHAND-EDITED DRIFT\n")[0] != 0, "the gate accepted a drifted projection"
 
 
 def one_green_check():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # the document's correctness and the tool's are ONE green check: a single gate
     # invocation verifies the projection (document) AND runs the verifier (tool) —
     # breaking either side fails the same gate
-    w = [fx.entry("x", claim="one check", check="cmd:true")]
-    good = fx.project_text(w)
-    assert fx.gate(w, out=good)[0] == 0, "the single gate check did not pass"
-    assert fx.gate(w, out=good + "\nx\n")[0] != 0, "drift (document side) did not fail the gate"
-    bad_check = [fx.entry("x", claim="one check", check="cmd:false")]
-    assert fx.gate(bad_check, out=good)[0] != 0, "check failure (tool side) did not fail the gate"
+    w = [entry("x", claim="one check", check="cmd:true")]
+    good = project_text(w)
+    assert gate(w, out=good)[0] == 0, "the single gate check did not pass"
+    assert gate(w, out=good + "\nx\n")[0] != 0, "drift (document side) did not fail the gate"
+    bad_check = [entry("x", claim="one check", check="cmd:false")]
+    assert gate(bad_check, out=good)[0] != 0, "check failure (tool side) did not fail the gate"
 
 
 # ── Π·distinct-witnesses: split the shared projection-stable group (--without-K) ──
@@ -276,27 +287,32 @@ def closes_gap():
 
 
 def unverified_cant_ship():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # an unverified sentence cannot ship: one failing verifier blocks the whole document
-    w = [fx.entry("a", claim="verified", check="cmd:true"),
-         fx.entry("b", claim="unverified", frm="a", check="cmd:false")]
-    assert fx.gate(w, out=fx.project_text(w))[0] != 0, "a document with an unverified sentence shipped"
+    w = [entry("a", claim="verified", check="cmd:true"),
+         entry("b", claim="unverified", frm="a", check="cmd:false")]
+    assert gate(w, out=project_text(w))[0] != 0, "a document with an unverified sentence shipped"
 
 
 def not_project():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # ...because it does not project: only the exact projection ships
-    w = [fx.entry("x", claim="canonical")]
-    good = fx.project_text(w)
-    assert fx.gate(w, out=good)[0] == 0, "the canonical projection was rejected"
-    assert fx.gate(w, out="not the projection\n")[0] != 0, "a non-projection shipped"
+    w = [entry("x", claim="canonical")]
+    good = project_text(w)
+    assert gate(w, out=good)[0] == 0, "the canonical projection was rejected"
+    assert gate(w, out="not the projection\n")[0] != 0, "a non-projection shipped"
 
 
 # ── edges: the three dependency graphs (from / rests-on / move) ───────────────
 def edge_from_orders():
+    from _fixture_project import project_text
     # `from` fixes prose order — a claim is projected only AFTER the claims it lists,
     # so document order is a topological sort of the from-graph (keys given scrambled)
-    t = fx.project_text([fx.entry("c", claim="gamma", frm="b"),
-                         fx.entry("a", claim="alpha"),
-                         fx.entry("b", claim="beta", frm="a")]).lower()
+    t = project_text([entry("c", claim="gamma", frm="b"),
+                      entry("a", claim="alpha"),
+                      entry("b", claim="beta", frm="a")]).lower()
     ia, ib, ic = (t.find(x) for x in ("alpha", "beta", "gamma"))
     assert -1 < ia < ib < ic, "from did not order the prose alpha→beta→gamma"
 
@@ -346,51 +362,56 @@ def edge_move_types():
 
 # ── projection: the projector's mechanics ────────────────────────────────────
 def weave_sentence():
+    from _fixture_project import project_text
     # a section's claims weave into ONE paragraph: first clause capitalized, each
     # carries its own citation tag, the rest attach inline (not one bullet per claim)
-    t = fx.project_text([fx.entry("a", claim="alpha beat"),
-                         fx.entry("b", claim="beta beat", frm="a")])
+    t = project_text([entry("a", claim="alpha beat"),
+                      entry("b", claim="beta beat", frm="a")])
     para = next(ln for ln in t.splitlines() if "@a]" in ln)
     assert "@b]" in para, "claims were not woven into one paragraph"
     assert para.lstrip()[:5] == "Alpha", "first clause was not capitalized"
 
 
 def connector_resolution():
+    from _fixture_project import project_text
     # the connector between adjacent clauses resolves by priority: an explicit `join`
     # overrides a `move`'s default connector
-    won = fx.project_text([fx.entry("a", claim="alpha"),
-                           fx.entry("b", claim="beta", frm="a", join="; therefore, ", move="apposition")])
+    won = project_text([entry("a", claim="alpha"),
+                        entry("b", claim="beta", frm="a", join="; therefore, ", move="apposition")])
     assert "therefore" in won and "that is" not in won, "explicit join did not override the move connector"
     # a `move` with no `join` falls back to the move's typed connector (apposition → " — that is, ")
-    fell = fx.project_text([fx.entry("a", claim="alpha"),
-                            fx.entry("b", claim="beta", frm="a", move="apposition")])
+    fell = project_text([entry("a", claim="alpha"),
+                         entry("b", claim="beta", frm="a", move="apposition")])
     assert "that is" in fell, "the move's connector was not used as the fallback"
 
 
 def emit_placement():
+    from _fixture_project import project_text
     # an `emit` warrant is placed VERBATIM (not woven), fenced by the asset's
     # extension; an image asset is placed as a markdown image instead
-    code = fx.project_text([fx.entry("e", claim="example", emit="ex.sh")],
-                           assets={"ex.sh": "echo hi\n"})
+    code = project_text([entry("e", claim="example", emit="ex.sh")],
+                        assets={"ex.sh": "echo hi\n"})
     assert "```sh" in code and "echo hi" in code, "shell asset not placed, fenced as sh"
-    img = fx.project_text([fx.entry("g", claim="a figure", emit="fig.svg")],
-                          assets={"fig.svg": "<svg></svg>\n"})
+    img = project_text([entry("g", claim="a figure", emit="fig.svg")],
+                       assets={"fig.svg": "<svg></svg>\n"})
     assert "![a figure](fig.svg)" in img, "image asset not placed as a markdown image"
 
 
 def config_flags():
+    from _fixture_project import project_text
     # projection structure is configured, not hard-coded: `numbered` toggles section
     # numbers, `references` toggles the bibliography heading
-    on = fx.project_text([fx.entry("a", claim="x")], numbered=True, references=True)
-    off = fx.project_text([fx.entry("a", claim="x")], numbered=False, references=False)
+    on = project_text([entry("a", claim="x")], numbered=True, references=True)
+    off = project_text([entry("a", claim="x")], numbered=False, references=False)
     assert "## 1." in on and "## References" in on, "flags not honored when on"
     assert "## 1." not in off and "References" not in off, "flags not honored when off"
 
 
 def latex_clean():
+    from _fixture_project import project_text
     # claim text is normalized on the way out: --- → em-dash, an inter-word -- →
     # en-dash, LaTeX escapes resolved, braces stripped, trailing period dropped
-    t = fx.project_text([fx.entry("a", claim=r"alpha --- beta, a\_b, and x--y")]).lower()
+    t = project_text([entry("a", claim=r"alpha --- beta, a\_b, and x--y")]).lower()
     assert "alpha — beta" in t, "--- not converted to an em-dash"
     assert "a_b" in t, "the \\_ escape was not resolved"
     assert "x–y" in t, "inter-word -- not converted to an en-dash"
@@ -398,44 +419,48 @@ def latex_clean():
 
 # ── gate: resolution and the strict modes ────────────────────────────────────
 def resolve_passes():
+    from _fixture_gate import gate
     # RESOLVE: a cited claim whose check FAILS blocks the gate (the verdict is the
     # conjunction of every cited claim's check)
-    assert fx.gate([fx.entry("c", claim="present", check="cmd:true")])[0] == 0, \
+    assert gate([entry("c", claim="present", check="cmd:true")])[0] == 0, \
         "a passing cited check did not gate green"
-    assert fx.gate([fx.entry("c", claim="present", check="cmd:false")])[0] != 0, \
+    assert gate([entry("c", claim="present", check="cmd:false")])[0] != 0, \
         "a failing cited check did not block the gate"
 
 
 def safe_rejects_postulates():
+    from _fixture_gate import gate
     # --safe: an uncited placement (a block no prose cites) is a postulate — advised
     # against by default, REJECTED under --safe
-    w = [fx.entry("p", claim="cited prose", check="cmd:true"),
-         fx.entry("ph", emit="ph.txt", check="cmd:true")]            # placed, cited by nothing
-    assert fx.gate(w, assets={"ph.txt": "block\n"})[0] == 0, "an uncited placement was not tolerated by default"
-    assert fx.gate(w, "--safe", assets={"ph.txt": "block\n"})[0] != 0, "--safe did not reject the postulate"
+    w = [entry("p", claim="cited prose", check="cmd:true"),
+         entry("ph", emit="ph.txt", check="cmd:true")]            # placed, cited by nothing
+    assert gate(w, assets={"ph.txt": "block\n"})[0] == 0, "an uncited placement was not tolerated by default"
+    assert gate(w, "--safe", assets={"ph.txt": "block\n"})[0] != 0, "--safe did not reject the postulate"
 
 
 def without_k_distinct():
+    from _fixture_gate import gate
     # --without-K: two cited claims sharing ONE witness collapse (proof-irrelevance,
     # Axiom K); the flag forbids it, demanding a distinct witness per claim
-    shared = [fx.entry("a", claim="alpha", check="cmd:true"),
-              fx.entry("b", claim="beta", check="cmd:true", frm="a")]
-    distinct = [fx.entry("a", claim="alpha", check="cmd:true"),
-                fx.entry("b", claim="beta", check="file:w.bib", frm="a")]
-    assert fx.gate(shared)[0] == 0, "a shared witness is intolerable even without the flag"
-    assert fx.gate(shared, "--without-K")[0] != 0, "--without-K did not flag the collapse"
-    assert fx.gate(distinct, "--without-K")[0] == 0, "--without-K rejected distinct witnesses"
+    shared = [entry("a", claim="alpha", check="cmd:true"),
+              entry("b", claim="beta", check="cmd:true", frm="a")]
+    distinct = [entry("a", claim="alpha", check="cmd:true"),
+                entry("b", claim="beta", check="file:w.bib", frm="a")]
+    assert gate(shared)[0] == 0, "a shared witness is intolerable even without the flag"
+    assert gate(shared, "--without-K")[0] != 0, "--without-K did not flag the collapse"
+    assert gate(distinct, "--without-K")[0] == 0, "--without-K rejected distinct witnesses"
 
 
 def jobs_parallel():
+    from _fixture_gate import gate
     # --jobs: checks resolve concurrently (default all cores) and the verdict is
     # independent of the worker count — parallel ≡ serial
-    ok = [fx.entry("a", claim="alpha", check="cmd:true"),
-          fx.entry("b", claim="beta", check="cmd:true", frm="a")]
-    bad = [fx.entry("a", claim="alpha", check="cmd:true"),
-           fx.entry("b", claim="beta", check="cmd:false", frm="a")]
-    assert fx.gate(ok, "--jobs=1")[0] == 0 and fx.gate(ok, "--jobs=8")[0] == 0, "parallel disagreed on a pass"
-    assert fx.gate(bad, "--jobs=1")[0] != 0 and fx.gate(bad, "--jobs=8")[0] != 0, "parallel disagreed on a fail"
+    ok = [entry("a", claim="alpha", check="cmd:true"),
+          entry("b", claim="beta", check="cmd:true", frm="a")]
+    bad = [entry("a", claim="alpha", check="cmd:true"),
+           entry("b", claim="beta", check="cmd:false", frm="a")]
+    assert gate(ok, "--jobs=1")[0] == 0 and gate(ok, "--jobs=8")[0] == 0, "parallel disagreed on a pass"
+    assert gate(bad, "--jobs=1")[0] != 0 and gate(bad, "--jobs=8")[0] != 0, "parallel disagreed on a fail"
 
 
 # ── adequacy: how Δ grades a check ───────────────────────────────────────────
@@ -444,10 +469,11 @@ def jobs_parallel():
 # byte-for-byte this module's old grade_ladder(), so the concept is now authored, graded, and proved
 # ONCE, and this view inherits the owner's engine fingerprint rather than re-deriving it.
 def mutation_probes():
+    from _fixture_delta import discriminate
     # the grade is empirical: Δ corrupts each input and sees if the check flips from
     # pass to fail; the inputs whose corruption flips it are its sensitivity set
-    recs = json.loads(fx.discriminate(
-        [fx.entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],
+    recs = json.loads(discriminate(
+        [entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],
         "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
     r = recs[0]
     assert r["grade"] == "behavioral" and "a.txt" in r.get("tests", []), \
@@ -570,12 +596,13 @@ def sandbox_grade():
 
 
 def min_strength():
+    from _fixture_delta import discriminate
     # --min-strength gates the grades: a project fails if any cited claim's check grades
     # BELOW the threshold — this is how the paper enforces its own proof-relevance
-    strong = [fx.entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")]   # behavioral
-    weak = [fx.entry("c", claim="c", check="file:w.bib")]                  # vacuous
-    rc_ok, _ = fx.discriminate(strong, "--min-strength", "behavioral", assets={"a.txt": "TOKEN\n"})
-    rc_bad, _ = fx.discriminate(weak, "--min-strength", "behavioral")
+    strong = [entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")]   # behavioral
+    weak = [entry("c", claim="c", check="file:w.bib")]                  # vacuous
+    rc_ok, _ = discriminate(strong, "--min-strength", "behavioral", assets={"a.txt": "TOKEN\n"})
+    rc_bad, _ = discriminate(weak, "--min-strength", "behavioral")
     assert rc_ok == 0 and rc_bad != 0, f"--min-strength did not gate on grade (ok={rc_ok}, bad={rc_bad})"
 
 
@@ -744,32 +771,36 @@ def report_live():
 
 # ── implications: what follows, and the honest limits ────────────────────────
 def fresh_by_construction():
+    from _fixture_gate import gate
+    from _fixture_project import project_text
     # because the document IS the projection, regeneration is idempotent and any
     # hand-edit is rejected — the prose cannot drift from its claims
-    w = [fx.entry("a", claim="alpha")]
-    once, twice = fx.project_text(w), fx.project_text(w)
+    w = [entry("a", claim="alpha")]
+    once, twice = project_text(w), project_text(w)
     assert once == twice, "projection is not idempotent"
-    assert fx.gate(w, out=once)[0] == 0 and fx.gate(w, out=once + "\nedit\n")[0] != 0, \
+    assert gate(w, out=once)[0] == 0 and gate(w, out=once + "\nedit\n")[0] != 0, \
         "a hand-edited (drifted) copy was not rejected"
 
 
 def adequacy_gap():
+    from _fixture_gate import gate
     # Π — ONE capability: the GATE is blind to relevance.  A passing check proves a sentence
     # NAMED a verifier, not that the verifier ENTAILS the claim, so a false sentence whose check
     # is behavioral-but-irrelevant still passes the gate.  That the GRADER even grades such a check
     # behavioral is a DISTINCT capability — the sibling claim crash-sensitive-limit owns it — so it
     # is not re-asserted here; re-asserting it dragged the whole grader into this claim's footprint
     # (Δ·scope then bounds adequacy-gap to the gate it actually exercises, not gate + grader).
-    w = [fx.entry("c", claim="the sky is green", check="cmd:grep -q TOKEN a.txt")]
-    assert fx.gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
+    w = [entry("c", claim="the sky is green", check="cmd:grep -q TOKEN a.txt")]
+    assert gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
 
 
 def crash_sensitive_limit():
+    from _fixture_delta import discriminate
     # Δ FLAGS but does not forbid the gap: a check can be behavioral yet sensitive only
     # to inputs OTHER than the document's content (its bib/rubric/out) — content_sensitive
     # marks that, so "behavioral" is necessary but not sufficient for relevance
-    recs = json.loads(fx.discriminate(
-        [fx.entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],   # sensitive to an asset, not content
+    recs = json.loads(discriminate(
+        [entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],   # sensitive to an asset, not content
         "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
     r = recs[0]
     assert r["grade"] == "behavioral" and r.get("content_sensitive") is False, \
@@ -777,26 +808,28 @@ def crash_sensitive_limit():
 
 
 def trust_boundary():
+    from _fixture_gate import gate
     # a check is arbitrary code (cmd: is the universal escape hatch), so gating a
     # document EXECUTES its checks — the warrant set is trusted code, like a Makefile.
     # Demonstrate: a cmd: check with a side effect runs when the document is gated.
     d = tempfile.mkdtemp()
     try:
         marker = os.path.join(d, "ran")
-        fx.gate([fx.entry("c", claim="x", check=f"cmd:touch {marker}")])
+        gate([entry("c", claim="x", check=f"cmd:touch {marker}")])
         assert os.path.exists(marker), "gating did not execute the check — arbitrary code runs"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
 
 def env_sanitized():
+    from _fixture_gate import gate
     # to bound that, a check runs in a controlled, default-deny environment: an ambient
     # variable that is not on the allow-list does NOT reach it, so a verdict cannot be
     # injected through the caller's environment (sshd's defence against env injection)
     os.environ["INJECTED_XYZ"] = "leaked"
     try:
-        w = [fx.entry("c", claim="x", check='cmd:test -z "$INJECTED_XYZ"')]
-        assert fx.gate(w)[0] == 0, "an un-allow-listed ambient var leaked into the check"
+        w = [entry("c", claim="x", check='cmd:test -z "$INJECTED_XYZ"')]
+        assert gate(w)[0] == 0, "an un-allow-listed ambient var leaked into the check"
     finally:
         os.environ.pop("INJECTED_XYZ", None)
 
@@ -823,7 +856,7 @@ def grounding_reflected():
     # reflected; a disjoint edge from a claim that tests NO engine capability is vacuously
     # disjoint (rhetorical, auto-discharged); a disjoint edge from a claim that DOES test
     # engine capability is a genuine miss, dischargeable by a `link`.  Shared test
-    # scaffolding (claims.py / _fixture) does NOT count as engine grounding.
+    # scaffolding (claims.py / the _fixture_* modules) does NOT count as engine grounding.
     import coherence
     recs = [
         {"key": "y", "grade": "behavioral", "rests-on": [],

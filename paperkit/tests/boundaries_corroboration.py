@@ -16,7 +16,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture import discriminate, entry  # noqa: E402
+from _fixture_delta import discriminate  # noqa: E402
+from _fixture_model import entry  # noqa: E402
 
 
 def grade(check):

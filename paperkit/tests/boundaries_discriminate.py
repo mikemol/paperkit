@@ -20,7 +20,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture import discriminate, discriminate_stderr, entry, project_text  # noqa: E402
+from _fixture_delta import discriminate, discriminate_stderr  # noqa: E402
+from _fixture_model import entry  # noqa: E402
+from _fixture_project import project_text  # noqa: E402
 
 TOKEN = "WARRANT-TOKEN-A1B2"
 

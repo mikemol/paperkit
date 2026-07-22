@@ -81,3 +81,27 @@
   claim   = {the paper's self-host face imports this same certificate --- the gate that accepts the paper is the very subject it describes, enforcing the invariants the paper states},
   check   = {cmd:python3 concepts.py gate-is-subject}
 }
+
+@misc{rm-resolver,
+  section = {resolver},
+  claim   = {the resolver component's certificate --- a verifier is named type:target, EVERY declared verb dispatches to a real branch (read from resolver.VERBS, nothing re-listed), the built-in set is closed, and a custom type dispatches through the registry},
+  check   = {cmd:python3 concepts.py rm-resolver}
+}
+
+@misc{verifier-named,
+  section = {resolver},
+  claim   = {the paper's verifier-named face imports this certificate --- the type prefix selects the verb},
+  check   = {cmd:python3 concepts.py verifier-named}
+}
+
+@misc{gate-dispatches,
+  section = {resolver},
+  claim   = {and its gate-dispatches face --- the gate dispatches through a small registry of check types, built-in and custom},
+  check   = {cmd:python3 concepts.py gate-dispatches}
+}
+
+@misc{two-builtins,
+  section = {resolver},
+  claim   = {and its two-builtins face --- a verifier ships built in per verb, and the set is pinned ENUMERATIVELY rather than by count, closing the adequacy gap that let a fifth verb falsify the prose silently},
+  check   = {cmd:python3 concepts.py two-builtins}
+}

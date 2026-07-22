@@ -7,9 +7,17 @@ durable index. Append-only, retirement-logged (see README).
 ## The two live threads
 
 1. **Container / sandbox** — the Ζ·idempotent arc's forward edge: `Κ·image·sandbox`
-   (R3/R4/R5) + `Ζ·canary·v2` (delivery-independent degradation detector).
-2. **Reconstitution** (the original goal) — `Λ·resolver → Λ·full → Σ·step5`, a concept
-   authored once and imported by every view; stalled behind the container detour.
+   (R3 DONE @ 2bae2aa, R4 dead, split attestation = terminus) + `Ζ·canary·v2`.
+2. **Reconstitution → Μ·kernel** (the original goal, now moving) — concepts authored once
+   and imported by every view: 7 witnesses / 17 keys lifted (26f96ec, c9daf03, 084cd4d,
+   the resolver reconcile); `Σ·step5` guide view landed (c66334e, zero witness code).
+   **Μ·kernel** [the owner's destination, 2026-07-22]: decompose the ENGINE into
+   library-certified components around a microkernel, so mutate-verification becomes
+   component-local instead of whole-repo-per-commit. Rungs: **Μ·kernel·bounds** (component
+   filegroups; extract the bib parser first, per engine-modularization) →
+   **Μ·kernel·cells** (Δ cell inputs scoped to components → Bazel invalidation is
+   component-local) → **Μ·kernel·certs** (Λ·full continuing per component; the resolver
+   cert — 7 sites — is the first component certificate).
 
 ## Live
 

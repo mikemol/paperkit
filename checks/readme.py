@@ -63,23 +63,6 @@ def rm_cmds():
     assert fx.gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
 
 
-def rm_resolver():
-    # a verifier is NAMED type:target (the type prefix selects the verb), one verb ships per
-    # resolution KIND, and an unregistered type resolves through none (the set is CLOSED).
-    # Λ·registry: the verbs are READ from resolver.VERBS — no count, no list, nothing to drift.
-    # Behavioral (Ε·behavioral).
-    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("file:true", ENGINE, {}) is False, \
-        "the type prefix does not select the verb (a verifier is named type:target)"
-    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: verb"
-    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: verb"
-    # every DECLARED verb is a real dispatch: an unknown target under a declared verb must come back
-    # False (resolved and failed), never crash — whereas an undeclared TYPE is refused outright.
-    for typ in resolver.VERBS:
-        assert gate.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}) is False, \
-            f"{typ}: is declared in VERBS but does not dispatch to a real branch"
-    assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "an unregistered type resolved — the built-in set is not closed"
-
-
 def rm_resolver_premise():
     # `premise` is a PROVENANCE kind the footnote/plain render reads off a check (project._verify_note),
     # NOT one of the built-in resolving verbs — it surfaces an honest "not machine-checked" note and does
@@ -209,7 +192,6 @@ def rm_resolver_eg():
 CLAIMS = {
     "rm-pitch": rm_pitch,
     "rm-selfhost": rm_selfhost, "rm-cmds": rm_cmds,
-    "rm-resolver": rm_resolver,
     "rm-resolver-premise": rm_resolver_premise,
     "rm-next": rm_next,
     "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,

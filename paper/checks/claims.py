@@ -45,38 +45,6 @@ def _parse(bib_text):
         shutil.rmtree(d, ignore_errors=True)
 
 
-def verifier_named():
-    import gate
-    # a verifier is NAMED type:target — the resolver splits on the ':' so the TYPE prefix selects the
-    # verb: the SAME target under a different type yields a different verdict (behavioral, Ε·behavioral).
-    assert gate.resolves("cmd:true", ENGINE, {}) is True, "cmd:true — the type did not dispatch to RUN the target"
-    assert gate.resolves("file:true", ENGINE, {}) is False, "file:true — same target, but the file verb must find no file named 'true'"
-
-
-def gate_dispatches():
-    import gate
-    # dispatch through a small registry — a built-in branch per verb, plus a CUSTOM type from the
-    # project's [checks.X] registry; each resolves through ITS OWN branch (behavioral, Ε·behavioral).
-    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "the file: branch did not dispatch"
-    assert gate.resolves("cmd:true", ENGINE, {}) is True, "the cmd: branch did not dispatch"
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, "the custom-type (registry) branch did not dispatch"
-    assert gate.resolves("demo:x", ENGINE, {}) is False, "an unregistered type resolved through no branch"
-
-
-def two_builtins():
-    import gate
-    # a verb per resolution kind ships built in (file EXISTS, cmd EXECS, agree CONCURS; result PARSES a
-    # sibling — result_builtin; concept IMPORTS the library's certificate — Λ·witness), each resolving
-    # through its OWN branch, and an UNREGISTERED type resolves through NONE.  NOTE this witness asserts
-    # only that the named verbs resolve and an unregistered one does not — it does NOT pin the SET, which
-    # is why adding concept: silently left "four types ship built in" false in the prose (Λ·verbcount).
-    # Λ·registry's enumerative closure assertion is the fix.  Behavioral.
-    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: verb"
-    assert gate.resolves("cmd:true", ENGINE, {}) is True, "cmd: verb"
-    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: verb"
-    assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "an unregistered type resolved — the built-in set is not closed"
-
-
 def agree_builtin():
     # agree CONCURS — ≥2 independent producers (split on |||) must all exit 0 and emit
     # IDENTICAL output; agreement across implementations rules out a shared bug.
@@ -1014,11 +982,8 @@ CLAIMS = {
     "node-is-claim": node_is_claim,
     "paper-is-projection": paper_is_projection,
     "claims-are-warrants": claims_are_warrants,
-    "verifier-named": verifier_named,
-    "gate-dispatches": gate_dispatches,
     "dataset-backed": dataset_backed,
     "dataset-fresh": dataset_fresh,
-    "two-builtins": two_builtins,
     "agree-builtin": agree_builtin,
     "result-builtin": result_builtin,
     "file-builtin": file_builtin,

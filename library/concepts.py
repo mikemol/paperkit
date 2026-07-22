@@ -29,6 +29,7 @@ sys.path.insert(0, str(ENGINE / "tests"))
 import _fixture as fx  # noqa: E402  (the validated fixture builder)
 import project as P  # noqa: E402  — the bib parser (Μ·model), for the claim-is-record witness
 import gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
+import resolver  # noqa: E402  — VERBS, the engine's OWN verb set (never re-listed here; Λ·registry)
 
 
 def adequacy_pitch():
@@ -106,6 +107,25 @@ def gate_enforces_invariants():
     assert fx.gate(bad, out=fx.project_text(bad))[0] != 0, "check-resolution not enforced"
 
 
+def resolver_dispatches():
+    # the resolver COMPONENT's certificate (Μ·kernel): a verifier is NAMED type:target (the prefix
+    # selects the verb), every DECLARED verb dispatches to a real branch — read from resolver.VERBS,
+    # no count, no list, nothing to drift (Λ·registry) — the built-in set is CLOSED, and a custom
+    # [checks.X] type dispatches through the registry.  The SUPERSET of the four view faces it
+    # certifies; the fingerprint is the resolver's own def-sites.
+    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("file:true", ENGINE, {}) is False, \
+        "the type prefix does not select the verb (a verifier is named type:target)"
+    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: verb"
+    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: verb"
+    for typ in resolver.VERBS:
+        assert gate.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}) is False, \
+            f"{typ}: is declared in VERBS but does not dispatch to a real branch"
+    assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, \
+        "an unregistered type resolved — the built-in set is not closed"
+    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
+        "a custom [checks.X] type did not dispatch through the registry"
+
+
 CONCEPTS = {
     # one witness, two keys: the README's pitch face and paper's deep grade-ladder face resolve to the
     # SAME grader run — the adequacy concept is authored once here, each view imports the certificate.
@@ -128,6 +148,13 @@ CONCEPTS = {
     # the gate enforces its invariants: README (rm-cmds-inv), paper self-host (gate-is-subject).
     "rm-cmds-inv": gate_enforces_invariants,
     "gate-is-subject": gate_enforces_invariants,
+    # the resolver component (Μ·kernel) — one SUPERSET witness, FOUR keys: README (rm-resolver),
+    # paper (verifier-named, gate-dispatches, two-builtins).  The reconcile: the paper's three
+    # weaker faces now import the strong enumerative certificate.
+    "rm-resolver": resolver_dispatches,
+    "verifier-named": resolver_dispatches,
+    "gate-dispatches": resolver_dispatches,
+    "two-builtins": resolver_dispatches,
 }
 
 

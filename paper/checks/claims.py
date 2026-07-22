@@ -235,14 +235,6 @@ def every_claim_cited():
 
 
 # ── model section ────────────────────────────────────────────────────────────
-def claim_is_record():
-    # "a claim is a single record — a statement, its section, its dependencies, its verifier"
-    rec = _parse("@misc{k,\n  section = {s},\n  from = {d},\n"
-                 "  claim = {a statement},\n  check = {file:x}\n}\n")["k"]
-    for field in ("claim", "section", "from", "check"):
-        assert rec.get(field), f"a claim record is missing its {field}"
-
-
 def record_is_bibentry():
     # "which is exactly the shape of a bibliography entry" — a standard reference
     # entry parses through the very same record parser
@@ -1094,7 +1086,6 @@ CLAIMS = {
     "coverage-both-sides": coverage_both_sides,
     "every-section-appears": every_section_appears,
     "every-claim-cited": every_claim_cited,
-    "claim-is-record": claim_is_record,
     "record-is-bibentry": record_is_bibentry,
     "prose-projected": prose_projected,
     "ordered-by-deps": ordered_by_deps,

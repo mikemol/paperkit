@@ -70,13 +70,6 @@ def rm_selfhost():
     assert P.project(cfg) == cfg["out"].read_text(), "README.md is not the projection of the root warrants"
 
 
-def rm_model():
-    # a claim is one bibliography entry: a statement, its section, its deps, its check
-    rec = _parse("@misc{k,\n  section = {s},\n  from = {d},\n  claim = {a statement},\n  check = {file:x}\n}\n")["k"]
-    for field in ("claim", "section", "from", "check"):
-        assert rec.get(field), f"a claim entry is missing its {field}"
-
-
 def rm_cmds():
     # two commands: project makes the document, gate verifies it (and catches drift)
     w = [fx.entry("x", claim="content")]
@@ -248,7 +241,7 @@ def rm_resolver_eg():
 
 CLAIMS = {
     "rm-pitch": rm_pitch, "rm-verifier": rm_verifier, "rm-noship": rm_noship,
-    "rm-selfhost": rm_selfhost, "rm-model": rm_model, "rm-cmds": rm_cmds,
+    "rm-selfhost": rm_selfhost, "rm-cmds": rm_cmds,
     "rm-cmds-inv": rm_cmds_inv, "rm-resolver": rm_resolver, "rm-resolver-cmd": rm_resolver_cmd,
     "rm-resolver-premise": rm_resolver_premise,
     "rm-next": rm_next,

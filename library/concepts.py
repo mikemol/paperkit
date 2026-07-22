@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +27,7 @@ ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or ROOT / "paperkit")
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 import _fixture as fx  # noqa: E402  (the validated fixture builder)
+import project as P  # noqa: E402  — the bib parser (Μ·model), for the claim-is-record witness
 
 
 def adequacy_pitch():
@@ -40,11 +43,35 @@ def adequacy_pitch():
     assert g["vac"] == "vacuous" and g["beh"] == "behavioral", f"grade ladder wrong: {g}"
 
 
+def _parse(text):
+    # the bib PARSER is engine code (project.entries), so mutating a parser def-site flips this
+    # witness — the certificate's sensitivity fingerprint IS that parser, which is exactly what a
+    # view citing "a claim is a record" should inherit rather than re-derive.
+    d = tempfile.mkdtemp()
+    try:
+        p = Path(d) / "t.bib"
+        p.write_text(text)
+        return P.entries(p)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def claim_is_record():
+    # a claim is one bibliography entry: a statement, its section, its dependencies, its check.
+    # Authored once here; README (rm-model) and paper (claim-is-record) both import this certificate.
+    rec = _parse("@misc{k,\n  section = {s},\n  from = {d},\n  claim = {a statement},\n  check = {file:x}\n}\n")["k"]
+    for field in ("claim", "section", "from", "check"):
+        assert rec.get(field), f"a claim record is missing its {field}"
+
+
 CONCEPTS = {
     # one witness, two keys: the README's pitch face and paper's deep grade-ladder face resolve to the
     # SAME grader run — the adequacy concept is authored once here, each view imports the certificate.
     "adequacy-pitch": adequacy_pitch,
     "grade-ladder": adequacy_pitch,
+    # a claim is a record: authored once, imported by README (rm-model) and paper (claim-is-record).
+    "rm-model": claim_is_record,
+    "claim-is-record": claim_is_record,
 }
 
 

@@ -27,3 +27,33 @@
   claim   = {the same witness under the paper's key certifies that a claim is a single record --- the deep view imports the identical proof the README pitch does},
   check   = {cmd:python3 concepts.py claim-is-record}
 }
+
+@misc{rm-verifier,
+  section = {resolver},
+  claim   = {each claim carries a machine-checkable verifier --- the check field names a verb and the gate RESOLVES it; the parser and the resolver are engine, so the certificate's fingerprint is them},
+  check   = {cmd:python3 concepts.py rm-verifier}
+}
+
+@misc{claim-bears-check,
+  section = {resolver},
+  claim   = {the same witness under the paper's key certifies that each claim bears a machine-checkable verifier},
+  check   = {cmd:python3 concepts.py claim-bears-check}
+}
+
+@misc{rm-resolver-cmd,
+  section = {resolver},
+  claim   = {cmd is the escape hatch every check reduces to, and a new domain adds a verifier in config without touching the engine --- a config-supplied type resolves, an unregistered one does not},
+  check   = {cmd:python3 concepts.py rm-resolver-cmd}
+}
+
+@misc{cmd-escape,
+  section = {resolver},
+  claim   = {the paper's cmd-escape face imports this same certificate --- cmd is the universal escape hatch every other check reduces to},
+  check   = {cmd:python3 concepts.py cmd-escape}
+}
+
+@misc{new-domain-adds,
+  section = {resolver},
+  claim   = {and the paper's new-domain-adds face too --- supporting a new domain means adding verifiers, not editing the engine},
+  check   = {cmd:python3 concepts.py new-domain-adds}
+}

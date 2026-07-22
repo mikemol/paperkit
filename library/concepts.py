@@ -28,6 +28,7 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 import _fixture as fx  # noqa: E402  (the validated fixture builder)
 import project as P  # noqa: E402  — the bib parser (Μ·model), for the claim-is-record witness
+import gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
 
 
 def adequacy_pitch():
@@ -64,6 +65,25 @@ def claim_is_record():
         assert rec.get(field), f"a claim record is missing its {field}"
 
 
+def claim_bears_check():
+    # each claim carries a machine-checkable verifier: the check field names a verb, and the gate
+    # RESOLVES it (runs it).  Parser and resolver are engine, so the certificate's fingerprint IS them.
+    rec = _parse("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")["c"]
+    assert rec.get("check") == "cmd:true", "the claim carries no check"
+    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("cmd:false", ENGINE, {}) is False, \
+        "the verifier is not machine-checkable"
+
+
+def custom_type_resolves():
+    # cmd is the escape hatch every check reduces to, and a new domain adds a verifier in config
+    # without touching the engine: a config-supplied type resolves by running its cmd; an unregistered
+    # one does not.  The resolver dispatch is engine, so mutating a dispatch def-site flips this.
+    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
+        "a config-supplied check type did not resolve to its cmd"
+    assert gate.resolves("demo:x", ENGINE, {}) is False, \
+        "an unregistered check type resolved with nothing behind it"
+
+
 CONCEPTS = {
     # one witness, two keys: the README's pitch face and paper's deep grade-ladder face resolve to the
     # SAME grader run — the adequacy concept is authored once here, each view imports the certificate.
@@ -72,6 +92,14 @@ CONCEPTS = {
     # a claim is a record: authored once, imported by README (rm-model) and paper (claim-is-record).
     "rm-model": claim_is_record,
     "claim-is-record": claim_is_record,
+    # each claim carries a machine-checkable verifier: README pitch (rm-verifier), paper (claim-bears-check).
+    "rm-verifier": claim_bears_check,
+    "claim-bears-check": claim_bears_check,
+    # cmd is the escape hatch / a new domain adds a type via config — one witness, THREE keys:
+    # README (rm-resolver-cmd), paper (cmd-escape, new-domain-adds).
+    "rm-resolver-cmd": custom_type_resolves,
+    "cmd-escape": custom_type_resolves,
+    "new-domain-adds": custom_type_resolves,
 }
 
 

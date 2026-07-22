@@ -47,14 +47,6 @@ def rm_pitch():
     assert "a claim not prose" in t and t.startswith("#"), "the document is not the projection of its claims"
 
 
-def rm_verifier():
-    # each claim carries a machine-checkable verifier (the gate runs it)
-    rec = _parse("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")["c"]
-    assert rec.get("check") == "cmd:true", "the claim carries no verifier"
-    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("cmd:false", ENGINE, {}) is False, \
-        "the verifier is not machine-checkable"
-
-
 def rm_noship():
     # an unverified sentence does not project / cannot overclaim: a failing check blocks the gate
     ok = [fx.entry("x", claim="present", check="cmd:true")]
@@ -105,12 +97,6 @@ def rm_resolver():
         assert gate.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}) is False, \
             f"{typ}: is declared in VERBS but does not dispatch to a real branch"
     assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "an unregistered type resolved — the built-in set is not closed"
-
-
-def rm_resolver_cmd():
-    # cmd is the escape hatch every check reduces to; a new domain adds types via config
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, "a config-supplied type does not resolve"
-    assert gate.resolves("demo:x", ENGINE, {}) is False, "an unregistered type resolved"
 
 
 def rm_resolver_premise():
@@ -240,9 +226,9 @@ def rm_resolver_eg():
 
 
 CLAIMS = {
-    "rm-pitch": rm_pitch, "rm-verifier": rm_verifier, "rm-noship": rm_noship,
+    "rm-pitch": rm_pitch, "rm-noship": rm_noship,
     "rm-selfhost": rm_selfhost, "rm-cmds": rm_cmds,
-    "rm-cmds-inv": rm_cmds_inv, "rm-resolver": rm_resolver, "rm-resolver-cmd": rm_resolver_cmd,
+    "rm-cmds-inv": rm_cmds_inv, "rm-resolver": rm_resolver,
     "rm-resolver-premise": rm_resolver_premise,
     "rm-next": rm_next,
     "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,

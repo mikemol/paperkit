@@ -18,7 +18,7 @@
   section = {resolver}, from = {gate-dispatches}, join = {, so },
   claim   = {supporting a new domain means adding verifiers, not editing the engine},
   rests-on = {gate-dispatches},
-  check   = {claim:new-domain-adds}
+  check   = {concept:new-domain-adds}
 }
 
 @misc{two-builtins,
@@ -57,7 +57,7 @@
   section = {resolver}, from = {cmd-builtin, new-domain-adds}, join = {; and },
   claim   = {cmd is the universal escape hatch every other check reduces to},
   rests-on = {cmd-builtin, new-domain-adds},
-  check   = {claim:cmd-escape}
+  check   = {concept:cmd-escape}
 }
 
 @misc{dataset-backed,

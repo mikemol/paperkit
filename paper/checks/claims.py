@@ -63,16 +63,6 @@ def gate_dispatches():
     assert gate.resolves("demo:x", ENGINE, {}) is False, "an unregistered type resolved through no branch"
 
 
-def new_domain_adds():
-    # "a new domain adds verifiers, not editing the engine" — a type supplied only
-    # in the custom registry resolves; an unregistered one does not
-    import gate
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
-        "a registry-supplied check type does not resolve"
-    assert gate.resolves("demo:x", ENGINE, {}) is False, \
-        "an unregistered check type must not resolve"
-
-
 def two_builtins():
     import gate
     # a verb per resolution kind ships built in (file EXISTS, cmd EXECS, agree CONCURS; result PARSES a
@@ -175,16 +165,6 @@ def cmd_builtin():
     assert gate.resolves("cmd:false", ENGINE, {}) is False, "cmd:false did not fail"
 
 
-def cmd_escape():
-    # "cmd is the hatch every other check reduces to" — a custom type resolves by
-    # running its cmd template; a type with no cmd behind it does not resolve
-    import gate
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
-        "a custom type did not reduce to its cmd"
-    assert gate.resolves("demo:x", ENGINE, {}) is False, \
-        "an unregistered type resolved with nothing behind it"
-
-
 # ── engine section ───────────────────────────────────────────────────────────
 def projector_emits():
     # "the projector emits the whole document from the warrant set" — project a
@@ -281,15 +261,6 @@ def node_is_claim():
     recs = _parse("@misc{n,\n  section = {s},\n  claim = {a single statement},\n  check = {file:x}\n}\n")
     assert len(recs) == 1 and recs["n"].get("claim") == "a single statement", \
         "a warrant node is not a single claim"
-
-
-def claim_bears_check():
-    # each claim carries a verifier, and the verifier is machine-checkable (the gate runs it)
-    import gate
-    rec = _parse("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")["c"]
-    assert rec.get("check") == "cmd:true", "the claim carries no check"
-    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("cmd:false", ENGINE, {}) is False, \
-        "the verifier is not machine-checkable"
 
 
 def paper_is_projection():
@@ -1064,7 +1035,6 @@ CLAIMS = {
     "paperkit-on-paperkit": paperkit_on_paperkit,
     "one-green-check": one_green_check,
     "node-is-claim": node_is_claim,
-    "claim-bears-check": claim_bears_check,
     "paper-is-projection": paper_is_projection,
     "claims-are-warrants": claims_are_warrants,
     "gate-is-subject": gate_is_subject,
@@ -1072,13 +1042,11 @@ CLAIMS = {
     "gate-dispatches": gate_dispatches,
     "dataset-backed": dataset_backed,
     "dataset-fresh": dataset_fresh,
-    "new-domain-adds": new_domain_adds,
     "two-builtins": two_builtins,
     "agree-builtin": agree_builtin,
     "result-builtin": result_builtin,
     "file-builtin": file_builtin,
     "cmd-builtin": cmd_builtin,
-    "cmd-escape": cmd_escape,
     "projector-emits": projector_emits,
     "prose-is-artifact": prose_is_artifact,
     "gate-rejects-drift": gate_rejects_drift,

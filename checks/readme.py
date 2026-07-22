@@ -47,14 +47,6 @@ def rm_pitch():
     assert "a claim not prose" in t and t.startswith("#"), "the document is not the projection of its claims"
 
 
-def rm_noship():
-    # an unverified sentence does not project / cannot overclaim: a failing check blocks the gate
-    ok = [fx.entry("x", claim="present", check="cmd:true")]
-    bad = [fx.entry("x", claim="present", check="cmd:false")]
-    good = fx.project_text(ok)
-    assert fx.gate(ok, out=good)[0] == 0 and fx.gate(bad, out=good)[0] != 0, "an unverified sentence shipped"
-
-
 def rm_selfhost():
     # this README is itself a projection: README.md == project(root warrants)
     cfg = P.load_config(ROOT)
@@ -69,17 +61,6 @@ def rm_cmds():
     assert doc.startswith("#"), "project did not make a document"
     assert fx.gate(w, out=doc)[0] == 0, "gate rejected a faithful document"
     assert fx.gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
-
-
-def rm_cmds_inv():
-    # the gate ENFORCES three invariants — violating each makes it RED (projection-equality,
-    # check-resolution; coverage is entailed by a faithful projection).  Behavioral (Ε·behavioral).
-    w = [fx.entry("x", claim="content", check="cmd:true")]
-    good = fx.project_text(w)
-    assert fx.gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
-    assert fx.gate(w, out=good + "\nDRIFT\n")[0] != 0, "projection-equality not enforced"
-    bad = [fx.entry("x", claim="content", check="cmd:false")]
-    assert fx.gate(bad, out=fx.project_text(bad))[0] != 0, "check-resolution not enforced"
 
 
 def rm_resolver():
@@ -226,9 +207,9 @@ def rm_resolver_eg():
 
 
 CLAIMS = {
-    "rm-pitch": rm_pitch, "rm-noship": rm_noship,
+    "rm-pitch": rm_pitch,
     "rm-selfhost": rm_selfhost, "rm-cmds": rm_cmds,
-    "rm-cmds-inv": rm_cmds_inv, "rm-resolver": rm_resolver,
+    "rm-resolver": rm_resolver,
     "rm-resolver-premise": rm_resolver_premise,
     "rm-next": rm_next,
     "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,

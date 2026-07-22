@@ -280,19 +280,6 @@ def claims_are_warrants():
     assert recs.get("paper-is-projection", {}).get("claim"), "the paper's claims are not its warrants"
 
 
-def gate_is_subject():
-    # the gate that accepts this paper is its subject: gate.py ENFORCES the very invariants the paper
-    # describes — violating each makes it RED (behavioral, Ε·behavioral).  PROJECT = out.md is the
-    # projection; RESOLVE = every cited claim's check passes.  (COVERAGE — every section-tagged claim
-    # cited — is entailed by a faithful projection, which cites them all.)
-    w = [fx.entry("x", claim="a verified claim", check="cmd:true")]
-    good = fx.project_text(w)
-    assert fx.gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
-    assert fx.gate(w, out=good + "\nDRIFT\n")[0] != 0, "PROJECT: out.md ≠ the projection was not caught"
-    bad = [fx.entry("x", claim="an unverified claim", check="cmd:false")]
-    assert fx.gate(bad, out=fx.project_text(bad))[0] != 0, "RESOLVE: a failing cited check was not caught"
-
-
 # ── Π·selfhost: the drift-caught negative-assertions, as Φ counter-fixtures ───
 def paperkit_on_paperkit():
     # run paperkit on paperkit: project a fixture, confirm the gate ACCEPTS the
@@ -316,15 +303,6 @@ def one_green_check():
 
 
 # ── Π·distinct-witnesses: split the shared projection-stable group (--without-K) ──
-def fail_omits():
-    # a claim whose verifier FAILS cannot ship: the gate refuses the document
-    ok = [fx.entry("x", claim="present", check="cmd:true")]
-    bad = [fx.entry("x", claim="present", check="cmd:false")]
-    good = fx.project_text(ok)
-    assert fx.gate(ok, out=good)[0] == 0, "a claim with a passing verifier did not ship"
-    assert fx.gate(bad, out=good)[0] != 0, "a claim with a FAILING verifier still shipped"
-
-
 def paper_is_paperkit():
     # this paper is itself a paperkit project: a well-formed config projecting to paper.md
     import project as P
@@ -1026,7 +1004,6 @@ CLAIMS = {
     "edge-rests-grounds": edge_rests_grounds,
     "edge-chiral": edge_chiral,
     "edge-move-types": edge_move_types,
-    "fail-omits": fail_omits,
     "paper-is-paperkit": paper_is_paperkit,
     "prose-is-projection": prose_is_projection,
     "closes-gap": closes_gap,
@@ -1037,7 +1014,6 @@ CLAIMS = {
     "node-is-claim": node_is_claim,
     "paper-is-projection": paper_is_projection,
     "claims-are-warrants": claims_are_warrants,
-    "gate-is-subject": gate_is_subject,
     "verifier-named": verifier_named,
     "gate-dispatches": gate_dispatches,
     "dataset-backed": dataset_backed,

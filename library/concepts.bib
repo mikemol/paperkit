@@ -57,3 +57,27 @@
   claim   = {and the paper's new-domain-adds face too --- supporting a new domain means adding verifiers, not editing the engine},
   check   = {cmd:python3 concepts.py new-domain-adds}
 }
+
+@misc{rm-noship,
+  section = {gate},
+  claim   = {an unverified sentence cannot ship --- a claim whose check FAILS blocks the gate; the gate is engine, so its def-sites are the fingerprint},
+  check   = {cmd:python3 concepts.py rm-noship}
+}
+
+@misc{fail-omits,
+  section = {gate},
+  claim   = {the paper's fail-omits face imports this same certificate --- a claim whose verifier fails simply does not appear in the prose},
+  check   = {cmd:python3 concepts.py fail-omits}
+}
+
+@misc{rm-cmds-inv,
+  section = {gate},
+  claim   = {the gate ENFORCES its invariants --- the committed prose equals its projection, and every cited claim's check passes --- so violating each makes it RED},
+  check   = {cmd:python3 concepts.py rm-cmds-inv}
+}
+
+@misc{gate-is-subject,
+  section = {gate},
+  claim   = {the paper's self-host face imports this same certificate --- the gate that accepts the paper is the very subject it describes, enforcing the invariants the paper states},
+  check   = {cmd:python3 concepts.py gate-is-subject}
+}

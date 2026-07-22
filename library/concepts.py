@@ -84,6 +84,28 @@ def custom_type_resolves():
         "an unregistered check type resolved with nothing behind it"
 
 
+def failing_check_blocks():
+    # an unverified sentence cannot ship: a claim whose check FAILS blocks the gate.  The gate is
+    # engine, so mutating its resolution/projection def-sites flips this — the fingerprint is the gate.
+    ok = [fx.entry("x", claim="present", check="cmd:true")]
+    bad = [fx.entry("x", claim="present", check="cmd:false")]
+    good = fx.project_text(ok)
+    assert fx.gate(ok, out=good)[0] == 0, "a claim with a passing verifier did not ship"
+    assert fx.gate(bad, out=good)[0] != 0, "a claim with a FAILING verifier still shipped"
+
+
+def gate_enforces_invariants():
+    # the gate ENFORCES its invariants — the committed prose equals its projection, and every cited
+    # claim's check passes — so violating each makes it RED.  The gate is the engine's, so its
+    # def-sites (projection-equality, check-resolution) are the certificate's fingerprint.
+    w = [fx.entry("x", claim="content", check="cmd:true")]
+    good = fx.project_text(w)
+    assert fx.gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
+    assert fx.gate(w, out=good + "\nDRIFT\n")[0] != 0, "projection-equality not enforced"
+    bad = [fx.entry("x", claim="content", check="cmd:false")]
+    assert fx.gate(bad, out=fx.project_text(bad))[0] != 0, "check-resolution not enforced"
+
+
 CONCEPTS = {
     # one witness, two keys: the README's pitch face and paper's deep grade-ladder face resolve to the
     # SAME grader run — the adequacy concept is authored once here, each view imports the certificate.
@@ -100,6 +122,12 @@ CONCEPTS = {
     "rm-resolver-cmd": custom_type_resolves,
     "cmd-escape": custom_type_resolves,
     "new-domain-adds": custom_type_resolves,
+    # an unverified sentence cannot ship: README pitch (rm-noship), paper (fail-omits).
+    "rm-noship": failing_check_blocks,
+    "fail-omits": failing_check_blocks,
+    # the gate enforces its invariants: README (rm-cmds-inv), paper self-host (gate-is-subject).
+    "rm-cmds-inv": gate_enforces_invariants,
+    "gate-is-subject": gate_enforces_invariants,
 }
 
 

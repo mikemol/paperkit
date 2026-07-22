@@ -13,11 +13,23 @@ durable index. Append-only, retirement-logged (see README).
    the resolver reconcile); `Σ·step5` guide view landed (c66334e, zero witness code).
    **Μ·kernel** [the owner's destination, 2026-07-22]: decompose the ENGINE into
    library-certified components around a microkernel, so mutate-verification becomes
-   component-local instead of whole-repo-per-commit. Rungs: **Μ·kernel·bounds** (component
-   filegroups; extract the bib parser first, per engine-modularization) →
-   **Μ·kernel·cells** (Δ cell inputs scoped to components → Bazel invalidation is
-   component-local) → **Μ·kernel·certs** (Λ·full continuing per component; the resolver
-   cert — 7 sites — is the first component certificate).
+   component-local instead of whole-repo-per-commit.
+   - **Μ·kernel·bounds ✅** — components.bzl 7-way partition + derived ENGINE_SRCS +
+     comp-* filegroups + bnd-components guard (first run caught dag.bzl stale by 10
+     edges; bibtex.bzl extension re-pointed from BUILD-text-parsing to the owner).
+   - **Μ·kernel·cells — MEASURED 2026-07-22, verdict reshapes the rung.** Probe: a
+     docstring edit to coherence.py (ZERO in-engine dependents) re-ran 25,813/26,650
+     actions (97%, 32 min). Mechanism: the pk_eval cone plumbing ALREADY exists and is
+     correct (closure_pyc/py depsets, not the flat engine) — but witness CLOSURES are
+     honestly whole-engine because view witnesses import _fixture → discriminate/gate/
+     project → everything. Footprint-based staging is UNSOUND (under-approximates what
+     a check could read); the two honest levers:
+     (1) **Μ·kernel·certs** — each concept: lift DELETES the claim's def-grid from its
+     views (graded once at the library); the cell-count reduction IS Λ·full continuing.
+     (2) **Μ·kernel·fixture** — split _fixture's hub imports into per-capability
+     fixtures so remaining witnesses' closures collapse to their subsystem cones.
+   - **Μ·kernel·certs** — resolver DONE (7 sites, 4 faces); parser/model, projector,
+     gate, delta components next.
 
 ## Live
 

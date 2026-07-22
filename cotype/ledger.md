@@ -27,7 +27,10 @@ durable index. Append-only, retirement-logged (see README).
      engine from eval cells; the closure stages the engine modules). Closure width remains
      the SECOND-order limiter (witnesses → _fixture → discriminate/gate/project).
      Footprint-based staging is UNSOUND (under-approximates what a check could read);
-     the two follow-on levers:
+     PAYOFF MEASURED (post-unstage, 5e7dacb): the same coherence probe re-ran 2,223
+     cells in ~8 min (was 25,813 in ~32 min) — −91% invalidation, 4× cycle time.
+     Remaining shrink: pk_grade's flat-engine data (small unstage), result: rows
+     (legitimate), and the closure remainder via the split. The two follow-on levers:
      (1) **Μ·kernel·certs** — each concept: lift DELETES the claim's def-grid from its
      views (graded once at the library); the cell-count reduction IS Λ·full continuing.
      (2) **Μ·kernel·fixture** — split _fixture's hub imports into per-capability

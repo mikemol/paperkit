@@ -134,28 +134,11 @@ def cmd_builtin():
 
 
 # ── engine section ───────────────────────────────────────────────────────────
-def projector_emits():
-    # "the projector emits the whole document from the warrant set" — project a
-    # two-section fixture; the whole document (title + every section + the claim) appears
-    text = fx.project_text([fx.entry("x", claim="anchor phrase")],
-                           rubric=(("s", "Sec One"), ("t", "Sec Two")), title="Doc")
-    for needle in ("# Doc", "## Sec One", "## Sec Two", "anchor phrase"):
-        assert needle.lower() in text.lower(), f"projection is missing {needle!r}"
-
-
 def prose_is_artifact():
     # "the committed prose is a build artifact, not a source" — the projector has a
     # --check mode that compares the committed file against a fresh projection
     assert "--check" in PROJECT_SRC and "read_text() != out" in PROJECT_SRC, \
         "projector can no longer detect a hand-edit against its projection"
-
-
-def gate_rejects_drift():
-    # "the gate rejects prose that has drifted" — counter-fixture: canonical passes, drift fails
-    w = [fx.entry("x", claim="anchored")]
-    canonical = fx.project_text(w)
-    assert fx.gate(w, out=canonical)[0] == 0, "gate rejected the exact projection"
-    assert fx.gate(w, out=canonical + "\nHAND-EDITED DRIFT\n")[0] != 0, "gate accepted drifted prose"
 
 
 def edit_cant_survive():
@@ -229,14 +212,6 @@ def node_is_claim():
     recs = _parse("@misc{n,\n  section = {s},\n  claim = {a single statement},\n  check = {file:x}\n}\n")
     assert len(recs) == 1 and recs["n"].get("claim") == "a single statement", \
         "a warrant node is not a single claim"
-
-
-def paper_is_projection():
-    # a paper IS the projection of its claim-DAG: project emits the claims as the document
-    t = fx.project_text([fx.entry("a", claim="alpha thesis"),
-                         fx.entry("b", claim="beta point", frm="a")], title="Doc").lower()
-    for needle in ("# doc", "alpha thesis", "beta point"):
-        assert needle in t, f"the paper is not the projection of its claim-DAG ({needle!r} missing)"
 
 
 def claims_are_warrants():
@@ -980,7 +955,6 @@ CLAIMS = {
     "paperkit-on-paperkit": paperkit_on_paperkit,
     "one-green-check": one_green_check,
     "node-is-claim": node_is_claim,
-    "paper-is-projection": paper_is_projection,
     "claims-are-warrants": claims_are_warrants,
     "dataset-backed": dataset_backed,
     "dataset-fresh": dataset_fresh,
@@ -988,9 +962,7 @@ CLAIMS = {
     "result-builtin": result_builtin,
     "file-builtin": file_builtin,
     "cmd-builtin": cmd_builtin,
-    "projector-emits": projector_emits,
     "prose-is-artifact": prose_is_artifact,
-    "gate-rejects-drift": gate_rejects_drift,
     "edit-cant-survive": edit_cant_survive,
     "coverage-both-sides": coverage_both_sides,
     "every-section-appears": every_section_appears,

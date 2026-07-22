@@ -41,26 +41,11 @@ def _parse(text):
         shutil.rmtree(d, ignore_errors=True)
 
 
-def rm_pitch():
-    # paperkit treats a document as the projection of a claim-DAG: claims become prose
-    t = fx.project_text([fx.entry("a", claim="a claim not prose")]).lower()
-    assert "a claim not prose" in t and t.startswith("#"), "the document is not the projection of its claims"
-
-
 def rm_selfhost():
     # this README is itself a projection: README.md == project(root warrants)
     cfg = P.load_config(ROOT)
     assert cfg["out"].name == "README.md", "the root project does not project to README.md"
     assert P.project(cfg) == cfg["out"].read_text(), "README.md is not the projection of the root warrants"
-
-
-def rm_cmds():
-    # two commands: project makes the document, gate verifies it (and catches drift)
-    w = [fx.entry("x", claim="content")]
-    doc = fx.project_text(w)
-    assert doc.startswith("#"), "project did not make a document"
-    assert fx.gate(w, out=doc)[0] == 0, "gate rejected a faithful document"
-    assert fx.gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
 
 
 def rm_resolver_premise():
@@ -190,8 +175,7 @@ def rm_resolver_eg():
 
 
 CLAIMS = {
-    "rm-pitch": rm_pitch,
-    "rm-selfhost": rm_selfhost, "rm-cmds": rm_cmds,
+    "rm-selfhost": rm_selfhost,
     "rm-resolver-premise": rm_resolver_premise,
     "rm-next": rm_next,
     "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,

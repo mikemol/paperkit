@@ -126,6 +126,30 @@ def resolver_dispatches():
         "a custom [checks.X] type did not dispatch through the registry"
 
 
+def document_is_projection():
+    # the PROJECTOR component's certificate: a document IS the projection of its claim-DAG — the
+    # title, EVERY rubric section (populated or not), and every claim's prose appear in the emitted
+    # document, which leads with a heading.  The superset of the three view faces (README pitch,
+    # paper thesis, paper projector-emits).
+    t = fx.project_text([fx.entry("a", claim="alpha thesis"),
+                         fx.entry("b", claim="beta point", frm="a")],
+                        rubric=(("s", "Sec One"), ("t", "Sec Two")), title="Doc")
+    low = t.lower()
+    assert t.startswith("#"), "the projection does not lead with a document heading"
+    for needle in ("# doc", "## sec one", "## sec two", "alpha thesis", "beta point"):
+        assert needle in low, f"the projection is missing {needle!r}"
+
+
+def project_then_gate():
+    # two commands do the work — PROJECT makes the document, GATE verifies it: the exact projection
+    # passes, and hand-edited drift is rejected.
+    w = [fx.entry("x", claim="content")]
+    doc = fx.project_text(w)
+    assert doc.startswith("#"), "project did not make a document"
+    assert fx.gate(w, out=doc)[0] == 0, "gate rejected a faithful document"
+    assert fx.gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
+
+
 CONCEPTS = {
     # one witness, two keys: the README's pitch face and paper's deep grade-ladder face resolve to the
     # SAME grader run — the adequacy concept is authored once here, each view imports the certificate.
@@ -155,6 +179,14 @@ CONCEPTS = {
     "verifier-named": resolver_dispatches,
     "gate-dispatches": resolver_dispatches,
     "two-builtins": resolver_dispatches,
+    # the projector component — one witness, THREE keys: README pitch (rm-pitch), the paper's
+    # thesis (paper-is-projection), and its engine face (projector-emits).
+    "rm-pitch": document_is_projection,
+    "paper-is-projection": document_is_projection,
+    "projector-emits": document_is_projection,
+    # project then gate: README (rm-cmds), paper (gate-rejects-drift).
+    "rm-cmds": project_then_gate,
+    "gate-rejects-drift": project_then_gate,
 }
 
 

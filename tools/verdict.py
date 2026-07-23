@@ -21,6 +21,12 @@ Subcommands — each writes one compact {verb, verdict} record to <out>:
   agree  <verb> <out> <produced>...                — pass iff >=2 produced outputs, all byte-equal, none failed
   calc   <verb> <calc.json> <out>                  — pass iff the calc record's baseline holds (pk_verdict)
   cohere <verb> <project> <out> <calc>...          — pass iff coherence.py passes over the calcs (pk_cohere)
+  canary <pos.json> <nul.json> <out>               — Ζ·canary: pass iff the guaranteed-flip eval
+                                                     FLIPPED and the ∅ identity did NOT; anything
+                                                     else = the harness itself is degraded (a
+                                                     non-hermetic sandbox lets checks resolve()
+                                                     out to the real unmutated tree) → fail LOUD
+                                                     with a NAMED error, never a silent green.
 """
 import argparse
 import json
@@ -58,6 +64,10 @@ def main(argv):
     pc.add_argument("project")
     pc.add_argument("out")
     pc.add_argument("calcs", nargs="*")
+    pn = sub.add_parser("canary")
+    pn.add_argument("pos")
+    pn.add_argument("nul")
+    pn.add_argument("out")
     a = ap.parse_args(argv)
 
     if a.cmd == "emit":
@@ -93,6 +103,20 @@ def main(argv):
         rc = subprocess.run([sys.executable, "paperkit/coherence.py", "--from-calcs", a.project, *a.calcs],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
         _write(a.out, a.verb, rc == 0)
+    elif a.cmd == "canary":
+        # Ζ·canary — the positive control's verdict.  Both directions asserted (a gate is sound
+        # both ways, [[instrument-vs-gate]]): the guaranteed-flip cell MUST flip, the ∅ identity
+        # MUST NOT.  Failure is NAMED — the degraded state says it degraded.
+        pos = json.loads(pathlib.Path(a.pos).read_text())
+        nul = json.loads(pathlib.Path(a.nul).read_text())
+        ok = pos.get("flipped") is True and nul.get("flipped") is False
+        if not ok:
+            print("verdict canary: HARNESS DEGRADED — guaranteed-flip mutation flipped=%s, "
+                  "∅ identity flipped=%s.  A non-hermetic sandbox (processwrapper fallback) lets "
+                  "checks resolve() out to the real unmutated tree; run under --config=mutant "
+                  "(hermetic linux-sandbox)." % (pos.get("flipped"), nul.get("flipped")),
+                  file=sys.stderr)
+        _write(a.out, "canary", ok)
     return 0
 
 

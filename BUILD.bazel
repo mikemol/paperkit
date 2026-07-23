@@ -47,6 +47,13 @@ filegroup(name = "files", srcs = [
 # The local CI: `bazel test //:hook` IS the pre-commit (Ζ·hook / Ζ·foot·hook) — it gates AND grades
 # every document as a graph of per-claim check targets.  bnd-check verifies this suite is complete.
 test_suite(name = "hook", tests = [
+    # Ζ·canary — the harness's POSITIVE CONTROL (one global member, a harness property): a
+    # guaranteed-flip pk_eval that MUST flip + the ∅ identity that MUST NOT, off the same
+    # bazel-staged-.pyc delivery every grid row uses — so a silently degraded sandbox
+    # (processwrapper fallback) turns the whole hook RED with a NAMED error instead of the
+    # sweep quietly grading everything indeterminate.  ⟨P,F,δ⟩ proven against the real
+    # failure: P green under --config=mutant, F red under --spawn_strategy=processwrapper.
+    "//canary:canary",
     "@paperkit_root//:gate",
     "@paperkit_paper//:gate",
     "@paperkit_boundaries//:gate",

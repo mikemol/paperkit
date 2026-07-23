@@ -392,6 +392,35 @@ pk_verdict = rule(
     },
 )
 
+# Ζ·canary — the harness's POSITIVE CONTROL verdict: the guaranteed-flip pk_eval MUST have
+# flipped, the ∅ identity MUST NOT.  The dual of pk_sens's ∅-baseline guard (that catches a
+# harness flipping EVERYTHING; this catches one flipping NOTHING — the silently-degraded-sandbox
+# class, twice demonstrated by the processwrapper false-indeterminate incidents).  verdict.py
+# owns the record; failure is a NAMED harness error, never a silent green.
+def _canary_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
+    v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
+    ctx.actions.run_shell(
+        outputs = [v],
+        inputs = depset([ctx.file._tool, ctx.file.pos, ctx.file.nul], transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+                  " canary " + ctx.file.pos.path + " " + ctx.file.nul.path + " " + v.path,
+        mnemonic = "PkCanary",
+        progress_message = "Ζ·canary " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([v]))]
+
+pk_canary = rule(
+    implementation = _canary_impl,
+    doc = "Ζ·canary — the harness positive control: guaranteed-flip eval flipped AND ∅ identity did not, else a LOUD named failure.",
+    toolchains = [_PY],
+    attrs = {
+        "pos": attr.label(allow_single_file = True, mandatory = True, doc = "the guaranteed-flip pk_eval record (MUST be flipped)"),
+        "nul": attr.label(allow_single_file = True, mandatory = True, doc = "the ∅ identity pk_eval record (MUST NOT be flipped)"),
+        "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
+    },
+)
+
 def _grade_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     g = ctx.actions.declare_file(ctx.label.name + ".grade.json")

@@ -12,6 +12,10 @@ The build graph is ONE mechanism (not per-project bespoke rules), and the local 
                   Ξ·dag·eval closure cells).  So `bazel test //:hook` gates, grades, AND coheres every
                   document.  This is the guarantee local-ci delegates to the hook for: its witness
                   asserts the pre-commit RUNS //:hook; THIS asserts //:hook is complete.
+  ⟨harness sound⟩ //:hook carries the ONE harness canary (//canary:canary, Ζ·canary) — the
+                  positive control that fails LOUD when the mutation harness degrades.  The
+                  member-shape check names the canary as the exact non-project residual
+                  (set-equality, Λ·cardinality — never a bare "extra members allowed").
 
     python3 paperkit/tests/boundaries_check.py
 """
@@ -71,8 +75,14 @@ def main() -> int:
     check("every project is wired by the SAME bib.project tag (no bespoke per-project rule)",
           len(projs) >= 4 and MODULE.count("bib.project(") == len(projs))
     check("//:hook is a SINGLE test_suite", BUILD.count('name = "hook"') == 1)
-    check("the hook's members are uniform @proj//:{gate,adequacy,cohere} targets (one shape)",
-          bool(hook) and all(re.match(r"@\w+//:(gate|adequacy|cohere)$", t) for t in hook))
+    # Λ·cardinality — the non-project residual is the OWNED set {//canary:canary}, asserted by
+    # set-EQUALITY (a bare "project-shaped or not" filter would silently admit any stray member).
+    check("the hook's members are uniform @proj//:{gate,adequacy,cohere} targets plus exactly the harness canary",
+          bool(hook) and {t for t in hook if not re.match(r"@\w+//:(gate|adequacy|cohere)$", t)} == {"//canary:canary"})
+
+    print("\n⟨harness sound⟩\n")
+    check("//:hook carries the harness canary (Ζ·canary — a degraded sandbox fails LOUD, not silently green)",
+          "//canary:canary" in hook)
 
     print("\n⟨hook complete⟩\n")
     graded = [n for n, p in projs.items() if p["graded"]]
@@ -94,7 +104,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (6 behaviors, 1 delta)")
+    print("BOUNDARIES: PASS (7 behaviors, 1 delta)")
     return 0
 
 

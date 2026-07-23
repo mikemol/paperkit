@@ -1,0 +1,76 @@
+# Ζ·canary·v2 — the harness's POSITIVE CONTROL, a direct //:hook member (ONE global canary:
+# sandbox degradation is harness-wide, so it is a harness property, not any project's —
+# place-by-ownership).  Hand-instantiates the SAME public rules the generator emits for every
+# real grid row (pk_mutate → pk_pyc → pk_eval off the bazel-staged mutant .pyc), so it exercises
+# the identical delivery path and CO-DEGRADES with the sweep by construction — what canary v1
+# lacked (its runtime-written .pyc bit under BOTH sandboxes; the bazel-staged one does not).
+#
+#   pos — the probe's one def dropped: MUST flip the check.  A silently degraded sandbox
+#         (processwrapper symlink-resolve-escape → checks read the real unmutated tree) leaves
+#         it unflipped → pk_canary emits a LOUD named failure instead of the sweep quietly
+#         grading everything indeterminate (twice-demonstrated: the poisoned-canary incident).
+#   nul — the ∅ identity: MUST NOT flip (the dual guard pk_sens already enforces per-row).
+load("//tools:calc.bzl", "pk_canary", "pk_eval", "pk_mutate", "pk_pyc")
+
+pk_mutate(
+    name = "mut_pos",
+    module = "canary/canary_probe.py",
+    site = "truth",
+    data = ["//paperkit:mutate.py", "canary_probe.py"],
+)
+
+pk_mutate(
+    name = "mut_nul",
+    module = "canary/canary_probe.py",
+    site = "",
+    data = ["//paperkit:mutate.py", "canary_probe.py"],
+)
+
+pk_pyc(name = "pyc_pos", src = ":mut_pos")
+
+pk_pyc(name = "pyc_nul", src = ":mut_nul")
+
+pk_eval(
+    name = "pos",
+    claim = "canary",
+    check = "canary/canary_check.py",
+    closure = [],
+    module = "canary/canary_probe.py",
+    mutated_py = ":mut_pos",
+    mutated_pyc = ":pyc_pos",
+    project = [
+        "canary_check.py",
+        "canary_probe.py",
+    ],
+    site = "canary/canary_probe.py::truth",
+)
+
+pk_eval(
+    name = "nul",
+    claim = "canary",
+    check = "canary/canary_check.py",
+    closure = [],
+    module = "canary/canary_probe.py",
+    mutated_py = ":mut_nul",
+    mutated_pyc = ":pyc_nul",
+    project = [
+        "canary_check.py",
+        "canary_probe.py",
+    ],
+    site = "0",
+)
+
+pk_canary(
+    name = "canary_rec",
+    nul = ":nul",
+    pos = ":pos",
+)
+
+sh_test(
+    name = "canary",
+    size = "small",
+    srcs = ["//tools:assert_pass.sh"],
+    args = ["$(rootpath :canary_rec)"],
+    data = [":canary_rec"],
+    visibility = ["//visibility:public"],
+)

@@ -805,19 +805,6 @@ def adequacy_gap():
     assert gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
 
 
-def crash_sensitive_limit():
-    from _fixture_delta import discriminate
-    # Δ FLAGS but does not forbid the gap: a check can be behavioral yet sensitive only
-    # to inputs OTHER than the document's content (its bib/rubric/out) — content_sensitive
-    # marks that, so "behavioral" is necessary but not sufficient for relevance
-    recs = json.loads(discriminate(
-        [entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],   # sensitive to an asset, not content
-        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
-    r = recs[0]
-    assert r["grade"] == "behavioral" and r.get("content_sensitive") is False, \
-        f"a non-content-sensitive behavioral check should be flagged (content_sensitive={r.get('content_sensitive')})"
-
-
 def trust_boundary():
     from _fixture_gate import gate
     # a check is arbitrary code (cmd: is the universal escape hatch), so gating a
@@ -954,7 +941,6 @@ CLAIMS = {
     "collapse-safe": collapse_safe,
     "fresh-by-construction": fresh_by_construction,
     "adequacy-gap": adequacy_gap,
-    "crash-sensitive-limit": crash_sensitive_limit,
     "trust-boundary": trust_boundary,
     "env-sanitized": env_sanitized,
     "path-surface": path_surface,

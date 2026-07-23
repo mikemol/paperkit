@@ -6,6 +6,10 @@
 
 The adequacy witness runs the real grader over a fixture, so mutating an engine def-site flips it — the certificate's sensitivity fingerprint IS the engine, which every importing view inherits [@adequacy-pitch]; the same witness under the deep key certifies the grade ladder — a presupposed file grades vacuous, a content-sensitive command behavioral — so the paper's deep exposition imports the identical proof the pitch does [@grade-ladder].
 
+## Delta: The Grader and Coherence
+
+Δ flags the relevance gap without closing it — a check can grade behavioral while sensitive only to inputs other than the document's content, and content-sensitivity marks the difference, so behavioral is necessary but not sufficient for relevance [@crash-sensitive-limit].
+
 ## Model: A Claim Is a Record
 
 A claim is one bibliography entry — a statement, its rubric section, its dependencies, and its check — parsed by the engine's OWN bib reader, so mutating a parser def-site flips the witness and the certificate's fingerprint IS that parser [@rm-model]; the same witness under the paper's key certifies that a claim is a single record — the deep view imports the identical proof the README pitch does [@claim-is-record].

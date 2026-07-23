@@ -159,7 +159,24 @@ def project_then_gate():
     assert gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
 
 
+# ── delta component (Μ·kernel·certs·delta) — the Δ grader/coherence concepts, interned here as
+# canonical nodes (library-is-hash-cons: authored ONCE, the paper CITES via concept:). ────────
+def content_marks_relevance():
+    from _fixture_delta import discriminate
+    # Δ FLAGS the relevance gap without closing it: a check can grade behavioral yet be sensitive
+    # only to inputs OTHER than the document's content (an asset, not its bib/rubric/out) —
+    # content_sensitive marks that, so behavioral is necessary but not sufficient for relevance.
+    recs = json.loads(discriminate(
+        [entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],   # sensitive to an asset, not content
+        "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
+    r = recs[0]
+    assert r["grade"] == "behavioral" and r.get("content_sensitive") is False, \
+        f"a non-content-sensitive behavioral check should be flagged (content_sensitive={r.get('content_sensitive')})"
+
+
 CONCEPTS = {
+    # delta component (Μ·kernel·certs·delta) — canonical Δ-grader/coherence nodes.
+    "crash-sensitive-limit": content_marks_relevance,
     # one witness, two keys: the README's pitch face and paper's deep grade-ladder face resolve to the
     # SAME grader run — the adequacy concept is authored once here, each view imports the certificate.
     "adequacy-pitch": adequacy_pitch,

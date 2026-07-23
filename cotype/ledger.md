@@ -37,6 +37,20 @@ durable index. Append-only, retirement-logged (see README).
      fixtures so remaining witnesses' closures collapse to their subsystem cones.
    - **Μ·kernel·certs** — resolver DONE (7 sites, 4 faces); parser/model, projector,
      gate, delta components next.
+   - **Μ·kernel·fixture·{unstage,split} ✅** `[5e7dacb 886ce4f]` — flat-engine staging cut
+     from eval cells; _fixture split into 4 capability modules, consumers repointed
+     minimal-capability. Payoffs measured: coherence edit 25,813→2,223 cells (−91%);
+     grader edit (worst case) 7,980 cells / ~14.4 min.
+   - **Μ·kernel·shrink·grade-edge ✅** `[2ab5760, 2026-07-22]` — the config.py→grade edge
+     CUT (Option C, validation-at-use-site): config drops `import grade` + both `choices=`;
+     discriminate.py (the ladder's ONE consumer) refuses a floor ∉ ORDER/CORRO_C with the
+     must-be-one-of contract; grade.py kernel→delta; dag regen; new floor-refusal F-arm
+     (no test pinned the contract before); _call gains CPython string-SystemExit parity.
+     KERNEL IS NOW config.py ALONE. PAYOFF MEASURED: grade.py edit 18,595→8,312 executed
+     actions, 24.7→13.3 min (−55% actions; the saturation's ~70% was in cells — action
+     count carries per-row mutant/pyc/sens overhead; same order as the grader probe 7,980).
+     Follow-on rungs: Μ·kernel·shrink·registry (param ownership), Μ·kernel·fixture·reads
+     (readme's 12 rows keep grade via READ roots until the typed-roots cut).
 
 ## Live
 

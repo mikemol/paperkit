@@ -51,6 +51,17 @@ durable index. Append-only, retirement-logged (see README).
      count carries per-row mutant/pyc/sens overhead; same order as the grader probe 7,980).
      Follow-on rungs: Μ·kernel·shrink·registry (param ownership), Μ·kernel·fixture·reads
      (readme's 12 rows keep grade via READ roots until the typed-roots cut).
+   - **Μ·kernel·shrink·registry ✅** `[615e880 24e38ed, 2026-07-22]` — all 21 Params moved to
+     their RESOLVING modules (config resolved zero — pure placement-by-need); config.py = the
+     ~110-line mechanism; the 3 CLI entries compose per-cone registries; NEW bnd-config
+     completeness guard (dag.bzl cone + Param introspection; F-arm: one dropped element CAUGHT
+     — closes the silent-flag-ignore class the split opened); config project introspects the
+     union via components.bzl (canonical order), precedence on a synthetic Param.
+     MEASURED: delta-hosted knob edits ≤8,312 actions; gate-hosted = 18,296 ≈ full grid (gate
+     near-universal in row cones — win there is STRUCTURAL: churn re-homed, guard, dead export
+     gone). Two staging reds bought one lesson: a sandboxed check reading components.bzl/dag.bzl
+     needs reads = {.} — the .bzl owners are staged via root files, not the engine filegroup.
+     KERNEL AT ITS FLOOR: mechanism edits honestly re-key the full grid; everything else moved.
 
 ## Live
 

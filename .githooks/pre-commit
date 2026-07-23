@@ -2,7 +2,9 @@
 # paperkit local CI — ONE Bazel target.  `bazel test //:hook` gates every project (each claim a
 # per-claim check target — the bib IS the build graph, Ζ·starlark) AND grades each behaviorally
 # adequate (Δ --min-strength, now hermetic under Bazel — Ζ·foot/Ξ·result-imported), so a commit
-# re-runs only what changed, in parallel, with live progress, and never lands the repo broken.
+# re-runs only what changed, in parallel, with live progress — and under the hook-index
+# precondition below (worktree ≡ index outside cotype/), never lands the repo broken: the
+# worktree verdict IS the index verdict by substitution, at zero cache cost (Ζ·hook·index).
 #
 # Enable once per clone:   git config core.hooksPath .githooks
 set -eu
@@ -18,6 +20,13 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
   fi
   echo "[pre-commit] ok: $desc"
 }
+
+# Ζ·hook·index — the bazel run below gates the WORKING TREE; a commit lands the INDEX.  This
+# precondition makes the worktree verdict THE index verdict by substitution: no divergence on
+# any path outside the allowlist (cotype/ — bazel-invisible AND index-gated by its own check
+# below).  Refusal is instant, BEFORE any build cost, and NAMES the paths;
+# PK_HOOK_ALLOW_DIRTY=1 downgrades it to a loud advisory for a deliberate split commit.
+run "hook-index (worktree ≡ index)"   mise exec -- python3 tools/hook_index.py
 
 # --config=mutant: the hook includes each emerge project's :cohere, whose def-sweep GRID cells
 # (Ξ·dag·eval) run as counterfactuals in the HERMETIC linux-sandbox (else a check's resolve()

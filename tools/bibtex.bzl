@@ -250,8 +250,9 @@ def _closures(module_ctx, project, core):
     """Ξ·dag·eval — per emerge project, each claim WITNESS's closure ROOTS via closure.py over the
     project's claim-witness module (paper.toml [checks.claim]) + the core names (which include the
     per-capability _fixture_* modules, Μ·kernel·fixture·split — a fixture import is an ordinary
-    IMPORT root, no facade plumbing).  Returns ["claim\tmodule", ...]; [] if the project declares no
-    claim: type.  Unlike the def-site SURFACE (engine-global), a witness's closure depends on the
+    IMPORT root, no facade plumbing).  Returns ["claim\tmodule", ...] plus "claim\tread:module"
+    for pure-READ roots (Μ·kernel·fixture·reads — staged flat, own sites only); [] if the project
+    declares no claim: type.  Unlike the def-site SURFACE (engine-global), a witness's closure depends on the
     PROJECT's check module — so this runs per emerge project, watching that module so an edited
     witness re-generates its cells' closures."""
     script = _claim_script(module_ctx, project)
@@ -346,6 +347,7 @@ def _bib_repo_impl(repository_ctx):
     # get it; non-emerge get [] because they build no grid — the surface is not conditional on them).
     sites = [l.split("\t") for l in repository_ctx.attr.sites]
     closures = {}  # ·gen·closure — claim key → its witness's closure ROOT modules (Ξ·dag·eval)
+    rroots = {}    # Μ·kernel·fixture·reads — claim key → pure-READ modules (staged FLAT .py, no cone)
     fsites = {}    # Ζ·mutant·struct·node-kinds — claim key → its FILE toggle specs (file+:/file-:<path>)
     contents = {}  # Ζ·mutant·struct·node-kinds — claim key → [(op, path, substring)] CONTENT toggles
     for l in repository_ctx.attr.closures:
@@ -355,6 +357,8 @@ def _bib_repo_impl(repository_ctx):
             contents.setdefault(k, []).append((parts[1], parts[2], parts[3]))
         elif parts[1].startswith("file+:") or parts[1].startswith("file-:"):
             fsites.setdefault(k, []).append(parts[1])
+        elif parts[1].startswith("read:"):
+            rroots.setdefault(k, []).append(parts[1][len("read:"):])
         else:
             closures.setdefault(k, []).append(parts[1])
     # the claim-WITNESS script each pk_eval runs, EXEC-relative — the .py in THIS project's
@@ -412,7 +416,7 @@ def _bib_repo_impl(repository_ctx):
                        ", data = [" + dl + "])")
             out.append("pk_verdict(name = " + _lit(k) + ", calc = " + _lit(":" + k + "__calc") + (vis if owns else "") + ")")
             calc_claims[k] = True
-            if emerge and closures.get(k):
+            if emerge and (closures.get(k) or rroots.get(k)):
                 # Ζ·mutant·wire·gen·emit — a WITNESS claim's ROW of the grid: one pk_eval CELL per
                 # def-site (the check run off its CLOSURE with D's bytecode swapped — parallel + cached,
                 # Ξ·dag·eval), the ∅-baseline cell, and pk_sens reading them → {claim, baseline, sens}
@@ -426,9 +430,13 @@ def _bib_repo_impl(repository_ctx):
                 # it is in the closure).  This is the common structure of ·surface·scope AND file/bib node
                 # kinds: the surface is per-claim-READS, so a claim reading a file / bib-edge perturbs
                 # THAT artifact (a later rung, closure roots beyond .py) — through this same scoped row.
-                cset = {m: True for m in closures[k]}
+                # Μ·kernel·fixture·reads — a pure-READ root joins the SITE set (mutating its
+                # SOURCE can flip a source-inspection assert) but NOT the pyc-cone closure (a
+                # read_text never loads imports, so its cone cannot flip the check); it is staged
+                # as the plain //paperkit:<m>.py file label in the project list below.
+                cset = {m: True for m in closures.get(k, []) + rroots.get(k, [])}
                 csites = [s for s in sites if s[0] in cset]
-                cl = ", ".join(['"@@//paperkit:%s"' % m[len("paperkit/"):-len(".py")] for m in closures[k]])
+                cl = ", ".join(['"@@//paperkit:%s"' % m[len("paperkit/"):-len(".py")] for m in closures.get(k, [])])
                 # stage the claim's DECLARED reads (dl = _data(reads, files)), not just the project
                 # files — a witness may read cross-project inputs (local-ci reads .githooks/pre-commit,
                 # multi-project/report-live read siblings); the old pk_calc staged dl, so the grid ∅
@@ -442,7 +450,8 @@ def _bib_repo_impl(repository_ctx):
                 # …except a result:-checked row, which runs a whole SIBLING GATE in the cell — the
                 # sibling's checks (bnd-components' partition-totality among them) legitimately read
                 # the full engine tree, so its row keeps the flat staging.
-                edl = ", ".join([_lit(d) for d in _data(reads, files, imports, engine = False)])
+                rdl = ['"@@//paperkit:%s"' % m[len("paperkit/"):] for m in rroots.get(k, [])]
+                edl = ", ".join([_lit(d) for d in _data(reads, files, imports, engine = False)] + rdl)
                 ev = ("check = " + _lit(wscript) + ", closure = [" + cl + "], project = [" +
                       (dl if check.startswith("result:") else edl) + "]")
                 cellnames = []

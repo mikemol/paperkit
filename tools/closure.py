@@ -9,13 +9,18 @@ the flat engine.  Two AST-derived edge kinds (NEVER grep — a grep matches the 
                root: the _fixture_* modules are engine modules whose module-top imports carry the
                honest capability cone, so no fx-facade special-casing exists here any more.
   READ       — a `"x.py"` string constant (claims.py reads gate/resolver/project sources via
-               read_text at MODULE level) → that module must be staged as .py.
+               read_text at MODULE level) → that module must be staged as .py — FLAT
+               (Μ·kernel·fixture·reads): a read_text never LOADS imports, so a pure-READ root
+               does NOT cone-expand and contributes only its OWN def-sites to the row (a source
+               mutation can flip a source-inspection assert; its cone's cannot).  A module both
+               imported and read is an IMPORT root — the cone wins.
 
 Intra-claims.py calls are followed (a witness calling the local _parse helper inherits its `import
-project`).  Emits `claim<TAB>paperkit/<relpath>.py` per (claim, root); the codegen maps each root to
-its //paperkit:<target> pk_pyc target and PycInfo expands the transitive cone.  The check module's
-module-level roots are shared by every claim (claims.py imports _fixture_model + read_texts three
-sources).
+project`).  Emits `claim<TAB>paperkit/<relpath>.py` per (claim, import-cone module) and
+`claim<TAB>read:paperkit/<relpath>.py` per pure-READ root; the codegen maps an import root to its
+//paperkit:<target> pk_pyc target (PycInfo expands the transitive cone) and a read root to the
+plain //paperkit:<relpath>.py file label.  The check module's module-level roots are shared by
+every claim (claims.py imports _fixture_model + read_texts three sources).
 
 Usage: closure.py --check paper/checks/claims.py <engine.py>…"""
 import argparse
@@ -42,8 +47,6 @@ def _reads(node, names):
             and n.value.endswith(".py") and Path(n.value).stem in names}
 
 
-def _roots_of(node, names):
-    return _imports(node, names) | _reads(node, names)
 
 
 def _parents_prefix(node, parts):
@@ -173,21 +176,25 @@ def main(argv):
 
     # BASE — the module-level roots, run on EVERY witness (claims.py imports _fixture_model + read_texts
     # gate/resolver/project at import).  Top-level statements only (defs handled per-witness).
-    base = set()
+    # IMPORT and READ roots tracked SEPARATELY (Μ·kernel·fixture·reads): only imports cone-expand.
+    base_i, base_r = set(), set()
     for stmt in tree.body:
         if not isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            base |= _roots_of(stmt, names)
+            base_i |= _imports(stmt, names)
+            base_r |= _reads(stmt, names)
 
     def roots(fnname, seen):
         if fnname in seen or fnname not in funcs:
-            return set()
+            return set(), set()
         seen.add(fnname)
         fn = funcs[fnname]
-        r = _roots_of(fn, names)
+        ri, rr = _imports(fn, names), _reads(fn, names)
         for c in ast.walk(fn):        # follow intra-claims.py calls (a witness → local _parse helper)
             if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in funcs:
-                r |= roots(c.func.id, seen)
-        return r
+                ci, cr = roots(c.func.id, seen)
+                ri |= ci
+                rr |= cr
+        return ri, rr
 
     # CLAIMS = {key: fn} — the registry; emit per (claim key, root module).
     claims = {}
@@ -210,8 +217,13 @@ def main(argv):
     for key in sorted(claims):
         fn = funcs[claims[key]]
         pref = _dir_consts(relpath, fn.body, mod_pref)   # extend with the witness's function-local ones
-        for stem in sorted(_cone(base | roots(claims[key], set()))):
+        wi, wr = roots(claims[key], set())
+        cone = _cone(base_i | wi)
+        for stem in sorted(cone):
             print("{}\t{}".format(key, names[stem]))
+        # pure-READ roots — staged FLAT (.py, no cone), own def-sites only; import wins on overlap.
+        for stem in sorted((base_r | wr) - cone):
+            print("{}\tread:{}".format(key, names[stem]))
         for path in sorted(_exists_paths(fn, pref, parts)):
             if Path(path).is_dir():
                 continue                                 # a dir-existence is not a single-artifact toggle

@@ -45,7 +45,14 @@ def _library_for(project_dir: Path | None) -> Path:
     unusable by exactly the consumers who need it (they fall back to a custom type that re-RUNS the
     witness instead of importing its certificate).  An absent project library must resolve to the
     engine's BY FALLBACK, never by assumption.  Λ·location: the eight in-repo projects establish the
-    kernel is DOMAIN-free; only an out-of-repo consumer tests whether it is LOCATION-free."""
+    kernel is DOMAIN-free; only an out-of-repo consumer tests whether it is LOCATION-free.
+
+    Λ·library·fallthrough — this function picks the CANDIDATE library (a directory); ownership
+    of a KEY is decided at resolution: a project library that answers exit 2 ("not mine", the
+    sentinel contract concepts.py declares) must not ECLIPSE the engine's concepts, so
+    resolves() falls through to the engine's library per key.  Directory-level selection alone
+    made every engine key unreachable from any repo owning a library — the downstream audit's
+    live instance: they could never cite an engine concept even where it was the honest import."""
     if project_dir is not None:
         p = Path(project_dir).resolve()
         for base in (p, p.parent):                    # the project's own, then its repo root's
@@ -178,9 +185,16 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
         # nothing staged; its adequacy is the imported certificate (verdict + engine fingerprint).
         try:
             lib = _library_for(project_dir)
-            argv = [sys.executable, str(lib / "concepts.py"), target]
-            return subprocess.run(argv, cwd=lib, env=clean_env(),
-                                  capture_output=True).returncode == 0
+            r = subprocess.run([sys.executable, str(lib / "concepts.py"), target],
+                               cwd=lib, env=clean_env(), capture_output=True)
+            # Λ·library·fallthrough — per-KEY, not per-directory: exit 2 is the library's own
+            # "not mine" sentinel, so a project library lacking the key falls through to the
+            # engine's (the true owner answers); any other exit is the OWNING library's verdict.
+            # The owning case runs ONCE; only a fallthrough pays the cheap rc-2 probe first.
+            if r.returncode == 2 and lib != _LIBRARY:
+                r = subprocess.run([sys.executable, str(_LIBRARY / "concepts.py"), target],
+                                   cwd=_LIBRARY, env=clean_env(), capture_output=True)
+            return r.returncode == 0
         except Exception:
             return False
     if typ == "agree":
@@ -222,6 +236,11 @@ def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str
     if typ == "result":
         return f"{sys.executable} {_GATE} --json --safe --without-K {target}"
     if typ == "concept":
+        # The CANDIDATE library's command (the project's own first).  In the per-key fallthrough
+        # case (Λ·library·fallthrough — the project library answers exit 2 and resolves() retries
+        # the engine's) this traces the rc-2 probe, not the engine run: a bounded imprecision —
+        # concept: carries no local footprint engine-side (bibtex.bzl skips it), and a downstream
+        # fallthrough's footprint would need a run to discover, which a trace-string must not do.
         return f"{sys.executable} {_library_for(project_dir) / 'concepts.py'} {target}"
     if typ == "agree":   # trace every producer's reads — the footprint is their union
         return "; ".join(p.strip() for p in target.split("|||") if p.strip())

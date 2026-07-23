@@ -166,7 +166,7 @@
           "@@//paperkit/layout.py": "6bf81fee3ebd4f8cea78cda3ecec50974ceb0841dc95806a46c2b42bfa2990d9",
           "@@//paperkit/mutate.py": "f609f1a2667a94d2a8008c43801c253bcc44c22b46e93e4afd8941f9ef0bd504",
           "@@//paperkit/project.py": "eae4900b180e8e2d26fbda25cd0396452123bbb44ac7b25b2e0bb20b89cee445",
-          "@@//paperkit/resolver.py": "a0a5441881a6bac83aaa11f18932ab732a1095cec637652da3edfb591f801cd6",
+          "@@//paperkit/resolver.py": "3156946135a88aab440a521268f3a7363ba30f188353e0729496c98b1e148eb0",
           "@@//paperkit/rhetoric.py": "2b4ba52de01006ac87a87f48f5cd78c484afbc25a07be23e7b19e61c090a1518",
           "@@//paperkit/tests/_fixture_delta.py": "02b84200601b6e1250749ed462a56ee67da3e2ea17f771704ecb3c1dec08f744",
           "@@//paperkit/tests/_fixture_gate.py": "16b7aac5968ce99b3ca08c73d28db82589cabf8dd4bc3258c9daf79f7c051b64",

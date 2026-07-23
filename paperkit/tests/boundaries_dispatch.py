@@ -110,12 +110,25 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as d:
         far = Path(d) / "their-repo"
         (far / "library").mkdir(parents=True)
-        (far / "library" / "concepts.py").write_text("CONCEPTS = {}\n")
+        # A runnable downstream library honouring the exit-2 "not mine" sentinel contract:
+        # owns exactly one key.  (The fallthrough dispatches on that contract, so the fixture
+        # must SPEAK it — a bare data file would test directory pick, not key ownership.)
+        (far / "library" / "concepts.py").write_text(
+            "import sys\nsys.exit(0 if sys.argv[1:2] == ['mine'] else 2)\n")
         (far / "doc").mkdir()
         check("a project outside this repo resolves concept: to ITS OWN library, not the engine's",
               resolver._library_for(far / "doc") == far / "library")
         check("...and one with NO library falls back to the engine's (fallback, never assumption)",
               resolver._library_for(Path(d)) == resolver._LIBRARY)
+        # Λ·library·fallthrough — per-KEY ownership, both sides reachable (the audit's reverse
+        # finding: directory-level selection eclipsed ALL engine keys from any repo owning a
+        # library, the exact inverse of the shadowing the seam was built to fix).
+        check("a key the project library OWNS resolves project-side",
+              resolver.resolves("concept:mine", far / "doc", {}) is True)
+        check("a key it answers 'not mine' (exit 2) FALLS THROUGH to the engine's library",
+              resolver.resolves("concept:claim-is-record", far / "doc", {}) is True)
+        check("a key owned NOWHERE fails (exit 2 everywhere is not a pass)",
+              resolver.resolves("concept:no-such-concept", far / "doc", {}) is False)
     check("in-repo resolution is UNCHANGED by the seam (every project here shares the root library)",
           resolver._library_for(ROOT / "paper") == ROOT / "library")
 

@@ -28,6 +28,22 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
 # PK_HOOK_ALLOW_DIRTY=1 downgrades it to a loud advisory for a deliberate split commit.
 run "hook-index (worktree ≡ index)"   mise exec -- python3 tools/hook_index.py
 
+# Ζ·sched-batch — tune the bazel SERVER (SCHED_BATCH + nice 19 + a 100ms EEVDF slice) so the grid's
+# concurrent CPU-bound cells run long uninterrupted stretches instead of preempting each other every
+# ~2.8ms (the default fair-class slice; measured ~30% sys / 15-20k ctx-switch/s / run-queue 2-3x
+# cores).  The tuning is per-task, UNPRIVILEGED, and INHERITED by every action the server forks
+# (verified: policy+nice+slice all propagate across fork+exec) — so ONE cross-pid tune covers the
+# whole grid, no per-action prefix.  Best-effort: PK_SCHED_OFF=1 disables; a missing cc or any
+# failure is IGNORED (a scheduling hint never blocks a commit).  Lazy-built from tools/sched-batch.c.
+if [ -z "${PK_SCHED_OFF:-}" ] && command -v cc >/dev/null 2>&1; then
+  [ -x tools/sched-batch ] || cc -O2 -o tools/sched-batch tools/sched-batch.c 2>/dev/null || true
+  if [ -x tools/sched-batch ]; then
+    srv=$(mise exec -- bazel info server_pid 2>/dev/null) || srv=""      # warms + names the server
+    [ -n "$srv" ] && tools/sched-batch --pid "$srv" 2>/dev/null || true  # every forked cell inherits
+    echo "[pre-commit] ok: sched-batch (bazel server ${srv:-?} → SCHED_BATCH+nice19+100ms)"
+  fi
+fi
+
 # --config=mutant: the hook includes each emerge project's :cohere, whose def-sweep GRID cells
 # (Ξ·dag·eval) run as counterfactuals in the HERMETIC linux-sandbox (else a check's resolve()
 # escapes to the source tree → the mutation is invisible → empty sens).  The gate/adequacy checks

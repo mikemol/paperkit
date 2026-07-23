@@ -12,3 +12,6 @@ setup/.loadtest.lock
 /inbox/*
 !/inbox/README.md
 !/inbox/archive/
+
+# Ζ·sched-batch — the lazy-built helper binary (arch-specific; source tools/sched-batch.c is tracked)
+tools/sched-batch

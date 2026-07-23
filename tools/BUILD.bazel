@@ -15,3 +15,20 @@ exports_files(["calc.bzl", "verb.bzl", "grade.bzl", "bibtex.bzl", "witness.bzl"]
 observe_setting(name = "observe", build_setting_default = False)
 
 py_binary(name = "pyinfo", srcs = ["pyinfo.py"], main = "pyinfo.py")
+
+# Ζ·sched-batch·phase2 — the per-cell scheduler helper as a bazel artifact, LAZY-BUILT via rustc
+# (mise-provisioned, system fallback) to match substrate's lazy-rustc pattern (consistency across
+# projects) rather than a bazel-specific rust toolchain.  local = 1: runs on the host so mise/rustc
+# resolve.  BEST-EFFORT: if no rustc, emit a no-op shell wrapper (`shift; exec "$@"`) so the grid
+# runs UNTUNED but NEVER breaks — a scheduling hint must not block a build.  Grid actions stage this
+# output and prefix their command with `<bin> -- "$(command -v python3)" …` so each cell self-tunes
+# at exec (SCHED_BATCH + nice 19 + 100ms slice), thread-independent (the durable fix Phase 1 wasn't).
+genrule(
+    name = "sched-batch-bin",
+    srcs = ["sched-batch.rs"],
+    outs = ["sched-batch"],
+    cmd = ("if mise exec -- rustc -O -o $@ $< 2>/dev/null || rustc -O -o $@ $< 2>/dev/null; " +
+           "then :; else printf '#!/bin/sh\\nshift\\nexec \"$$@\"\\n' > $@ && chmod +x $@; fi"),
+    local = 1,
+    visibility = ["//visibility:public"],
+)

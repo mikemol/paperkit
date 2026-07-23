@@ -247,8 +247,12 @@ def _eval_impl(ctx):
         carg = " --content-path " + ctx.attr.content_path + " --content-textfile " + cf.path
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(mut + ctx.files.project, transitive = [closure_pyc, closure_py]),
-        command = '"$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset(mut + ctx.files.project + [ctx.file._sched], transitive = [closure_pyc, closure_py]),
+        # Ζ·sched-batch·phase2 — each grid cell self-tunes at exec (SCHED_BATCH + nice 19 + 100ms
+        # slice), so concurrent cells run long uninterrupted stretches instead of preempting each
+        # other every ~2.8ms (kills ctx-switch AND, under zswap, the refault codec-CPU thrash).
+        # Per-cell = thread-independent (the durable fix Phase 1's server-tune could not reach).
+        command = '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
                   " --engine-dir paperkit" + marg + carg +
                   " --check " + ctx.attr.check + " --claim " + ctx.attr.claim +
                   " --site '" + ctx.attr.site + "' --out " + o.path,
@@ -272,6 +276,7 @@ pk_eval = rule(
         "content_path": attr.string(default = "", doc = "a content cell's target file (its substring toggled in the sandbox); empty for a .py/file cell"),
         "content_text": attr.string(default = "", doc = "the substring a content cell drops/injects — delivered via ctx.actions.write, so any chars are safe"),
         "_tool": attr.label(default = "//tools:eval.py", allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 

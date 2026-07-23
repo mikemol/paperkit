@@ -40,7 +40,20 @@ run "hook-index (worktree ≡ index)"   mise exec -- python3 tools/hook_index.py
 # (Ξ·dag·eval) run as counterfactuals in the HERMETIC linux-sandbox (else a check's resolve()
 # escapes to the source tree → the mutation is invisible → empty sens).  The gate/adequacy checks
 # pass identically under it, so the whole hook stays ONE Bazel target under one config.
-run "bazel test //:hook"   mise exec -- bazel test //:hook --config=mutant
+# Ρ·telemetry — capture bazel's OWN per-spawn timing (--execution_log_json_file) so the
+# best-effort push below can turn cycle time into a series.  The flag is a LOG sink, NOT an
+# --action_env, so it changes no action key (cache-safe).  The push is OBSERVATION, never a
+# gate: it runs only on a GREEN hook (run() aborts the commit on red), only when the endpoint
+# env is set (default OFF ⇒ no uv fetch, no cost), and can never block a commit (|| true + the
+# tool's own best-effort no-op).  It parses the log — a hermetic cell has no network to emit.
+PK_EXECLOG=$(mktemp)
+PK_T0=$(date +%s)
+run "bazel test //:hook"   mise exec -- bazel test //:hook --config=mutant --execution_log_json_file="$PK_EXECLOG"
+if [ -n "${PAPERKIT_OTLP_METRICS:-}" ]; then
+  uv run --with opentelemetry-proto python3 tools/otlp_push.py "$PK_EXECLOG" \
+      --build-seconds "$(( $(date +%s) - PK_T0 ))" || true
+fi
+rm -f "$PK_EXECLOG"
 
 # Σ·cotype — cotype-monotone: ledger entry keys never vanish (append-only, retirement-logged).
 # A commit-DELTA property: its truth-maker is HEAD's ledger vs the STAGED one, which only this

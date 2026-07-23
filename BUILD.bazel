@@ -42,6 +42,8 @@ filegroup(name = "files", srcs = [
         "//paperkit:components.bzl",
         "//paperkit:dag.bzl",
         "//tools:imports.py",
+        # Ζ·bnd·toplevel derives its read semantics from the owner (closure.py's _reads).
+        "//tools:closure.py",
     ], visibility = ["//visibility:public"])
 
 # The local CI: `bazel test //:hook` IS the pre-commit (Ζ·hook / Ζ·foot·hook) — it gates AND grades
@@ -57,6 +59,10 @@ test_suite(name = "hook", tests = [
     "@paperkit_root//:gate",
     "@paperkit_paper//:gate",
     "@paperkit_boundaries//:gate",
+    # Ζ·hook-rot — config is wired (bib.project) but declares neither adequacy nor emerge, so
+    # bnd-check's completeness never OWED it a member; its gate rotted silently outside the hook.
+    # Gate-only (no adequacy/cohere targets exist without those flags), near-free (4 cmd checks).
+    "@paperkit_config//:gate",
     "@paperkit_paper//:adequacy",
     "@paperkit_root//:adequacy",
     # Λ·witness — the concept LIBRARY: it self-grades each concept witness (adequacy) and gates its

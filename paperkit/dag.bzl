@@ -37,5 +37,6 @@ IMPORTS = {
     "tests/boundaries_sandbox.py": ["layout"],
     "tests/boundaries_surface.py": ["grade", "grader", "layout"],
     "tests/boundaries_target.py": ["project"],
+    "tests/boundaries_toplevel.py": ["boundaries_components"],
     "tests/boundaries_without_k.py": ["_fixture_gate", "_fixture_model"],
 }

@@ -117,8 +117,14 @@
   check   = {cmd:python3 ../tools/lint_bzl.py ../tools/calc.bzl ../tools/verb.bzl ../tools/grade.bzl ../tools/bibtex.bzl ../tools/witness.bzl},
   reads   = {.}
 }
-@misc{bnd-grounding,
+@misc{bnd-toplevel,
   section = {engine}, from = {bnd-lint}, join = {. },
+  claim   = {a claim-witness module's TOP LEVEL carries no engine-source reads (Ζ·bnd·toplevel) --- a module-level convenience becomes a staged input of EVERY grid row (one engine edit re-keys the whole grid), so a source inspection lives INSIDE the witness that makes it, scoped to exactly its rows; the witness set is discovered from the paper.tomls and the read semantics derive from closure.py, the owner},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_toplevel.py},
+  reads   = {., paper, library}
+}
+@misc{bnd-grounding,
+  section = {engine}, from = {bnd-toplevel}, join = {. },
   claim   = {the grounding closure's boundary --- the gate resolves the TRANSITIVE rests-on cone of the cited/placed set on every render target (a sectionless premise two hops away fails the gate when its check breaks, a cycle terminates, and a rests-on edge to an undefined key is a broken grounding that fails the gate), an unreachable sectionless node's check stays un-gated, and Delta grades the cone too},
   check   = {cmd:python3 ../paperkit/tests/boundaries_grounding.py}
 }

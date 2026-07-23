@@ -15,9 +15,15 @@ The cotype grows monotonically. An entry is never silently overwritten or delete
   is logged. Deletion without a logged retirement is forbidden — it breaks the
   cross-session persistence the cotype exists to provide.
 
-This invariant is the cotype's own gate (see `cotype-monotone`, a planned check: every
-line removed from `ledger.md` in a commit must be accompanied by a `RETIRED:` line in
-the same commit). Until that gate lands, the rule is enforced by convention.
+This invariant is the cotype's own gate — `cotype-monotone` (`cotype/check.py`, run by
+`.githooks/pre-commit` on HEAD's ledger vs the staged one): **entry-KEY monotonicity**.
+The unit is the entry (a `- **key** …` bullet), not the line, because every sanctioned
+move preserves the key — adding appears, a status edit changes the line but keeps the
+key, and retirement keeps the entry with its `RETIRED:` reason.  Only outright deletion
+makes a key vanish, and that is what the gate refuses.  (The commit hook is the layer
+that owns commit deltas; the hermetic `//:hook` sandbox has no git history.  Honest
+bound: `git commit --no-verify` skips it, as it skips all local CI.)  The check proves
+its own ⟨P,F,δ⟩ on every run: one entry dropped from an in-memory copy must be caught.
 
 ## The over-decode guard: entailed vs asserted
 

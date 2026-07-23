@@ -95,9 +95,13 @@ durable index. Append-only, retirement-logged (see README).
 - **Κ·inbox·vcs** `[in progress]` — inbox split into ephemeral drop-zone + tracked
   `inbox/archive/`; letters promoted. Push held pending cassian consent for the raw exchange.
 - **Σ·cotype** `[in progress]` — this ledger. Step 2 = the `cotype-monotone` gate.
-- **cotype-monotone** `[planned gate]` — enforce append-only+retirement-log on `ledger.md`;
-  and (from cassian reply3) the over-decode predicate: a unifying entry is `entailed` (cite two
-  points) or `asserted` (candidate, not closure). See README "over-decode guard".
+- **cotype-monotone ✅** `[LANDED 2026-07-23]` — the gate is `cotype/check.py`, run by
+  `.githooks/pre-commit` on HEAD's ledger vs the staged one: ENTRY-KEY monotonicity (the
+  constructible form — every sanctioned move preserves the key; only deletion vanishes one).
+  Self-proving ⟨P,F,δ⟩ each run (an entry dropped from an in-memory copy must be caught).
+  The over-decode predicate (entailed vs asserted, cassian reply3) stays a READER rule owned
+  by the README — its declared default ("unlabelled = asserted") makes absence sanctioned,
+  so a gate erroring on absence would contradict the contract it enforces.
 - **Λ·cardinality** `[verified sound — cassian reply3]` — a derived completeness cross-check must
   assert cardinality against an OWNED count, not non-emptiness. Audited paperkit's guards: all sound
   (`for v in resolver.VERBS`, set-equality, `incomplete()` set-difference); the one floor

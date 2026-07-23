@@ -24,4 +24,16 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
 # escapes to the source tree → the mutation is invisible → empty sens).  The gate/adequacy checks
 # pass identically under it, so the whole hook stays ONE Bazel target under one config.
 run "bazel test //:hook"   mise exec -- bazel test //:hook --config=mutant
+
+# Σ·cotype — cotype-monotone: ledger entry keys never vanish (append-only, retirement-logged).
+# A commit-DELTA property: its truth-maker is HEAD's ledger vs the STAGED one, which only this
+# hook can see (the hermetic //:hook sandbox has no git) — so the one non-bazel check lives
+# here, at the layer that owns the delta, invoked as a real tool (cotype/check.py).
+if git rev-parse -q --verify HEAD:cotype/ledger.md >/dev/null 2>&1; then
+  old=$(mktemp); new=$(mktemp)
+  git show HEAD:cotype/ledger.md > "$old"
+  git show :cotype/ledger.md > "$new"
+  run "cotype-monotone"    mise exec -- python3 cotype/check.py "$old" "$new"
+  rm -f "$old" "$new"
+fi
 echo "[pre-commit] all checks passed"

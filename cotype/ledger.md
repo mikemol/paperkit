@@ -77,6 +77,12 @@ durable index. Append-only, retirement-logged (see README).
 
 ## Live
 
+- **Ζ·hook-rot ✅ / Ζ·bnd·toplevel ✅ / Ζ·probe·tool ✅** `[bd00147 c0d91ad, 2026-07-23]` —
+  the 20p G9 escalations landed: config gate = hook member 14; witness modules' top level
+  gated read-free (owned set from MODULE emerge tags, loud under-staging, semantics from
+  closure.py — its own first red was the staging-dependent-discovery bug, the pattern it
+  polices); the probe protocol mechanized as tools/probe.py (4 hygiene rules structural).
+
 - **Κ·image·sandbox** `[owner: R3|R4|R5]` — resolve-escape-proof sandbox in a rootless
   `podman build`. R1 (eval.py fix) refuted. R3 gate-only image (sound, narrower); R4
   nested-userns for real linux-sandbox (host caps OK, needs the RUN-step probe); R5

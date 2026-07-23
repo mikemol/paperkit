@@ -22,7 +22,7 @@
 @misc{sandbox-grade,
   section = {adequacy}, from = {content-cache}, join = {. }, depth = {1},
   claim   = {the sweep runs in a sandbox copy whose mutation surface excludes sibling projects (a nested directory with its own paper.toml), so each project grades independently of the others},
-  check   = {claim:sandbox-grade}
+  check   = {concept:sandbox-grade}
 }
 
 @misc{min-strength,
@@ -40,5 +40,5 @@
 @misc{imported-grade,
   section = {adequacy}, from = {footprint-scopes}, join = {. },
   claim   = {one grade sits outside the falsifiability ladder: a verdict-import is graded imported --- its adequacy delegated to a sibling project the gate verifies on its own, run once and never mutation-swept --- the way one paper rests on another it does not re-derive},
-  check   = {claim:imported-grade}
+  check   = {concept:imported-grade}
 }

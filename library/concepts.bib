@@ -24,6 +24,36 @@
   check   = {cmd:python3 concepts.py crash-sensitive-limit}
 }
 
+@misc{imported-grade,
+  section = {delta}, from = {crash-sensitive-limit}, join = {. },
+  claim   = {one grade sits outside the falsifiability ladder --- a verdict-import is graded imported, its adequacy delegated to a sibling the gate verifies on its own, run once and never mutation-swept},
+  check   = {cmd:python3 concepts.py imported-grade}
+}
+
+@misc{sandbox-grade,
+  section = {delta}, from = {imported-grade}, join = {. },
+  claim   = {the sweep runs in a sandbox copy whose mutation surface excludes sibling projects (a nested directory with its own paper.toml), so each project grades independently of the others},
+  check   = {cmd:python3 concepts.py sandbox-grade}
+}
+
+@misc{grounding-reflected,
+  section = {delta}, from = {sandbox-grade}, join = {. },
+  claim   = {definition resolution turns each claim's sensitivity into an engine-capability fingerprint and checks declared grounding against it --- a rests-on edge whose fingerprint overlaps its premise's is reflected, a disjoint one from a claim that tests engine capability is a genuine miss, and one from a claim that tests nothing engine is vacuously discharged},
+  check   = {cmd:python3 concepts.py grounding-reflected}
+}
+
+@misc{emergence-collapse,
+  section = {delta}, from = {grounding-reflected}, join = {; and stricter, },
+  claim   = {emergence is the coverage sibling of grounding --- grounding asks whether a rests-on edge overlaps its premise's fingerprint, emergence whether a claim's whole fingerprint is covered by its premises', so a claim that adds no engine sensitivity beyond its grounding collapses while any residual is its irreducible increment},
+  check   = {cmd:python3 concepts.py emergence-collapse}
+}
+
+@misc{edge-rests-grounds,
+  section = {delta}, from = {emergence-collapse}, join = {. },
+  claim   = {rests-on is a separate grounding edge --- a claim's effective grade is clamped to the weakest grade along it, regardless of prose order},
+  check   = {cmd:python3 concepts.py edge-rests-grounds}
+}
+
 @misc{rm-model,
   section = {model},
   claim   = {a claim is one bibliography entry --- a statement, its rubric section, its dependencies, and its check --- parsed by the engine's OWN bib reader, so mutating a parser def-site flips the witness and the certificate's fingerprint IS that parser},

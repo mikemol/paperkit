@@ -174,9 +174,118 @@ def content_marks_relevance():
         f"a non-content-sensitive behavioral check should be flagged (content_sensitive={r.get('content_sensitive')})"
 
 
+def delegated_grade():
+    # a verdict-import sits OUTSIDE the falsifiability ladder: Δ grades result: "imported" —
+    # adequacy delegated to a sibling the gate verifies on its own — run once, never swept.
+    import grader
+    d = Path(tempfile.mkdtemp())
+    try:
+        sib = d / "g"
+        sib.mkdir()
+        (sib / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
+                                        'rubric = "r.tsv"\nout = "out.md"\n')
+        (sib / "r.tsv").write_text("s\tSec\n")
+        (sib / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")
+        (sib / "out.md").write_text(P.project(P.load_config(sib)))
+        rec = grader.grade_check("result:g", d, set(), {}, d)
+        assert rec["grade"] == "imported", f"a green verdict-import should grade imported, got {rec['grade']}"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def sandbox_excludes_siblings():
+    # grading runs in a sandbox copy whose mutation surface excludes SIBLING projects (a nested dir
+    # with its own paper.toml), so a project grades independently of them.
+    import grader
+    import layout
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "paper.toml").write_text("[paper]\n")
+        (d / "main.py").write_text("own\n")
+        (d / "sub").mkdir()
+        (d / "sub" / "paper.toml").write_text("[paper]\n")          # a nested sibling project
+        (d / "sub" / "inner.py").write_text("theirs\n")
+        assert (d / "sub") in layout._nested_roots(d), "nested project not detected"
+        names = [f.name for f in grader.sandbox_files(d, set())]
+        assert "main.py" in names and "inner.py" not in names, \
+            f"surface should keep own files, drop the sibling's (got {names})"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def grounding_reflected():
+    # ∂²'s grounding face — each DECLARED rests-on edge checked against MEASURED engine
+    # sensitivity: overlap is reflected; a disjoint edge from a claim that tests engine capability
+    # is a genuine miss (dischargeable by a `link`); one from a claim that tests nothing engine is
+    # vacuously disjoint (rhetorical, auto-discharged); shared test scaffolding is not grounding.
+    import coherence
+    recs = [
+        {"key": "y", "grade": "behavioral", "rests-on": [],
+         "tests": ["paperkit/gate.py::resolves"]},
+        {"key": "x", "grade": "behavioral", "rests-on": ["y"],          # overlaps y
+         "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
+        {"key": "z", "grade": "behavioral", "rests-on": ["y"],          # tests engine, disjoint → genuine
+         "tests": ["paperkit/rhetoric.py::kind_of"]},
+        {"key": "w", "grade": "behavioral", "rests-on": ["y"],          # tests nothing engine → rhetorical
+         "tests": ["checks/claims.py::w"]},
+    ]
+    g = coherence.grounding_residual(recs)
+    assert g["grounding_edges"] == 3, g                                 # x→y, z→y, w→y
+    assert g["reflected"] == 1 and ["x", "y"] not in g["misses"], g     # x overlaps y
+    assert g["undischarged"] == 1 and ["z", "y"] in g["misses"], g      # z genuine miss
+    assert g["rhetorical"] == 1 and ["w", "y"] not in g["misses"], g    # w vacuously disjoint
+    assert coherence.grounding_residual(recs, discharged={"z"})["undischarged"] == 0, \
+        "a `link` did not discharge a genuine grounding miss"
+    scaffold = [
+        {"key": "y", "grade": "behavioral", "rests-on": [], "tests": ["checks/claims.py::y"]},
+        {"key": "x", "grade": "behavioral", "rests-on": ["y"], "tests": ["checks/claims.py::x"]},
+    ]
+    assert coherence.grounding_residual(scaffold)["grounding_edges"] == 0, \
+        "shared scaffolding counted as engine grounding — the engine restriction failed"
+
+
+def emergence_collapse():
+    # ∂²'s emergence face — the COVERAGE sibling of grounding: a claim whose engine fingerprint is
+    # ⊆ its premises' COLLAPSES (its witness emerges by consuming them); a residual is an INCREMENT;
+    # no grounding is a LEAF axiom.  STRICTER than grounding — an edge can OVERLAP yet the claim
+    # still test more, which coverage (not overlap) catches.
+    import coherence
+    recs = [
+        {"key": "ax", "rests-on": [], "tests": ["paperkit/gate.py::resolves"]},                # no grounding → leaf
+        {"key": "col", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves"]},           # ⊆ premise → collapse
+        {"key": "inc", "rests-on": ["ax"],                                                      # extra site → increment
+         "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
+    ]
+    e = coherence.emergence_residual(recs)
+    assert e["leaf"] == 1, e                                            # 'ax' has no grounding
+    assert e["collapse"] == 1, e                                        # 'col' reduces to its premise
+    assert e["increment"] == 1 and e["increments"][0][0] == "inc", e    # 'inc' tests beyond its premise
+    assert coherence.grounding_residual(recs)["reflected"] >= 1 and e["collapse"] == 1, \
+        "emergence is not strictly finer than grounding (overlap should pass where coverage can fail)"
+
+
+def rests_on_clamps():
+    # rests-on is a SEPARATE grounding edge: the EFFECTIVE grade clamps to the weakest premise
+    # along it (a behavioral thesis resting on a vacuous atom clamps to vacuous), regardless of
+    # prose order — the clamp (grade.clamp) over known premise grades.
+    import grade
+    recs = grade.clamp([
+        {"key": "atom", "grade": "vacuous", "rests-on": []},
+        {"key": "thesis", "grade": "behavioral", "rests-on": ["atom"]},
+    ])
+    th = next(r for r in recs if r["key"] == "thesis")
+    assert th["grade"] == "behavioral" and th["effective_grade"] == "vacuous", \
+        f"rests-on did not clamp the thesis (self={th['grade']}, eff={th['effective_grade']})"
+
+
 CONCEPTS = {
     # delta component (Μ·kernel·certs·delta) — canonical Δ-grader/coherence nodes.
     "crash-sensitive-limit": content_marks_relevance,
+    "imported-grade": delegated_grade,
+    "sandbox-grade": sandbox_excludes_siblings,
+    "grounding-reflected": grounding_reflected,
+    "emergence-collapse": emergence_collapse,
+    "edge-rests-grounds": rests_on_clamps,
     # one witness, two keys: the README's pitch face and paper's deep grade-ladder face resolve to the
     # SAME grader run — the adequacy concept is authored once here, each view imports the certificate.
     "adequacy-pitch": adequacy_pitch,

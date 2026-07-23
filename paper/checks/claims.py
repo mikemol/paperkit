@@ -322,21 +322,6 @@ def edge_from_orders():
     assert -1 < ia < ib < ic, "from did not order the prose alpha→beta→gamma"
 
 
-def edge_rests_grounds():
-    # rests-on is a SEPARATE grounding edge: the EFFECTIVE grade clamps to the weakest premise
-    # along it (a behavioral thesis resting on a vacuous atom clamps to vacuous).  Π — this tests
-    # the CLAMP (grade.clamp), the claim's subject; the premise grades are inputs other claims own
-    # (the vacuous/behavioral examples), so they are GIVEN, not re-derived through the whole sweep.
-    import grade
-    recs = grade.clamp([
-        {"key": "atom", "grade": "vacuous", "rests-on": []},
-        {"key": "thesis", "grade": "behavioral", "rests-on": ["atom"]},
-    ])
-    th = next(r for r in recs if r["key"] == "thesis")
-    assert th["grade"] == "behavioral" and th["effective_grade"] == "vacuous", \
-        f"rests-on did not clamp the thesis (self={th['grade']}, eff={th['effective_grade']})"
-
-
 def edge_chiral():
     # grounding is independent of prose adjacency: rests-on clamps even when the premise is NOT a
     # from-neighbor (the two graphs diverge / reverse).  Π — tests the CLAMP (grade.clamp) over
@@ -543,26 +528,6 @@ def footprint_scopes():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def imported_grade():
-    # a verdict-import sits OUTSIDE the falsifiability ladder: Δ grades result: "imported" —
-    # adequacy delegated to a sibling the gate verifies on its own — run once, never swept.
-    import grader
-    import project as P
-    d = Path(tempfile.mkdtemp())
-    try:
-        sib = d / "g"
-        sib.mkdir()
-        (sib / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
-                                        'rubric = "r.tsv"\nout = "out.md"\n')
-        (sib / "r.tsv").write_text("s\tSec\n")
-        (sib / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")
-        (sib / "out.md").write_text(P.project(P.load_config(sib)))
-        rec = grader.grade_check("result:g", d, set(), {}, d)
-        assert rec["grade"] == "imported", f"a green verdict-import should grade imported, got {rec['grade']}"
-    finally:
-        shutil.rmtree(d, ignore_errors=True)
-
-
 def module_split():
     # the engine is not a monolith but small single-responsibility modules — a resolver that
     # runs a check, a grader that sweeps it, a grade ladder that interprets the sweep, a cache,
@@ -579,26 +544,6 @@ def module_split():
     grade_src = (ENGINE / "grade.py").read_text()
     assert not any(f"import {m}" in grade_src for m in ("gate", "project", "grader", "resolver", "cache")), \
         "the grade ladder imports an orchestrator — it must be a pure leaf (Μ·grade: calc vs interp)"
-
-
-def sandbox_grade():
-    # grading runs in a sandbox copy whose mutation surface excludes SIBLING projects
-    # (a nested dir with its own paper.toml), so a project grades independently of them
-    import grader
-    import layout
-    d = Path(tempfile.mkdtemp())
-    try:
-        (d / "paper.toml").write_text("[paper]\n")
-        (d / "main.py").write_text("own\n")
-        (d / "sub").mkdir()
-        (d / "sub" / "paper.toml").write_text("[paper]\n")          # a nested sibling project
-        (d / "sub" / "inner.py").write_text("theirs\n")
-        assert (d / "sub") in layout._nested_roots(d), "nested project not detected"
-        names = [f.name for f in grader.sandbox_files(d, set())]
-        assert "main.py" in names and "inner.py" not in names, \
-            f"surface should keep own files, drop the sibling's (got {names})"
-    finally:
-        shutil.rmtree(d, ignore_errors=True)
 
 
 def min_strength():
@@ -848,60 +793,6 @@ def path_surface():
         "clean_env kept a cwd-relative PATH entry — a document could shadow a tool beside itself"
 
 
-def grounding_reflected():
-    # ∂²'s grounding face — the comparison definition-resolution made possible: each
-    # DECLARED rests-on edge is checked against MEASURED engine sensitivity.  Overlap is
-    # reflected; a disjoint edge from a claim that tests NO engine capability is vacuously
-    # disjoint (rhetorical, auto-discharged); a disjoint edge from a claim that DOES test
-    # engine capability is a genuine miss, dischargeable by a `link`.  Shared test
-    # scaffolding (claims.py / the _fixture_* modules) does NOT count as engine grounding.
-    import coherence
-    recs = [
-        {"key": "y", "grade": "behavioral", "rests-on": [],
-         "tests": ["paperkit/gate.py::resolves"]},
-        {"key": "x", "grade": "behavioral", "rests-on": ["y"],          # overlaps y
-         "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
-        {"key": "z", "grade": "behavioral", "rests-on": ["y"],          # tests engine, disjoint → genuine
-         "tests": ["paperkit/rhetoric.py::kind_of"]},
-        {"key": "w", "grade": "behavioral", "rests-on": ["y"],          # tests nothing engine → rhetorical
-         "tests": ["checks/claims.py::w"]},
-    ]
-    g = coherence.grounding_residual(recs)
-    assert g["grounding_edges"] == 3, g                                 # x→y, z→y, w→y
-    assert g["reflected"] == 1 and ["x", "y"] not in g["misses"], g     # x overlaps y
-    assert g["undischarged"] == 1 and ["z", "y"] in g["misses"], g      # z genuine miss
-    assert g["rhetorical"] == 1 and ["w", "y"] not in g["misses"], g    # w vacuously disjoint, auto-discharged
-    assert coherence.grounding_residual(recs, discharged={"z"})["undischarged"] == 0, \
-        "a `link` did not discharge a genuine grounding miss"
-    scaffold = [
-        {"key": "y", "grade": "behavioral", "rests-on": [], "tests": ["checks/claims.py::y"]},
-        {"key": "x", "grade": "behavioral", "rests-on": ["y"], "tests": ["checks/claims.py::x"]},
-    ]
-    assert coherence.grounding_residual(scaffold)["grounding_edges"] == 0, \
-        "shared scaffolding counted as engine grounding — the engine restriction failed"
-
-
-def emergence_collapse():
-    # ∂²'s emergence face — the COVERAGE sibling of grounding: a claim whose engine fingerprint is
-    # ⊆ its premises' (fp(X) ⊆ ∪rests-on) COLLAPSES (its witness emerges by consuming them); a
-    # residual is an INCREMENT; no grounding is a LEAF axiom.  STRICTER than grounding — an edge can
-    # OVERLAP yet the claim still test more, which coverage (not overlap) catches.
-    import coherence
-    recs = [
-        {"key": "ax", "rests-on": [], "tests": ["paperkit/gate.py::resolves"]},                # no grounding → leaf
-        {"key": "col", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves"]},           # ⊆ premise → collapse
-        {"key": "inc", "rests-on": ["ax"],                                                      # extra site → increment
-         "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
-    ]
-    e = coherence.emergence_residual(recs)
-    assert e["leaf"] == 1, e                                            # 'ax' has no grounding
-    assert e["collapse"] == 1, e                                        # 'col' reduces to its premise
-    assert e["increment"] == 1 and e["increments"][0][0] == "inc", e    # 'inc' tests beyond its premise
-    # STRICTER than grounding: 'inc' OVERLAPS its premise (shares resolves) yet does not collapse
-    assert coherence.grounding_residual(recs)["reflected"] >= 1 and e["collapse"] == 1, \
-        "emergence is not strictly finer than grounding (overlap should pass where coverage can fail)"
-
-
 def collapse_safe():
     # The proof that COLLAPSE is safe to delete, routed through the graph (not an ephemeral test):
     # replacing a collapsed claim's witness with consuming its premises preserves the proof's
@@ -936,8 +827,6 @@ def forward_direction():
 
 
 CLAIMS = {
-    "grounding-reflected": grounding_reflected,
-    "emergence-collapse": emergence_collapse,
     "collapse-safe": collapse_safe,
     "fresh-by-construction": fresh_by_construction,
     "adequacy-gap": adequacy_gap,
@@ -960,9 +849,7 @@ CLAIMS = {
     "mutation-probes": mutation_probes,
     "content-cache": content_cache,
     "footprint-scopes": footprint_scopes,
-    "imported-grade": imported_grade,
     "module-split": module_split,
-    "sandbox-grade": sandbox_grade,
     "min-strength": min_strength,
     "resolve-passes": resolve_passes,
     "safe-rejects-postulates": safe_rejects_postulates,
@@ -974,7 +861,6 @@ CLAIMS = {
     "config-flags": config_flags,
     "latex-clean": latex_clean,
     "edge-from-orders": edge_from_orders,
-    "edge-rests-grounds": edge_rests_grounds,
     "edge-chiral": edge_chiral,
     "edge-move-types": edge_move_types,
     "paper-is-paperkit": paper_is_paperkit,

@@ -23,11 +23,10 @@ import gate  # noqa: E402
 import resolver  # noqa: E402  — for VERBS, the engine's OWN verb set (never re-listed here)
 import project as P  # noqa: E402
 
-GATE_SRC = (ENGINE / "gate.py").read_text()
-RESOLVER_SRC = (ENGINE / "resolver.py").read_text()   # the check-resolution core (split out of gate)
-DISC_SRC = (ENGINE / "discriminate.py").read_text()
-GRADER_SRC = (ENGINE / "grader.py").read_text()       # the mutation sweep (split out of discriminate)
-GRADE_SRC = (ENGINE / "grade.py").read_text()         # the grade ladder + interpretation (Μ·grade, split out of grader)
+# (Μ·kernel·fixture·reads — no module-level source reads: a witness that inspects a module's
+# SOURCE reads it inside its own body, so only that witness stages the module and sweeps its
+# sites.  Four of the five constants that used to sit here were DEAD reads — staged inputs of
+# every row, used by none.)
 
 
 def _parse(text):
@@ -105,7 +104,7 @@ def rm_delta_cmds():
     cmds = (ROOT / "assets" / "delta-cmds.sh").read_text()
     assert "paperkit/discriminate.py" in cmds, "the Δ example does not run discriminate.py"
     assert (ENGINE / "discriminate.py").exists(), "discriminate.py (the Δ tool) is missing"
-    assert "--min-strength" in cmds and "--min-strength" in DISC_SRC, \
+    assert "--min-strength" in cmds and "--min-strength" in (ENGINE / "discriminate.py").read_text(), \
         "the example uses a --min-strength flag discriminate.py does not define"
 
 

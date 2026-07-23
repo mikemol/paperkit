@@ -29,9 +29,12 @@ sys.path.insert(0, str(ENGINE / "tests"))
 from _fixture_model import entry  # noqa: E402  (the validated fixture kernel — counter-fixtures;
 #   capability helpers are imported FUNCTION-LOCALLY per witness, so closure.py's BASE stays model-only)
 
-GATE_SRC = (ENGINE / "gate.py").read_text()
-RESOLVER_SRC = (ENGINE / "resolver.py").read_text()   # the check-resolution core (split out of gate)
-PROJECT_SRC = (ENGINE / "project.py").read_text()
+def _src(name):
+    """A module's SOURCE, read INSIDE the witness that inspects it (Μ·kernel·fixture·reads):
+    the "x.py" string constant sits in the witness body, so only the source-inspecting
+    witnesses stage that module (flat) and sweep its sites — a MODULE-level read would make
+    it a staged input of EVERY row of the grid."""
+    return (ENGINE / name).read_text()
 
 
 def _parse(bib_text):
@@ -138,7 +141,8 @@ def cmd_builtin():
 def prose_is_artifact():
     # "the committed prose is a build artifact, not a source" — the projector has a
     # --check mode that compares the committed file against a fresh projection
-    assert "--check" in PROJECT_SRC and "read_text() != out" in PROJECT_SRC, \
+    src = _src("project.py")
+    assert "--check" in src and "read_text() != out" in src, \
         "projector can no longer detect a hand-edit against its projection"
 
 
@@ -155,17 +159,18 @@ def edit_cant_survive():
 
 def coverage_both_sides():
     # "coverage is enforced from both sides" — section-present AND claim-cited branches
-    assert "absent" in GATE_SRC and "not cited" in GATE_SRC, "coverage no longer checks both directions"
+    src = _src("gate.py")
+    assert "absent" in src and "not cited" in src, "coverage no longer checks both directions"
 
 
 def every_section_appears():
     # "every required section must appear"
-    assert "not in headings" in GATE_SRC, "gate no longer checks each section appears"
+    assert "not in headings" in _src("gate.py"), "gate no longer checks each section appears"
 
 
 def every_claim_cited():
     # "every claim tagged for a section must be cited within it"
-    assert "k not in cited" in GATE_SRC, "gate no longer checks each tagged claim is cited"
+    assert "k not in cited" in _src("gate.py"), "gate no longer checks each tagged claim is cited"
 
 
 # ── model section ────────────────────────────────────────────────────────────
@@ -565,7 +570,8 @@ def module_split():
     # so a change to one has a small blast radius.
     for mod in ("resolver", "grader", "grade", "cache", "layout"):
         assert (ENGINE / f"{mod}.py").exists(), f"engine module {mod}.py is missing"
-    assert "import gate" not in RESOLVER_SRC and "concurrent.futures" not in RESOLVER_SRC, \
+    resolver_src = _src("resolver.py")
+    assert "import gate" not in resolver_src and "concurrent.futures" not in resolver_src, \
         "the resolver imports the gate / its parallelism — not a small blast radius"
     grader_src = (ENGINE / "grader.py").read_text()
     assert "import gate" not in grader_src and "import project" not in grader_src, \

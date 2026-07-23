@@ -129,8 +129,14 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_prove.py},
   reads   = {., library}
 }
-@misc{bnd-hook-index,
+@misc{bnd-prove-envelope,
   section = {engine}, from = {bnd-prove}, join = {. },
+  claim   = {the prove face runs the SAME oracle as the build's cached record (Ζ·prove-gate) --- a concept's --prove certificate and its library <key>__dcalc build target invoke the byte-identical discriminate sweep (--only <key> --calc --resolution def) and grade through the one shared ladder leaf, so their verdict, baseline, sensitivity and grade agree BY CONSTRUCTION without the check re-running any sweep; what stays unproven --- that the two independent executions emit byte-identical output --- is entailed by action idempotency, an engine invariant owned elsewhere, not a bare hand-verification},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_prove_envelope.py},
+  reads   = {., library}
+}
+@misc{bnd-hook-index,
+  section = {engine}, from = {bnd-prove-envelope}, join = {. },
   claim   = {the local CI's index boundary (Ζ·hook·index) --- the bazel hook gates the working tree while a commit lands the index, so the pre-commit verifies the EQUIVALENCE PRECONDITION first: worktree and index agree on every path outside the one ownership-justified allowlist (cotype/, bazel-invisible and index-gated by its own check), making the worktree verdict the index verdict by substitution at zero cache cost; a staged-only change passes, one unstaged edit or one untracked file refuses naming the path, and a rename's origin field parses so the path that LANDS is the one judged},
   check   = {cmd:python3 ../paperkit/tests/boundaries_hook_index.py},
   reads   = {.}

@@ -64,6 +64,7 @@ COMPONENTS = {
         "tests/boundaries_memoize.py",
         "tests/boundaries_path.py",
         "tests/boundaries_prove.py",
+        "tests/boundaries_prove_envelope.py",
         "tests/boundaries_references.py",
         "tests/boundaries_sandbox.py",
         "tests/boundaries_surface.py",

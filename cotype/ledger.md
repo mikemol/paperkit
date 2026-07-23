@@ -81,10 +81,14 @@ durable index. Append-only, retirement-logged (see README).
   `podman build`. R1 (eval.py fix) refuted. R3 gate-only image (sound, narrower); R4
   nested-userns for real linux-sandbox (host caps OK, needs the RUN-step probe); R5
   `--config=mutant-oci` (host test).
-- **Ζ·canary·v2** `[ship regardless]` — sound `pk_eval` positive control that co-degrades
-  by construction; `pk_canary` rule + `verdict.py canary` + `//canary:canary` hook member;
-  same-commit generalization of the `boundaries_check.py` hook-completeness guard (highest
-  blast radius). No longer coupled to any eval.py fix (none exists).
+- **Ζ·canary·v2 ✅** `[3eb8265, 2026-07-23]` — SHIPPED as designed: self-contained probe
+  (outside ENGINE_SRCS) + resolve()-discovering check (co-degrades by construction);
+  pk_canary + verdict.py canary (NAMED "HARNESS DEGRADED"); //canary:canary in //:hook (13
+  members); bnd-check generalized same-commit (non-project residual == {//canary:canary} by
+  set-EQUALITY, Λ·cardinality honored; new ⟨harness sound⟩ invariant).  ⟨P,F,δ⟩ RUN against
+  the REAL instrument both directions: P green under --config=mutant, F red-loud under
+  processwrapper on a fresh output base (witnessed 9 processwrapper actions); δ = spawn
+  strategy alone.  The twice-bitten silently-degraded-sandbox class now fails LOUD.
 - **Λ·probe-isolation** `[G7]` — probe on an isolated copy; never mutate-and-restore a
   tracked file (an interruption leaves the tree dirty).
 - **Λ·push** `[a48cfdc, OUTWARD, needs go]`.

@@ -547,7 +547,7 @@ def _bib_repo_impl(repository_ctx):
                 # WITH the owner's engine fingerprint (tests), so it passes adequacy (behavioral ≥ floor)
                 # AND the same cert feeds the view's :cohere.  No local re-sweep, no dropped fingerprint.
                 out.append("pk_grade(name = " + _lit(k + "__grade") + ", calc = " + _lit(imported_cert[k]) +
-                           ', data = ["@@//paperkit:engine", "@@//tools:read_grade.py"])')
+                           ', data = ["@@//paperkit:grade.py", "@@//tools:read_grade.py"])')
             elif k in calc_claims:
                 # Ζ·pyc·run·collapse — the grade is a READING of the GRID (the __dcalc pk_sens record),
                 # not the file-resolution k__calc crutch: for a WITNESS claim (closures.get(k)) the grid
@@ -558,9 +558,12 @@ def _bib_repo_impl(repository_ctx):
                 # closure) has only the def-fallback __dcalc (sens ∅ by construction) — grading it off
                 # that would demote it to indeterminate, so it stays on k__calc until its content surface
                 # is wired (the last gap before k__calc fully retires).
-                gcalc = ":" + k + ("__dcalc" if closures.get(k) else "__calc")
+                gcalc = ":" + k + ("__dcalc" if closures.get(k) or rroots.get(k) else "__calc")
+                # Μ·kernel — the grade is a READING via the ladder LEAF alone (read_grade imports
+                # paperkit/grade.py, nothing else); the flat engine here re-keyed every grade
+                # reading on ANY engine edit while buying nothing.
                 out.append("pk_grade(name = " + _lit(k + "__grade") + ", calc = " + _lit(gcalc) +
-                           ', data = ["@@//paperkit:engine", "@@//tools:read_grade.py"])')
+                           ', data = ["@@//paperkit:grade.py", "@@//tools:read_grade.py"])')
             else:
                 out.append("pk_grade_claim(name = " + _lit(k + "__grade") + ", claim = " + _lit(k) +
                            ", project = " + _lit(proj) + ", data = [" +

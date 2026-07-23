@@ -34,7 +34,6 @@ CONSUMERS = {
     "report/gen.py": ROOT / "report" / "gen.py",
     "report/figure.py": ROOT / "report" / "figure.py",
     "paperkit/discriminate.py": ENGINE / "discriminate.py",
-    "paperkit/config.py": ENGINE / "config.py",
     "tools/grade.bzl": ROOT / "tools" / "grade.bzl",
     "tools/verdict.py": ROOT / "tools" / "verdict.py",
 }

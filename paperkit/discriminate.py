@@ -91,9 +91,18 @@ def main(argv: list) -> int:
     presupposed = presupposed_inputs(project_dir, cfg)
 
     # every knob resolved through the ONE pipeline (env [post-arg] > paper.toml [paper] > default),
-    # validated against its choices inside resolve().
+    # validated against its choices inside resolve() — except the two FLOORS, validated here.
     min_strength = config.resolve(config.MIN_STRENGTH, pol)
     min_corro = config.resolve(config.MIN_CORRO, pol)
+    # Ζ·ladder — the valid FLOORS are the ladder's, so both sets are DERIVED from grade.py at
+    # its ONE consumer (this module already imports the ladder; config carrying choices= would
+    # re-import grade into the kernel and put the ladder in every module's cone —
+    # Μ·kernel·shrink·grade-edge).  Listing them would let the knob and the ladder disagree —
+    # a floor the ladder cannot rank.
+    if min_strength is not None and min_strength not in ORDER:
+        raise SystemExit(f"paperkit: --min-strength must be one of {sorted(ORDER)} (got {min_strength!r})")
+    if min_corro is not None and min_corro not in CORRO_C:
+        raise SystemExit(f"paperkit: --min-corroboration must be one of {sorted(CORRO_C)} (got {min_corro!r})")
     resolution = config.resolve(config.RESOLUTION, pol)
     state_file = config.resolve(config.STATE)
     budget_raw = config.resolve(config.BUDGET)     # None = batch grade; a value = resumable under a budget

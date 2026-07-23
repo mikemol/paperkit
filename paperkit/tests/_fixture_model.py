@@ -93,6 +93,11 @@ def _call(main, argv, env=None):
         with contextlib.redirect_stdout(o), contextlib.redirect_stderr(e):
             rc = main(list(argv))
     except SystemExit as se:
+        # CPython parity: sys.exit(None) → 0; sys.exit(int) → that code; sys.exit("msg") →
+        # the message on stderr and exit 1 (so a refusal's CONTRACT message stays observable
+        # in-process, e.g. the Ζ·ladder floor refusal).
+        if se.code is not None and not isinstance(se.code, int):
+            e.write(f"{se.code}\n")
         rc = se.code if isinstance(se.code, int) else (0 if se.code is None else 1)
     except Exception as ex:
         # A subprocess exits NONZERO on an engine crash; match that in-process.  The Ν·loud guards

@@ -5,7 +5,6 @@
 IMPORTS = {
     "cache.py": ["layout"],
     "coherence.py": ["bib"],
-    "config.py": ["grade"],
     "discriminate.py": ["bib", "cache", "config", "driver", "gate", "grade", "grader"],
     "footdeps.py": ["bib", "resolver"],
     "gate.py": ["bib", "config", "project", "resolver"],

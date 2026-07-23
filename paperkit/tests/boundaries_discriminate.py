@@ -271,11 +271,26 @@ def main() -> int:
     print(f"      F (flag side): --resolution def  → exit {def_rc} (engine absent → loud, not silent degrade)")
     print(f"      δ (min delta): the --resolution flag (file → def)\n")
 
+    # ── Ζ·ladder floor-refusal: a floor the ladder cannot rank is REFUSED loud with the
+    # must-be-one-of contract (owned by config.resolve's choices= until Μ·kernel·shrink·grade-edge
+    # moved validation to the ladder's ONE consumer — the set is derived from grade.py, listed
+    # nowhere).  P = a real rung gates (adequacy-composes above); F = a bogus floor is refused.
+    print("Δ floor validation — Ζ·ladder\n")
+    bogus_rc, _ = discriminate(W("cmd:true"), "--min-strength", "bogus")
+    bogus_msg = discriminate_stderr(W("cmd:true"), "--min-strength", "bogus")
+    floor_ok = bogus_rc != 0 and "--min-strength must be one of" in bogus_msg
+    if not floor_ok:
+        fails.append(("floor-refusal", bogus_rc, bogus_msg))
+    print(f"  {'ok ' if floor_ok else 'XX '}--min-strength bogus is refused, message names the valid set")
+    print(f"      P (pass side): --min-strength behavioral → gates (adequacy-composes above)")
+    print(f"      F (flag side): --min-strength bogus → exit {bogus_rc}, 'must be one of' on stderr")
+    print(f"      δ (min delta): one membership test against the ladder (bogus ∉ grade.ORDER)\n")
+
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} case(s) drifted)")
         return 1
     print(f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas, "
-          f"1 grader-equivalence, 1 adequacy-composes, 1 def-engine-guard)")
+          f"1 grader-equivalence, 1 adequacy-composes, 1 def-engine-guard, 1 floor-refusal)")
     return 0
 
 

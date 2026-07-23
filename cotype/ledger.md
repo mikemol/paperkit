@@ -70,7 +70,8 @@ durable index. Append-only, retirement-logged (see README).
      INSIDE the inspecting witness (_src; gate read by 4 witnesses, was all 67 rows).
      FINAL MEASURED LADDER (actions/edit): coherence 2,223 · grade ~8.3k · gate 18,296→8,357
      (−54%) · full-grid floor ~13.3k (was 25.8k pre-arc).  The Μ·kernel arc is COMPLETE;
-     residue: pk_grade flat-engine data (small), result:-rows legitimately flat.  Lesson
+     residue: result:-rows legitimately flat (pk_grade leaf-staged @ 9e618dc — coherence
+     edit 2,223 → 1,281, −95% vs pre-arc).  Lesson
      (2nd instance, now a pattern): a check module's TOP-LEVEL conveniences become universal
      staged inputs — audit them for dead/wide reads before trusting per-claim scoping.
 

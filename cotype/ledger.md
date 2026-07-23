@@ -77,6 +77,16 @@ durable index. Append-only, retirement-logged (see README).
 
 ## Live
 
+- **Ε·unmeasured ✅ DECLARE-THE-RESIDUE** `[2026-07-23, no repo change]` — the audit's last
+  reverse-finding, verified NEAR-VACUOUS in paperkit: every in-hook graded project has
+  unmeasured=∅ by construction (machine reads filtered before the axis; cross-project reads are
+  typed edges second-oracled by Π·delegate; the two historical .json/.bzl gaps were
+  suffix-closed).  Sole residue = report/'s {dag.svg, BUILD.bazel, MODULE.bazel}, on-demand +
+  out of //:hook + covered out-of-band.  (B) full ledger REJECTED = manufacturing an arc.
+  FORK DISSOLVED: a sound stays-empty ratchet needs a cheap read of a bazel-built record =
+  exactly [[Ζ·prove-gate]] (unsolved) — so the tripwire is SUBSUMED into it, buildable when
+  that lands.  Reverse credit: cassian's ledger is richer (machine-coupled domain); paperkit
+  answered the same question by scope+delegation.
 - **Ζ·hook·index ✅** `[7ad6c37 13b7c8c b2177bc, 2026-07-23]` — the hook gates the WORKTREE;
   a commit lands the INDEX.  Option B (refuse-on-divergence): verify worktree≡index on every
   path outside {cotype/} (ownership-justified: bazel-invisible + index-gated by its own

@@ -77,6 +77,16 @@ durable index. Append-only, retirement-logged (see README).
 
 ## Live
 
+- **Ζ·prove-gate ✅ (P1)** `[dcf1e5e, 2026-07-23]` — the long-carried honest gap CLOSED for
+  instance-1: --prove ≡ __dcalc gated by a structural source-assertion (bnd-prove-envelope,
+  rides the boundaries gate, no new hook member, ~0 cost).  Pivot verified from the tree: the
+  library __dcalc is a pk_calc running prove.py's byte-identical oracle; certificate PROJECTS
+  ⇒ same-oracle+same-ladder ⇒ equivalence by construction.  Byte-identity residue now
+  idempotency-entailed, not hand-verified.  Ε·unmeasured RIDER DEFERS (its field dropped at
+  the emit seam; a separate producer-line commit).  Two incidents strengthen
+  [[Μ·kernel·certs·delta]]: a check's staged-dependency is implicit/discovered-by-red (prove.py
+  needed reads={.,library}, MASKED by bnd-prove's nonzero-expecting F-arm) — decomposition
+  makes the staging cone derivable; and @-in-prose read as a citation.
 - **Ε·unmeasured ✅ DECLARE-THE-RESIDUE** `[2026-07-23, no repo change]` — the audit's last
   reverse-finding, verified NEAR-VACUOUS in paperkit: every in-hook graded project has
   unmeasured=∅ by construction (machine reads filtered before the axis; cross-project reads are

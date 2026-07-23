@@ -77,6 +77,16 @@ durable index. Append-only, retirement-logged (see README).
 
 ## Live
 
+- **Ζ·hook·index ✅** `[7ad6c37 13b7c8c b2177bc, 2026-07-23]` — the hook gates the WORKTREE;
+  a commit lands the INDEX.  Option B (refuse-on-divergence): verify worktree≡index on every
+  path outside {cotype/} (ownership-justified: bazel-invisible + index-gated by its own
+  check), making the worktree verdict the index verdict by SUBSTITUTION at zero cache cost —
+  the construct-the-common-structure resolution of A-vs-worktree (materialize-the-index was
+  dead against the Μ·kernel warmth).  tools/hook_index.py + bnd-hook-index (pure core) + the
+  paper's @local-ci claim carrying its precondition (the sharpest overstatement, fixed).
+  PK_HOOK_ALLOW_DIRTY advisory for deliberate splits.  Would've turned the 07-22 lock kill
+  into an instant named refusal.  RESIDUE: the allowlist is declared, not proven (retire via
+  bazel-query deps once warm cost measured).
 - **Λ·library·fallthrough ✅ DOWNSTREAM-VERIFIED** `[103d0f4; cassian reply6, 2026-07-23]` —
   per-key ownership landed AND proven across the seam same-day: concept:gate-rejects-drift
   cited live downstream (gate green first attempt — the first engine key across the seam);

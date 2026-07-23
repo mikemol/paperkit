@@ -11,10 +11,17 @@
  * sched_setattr.  Adapted from ~/github/substrate/scripts/sched-batch.rs — paperkit owns this copy
  * (portability: no dependency on substrate's path or on rustc; cc is more universally present).
  *
- * Two modes:
- *   sched-batch -- <cmd> [args...]   tune SELF, then exec <cmd>            (per-action, Phase 2)
- *   sched-batch --pid <PID>          tune an EXISTING task then exit; its
- *                                    later-forked children inherit          (server-tune, Phase 1)
+ * Modes:
+ *   sched-batch -- <cmd> [args...]   tune SELF, then exec <cmd>            (per-action, Phase 2 — durable)
+ *   sched-batch --pid <PID>          tune one task (its main thread) then exit
+ *   sched-batch --all-threads <PID>  tune EVERY thread of <PID> then exit  (bazel server pool)
+ *
+ * Scheduling is PER-THREAD: sched_setattr(tgid) tunes only the MAIN thread, so a multi-threaded
+ * server (bazel) that forks actions from its WORKER threads leaves those cells untuned.
+ * --all-threads iterates /proc/<PID>/task to tune the whole pool; a cell forked from any of them
+ * then inherits.  This is PARTIAL and DECAYS: threads the server spawns AFTER the tune are untuned,
+ * so their cells are untuned — the durable fix is the per-action `-- <cmd>` self-tune (Phase 2),
+ * where each cell tunes itself at exec regardless of which thread forked it.
  *
  * Env (optional): PK_SCHED_NICE (default 19) · PK_SCHED_SLICE_MS (default 100, kernel-clamped) ·
  *                 PK_SCHED_OFF (set -> skip tuning; mode `--` still execs, `--pid` is a no-op).
@@ -29,6 +36,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <stdint.h>
+#include <dirent.h>
 
 /* sched_setattr's struct — stable ABI; not always in libc headers, so declared here. */
 struct sched_attr {
@@ -64,7 +72,22 @@ static void tune(pid_t pid) {
 
 int main(int argc, char **argv) {
     if (argc >= 3 && strcmp(argv[1], "--pid") == 0) {
-        tune((pid_t)strtol(argv[2], NULL, 10));   /* Phase 1: tune an existing task, exit */
+        tune((pid_t)strtol(argv[2], NULL, 10));   /* tune one task's main thread, exit */
+        return 0;
+    }
+    if (argc >= 3 && strcmp(argv[1], "--all-threads") == 0) {
+        /* per-thread: tune EVERY thread of the pid so cells forked from any worker inherit */
+        char path[64];
+        snprintf(path, sizeof(path), "/proc/%s/task", argv[2]);
+        DIR *d = opendir(path);
+        if (d) {
+            struct dirent *e;
+            while ((e = readdir(d))) {
+                if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;   /* skip . .. */
+                tune((pid_t)strtol(e->d_name, NULL, 10));
+            }
+            closedir(d);
+        }
         return 0;
     }
     int i = 1;

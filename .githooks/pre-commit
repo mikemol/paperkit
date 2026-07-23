@@ -28,19 +28,22 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
 # PK_HOOK_ALLOW_DIRTY=1 downgrades it to a loud advisory for a deliberate split commit.
 run "hook-index (worktree ≡ index)"   mise exec -- python3 tools/hook_index.py
 
-# Ζ·sched-batch — tune the bazel SERVER (SCHED_BATCH + nice 19 + a 100ms EEVDF slice) so the grid's
-# concurrent CPU-bound cells run long uninterrupted stretches instead of preempting each other every
-# ~2.8ms (the default fair-class slice; measured ~30% sys / 15-20k ctx-switch/s / run-queue 2-3x
-# cores).  The tuning is per-task, UNPRIVILEGED, and INHERITED by every action the server forks
-# (verified: policy+nice+slice all propagate across fork+exec) — so ONE cross-pid tune covers the
-# whole grid, no per-action prefix.  Best-effort: PK_SCHED_OFF=1 disables; a missing cc or any
-# failure is IGNORED (a scheduling hint never blocks a commit).  Lazy-built from tools/sched-batch.c.
+# Ζ·sched-batch — tune the bazel server's threads (SCHED_BATCH + nice 19 + a 100ms EEVDF slice) so the
+# grid's concurrent CPU-bound cells run long uninterrupted stretches instead of preempting each other
+# every ~2.8ms (the default fair-class slice; measured ~30% sys / 15-20k ctx-switch/s / run-queue 2-3x
+# cores — and under zswap the refault churn from short slices is codec CPU, so this also cuts swap
+# TRAFFIC si/so, not just ctx-switch).  Scheduling is PER-THREAD: bazel forks action cells from its
+# WORKER threads, so we tune the whole /proc/<srv>/task pool (--all-threads), not just the tgid — a
+# cell forked from any worker then inherits.  PARTIAL + DECAYING: threads the server spawns AFTER this
+# tune are untuned, so their cells are untuned; the DURABLE fix is a per-action self-tune (Phase 2,
+# Ρ·telemetry will measure it).  Best-effort: PK_SCHED_OFF=1 disables; a missing cc or any failure is
+# IGNORED (a scheduling hint never blocks a commit).  Lazy-built from tools/sched-batch.c.
 if [ -z "${PK_SCHED_OFF:-}" ] && command -v cc >/dev/null 2>&1; then
   [ -x tools/sched-batch ] || cc -O2 -o tools/sched-batch tools/sched-batch.c 2>/dev/null || true
   if [ -x tools/sched-batch ]; then
-    srv=$(mise exec -- bazel info server_pid 2>/dev/null) || srv=""      # warms + names the server
-    [ -n "$srv" ] && tools/sched-batch --pid "$srv" 2>/dev/null || true  # every forked cell inherits
-    echo "[pre-commit] ok: sched-batch (bazel server ${srv:-?} → SCHED_BATCH+nice19+100ms)"
+    srv=$(mise exec -- bazel info server_pid 2>/dev/null) || srv=""            # warms + names the server
+    [ -n "$srv" ] && tools/sched-batch --all-threads "$srv" 2>/dev/null || true # tune the worker pool
+    echo "[pre-commit] ok: sched-batch (bazel server ${srv:-?} threads → SCHED_BATCH+nice19+100ms; partial, Phase 2 pending)"
   fi
 fi
 

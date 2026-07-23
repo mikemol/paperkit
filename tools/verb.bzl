@@ -50,8 +50,12 @@ def _cmd_impl(ctx):
     # record itself is emitted by verdict.py (no JSON built in shell).
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool] + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + "if ( " + inner + " ) >/dev/null 2>&1; then V=pass; else V=fail; fi; " +
+        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.data, transitive = [py.files]),
+        # Ζ·sched-batch·phase2 — the check `inner` is an arbitrary compound shell command, not a
+        # single exec, so we tune the ACTION SHELL ($$, single-threaded) and inner + the emit inherit
+        # (SCHED_BATCH + nice 19 + 100ms slice), matching the per-cell tuning of the grid rules.
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" --pid $$ 2>/dev/null; ' +
+                  "if ( " + inner + " ) >/dev/null 2>&1; then V=pass; else V=fail; fi; " +
                   '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path,
         mnemonic = "PkCmd",
         execution_requirements = er,
@@ -68,6 +72,7 @@ pk_cmd = rule(
         "data": attr.label_list(allow_files = True),
         "local": attr.bool(default = False),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 

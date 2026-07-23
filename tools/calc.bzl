@@ -76,9 +76,9 @@ def _calc_impl(ctx):
         peak = " ; echo 0 > " + p.path
     ctx.actions.run_shell(
         outputs = [c, p],
-        inputs = depset(ctx.files.data, transitive = [py.files]),
+        inputs = depset(ctx.files.data + [ctx.file._sched], transitive = [py.files]),
         command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
-                  '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
+                  '"' + ctx.file._sched.path + '" -- "$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
                   " --calc" + res + " " + ctx.attr.project + " > " + c.path + peak,
         mnemonic = "PkCalc",
         progress_message = "Ζ·calc " + ctx.label.name,
@@ -101,6 +101,7 @@ pk_calc = rule(
         "mem": attr.int(default = 0, doc = "Τ·mem learned reservation (MB, a pow2 bucket in _RS); 0 = unmeasured → cold-start floor by resolution"),
         "data": attr.label_list(allow_files = True),
         "_observe": attr.label(default = "@@//tools:observe"),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -118,8 +119,8 @@ def _mem_learn_impl(ctx):
         peaks += t[OutputGroupInfo].peak.to_list()
     ctx.actions.run_shell(
         outputs = [out],
-        inputs = depset([ctx.file._tool] + peaks, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
+        inputs = depset([ctx.file._tool, ctx.file._sched] + peaks, transitive = [py.files]),
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path + " " +
                   " ".join([p.path for p in peaks]) + " > " + out.path,
         mnemonic = "PkMemLearn",
         progress_message = "Τ·mem·learn " + ctx.label.name,
@@ -133,6 +134,7 @@ pk_mem_learn = rule(
     attrs = {
         "calcs": attr.label_list(mandatory = True, doc = "every pk_calc in the project (its peak output group is aggregated)"),
         "_tool": attr.label(default = "//tools:mem_learn.py", allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -146,8 +148,8 @@ def _mutate_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".mutated.py")
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" paperkit/mutate.py ' +
+        inputs = depset(ctx.files.data + [ctx.file._sched], transitive = [py.files]),
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" paperkit/mutate.py ' +
                   ctx.attr.module + " '" + ctx.attr.site + "' > " + o.path,
         mnemonic = "PkMutate",
         progress_message = "Ζ·mutate " + ctx.label.name,
@@ -162,6 +164,7 @@ pk_mutate = rule(
         "module": attr.string(mandatory = True, doc = "path of the .py module to mutate, e.g. paperkit/grader.py"),
         "site": attr.string(mandatory = True, doc = "the def-site qualname whose body is replaced"),
         "data": attr.label_list(allow_files = True, doc = "the staged files (mutate.py + the module)"),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -190,8 +193,8 @@ def _pyc_impl(ctx):
     # under the eval's config (--config=mutant ⇒ host python; OCI ⇒ image python) and matches it.
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, ctx.file.src]),
-        command = '"$(command -v python3)" ' + ctx.file._tool.path + " " + ctx.file.src.path + " " + o.path,
+        inputs = depset([ctx.file._tool, ctx.file.src, ctx.file._sched]),
+        command = '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path + " " + ctx.file.src.path + " " + o.path,
         mnemonic = "PkPyc",
         progress_message = "Ζ·pyc " + ctx.label.name,
     )
@@ -207,6 +210,7 @@ pk_pyc = rule(
         "src": attr.label(allow_single_file = [".py"], mandatory = True, doc = "the .py module to compile"),
         "deps": attr.label_list(providers = [PycInfo], doc = "Ξ·dag — the modules this one imports (paperkit/dag.bzl)"),
         "_tool": attr.label(default = "//tools:pyc.py", allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -292,8 +296,8 @@ def _sens_impl(ctx):
     evals = " ".join([e.path for e in ctx.files.evals])
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, ctx.file.baseline] + ctx.files.evals, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool, ctx.file.baseline, ctx.file._sched] + ctx.files.evals, transitive = [py.files]),
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
                   " --baseline " + ctx.file.baseline.path + " " + evals + " > " + o.path,
         mnemonic = "PkSens",
         progress_message = "Ζ·sens " + ctx.label.name,
@@ -308,6 +312,7 @@ pk_sens = rule(
         "evals": attr.label_list(allow_files = True, mandatory = True, doc = "the pk_eval records for one claim"),
         "baseline": attr.label(allow_single_file = True, mandatory = True, doc = "the ∅-mutation eval — must be flipped=false"),
         "_tool": attr.label(default = "//tools:sens.py", allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -321,9 +326,9 @@ def _mutant_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".mutant.json")
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(ctx.files.data, transitive = [py.files]),
+        inputs = depset(ctx.files.data + [ctx.file._sched], transitive = [py.files]),
         command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
-                  '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
+                  '"' + ctx.file._sched.path + '" -- "$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
                   " --mutant '" + ctx.attr.site + "' " + ctx.attr.project + " > " + o.path,
         mnemonic = "PkMutant",
         progress_message = "Ζ·mutant " + ctx.label.name,
@@ -340,6 +345,7 @@ pk_mutant = rule(
         "project": attr.string(mandatory = True),
         "site": attr.string(mandatory = True, doc = "the mutation-site label (path or path::qualname)"),
         "data": attr.label_list(allow_files = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -352,8 +358,8 @@ def _cohere_impl(ctx):
     calcs = " ".join([c.path for c in ctx.files.calcs])
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
                   " cohere cohere " + ctx.attr.project + " " + v.path + " " + calcs,
         mnemonic = "PkCohere",
         progress_message = "Ζ·emerge·gate cohere " + ctx.label.name,
@@ -369,6 +375,7 @@ pk_cohere = rule(
         "project": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
         "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -379,8 +386,8 @@ def _verdict_impl(ctx):
     calc = ctx.file.calc
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool, calc], transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool, calc, ctx.file._sched], transitive = [py.files]),
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
                   " calc verdict " + calc.path + " " + v.path,
         mnemonic = "PkVerdict",
         progress_message = "Ζ·calc verdict " + ctx.label.name,
@@ -394,6 +401,7 @@ pk_verdict = rule(
     attrs = {
         "calc": attr.label(allow_single_file = True, mandatory = True),
         "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -407,8 +415,8 @@ def _canary_impl(ctx):
     v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool, ctx.file.pos, ctx.file.nul], transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool, ctx.file.pos, ctx.file.nul, ctx.file._sched], transitive = [py.files]),
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
                   " canary " + ctx.file.pos.path + " " + ctx.file.nul.path + " " + v.path,
         mnemonic = "PkCanary",
         progress_message = "Ζ·canary " + ctx.label.name,
@@ -423,6 +431,7 @@ pk_canary = rule(
         "pos": attr.label(allow_single_file = True, mandatory = True, doc = "the guaranteed-flip pk_eval record (MUST be flipped)"),
         "nul": attr.label(allow_single_file = True, mandatory = True, doc = "the ∅ identity pk_eval record (MUST NOT be flipped)"),
         "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -432,8 +441,8 @@ def _grade_impl(ctx):
     calc = ctx.file.calc
     ctx.actions.run_shell(
         outputs = [g],
-        inputs = depset([calc] + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" tools/read_grade.py ' + calc.path + " > " + g.path,
+        inputs = depset([calc, ctx.file._sched] + ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" tools/read_grade.py ' + calc.path + " > " + g.path,
         mnemonic = "PkGradeRead",
         progress_message = "Ζ·calc grade " + ctx.label.name,
     )
@@ -446,5 +455,6 @@ pk_grade = rule(
     attrs = {
         "calc": attr.label(allow_single_file = True, mandatory = True),
         "data": attr.label_list(allow_files = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )

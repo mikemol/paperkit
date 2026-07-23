@@ -28,29 +28,13 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
 # PK_HOOK_ALLOW_DIRTY=1 downgrades it to a loud advisory for a deliberate split commit.
 run "hook-index (worktree ≡ index)"   mise exec -- python3 tools/hook_index.py
 
-# Ζ·sched-batch — tune the bazel server's threads (SCHED_BATCH + nice 19 + a 100ms EEVDF slice) so the
-# grid's concurrent CPU-bound cells run long uninterrupted stretches instead of preempting each other
-# every ~2.8ms (the default fair-class slice; measured ~30% sys / 15-20k ctx-switch/s / run-queue 2-3x
-# cores — and under zswap the refault churn from short slices is codec CPU, so this also cuts swap
-# TRAFFIC si/so, not just ctx-switch).  Scheduling is PER-THREAD: bazel forks action cells from its
-# WORKER threads, so we tune the whole /proc/<srv>/task pool (--all-threads), not just the tgid — a
-# cell forked from any worker then inherits.  PARTIAL + DECAYING: threads the server spawns AFTER this
-# tune are untuned, so their cells are untuned; the DURABLE fix is a per-action self-tune (Phase 2,
-# Ρ·telemetry will measure it).  Best-effort: PK_SCHED_OFF=1 disables; a missing cc or any failure is
-# IGNORED (a scheduling hint never blocks a commit).  Lazy-built from tools/sched-batch.rs via rustc,
-# resolved through mise (the provisioner this hook already uses for bazel — so rustc is as reachable as
-# bazel) or the system PATH.
-if [ -z "${PK_SCHED_OFF:-}" ]; then
-  if [ ! -x tools/sched-batch ]; then
-    mise exec -- rustc -O -o tools/sched-batch tools/sched-batch.rs 2>/dev/null \
-      || rustc -O -o tools/sched-batch tools/sched-batch.rs 2>/dev/null || true
-  fi
-  if [ -x tools/sched-batch ]; then
-    srv=$(mise exec -- bazel info server_pid 2>/dev/null) || srv=""            # warms + names the server
-    [ -n "$srv" ] && tools/sched-batch --all-threads "$srv" 2>/dev/null || true # tune the worker pool
-    echo "[pre-commit] ok: sched-batch (bazel server ${srv:-?} threads → SCHED_BATCH+nice19+100ms; partial, Phase 2 pending)"
-  fi
-fi
+# Ζ·sched-batch — the grid's concurrent CPU-bound cells self-tune PER-ACTION (SCHED_BATCH + nice 19 +
+# a 100ms EEVDF slice, vs the 2.8ms default) via the //tools:sched-batch-bin prefix baked into every
+# pk_* action (tools/calc.bzl, tools/verb.bzl) — so a cell runs a long uninterrupted stretch instead
+# of preempting a peer every ~2.8ms (measured ~30% sys / 15-20k ctx-switch/s; under zswap the refault
+# churn is codec CPU, so this also cuts swap TRAFFIC si/so).  Per-action = thread-independent, the
+# durable fix (Phase 1's server-tune could reach cells only nondeterministically).  Nothing to do here
+# — the tuning is in the build graph; PK_SCHED_OFF=1 (an --action_env) disables it, best-effort.
 
 # --config=mutant: the hook includes each emerge project's :cohere, whose def-sweep GRID cells
 # (Ξ·dag·eval) run as counterfactuals in the HERMETIC linux-sandbox (else a check's resolve()

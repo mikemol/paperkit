@@ -77,6 +77,14 @@ durable index. Append-only, retirement-logged (see README).
 
 ## Live
 
+- **Δ·downstream ✅** `[cassian reply4, 2026-07-23]` — the second-instance test ran within
+  the hour, timeline-verified: the decomposed engine is behaviorally IDENTICAL downstream
+  (flags/messages/exit codes/grades/fingerprints); the flag-leak class structurally
+  unreachable at their sites; "the import-cone composition is invisible from where we
+  stand, which is what a decomposition should be."  The canary's CONSUMER FACE is now
+  their A86 (their pre-commit trusts our gate's green — the seam covered from both faces
+  when it lands).  Pattern received: transport-ack vs consumer-count two-oracles ("the
+  send happening is determinism; the rows existing is correctness").
 - **Ζ·hook-rot ✅ / Ζ·bnd·toplevel ✅ / Ζ·probe·tool ✅** `[bd00147 c0d91ad, 2026-07-23]` —
   the 20p G9 escalations landed: config gate = hook member 14; witness modules' top level
   gated read-free (owned set from MODULE emerge tags, loud under-staging, semantics from

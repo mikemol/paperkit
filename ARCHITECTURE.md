@@ -44,7 +44,7 @@ so it runs both as a script and as a Bazel-staged `.pyc` closure.
 | File | Purpose | Consumes | Consumed by |
 |---|---|---|---|
 | `bib.py` | Single source of truth for the `.bib` warrant grammar + data model (one entry = one claim). `parse()` returns full records; consumers project fields. | stdlib; reads `paper.toml`, rubric `.tsv`, `.bib` | coherence, discriminate, footdeps, gate, project, rhetoric; mirrored by `tools/bibtex.bzl` |
-| `config.py` | Ω·config — the one resolution pipeline: arg > `PAPERKIT_*` env > `paper.toml` > default. Registry (`REGISTRY`) is data, so every knob is enumerable. | stdlib, `os.environ`, config dict | discriminate, gate, grader, layout, project, resolver; config-project checks; tests |
+| `config.py` | Ω·config — the one resolution pipeline: arg > `PAPERKIT_*` env > `paper.toml` > default. The MECHANISM only (Μ·kernel·shrink·registry): each knob is declared as data (`Param`) in the module that RESOLVES it, each CLI entry composes its registry from its import cone (bnd-config guards completeness), and the union stays enumerable by introspection. | stdlib, `os.environ`, config dict | discriminate, gate, grader, layout, project, resolver; config-project checks; tests |
 | `grade.py` | Μ·grade — pure grade LADDER + interpretation (rungs, clamp/strength/corroboration orders, flip-set→grade). No engine imports, so a grade can be *read* cheaply. | stdlib | discriminate, grader, `checks/readme.py`, `tools/read_grade.py`, paper checks |
 | `mutate.py` | Ζ·mutant — pure AST perturbation leaf (drop def body→uncatchable raise, drop/inject import). Loud on a spec naming nothing. | stdlib (`ast`) | grader; `tools/calc.bzl` (`pk_mutate`), sites/sens/eval |
 | `layout.py` | Project file TOPOLOGY — which files Δ may read/corrupt, where the sandbox roots (`$HOME`-or-above refusal), which nested dirs are OTHER projects. | stdlib, `config`, filesystem | cache, grader, `boundaries_sandbox`, paper checks |
@@ -155,7 +155,7 @@ Uniform shape: `paper.toml` (config + custom check types) · `warrants.bib` (cla
 | **root (README)** | The engine's own pitch/model/commands/resolver/Δ/layout/CI, each a cited claim; examples emit their assets (`assets/*`). | `claim:` (`checks/readme.py`) + `cmd:grep/python3` + `result:boundaries`. | yes — `paperkit_root`, in `//:hook` (gate+adequacy+cohere) |
 | **paper/** | The 74-claim flagship "a paper is a projection of a verified claim-DAG" — projection, gate invariants, resolver, self-hosting, Δ adequacy, liveness, rhetoric, honest limits. The one project with a real `rests-on` grounding DAG + a nested `checks/fixture/` counter-project. | `claim:` (`checks/claims.py`, 77 witnesses against the *real* engine modules). | yes — `paperkit_paper`, in `//:hook` |
 | **boundaries/** | 18 tool ⟨P,F,δ⟩ boundaries, asserted by running the engine's own `paperkit/tests/boundaries_*.py` (+ `lint_bzl.py`). | engine reuse (`cmd:python3 ../paperkit/tests/…`). | yes — `paperkit_boundaries`, in `//:hook` |
-| **config/** | 4 claims: knob precedence, registry well-formedness, total CLI+env coverage, generated (non-drifting) knobs table. Drives the engine's own `config.REGISTRY`. | own logic over engine `config.py` (`checks/registry.py`, `gen_knobs.py`). | yes — `paperkit_config`, not in `//:hook` |
+| **config/** | 4 claims: knob precedence, union well-formedness, total CLI+env coverage, generated (non-drifting) knobs table. Drives the engine's introspected knob union (each knob declared at its resolver). | own logic over engine `config.py` (`checks/registry.py`, `gen_knobs.py`). | yes — `paperkit_config`, not in `//:hook` |
 | **setup/** | 27 host-coupled claims about this machine's swap/memory stack; evidence = shipped `reference.json` + a bounded cgroup oversubscription experiment (`loadtest.json`). Structurally mirrors pump/parse. | own logic (`probe.py` ref/fresh, `experiment.py` load) — custom `ref:`/`fresh:`/`load:` types. | yes — `paperkit_setup` (`local=True`, unsandboxed), not in `//:hook` |
 | **report/** | 14 claims: the gate-status of every document (all 7, with a CI-tier column — real status on the generating machine, so env-dependent for the on-demand docs), Δ grades + `--without-K` over the `//:hook`-gated set, + an accurate/accessible grounding-DAG figure. Live pipeline output, fresh-by-construction. | own logic + engine subprocess (`gen.py` ingests `discriminate/gate --json`; `figure.py`, `figure_checks.py`; custom `fresh:`/`fig:`). | **no** — on-demand |
 | **render/** | 10 claims that the rendered artifact faithfully *presents* the paper: docx emit, plain-text agreement, OOXML structure, PDF glyph/heading/OCR/font fidelity, citation resolution, vector/legible figures. | own domain (pandoc/libreoffice/pdftotext/tesseract) reading `../paper/paper.md` + `../report/assets/dag.svg`; only `plain.py` reuses the engine. | **no** — on-demand |
@@ -208,8 +208,8 @@ The system stacks meta-levels, each the "boundary of" the one below:
 The recurring move is *make the structure data so it becomes a checkable claim*:
 - the import DAG is data (`dag.bzl`), regenerated from AST (`imports.py`), driving `.pyc`
   closures;
-- the config registry is data (`config.REGISTRY`), so `config/` can claim total coverage
-  and a non-drifting table;
+- the knob declarations are data (`config.Param`, hosted by their resolving modules), so
+  `config/` can claim total coverage and a non-drifting table over the introspected union;
 - the memory ladder is data (`mem.json`), so Bazel can bound concurrent sweeps;
 - the footprint manifest is data (`footprints.json`), so Bazel `data` deps need no strace.
 

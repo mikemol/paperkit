@@ -129,8 +129,14 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_prove.py},
   reads   = {., library}
 }
-@misc{bnd-grounding,
+@misc{bnd-hook-index,
   section = {engine}, from = {bnd-prove}, join = {. },
+  claim   = {the local CI's index boundary (Ζ·hook·index) --- the bazel hook gates the working tree while a commit lands the index, so the pre-commit verifies the EQUIVALENCE PRECONDITION first: worktree and index agree on every path outside the one ownership-justified allowlist (cotype/, bazel-invisible and index-gated by its own check), making the worktree verdict the index verdict by substitution at zero cache cost; a staged-only change passes, one unstaged edit or one untracked file refuses naming the path, and a rename's origin field parses so the path that LANDS is the one judged},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_hook_index.py},
+  reads   = {.}
+}
+@misc{bnd-grounding,
+  section = {engine}, from = {bnd-hook-index}, join = {. },
   claim   = {the grounding closure's boundary --- the gate resolves the TRANSITIVE rests-on cone of the cited/placed set on every render target (a sectionless premise two hops away fails the gate when its check breaks, a cycle terminates, and a rests-on edge to an undefined key is a broken grounding that fails the gate), an unreachable sectionless node's check stays un-gated, and Delta grades the cone too},
   check   = {cmd:python3 ../paperkit/tests/boundaries_grounding.py}
 }

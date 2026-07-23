@@ -58,6 +58,7 @@ COMPONENTS = {
         "tests/boundaries_footprint.py",
         "tests/boundaries_gate_json.py",
         "tests/boundaries_grounding.py",
+        "tests/boundaries_hook_index.py",
         "tests/boundaries_jobs.py",
         "tests/boundaries_ladder.py",
         "tests/boundaries_memoize.py",

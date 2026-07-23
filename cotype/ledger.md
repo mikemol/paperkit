@@ -77,6 +77,14 @@ durable index. Append-only, retirement-logged (see README).
 
 ## Live
 
+- **Λ·library·fallthrough ✅ DOWNSTREAM-VERIFIED** `[103d0f4; cassian reply6, 2026-07-23]` —
+  per-key ownership landed AND proven across the seam same-day: concept:gate-rejects-drift
+  cited live downstream (gate green first attempt — the first engine key across the seam);
+  their exit-2 contract measured rc=2.  CLASS BANKED from their #3: a downstream guard had
+  ENCODED the eclipse (their every-claim-is-runnable required own-library keys — a correct
+  rule that became an enforcement of the removed bug); when a seam contract moves, grep the
+  consumers' GUARDS, not just call sites.  Ζ·pipestatus logged its 2nd independent downstream
+  instance (rc=$? after a pipe, while verifying an exit-code contract).
 - **Δ·downstream ✅** `[cassian reply4, 2026-07-23]` — the second-instance test ran within
   the hour, timeline-verified: the decomposed engine is behaviorally IDENTICAL downstream
   (flags/messages/exit codes/grades/fingerprints); the flag-leak class structurally

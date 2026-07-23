@@ -62,6 +62,17 @@ durable index. Append-only, retirement-logged (see README).
      gone). Two staging reds bought one lesson: a sandboxed check reading components.bzl/dag.bzl
      needs reads = {.} — the .bzl owners are staged via root files, not the engine filegroup.
      KERNEL AT ITS FLOOR: mechanism edits honestly re-key the full grid; everything else moved.
+   - **Μ·kernel·fixture·reads ✅** `[3e3173b 2da6124, 2026-07-23]` — cut Γ, two rungs: (1)
+     closure.py TYPES roots — imports cone-expand, a pure-READ root stages the flat
+     //paperkit:<m>.py label + contributes only its OWN sites (import wins on overlap);
+     (2) the first probe's finding — module-level SRC read_texts made gate/resolver/project
+     staged inputs of EVERY row, and FOUR of readme's five were DEAD reads → sources now read
+     INSIDE the inspecting witness (_src; gate read by 4 witnesses, was all 67 rows).
+     FINAL MEASURED LADDER (actions/edit): coherence 2,223 · grade ~8.3k · gate 18,296→8,357
+     (−54%) · full-grid floor ~13.3k (was 25.8k pre-arc).  The Μ·kernel arc is COMPLETE;
+     residue: pk_grade flat-engine data (small), result:-rows legitimately flat.  Lesson
+     (2nd instance, now a pattern): a check module's TOP-LEVEL conveniences become universal
+     staged inputs — audit them for dead/wide reads before trusting per-claim scoping.
 
 ## Live
 

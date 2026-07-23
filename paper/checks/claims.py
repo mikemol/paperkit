@@ -748,8 +748,13 @@ def local_ci():
     # the local CI is ONE Bazel target: the pre-commit runs `bazel test //:hook`, which both gates
     # (per-claim checks + invariants) AND grades (Δ adequacy) every document — Ζ·foot folded
     # adequacy into the hook, so there is no separate --min-strength step in the pre-commit.
+    # Ζ·hook·index — and the "never committed broken" clause is only sound if the hook also
+    # verifies worktree≡index (else it gates bytes the commit does not land), so require BOTH
+    # invocations.  Still names-not-entails (the standing warrant-adequacy-gap: a substring is
+    # not the behaviour); the entailing witness is bnd-hook-index over the predicate's core.
     hook = (Path(__file__).resolve().parents[2] / ".githooks" / "pre-commit").read_text()
     assert "bazel test //:hook" in hook, "the pre-commit hook does not run `bazel test //:hook`"
+    assert "tools/hook_index.py" in hook, "the pre-commit hook does not verify worktree≡index (Ζ·hook·index)"
 
 
 def boundaries_project():

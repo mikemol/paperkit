@@ -59,7 +59,7 @@
 
 @misc{local-ci,
   section = {projects}, from = {project-dag}, join = {. },
-  claim   = {a pre-commit githook is the local CI --- every commit runs bazel test //:hook, the single Bazel target that gates every document (each claim a per-claim check target plus the project invariants, --safe --without-K) and grades it behaviorally adequate (Delta --min-strength), so the repository is never committed in a broken state},
+  claim   = {a pre-commit githook is the local CI --- every commit runs bazel test //:hook, the single Bazel target that gates every document (each claim a per-claim check target plus the project invariants, --safe --without-K) and grades it behaviorally adequate (Delta --min-strength); and because that target gates the WORKING TREE while a commit lands the INDEX, the hook first verifies they agree on every gated path, so the verdict it renders is the verdict the commit carries and the repository is never committed in a broken state},
   check   = {claim:local-ci},
   reads   = {.}
 }

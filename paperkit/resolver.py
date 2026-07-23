@@ -106,6 +106,11 @@ _ENV_KEEP_PREFIX = ("LC_", "PAPERKIT_")        # locale + paperkit's own knobs
 # does not contain the project").  Recursive-check env leak (cf. Ω·config args-process-local).
 _ENV_DROP = {"PAPERKIT_ROOT"}
 
+# Ω·config — the knob this module RESOLVES, declared here (place-by-ownership; the kernel hosts
+# the mechanism only).
+PATH = config.Param("path", "PAPERKIT_PATH",
+                    help="pin tool resolution to these absolute dirs (colon-separated) instead of the host PATH — reproducibility, and dropping user-writable shadow dirs")
+
 
 def clean_env(env: dict | None = None) -> dict:
     """A sanitized environment for running a check: the controlled allow-list only, so
@@ -115,7 +120,7 @@ def clean_env(env: dict | None = None) -> dict:
     src = os.environ if env is None else env
     out = {k: v for k, v in src.items()
            if (k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)) and k not in _ENV_DROP}
-    pinned = config.resolve(config.PATH)
+    pinned = config.resolve(PATH)
     if pinned is not None:
         # Τ·path: PIN tool resolution to a DECLARED set of absolute, existing dirs —
         # reproducibility (the same `grep`/`pandoc` on any host) and defence-in-depth (the host

@@ -348,16 +348,31 @@ def project(cfg: dict, target: str = "pandoc") -> str:
     return "\n".join(lines).rstrip("\n") + "\n"          # exactly one trailing newline (MD012-clean)
 
 
+# Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
+# hosts the mechanism only).  TARGET is also resolved by gate/discriminate — they reference
+# project.TARGET (the lowest common component in the DEPS lattice owns it).
+TARGET = config.Param("target", "PAPERKIT_TARGET", config="target", default="pandoc", choices=("pandoc", "web", "footnote", "plain"),
+                      help="citation render target: pandoc ([@key] for citeproc/PDF), web (intra-page hyperlinks + anchors, for a blog), "
+                           "footnote (each clause's provenance as a document-end footnote — self-contained, no bibliography), "
+                           "or plain (no citation surfaced at all — a clean SUBMISSION view; the claim-DAG stays the author-side gate)")
+CHECK = config.Param("check", "PAPERKIT_CHECK", flag=True,
+                     help="project: verify the projection round-trips against the bib, then exit")
+# The projector CLI's composed registry: exactly the Params its import cone hosts
+# (bnd-config asserts this completeness — a cone-resolved Param missing here would be
+# a silently ignored flag).
+REGISTRY = [TARGET, CHECK]
+
+
 def main(argv: list) -> int:
-    config.apply_args(argv)
-    pos = config.positionals(argv)
+    config.apply_args(argv, REGISTRY)
+    pos = config.positionals(argv, REGISTRY)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     cfg = load_config(project_dir)
     pol = tomllib.loads((project_dir / "paper.toml").read_text()).get("paper", {})
 
-    out = project(cfg, config.resolve(config.TARGET, pol))   # Ω·config: pandoc (default) | web
+    out = project(cfg, config.resolve(TARGET, pol))   # Ω·config: pandoc (default) | web
 
-    if config.resolve(config.CHECK):
+    if config.resolve(CHECK):
         tgt = cfg["out"]
         if not tgt.exists() or tgt.read_text() != out:
             print(f"paperkit-project: {tgt.name} ≠ projection — regenerate "

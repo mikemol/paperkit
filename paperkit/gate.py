@@ -48,6 +48,26 @@ import project as P  # noqa: E402  (the PROJECTOR — gate's only genuine need f
 from resolver import (  # noqa: E402,F401
     clean_env, run_ok, resolves, footprint, _check_cmd,
     _ENV_KEEP, _ENV_KEEP_PREFIX)
+import resolver  # noqa: E402  (the module binding — resolver.PATH joins the composed registry below)
+
+# Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
+# hosts the mechanism only).  JSON and ONLY are also resolved by discriminate — it references
+# gate's (the lowest common component in the DEPS lattice owns them).
+SAFE = config.Param("safe", "PAPERKIT_SAFE", config="safe", flag=True,
+                    help="zero-postulate: an uncited placement FAILS the gate, not merely advises")
+WITHOUT_K = config.Param("without-K", "PAPERKIT_WITHOUT_K", config="without_k", flag=True, aliases=("--without-k",),
+                         help="forbid two cited claims sharing a single witness")
+JOBS = config.Param("jobs", "PAPERKIT_JOBS", config="jobs",
+                    help="gate worker count (default all cores; 1 = serial)")
+JSON = config.Param("json", "PAPERKIT_JSON", flag=True,
+                    help="emit structured results to stdout (human lines suppressed)")
+ONLY = config.Param("only", "PAPERKIT_ONLY",
+                    help="gate: resolve ONLY this one claim's check (the leaf of the recursive check target, Ζ·starlark) and exit")
+INVARIANTS = config.Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
+                          help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks")
+# The gate CLI's composed registry: exactly the Params its import cone hosts (own 6 +
+# project's + resolver's; bnd-config asserts this completeness).
+REGISTRY = [SAFE, WITHOUT_K, JOBS, JSON, ONLY, INVARIANTS, P.TARGET, P.CHECK, resolver.PATH]
 
 
 def cited_keys(prose: str) -> set:
@@ -61,18 +81,18 @@ def cited_keys(prose: str) -> set:
 
 
 def main(argv: list) -> int:
-    config.apply_args(argv)               # Ω·config: capture args (arg overrides env), process-local
-    pos = config.positionals(argv)
+    config.apply_args(argv, REGISTRY)     # Ω·config: capture args (arg overrides env), process-local
+    pos = config.positionals(argv, REGISTRY)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     raw = tomllib.loads((project_dir / "paper.toml").read_text())
     pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
-    safe = config.resolve(config.SAFE, pol)          # zero-postulate: uncited placements FAIL
-    without_k = config.resolve(config.WITHOUT_K, pol)  # forbid two cited claims sharing a witness
-    inv_only = config.resolve(config.INVARIANTS)     # Ζ·starlark: the invariants NODE (no per-check resolve)
-    as_json = config.resolve(config.JSON)            # structured stdout (human lines suppressed)
+    safe = config.resolve(SAFE, pol)                 # zero-postulate: uncited placements FAIL
+    without_k = config.resolve(WITHOUT_K, pol)       # forbid two cited claims sharing a witness
+    inv_only = config.resolve(INVARIANTS)            # Ζ·starlark: the invariants NODE (no per-check resolve)
+    as_json = config.resolve(JSON)                   # structured stdout (human lines suppressed)
     # The bib IS the makefile: a project's distinct checks are independent targets, so the gate
     # runs them concurrently (default = all cores; jobs=1 forces serial).
-    jobs = int(config.resolve(config.JOBS) or (os.cpu_count() or 4))
+    jobs = int(config.resolve(JOBS) or (os.cpu_count() or 4))
 
     def info(msg):              # human success lines — suppressed under --json
         if not as_json:
@@ -86,7 +106,7 @@ def main(argv: list) -> int:
     # Ζ·starlark — the LEAF of the recursive check target: resolve ONE claim's check and exit.
     # A project's gate (the node) is this over every claim ∧ the project invariants; a Bazel
     # check target is exactly this leaf, so the bib's claim-DAG runs as the build graph.
-    only = config.resolve(config.ONLY)
+    only = config.resolve(ONLY)
     if only:
         if only not in F or not F[only].get("check"):
             print(f"paperkit-gate: no check for claim {only!r}", file=sys.stderr)
@@ -100,7 +120,7 @@ def main(argv: list) -> int:
         print(f"paperkit-gate: {out.name} not built — run paperkit-project", file=sys.stderr)
         return 1
     prose = out.read_text()
-    target = config.resolve(config.TARGET, pol)
+    target = config.resolve(P.TARGET, pol)
     cited = cited_keys(prose)
     if target == "plain":
         # plain surfaces NO citation marker, but the projection WEAVES every section-tagged claim — each is

@@ -37,6 +37,13 @@ from grade import _grade_from_sens  # Μ·grade — the pure ladder/interpretati
 
 CORRUPT = b"\x00\x00DELTA-CORRUPTION\x00\x00\n"
 
+# Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
+# hosts the mechanism only).
+DELTA_REPEAT = config.Param("delta-repeat", "PAPERKIT_DELTA_REPEAT", default="1",
+                            help="re-run the pristine baseline N times to detect a flaky (non-deterministic) check")
+DELTA_PULSE = config.Param("delta-pulse", "PAPERKIT_DELTA_PULSE", default="2",
+                           help="min seconds between Δ progress pulses to a log (0 = silent)")
+
 
 def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
     """Resolved paths whose existence the build already presupposes — a file:
@@ -364,7 +371,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     # load, iteration order, the date, network) gets a single-sample grade that is noise.
     # PAPERKIT_DELTA_REPEAT=N (default 1, off) re-runs the pristine baseline N times; if
     # they disagree the check is PROVABLY non-deterministic, so the sweep would be noise.
-    reps = max(1, int(config.resolve(config.DELTA_REPEAT)))
+    reps = max(1, int(config.resolve(DELTA_REPEAT)))
     if reps > 1 and len({resolver.resolves(chk, sandbox_project, custom) for _ in range(reps)}) > 1:
         return {"grade": "broken", "tests": [], "determinism": "flaky",
                 "why": f"non-deterministic — {reps} baseline runs in a pristine sandbox disagreed; "
@@ -509,7 +516,7 @@ def _grade_parallel(project_dir, checks, custom, presupposed, resolution="file")
     jobs = max(1, min(len(checks), os.cpu_count() or 4))
     total, done, lock, t0 = len(checks), [0], threading.Lock(), time.monotonic()
     tty = sys.stderr.isatty()
-    every = float(config.resolve(config.DELTA_PULSE))   # min seconds between log pulses; 0 = off
+    every = float(config.resolve(DELTA_PULSE))   # min seconds between log pulses; 0 = off
     last = [t0]
 
     def pulse_grade(c):

@@ -78,11 +78,46 @@ from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
 from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness,  # noqa: E402,F401
                     _grade_parallel, _sandbox_root, mutate_one)
 from grade import STRENGTH, ORDER, RANK_C, CORRO_C, clamp, mark_content_sensitive  # noqa: E402,F401  (Μ·grade — the ladder + interpretation leaf)
+# The MODULE bindings whose Ω·config Params join the composed registry below (grader/layout/
+# resolver edges already in the cone; project is a NEW direct edge, DEPS-legal delta→project,
+# closure-neutral — it was already transitively staged via gate).
+import grader  # noqa: E402
+import layout  # noqa: E402
+import project  # noqa: E402
+import resolver  # noqa: E402
+
+# Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
+# hosts the mechanism only).
+MIN_STRENGTH = config.Param("min-strength", "PAPERKIT_MIN_STRENGTH", config="min_strength",
+                            help="Δ adequacy floor on the FALSIFIABILITY axis")
+MIN_CORRO = config.Param("min-corroboration", "PAPERKIT_MIN_CORROBORATION", config="min_corroboration",
+                         help="Δ floor on the orthogonal CORROBORATION axis")
+RESOLUTION = config.Param("resolution", "PAPERKIT_RESOLUTION", config="resolution", default="file",
+                          choices=("file", "def"), help="Δ mutation surface: file (project only) or def (+ engine)")
+STATE = config.Param("state", "PAPERKIT_STATE",
+                     help="resumable grading: the resumption-token file (persisted between calls)")
+BUDGET = config.Param("budget", "PAPERKIT_BUDGET",
+                      help="seconds per Δ invocation (<=0 = run to completion; unset = batch grade)")
+ALL = config.Param("all", "PAPERKIT_ALL", flag=True,
+                   help="Δ grades every checked warrant, not only cited ones")
+FOOTPRINT = config.Param("footprint", "PAPERKIT_FOOTPRINT", flag=True,
+                         help="print each check's READ footprint and exit")
+NO_CACHE = config.Param("no-cache", "PAPERKIT_NO_CACHE", flag=True,
+                        help="ignore the Δ footprint-cache (re-grade every check)")
+MUTANT = config.Param("mutant", "PAPERKIT_MUTANT",
+                      help="Ζ·mutant: with --only, probe ONE def-site (path or path::qualname) — mutate it, report whether it flips the check, exit (the sweep's atom, for a pk_mutant action)")
+# The Δ CLI's composed registry: exactly the Params its import cone hosts — its own 9 plus
+# every host below it in the DEPS lattice (bnd-config asserts this completeness — a
+# cone-resolved Param missing here would be a silently ignored flag).
+REGISTRY = [MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, MUTANT,
+            grader.DELTA_REPEAT, grader.DELTA_PULSE, layout.ROOT, resolver.PATH,
+            G.SAFE, G.WITHOUT_K, G.JOBS, G.JSON, G.ONLY, G.INVARIANTS,
+            project.TARGET, project.CHECK]
 
 
 def main(argv: list) -> int:
-    config.apply_args(argv)          # Ω·config: fold args into PAPERKIT_* env (arg overrides env)
-    pos = config.positionals(argv)
+    config.apply_args(argv, REGISTRY)   # Ω·config: capture args process-locally (arg overrides env)
+    pos = config.positionals(argv, REGISTRY)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     sandbox_root = _sandbox_root(project_dir)   # resolve+validate the sandbox root up front (home-guard) — clean exit before any sweep
     cfg = bib.load_config(project_dir)
@@ -92,8 +127,8 @@ def main(argv: list) -> int:
 
     # every knob resolved through the ONE pipeline (env [post-arg] > paper.toml [paper] > default),
     # validated against its choices inside resolve() — except the two FLOORS, validated here.
-    min_strength = config.resolve(config.MIN_STRENGTH, pol)
-    min_corro = config.resolve(config.MIN_CORRO, pol)
+    min_strength = config.resolve(MIN_STRENGTH, pol)
+    min_corro = config.resolve(MIN_CORRO, pol)
     # Ζ·ladder — the valid FLOORS are the ladder's, so both sets are DERIVED from grade.py at
     # its ONE consumer (this module already imports the ladder; config carrying choices= would
     # re-import grade into the kernel and put the ladder in every module's cone —
@@ -103,12 +138,12 @@ def main(argv: list) -> int:
         raise SystemExit(f"paperkit: --min-strength must be one of {sorted(ORDER)} (got {min_strength!r})")
     if min_corro is not None and min_corro not in CORRO_C:
         raise SystemExit(f"paperkit: --min-corroboration must be one of {sorted(CORRO_C)} (got {min_corro!r})")
-    resolution = config.resolve(config.RESOLUTION, pol)
-    state_file = config.resolve(config.STATE)
-    budget_raw = config.resolve(config.BUDGET)     # None = batch grade; a value = resumable under a budget
+    resolution = config.resolve(RESOLUTION, pol)
+    state_file = config.resolve(STATE)
+    budget_raw = config.resolve(BUDGET)     # None = batch grade; a value = resumable under a budget
     budget = float(budget_raw) if budget_raw else 0.0
-    consider_all = config.resolve(config.ALL)
-    as_json = config.resolve(config.JSON)
+    consider_all = config.resolve(ALL)
+    as_json = config.resolve(G.JSON)
 
     F = {}
     for b in cfg["bibs"]:
@@ -116,7 +151,7 @@ def main(argv: list) -> int:
 
     out = cfg["out"]
     cited = G.cited_keys(out.read_text()) if out.exists() else set()
-    if config.resolve(config.TARGET, pol) == "plain":
+    if config.resolve(project.TARGET, pol) == "plain":
         # plain surfaces no citation marker, but the projection weaves every section-tagged claim — so each
         # is placed-in-prose and must be graded (identical scope to the footnote target, which marked all).
         cited |= {k for k, f in F.items() if f.get("section")}
@@ -125,7 +160,7 @@ def main(argv: list) -> int:
     # survives in the rendered prose (the gate's rests_closure twin — same scope, same edges).
     cited |= bib.rests_closure(cited & set(F), F)[0]
 
-    only = config.resolve(config.ONLY)
+    only = config.resolve(G.ONLY)
     if only:
         # Ζ·nest — grade ONE claim (the per-claim grade ORACLE), emitting its raw grade as JSON.
         # Bazel nests one of these per claim and aggregates them (pk_adequacy), so the whole-project
@@ -144,7 +179,7 @@ def main(argv: list) -> int:
                               "error": "no-check" if f else "no-such-claim"}), file=sys.stderr)
             return 2
         chk = f["check"]
-        mutant = config.resolve(config.MUTANT)
+        mutant = config.resolve(MUTANT)
         if mutant:
             # Ζ·mutant — the SINGLE-SITE probe lifted for Bazel: mutate exactly one def-site and
             # report whether it flips the check.  A pk_mutant action runs this per (claim, site);
@@ -174,7 +209,7 @@ def main(argv: list) -> int:
     for k in keys:
         share.setdefault(F[k]["check"], []).append(k)
 
-    if config.resolve(config.FOOTPRINT):
+    if config.resolve(FOOTPRINT):
         # Φ·footprint: each considered check's READ footprint (the project files it opens),
         # the SOUND per-check key a footprint cache invalidates on — a diff touching none of
         # a check's footprint cannot change its verdict.  Reads ⊇ Δ's sensitivity `tests`.
@@ -186,7 +221,7 @@ def main(argv: list) -> int:
     # EPOCH (_engine_hash).  A commit then re-grades only the checks whose footprint the diff
     # touched — where the old whole-project content_key cache invalidated EVERY check on any
     # edit.  Reuse a check while its footprint files (and the engine) are unchanged.
-    no_cache = config.resolve(config.NO_CACHE)
+    no_cache = config.resolve(NO_CACHE)
     engine = _engine_hash()
     cached = {} if no_cache else _load_cache(project_dir)
     # A grade is a function of the check's inputs AND the sandbox UNIVERSE it reran in: a root

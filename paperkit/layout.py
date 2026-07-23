@@ -33,6 +33,12 @@ DERIVED_NAMES = {".delta-cache.json"}
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out", "bazel-*"}
 _ENGINE = Path(__file__).resolve().parent
 
+# Ω·config — the knob this module RESOLVES, declared here (place-by-ownership; the kernel hosts
+# the mechanism only).  NOTE: resolver._ENV_DROP names "PAPERKIT_ROOT" as a string LITERAL (it
+# cannot import layout upward) — keep the two in sync.
+ROOT = config.Param("root", "PAPERKIT_ROOT", config="root",
+                    help="the Δ sandbox's bounded universe (the dir copied to mutate); else inferred, $HOME refused")
+
 
 def _root_override(project_dir: Path) -> Path | None:
     """An EXPLICIT sandbox root — for container pipelines and downstream projects whose parent
@@ -46,7 +52,7 @@ def _root_override(project_dir: Path) -> Path | None:
             paper = tomllib.loads(cfg.read_text()).get("paper", {})
         except Exception:
             paper = {}
-    decl = config.resolve(config.ROOT, paper)
+    decl = config.resolve(ROOT, paper)
     if not decl:
         return None
     root = Path(decl)

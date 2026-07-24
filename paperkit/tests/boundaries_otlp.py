@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Ρ·telemetry — the OTLP pusher's boundary (the PURE core, gated).
 
-The wrapper-layer half (tools/otlp_push.py's push(): the live POST + counter settle-poll)
+The wrapper-layer half (tools/otlp_push.py's push(): the live POST + read-your-write verify)
 is observation and MUST NOT gate — a down endpoint can never block a commit, so it stays
 best-effort in the pre-commit, never in //:hook.  But the PURE half — parse the concatenated-
 JSON execlog, attribute each spawn to a project/check_type/target, aggregate into the cassian
-schema — is deterministic, stdlib-only, and load-bearing for the instrument's HONESTY (a
-mis-parse pushes wrongly-attributed rows the counter-guard cannot catch: the counter verifies
-COUNT, not ATTRIBUTION — the substrate-not-contract lesson).  So the pure half is gated here,
+schema, and extract values from the /api/v1/query response — is deterministic, stdlib-only, and
+load-bearing for the instrument's HONESTY (a mis-parse pushes wrongly-attributed rows the verify
+cannot catch: read-your-write confirms OUR heartbeat queried back, not that every metric was
+correctly ATTRIBUTED — the substrate-not-contract lesson).  So the pure half is gated here,
 exactly as bnd-hook-index gates hook_index.py's git-free core while its git call stays
 pre-commit-only.  ⟨P,F,δ⟩ over the one semantic decision in metric_families: a spawn counts as
 Δ (discriminate) work iff its mnemonic is in the owner's DELTA set — one spawn's mnemonic flips
@@ -23,7 +24,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 from otlp_push import (  # noqa: E402  (the OWNER of the parse/attribution/aggregation)
-    DELTA, Spawn, duration_seconds, metric_families, parse_execlog, project_of, target_of)
+    DELTA, Spawn, _extract_values, duration_seconds, metric_families, parse_execlog,
+    project_of, target_of)
 
 # A concatenated-JSON execlog (NOT a JSON array — bazel writes one SpawnExec object per spawn):
 # one Δ-grid action (PkEval) + one test wrapper (TestRunner) + one cross-project test.
@@ -85,6 +87,11 @@ def main() -> int:
           sum(len(f["points"]) for f in metric_families([])) == 0)
     check("DELTA is the OWNER's set, read not copied (PkEval ∈, TestRunner ∉)",
           "PkEval" in DELTA and "TestRunner" not in DELTA)
+    check("read-your-write oracle: _extract_values pulls sample values from a /api/v1/query response",
+          _extract_values('{"data":{"result":[{"value":[1.1,"1690000000"]},{"value":[2.2,"3.5"]}]}}')
+          == [1690000000.0, 3.5])
+    check("_extract_values on empty/garbage → [] (a malformed response can never false-verify a token)",
+          _extract_values('{"data":{"result":[]}}') == [] and _extract_values("not json") == [])
 
     print("\n⟨P, F, δ⟩ minimum-delta pair — the Δ-subset boundary\n")
     paper_eval = Spawn("PkEval", "@@+bib+paperkit_paper//:c__eval", 0.4)
@@ -101,7 +108,7 @@ def main() -> int:
     if fails:
         print(f"OTLP-PARSE: FAIL ({len(fails)} drifted)")
         return 1
-    print("OTLP-PARSE: PASS (11 behaviors, 1 delta)")
+    print("OTLP-PARSE: PASS (13 behaviors, 1 delta)")
     return 0
 
 

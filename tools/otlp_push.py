@@ -22,16 +22,23 @@ Endpoint: PAPERKIT_OTLP_METRICS (a plain env read HERE, NOT an engine config.Par
 engine resolves no endpoint; threading it through the config registry would be the coupling
 Μ·kernel·shrink·registry forbids).  Unset ⇒ no-op, exit 0, default OFF.
 
-Verify by the COUNTER, never the 200 (an empty/malformed OTLP POST returns 200 ingesting
-zero rows): read vm_rows_inserted_total before/after and settle-poll (cassian's two-oracles
-= agree: on the wire).  Best-effort: exit 0 even on push failure (a WARN, never a block);
---strict flips that for the ⟨P,F,δ⟩ proof.
+Verify by READ-YOUR-WRITE, never the 200, and NOT the shared counter (cassian's correction,
+2026-07-23): a malformed POST returns 200 ingesting zero rows, AND vm_rows_inserted_total is
+GLOBAL across producers — with substrate/cassian/us on one store a concurrent push satisfies a
+counter delta while our own rows dropped (a masking false-PASS).  So emit a heartbeat gauge
+(paperkit_emit_unixtime) whose VALUE is the run's start-unix-time — a token WE control — then poll
+/api/v1/query until that exact value queries back.  Still two-oracles / agree: (the send is
+determinism, the value querying back is correctness), only the oracle is producer-local, not shared.
+Per-commit is FIRE-AND-FORGET (POST, no wait — a fresh sample isn't queryable until the store's
+search.latencyOffset ~30s passes, and blocking on it would tax the cycle time we measure); --strict
+does the read-your-write poll (deadline clears that offset + first-run name-index) and gates the exit
+code for the ⟨P,F,δ⟩ proof.  Best-effort throughout: a down endpoint WARNs, never blocks a commit.
 
 Wire (dependency-free by construction): the OTLP protobuf is built with the ephemeral
 opentelemetry-proto lib (`uv run --with opentelemetry-proto` — leaves no venv, the
-sched-batch lazy-provision precedent); the counter GET is stdlib urllib; absent the proto
-lib the push is a warned no-op.  The offline half (parse → map → families) is pure stdlib
-and self-proves under --selftest.
+sched-batch lazy-provision precedent); the /api/v1/query GET is stdlib urllib; absent the proto
+lib the push is a warned no-op.  The offline half (parse → map → families → the query-response
+value extractor) is pure stdlib and self-proves under --selftest.
 
     uv run --with opentelemetry-proto tools/otlp_push.py execlog.json --build-seconds 402
     python3 tools/otlp_push.py execlog.json --dry-run     # parse+map, no network
@@ -43,6 +50,7 @@ import os
 import re
 import sys
 import time
+import urllib.parse
 import urllib.request
 from collections import defaultdict
 
@@ -203,35 +211,54 @@ def _post_protobuf(endpoint, payload):
         return r.status
 
 
-_COUNTER = re.compile(
-    r'^vm_rows_inserted_total\{[^}]*type="opentelemetry"[^}]*\}\s+([0-9.eE+]+)', re.M)
+EMIT_METRIC = "paperkit_emit_unixtime"  # the read-your-write heartbeat (value = run start-unix-time)
 
 
-def read_counter(counter_url):
-    """GET the /metrics text and return vm_rows_inserted_total{type=opentelemetry}, or None.
-    The counter is GLOBAL (all OTLP ingest), so a delta is a NECESSARY lower bound, not
-    sufficient — cassian's own rule is >=, not ==.  Its own filehandle; never merged."""
+def _extract_values(query_json_text):
+    """PURE: pull the sample VALUES out of a VM /api/v1/query JSON response — the read-your-write
+    oracle's parse.  Returns a list of floats (one per result series), [] on empty/garbage (so a
+    malformed response can never false-verify)."""
     try:
-        with urllib.request.urlopen(counter_url, timeout=10) as r:
-            text = r.read().decode("utf-8", "replace")
+        data = json.loads(query_json_text)
+    except (ValueError, TypeError):
+        return []
+    out = []
+    for series in data.get("data", {}).get("result", []):
+        v = series.get("value")  # [timestamp, "<value>"]
+        if isinstance(v, list) and len(v) == 2:
+            try:
+                out.append(float(v[1]))
+            except (ValueError, TypeError):
+                pass
+    return out
+
+
+def query_values(query_url, metric):
+    """GET /api/v1/query?query=<metric> and return the queried sample values (best-effort, []
+    on failure).  Its own filehandle; the parse is the pure _extract_values."""
+    try:
+        url = query_url + "?query=" + urllib.parse.quote(metric)
+        with urllib.request.urlopen(url, timeout=10) as r:
+            return _extract_values(r.read().decode("utf-8", "replace"))
     except Exception as e:  # noqa: BLE001 — best-effort probe
-        print(f"otlp: counter GET failed ({e})", file=sys.stderr)
-        return None
-    m = _COUNTER.search(text)
-    return float(m.group(1)) if m else 0.0
+        print(f"otlp: /api/v1/query GET failed ({e})", file=sys.stderr)
+        return []
 
 
-def _default_counter_url(endpoint):
-    """Derive the VM counter endpoint (scheme://host:port/metrics) from the OTLP URL."""
+def _default_query_url(endpoint):
+    """Derive the VM query endpoint (scheme://host:port/api/v1/query) from the OTLP URL."""
     m = re.match(r"(https?://[^/]+)", endpoint)
-    return (m.group(1) if m else endpoint.rstrip("/")) + "/metrics"
+    return (m.group(1) if m else endpoint.rstrip("/")) + "/api/v1/query"
 
 
-def push(fams, endpoint, counter_url, deadline=15.0):
-    """Best-effort push + counter-guard (the agree: two-oracles).  Returns True iff the
-    consumer counter advanced by >= the rows sent within the deadline."""
+def push(fams, endpoint, query_url, token, deadline=45.0, verify=False):
+    """Best-effort push.  `fams` must carry the heartbeat gauge whose value is `token`.  Per-commit
+    is FIRE-AND-FORGET (verify=False): POST and return — never wait, since read-your-write can't
+    confirm until the store's search.latencyOffset (~30s default) passes and blocking on it would
+    tax the very cycle time we measure.  verify=True (--strict / the proof) polls /api/v1/query
+    until OUR EXACT token value queries back — ingestion AND queryability of our own data, never
+    the shared vm_rows_inserted_total counter (which a concurrent producer can false-pass)."""
     expected = _point_count(fams)
-    before = read_counter(counter_url)
     try:
         payload = _build_request(fams, time.time_ns()).SerializeToString()
     except ImportError:
@@ -244,23 +271,24 @@ def push(fams, endpoint, counter_url, deadline=15.0):
         print(f"otlp: POST to {endpoint} failed ({e})", file=sys.stderr)
         return False
     print(f"otlp: POST {endpoint} -> {status}; {expected} data points; "
-          f"counter before={before}", file=sys.stderr)
-    if before is None:
-        print("otlp: no counter to verify against — transport-acked, ingest UNVERIFIED",
+          f"heartbeat {EMIT_METRIC}={token}", file=sys.stderr)
+    if not verify:
+        print("otlp: fire-and-forget (best-effort, unverified — --strict to read-your-write)",
               file=sys.stderr)
-        return False
-    # settle-poll: rows lag the push ~1s; verify by the counter, not the 200.
+        return True
+    # poll until OUR heartbeat value queries back.  Value-equality on a token WE chose, so neither
+    # a stale value nor another producer's push can verify us.  Deadline must clear the store's
+    # search.latencyOffset (default ~30s: instant queries evaluate at now-offset) plus, on the very
+    # first push of a new metric name, name-index creation.
     end = time.monotonic() + deadline
     while time.monotonic() < end:
-        after = read_counter(counter_url)
-        if after is not None and after - before >= expected:
-            print(f"otlp: verified — counter {before} -> {after} (>= +{expected})",
+        if any(abs(v - token) < 0.5 for v in query_values(query_url, EMIT_METRIC)):
+            print(f"otlp: verified — {EMIT_METRIC} == {token} queried back (our own write)",
                   file=sys.stderr)
             return True
         time.sleep(1.0)
-    after = read_counter(counter_url)
-    print(f"otlp: NOT verified — counter {before} -> {after}, expected +{expected} "
-          f"(200 can ingest 0 rows on a schema slip)", file=sys.stderr)
+    print(f"otlp: NOT verified — {EMIT_METRIC} == {token} did not query back within {deadline}s "
+          f"(a fresh sample isn't queryable until search.latencyOffset ~30s passes)", file=sys.stderr)
     return False
 
 
@@ -291,12 +319,13 @@ def _selftest():
     # F: an empty execlog yields empty families (no vacuous points) and zero rows.
     empty = metric_families([])
     assert _point_count(empty) == 0, empty
-    # counter regex extracts the labeled series only.
-    txt = ('vm_rows_inserted_total{type="graphite"} 5\n'
-           'vm_rows_inserted_total{path="/x",type="opentelemetry"} 42\n')
-    assert _COUNTER.search(txt).group(1) == "42"
-    # δ: dropping the label leaves the wrong series unmatched → guard cannot false-verify.
-    assert _COUNTER.search('vm_rows_inserted_total{type="influx"} 7\n') is None
+    # read-your-write oracle: the /api/v1/query value extractor (pure).
+    resp = ('{"status":"success","data":{"resultType":"vector","result":'
+            '[{"metric":{"__name__":"paperkit_emit_unixtime"},"value":[1690000000.1,"1690000000"]}]}}')
+    assert _extract_values(resp) == [1690000000.0], _extract_values(resp)
+    # a malformed or empty response yields [] → can NEVER false-verify a token.
+    assert _extract_values('{"data":{"result":[]}}') == []
+    assert _extract_values("not json") == []
     print("otlp: selftest OK", file=sys.stderr)
     return 0
 
@@ -308,13 +337,15 @@ def main(argv):
                     help="whole-//:hook wall (the wrapper times the bazel run)")
     ap.add_argument("--endpoint", default=os.environ.get("PAPERKIT_OTLP_METRICS"),
                     help="OTLP metrics URL (default env PAPERKIT_OTLP_METRICS; unset ⇒ no-op)")
-    ap.add_argument("--counter", default=None,
-                    help="VM counter /metrics URL (default derived from --endpoint)")
-    ap.add_argument("--deadline", type=float, default=15.0, help="counter settle-poll seconds")
+    ap.add_argument("--query-url", default=None,
+                    help="VM /api/v1/query URL for read-your-write (default derived from --endpoint)")
+    ap.add_argument("--deadline", type=float, default=45.0,
+                    help="--strict read-your-write poll seconds (must clear the store's "
+                         "search.latencyOffset, ~30s default, + first-run name-index)")
     ap.add_argument("--dry-run", action="store_true", help="parse+map, print, no network")
     ap.add_argument("--selftest", action="store_true", help="run the pure-function ⟨P,F,δ⟩")
     ap.add_argument("--strict", action="store_true",
-                    help="exit nonzero if the counter-guard does not verify (for ⟨P,F,δ⟩)")
+                    help="exit nonzero if read-your-write does not verify (for the ⟨P,F,δ⟩ proof)")
     a = ap.parse_args(argv)
 
     if a.selftest:
@@ -336,8 +367,13 @@ def main(argv):
         sys.stdout.write("\n")
         return 0
 
-    counter_url = a.counter or _default_counter_url(a.endpoint)
-    ok = push(fams, a.endpoint, counter_url, deadline=a.deadline)
+    # the read-your-write token: a value WE control (the run's start-unix-time), emitted as a
+    # heartbeat gauge and polled back over /api/v1/query — never the shared counter.
+    start_unix = int(time.time())
+    heartbeat = _family(EMIT_METRIC, [(float(start_unix), {})])
+    query_url = a.query_url or _default_query_url(a.endpoint)
+    ok = push(fams + [heartbeat], a.endpoint, query_url, start_unix,
+              deadline=a.deadline, verify=a.strict)
     return (0 if ok else 1) if a.strict else 0
 
 

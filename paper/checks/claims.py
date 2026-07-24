@@ -700,6 +700,7 @@ def local_ci():
     hook = (Path(__file__).resolve().parents[2] / ".githooks" / "pre-commit").read_text()
     assert "bazel test //:hook" in hook, "the pre-commit hook does not run `bazel test //:hook`"
     assert "tools/hook_index.py" in hook, "the pre-commit hook does not verify worktree≡index (Ζ·hook·index)"
+    assert "paperkit/footdeps.py" in hook, "the pre-commit hook does not run the footprint audit (Ξ·dag·reads — declared reads ⊇ Φ·footprint)"
 
 
 def boundaries_project():

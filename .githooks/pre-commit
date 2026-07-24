@@ -55,6 +55,16 @@ if [ -n "${PAPERKIT_OTLP_METRICS:-}" ]; then
 fi
 rm -f "$PK_EXECLOG"
 
+# Ξ·dag·reads — the footprint audit: every claim's declared `reads` ⊇ its live Φ·footprint (strace).
+# A gate HERE, not in //:hook, for the same reason as hook-index/cotype: it must read the CURRENT
+# reads= on a FRESH strace every run (no bazel caching that could serve a stale verdict when a
+# reads= changes — the exact invalidation we could not prove under --config=mutant), and the standard
+# env is reliably strace-capable.  ~10s.  Catches an under-declared reads UP FRONT with the exact
+# remediation ("add X to the claim's `reads` field") instead of a cryptic sandbox file-not-found —
+# or, as with bnd-prove's nonzero-F-arm, a red the hook MASKS.  Sound by construction: the audit's
+# coverage model (own ∪ engine ∪ declared-filegroups ∪ imports) is gated by bnd-otlp-adjacent tests.
+run "footprint audit (reads ⊇ Φ)"   mise exec -- python3 paperkit/footdeps.py
+
 # Σ·cotype — cotype-monotone: ledger entry keys never vanish (append-only, retirement-logged).
 # A commit-DELTA property: its truth-maker is HEAD's ledger vs the STAGED one, which only this
 # hook can see (the hermetic //:hook sandbox has no git) — so the one non-bazel check lives

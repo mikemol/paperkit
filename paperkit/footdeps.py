@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -32,18 +33,66 @@ import resolver  # noqa: E402
 WIRED = ["boundaries", "config", "paper", "setup", "."]   # projects with per-claim Bazel graphs
 
 
-def _tokens(reads: list, projects: set) -> list:
-    """Reduce repo-relative read paths to dep tokens (top-level unit each belongs to)."""
+_FILEGROUP_RE = re.compile(r'filegroup\(\s*name\s*=\s*"files"\s*,\s*srcs\s*=\s*\[(.*?)\]', re.S)
+
+
+def _root_files(repo_root: Path) -> set:
+    """Ξ·dag·reads — the repo-relative paths the root //:files filegroup STAGES (the `.` reads
+    token).  DERIVED from BUILD.bazel (the owner, never a hardcoded copy) because //:files curates
+    a CROSS-DIRECTORY set — it lists //report:gen.py, //tools:*.py, //paperkit:components.bzl, … —
+    so which reads token stages a file is decided by its OWNING FILEGROUP, not its directory.  The
+    project :files filegroups are own-directory-only, so //:files is the only cross-dir case."""
+    m = _FILEGROUP_RE.search((repo_root / "BUILD.bazel").read_text())
+    if not m:
+        return set()
+    return {(lit[2:].replace(":", "/", 1) if lit.startswith("//") else lit)
+            for lit in re.findall(r'"([^"]+)"', m.group(1))}
+
+
+def _covering(f: str, projects: set, root_files: set) -> set:
+    """Ξ·dag·reads — the reads tokens that STAGE file f; ANY ONE suffices.  A file can be staged by
+    SEVERAL sources, so this is a SET, not a single token: report/gen.py is in BOTH //report:files
+    (`report`) and //:files (`.`), so a check declaring EITHER covers it."""
+    top = f.split("/")[0]
+    if top == "paperkit":
+        # engine-adjacent — the .py modules AND the .bzl the build reads (components.bzl, dag.bzl),
+        # incidentally opened by every engine-importing check; excluded like the engine (a genuine
+        # need is caught by //:hook's own file-not-found on the unstaged file).
+        return {"paperkit"}
+    s = set()
+    if top in projects:
+        s.add(top)                       # under a project dir → coverable by @@//<proj>:files
+    if f in root_files:
+        s.add(".")                       # cross-listed in //:files → coverable by the `.` token
+    return s or {"."}                    # a bare root file (.githooks/, a root bib/rubric/asset)
+
+
+def _imported(project_dir: Path, repo_root: Path) -> set:
+    """Repo-relative paths of the warrant bibs COMPOSED into a project from OTHER packages (root
+    imports //paper:adequacy_pitch.bib).  Staged by the bib COMPOSITION, not a reads token, so a
+    footprint read of one is already covered — derived from the same load_config the build uses."""
     out = set()
-    for r in reads:
-        top = r.split("/")[0]
-        if top == "paperkit":
-            out.add("paperkit")
-        elif top in projects:
-            out.add(top)
-        else:
-            out.add(".")              # a root file (.githooks/, a root bib/rubric/asset)
-    return sorted(out)
+    for b in bib.load_config(project_dir)["bibs"]:
+        try:
+            out.add(str(Path(b).resolve().relative_to(repo_root)))
+        except ValueError:               # a bib outside the repo — ignore
+            continue
+    return out
+
+
+def _missing(fp: list, declared: set, projects: set, root_files: set, name: str, imported: set) -> list:
+    """The reads tokens a check is MISSING: for each footprint file NOT already staged — by its own
+    project, the engine, an imported warrant bib, or a DECLARED token's filegroup — the tokens that
+    WOULD stage it (any one suffices).  [] iff every read is staged (the audit's soundness core)."""
+    have = set(declared) | {name, "paperkit"}
+    miss = set()
+    for f in fp:
+        if f in imported:
+            continue                     # staged via warrant-imports composition, not reads=
+        cov = _covering(f, projects, root_files)
+        if not (cov & have):
+            miss |= cov                  # any of these declared would cover f
+    return sorted(miss)
 
 
 def _engine(reads: list) -> list:
@@ -68,7 +117,6 @@ def _engine(reads: list) -> list:
 
 
 def build(repo_root: Path, names: list) -> dict:
-    projects = {p.name for p in repo_root.iterdir() if (p / "paper.toml").is_file()}
     manifest = {}
     for name in names:
         pdir = repo_root if name == "." else repo_root / name
@@ -87,7 +135,7 @@ def build(repo_root: Path, names: list) -> dict:
 
         def deps(chk):
             fp = resolver.footprint(chk, pdir, custom, scope=repo_root)
-            return ["*"] if fp is None else _tokens(fp, projects)
+            return ["*"] if fp is None else fp
 
         with ThreadPoolExecutor(max_workers=min(16, (os.cpu_count() or 4))) as ex:
             graded = list(ex.map(lambda kc: deps(kc[1]), items))
@@ -110,16 +158,19 @@ def audit(repo_root: Path, names: list) -> list:
     `reads` (plus its own project + the engine).  Returns the under-declared [(proj, claim,
     missing, declared)] — an empty list means every declaration is sound."""
     live = build(repo_root, names)
+    projects = {p.name for p in repo_root.iterdir() if (p / "paper.toml").is_file()}
+    root_files = _root_files(repo_root)
     bad = []
     for name in names:
-        declared = _declared(repo_root if name == "." else repo_root / name)
-        for k, toks in live.get(name, {}).items():
-            if "*" in toks:                          # degraded footprint (e.g. strace blocked) — skip
+        pdir = repo_root if name == "." else repo_root / name
+        declared = _declared(pdir)
+        imported = _imported(pdir, repo_root)
+        for k, fp in live.get(name, {}).items():
+            if "*" in fp:                            # degraded footprint (e.g. strace blocked) — skip
                 continue
-            extra = {t for t in toks if t != "paperkit" and t != name}
-            miss = extra - declared.get(k, set())
+            miss = _missing(fp, declared.get(k, set()), projects, root_files, name, imported)
             if miss:
-                bad.append((name, k, sorted(miss), sorted(declared.get(k, set()))))
+                bad.append((name, k, miss, sorted(declared.get(k, set()))))
     return bad
 
 
@@ -144,8 +195,8 @@ def audit_one(proj: str, claim: str) -> dict:
     fp = resolver.footprint(f["check"], project_dir, custom, scope=repo_root)
     if fp is None:
         return {"claim": claim, "ok": True, "degraded": True}  # strace blocked — over-declare, never fail
-    extra = {t for t in _tokens(fp, projects) if t != "paperkit" and t != name}
-    missing = sorted(extra - declared)
+    missing = _missing(fp, declared, projects, _root_files(repo_root), name,
+                       _imported(project_dir, repo_root))
     # `engine` = the def-mutable surface (the modules whose def-sites the Ζ·mutant fanout sweeps);
     # pk_foot_learn aggregates it across claims → footprints.json (the def-scope manifest).
     return {"claim": claim, "ok": not missing, "missing": missing, "engine": _engine(fp)}

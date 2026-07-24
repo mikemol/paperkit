@@ -22,6 +22,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -202,6 +203,19 @@ def audit_one(proj: str, claim: str) -> dict:
     return {"claim": claim, "ok": not missing, "missing": missing, "engine": _engine(fp)}
 
 
+def _strace_works() -> bool:
+    """Ζ·degrade·roots — a POSITIVE CONTROL for the audit's own instrument.  strace can DEGRADE
+    silently (absent, or ptrace blocked on a hardened host/container): resolver.footprint then
+    returns None, every claim over-declares to ["*"], the audit finds nothing to flag, and main()
+    prints a GREEN 'every declared reads ⊇ footprint' — a plausible-but-WRONG pass.  So trace a check
+    with a KNOWN small footprint first; if it comes back empty, strace is degraded and the audit is
+    not trustworthy (mirrors bnd-footprint, which guards the SANDBOX strace in //:hook)."""
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d)
+        (p / "probe.txt").write_text("PK_PROBE\n")
+        return resolver.footprint("cmd:grep -q PK_PROBE probe.txt", p, {}, scope=p) == ["probe.txt"]
+
+
 def main(argv: list) -> int:
     if "--only" in argv:
         i = argv.index("--only")
@@ -211,6 +225,12 @@ def main(argv: list) -> int:
         return 0
     repo_root = Path(subprocess.run(["git", "rev-parse", "--show-toplevel"],
                                     capture_output=True, text=True).stdout.strip())
+    if not _strace_works():
+        print("paperkit-footdeps: DEGRADED — strace is unavailable on this host (a probe with a KNOWN "
+              "footprint traced empty); the footprint audit CANNOT verify declared reads and is SKIPPED, "
+              "not passed (Ζ·degrade·roots positive control — never a silent false green).  reads= are "
+              "unenforced here; run on a strace-capable host to gate them.", file=sys.stderr)
+        return 0
     names = [a for a in argv[1:] if not a.startswith("-")] or WIRED
     bad = audit(repo_root, names)
     if bad:

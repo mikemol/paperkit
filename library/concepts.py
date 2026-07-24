@@ -113,6 +113,16 @@ def gate_enforces_invariants():
     assert gate(bad, out=project_text(bad))[0] != 0, "check-resolution not enforced"
 
 
+def adequacy_gap():
+    from _fixture_gate import gate
+    # the GATE is blind to RELEVANCE: a passing check proves a sentence NAMED a verifier, not that
+    # the verifier ENTAILS the claim, so a false sentence with a behavioral-but-irrelevant check
+    # still passes — verification here is adequacy, not proof of meaning.  (Δ·scope bounds this to
+    # the GATE it exercises, not gate + grader; crash-sensitive-limit owns the grader's half.)
+    w = [entry("c", claim="the sky is green", check="cmd:grep -q TOKEN a.txt")]
+    assert gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
+
+
 def resolver_dispatches():
     # the resolver COMPONENT's certificate (Μ·kernel): a verifier is NAMED type:target (the prefix
     # selects the verb), every DECLARED verb dispatches to a real branch — read from resolver.VERBS,
@@ -307,6 +317,9 @@ CONCEPTS = {
     # the gate enforces its invariants: README (rm-cmds-inv), paper self-host (gate-is-subject).
     "rm-cmds-inv": gate_enforces_invariants,
     "gate-is-subject": gate_enforces_invariants,
+    # the gate is blind to RELEVANCE (adequacy, not proof of meaning): paper (adequacy-gap).  The
+    # grader's half — that Δ even grades such a check behavioral — is crash-sensitive-limit (delta).
+    "adequacy-gap": adequacy_gap,
     # the resolver component (Μ·kernel) — one SUPERSET witness, FOUR keys: README (rm-resolver),
     # paper (verifier-named, gate-dispatches, two-builtins).  The reconcile: the paper's three
     # weaker faces now import the strong enumerative certificate.

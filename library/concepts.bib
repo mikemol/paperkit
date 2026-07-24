@@ -120,6 +120,12 @@
   check   = {cmd:python3 concepts.py gate-is-subject}
 }
 
+@misc{adequacy-gap,
+  section = {gate},
+  claim   = {the gate is blind to RELEVANCE --- a passing check proves a sentence NAMED a verifier, not that the verifier ENTAILS the claim, so a false sentence with a behavioral yet irrelevant check still passes: verification here is adequacy, not proof of meaning},
+  check   = {cmd:python3 concepts.py adequacy-gap}
+}
+
 @misc{rm-resolver,
   section = {resolver},
   claim   = {the resolver component's certificate --- a verifier is named type:target, EVERY declared verb dispatches to a real branch (read from resolver.VERBS, nothing re-listed), the built-in set is closed, and a custom type dispatches through the registry},

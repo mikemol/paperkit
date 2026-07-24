@@ -739,18 +739,6 @@ def fresh_by_construction():
         "a hand-edited (drifted) copy was not rejected"
 
 
-def adequacy_gap():
-    from _fixture_gate import gate
-    # Π — ONE capability: the GATE is blind to relevance.  A passing check proves a sentence
-    # NAMED a verifier, not that the verifier ENTAILS the claim, so a false sentence whose check
-    # is behavioral-but-irrelevant still passes the gate.  That the GRADER even grades such a check
-    # behavioral is a DISTINCT capability — the sibling claim crash-sensitive-limit owns it — so it
-    # is not re-asserted here; re-asserting it dragged the whole grader into this claim's footprint
-    # (Δ·scope then bounds adequacy-gap to the gate it actually exercises, not gate + grader).
-    w = [entry("c", claim="the sky is green", check="cmd:grep -q TOKEN a.txt")]
-    assert gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
-
-
 def trust_boundary():
     from _fixture_gate import gate
     # a check is arbitrary code (cmd: is the universal escape hatch), so gating a
@@ -830,7 +818,6 @@ def forward_direction():
 CLAIMS = {
     "collapse-safe": collapse_safe,
     "fresh-by-construction": fresh_by_construction,
-    "adequacy-gap": adequacy_gap,
     "trust-boundary": trust_boundary,
     "env-sanitized": env_sanitized,
     "path-surface": path_surface,

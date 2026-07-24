@@ -20,7 +20,7 @@ Each claim carries a machine-checkable verifier — the check field names a verb
 
 ## Gate: Enforcing the Invariants
 
-An unverified sentence cannot ship — a claim whose check FAILS blocks the gate; the gate is engine, so its def-sites are the fingerprint [@rm-noship]; the paper's fail-omits face imports this same certificate — a claim whose verifier fails simply does not appear in the prose [@fail-omits]; the gate ENFORCES its invariants — the committed prose equals its projection, and every cited claim's check passes — so violating each makes it RED [@rm-cmds-inv]; the paper's self-host face imports this same certificate — the gate that accepts the paper is the very subject it describes, enforcing the invariants the paper states [@gate-is-subject].
+An unverified sentence cannot ship — a claim whose check FAILS blocks the gate; the gate is engine, so its def-sites are the fingerprint [@rm-noship]; the paper's fail-omits face imports this same certificate — a claim whose verifier fails simply does not appear in the prose [@fail-omits]; the gate ENFORCES its invariants — the committed prose equals its projection, and every cited claim's check passes — so violating each makes it RED [@rm-cmds-inv]; the paper's self-host face imports this same certificate — the gate that accepts the paper is the very subject it describes, enforcing the invariants the paper states [@gate-is-subject]; the gate is blind to RELEVANCE — a passing check proves a sentence NAMED a verifier, not that the verifier ENTAILS the claim, so a false sentence with a behavioral yet irrelevant check still passes: verification here is adequacy, not proof of meaning [@adequacy-gap].
 
 ## Projector: The Document Is the Projection
 

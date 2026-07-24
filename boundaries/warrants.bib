@@ -163,3 +163,9 @@
   claim   = {the mutation SURFACE has a boundary of its own, and the grade must say where it runs --- a claim's falsifiability is measured over the inputs the sweep can corrupt, so an input it merely READS and cannot mutate (excluded by suffix, or living outside the project entirely) leaves the grade narrower than it looks, and reporting that gap is what keeps indeterminate meaning ONE thing: every input was corrupted and none flipped it, never we did not look --- an orthogonal axis like corroboration, never a rung, since incompleteness is not a weaker grade and no adequacy floor may fail a claim for it},
   check   = {cmd:python3 ../paperkit/tests/boundaries_surface.py}
 }
+@misc{bnd-otlp,
+  section = {engine}, from = {bnd-surface}, join = {. },
+  claim   = {the build-telemetry pusher splits at the same boundary (Ρ·telemetry) --- its live half (the OTLP POST and the counter settle-poll) is OBSERVATION and never gates, staying best-effort in the pre-commit where a down endpoint cannot block a commit, while its PURE half (parse the concatenated-JSON execlog, attribute each spawn to project and check_type and target, aggregate into the schema) is deterministic and gated HERE, because a mis-parse pushes wrongly-attributed rows the counter-guard cannot catch --- the counter verifies COUNT, not ATTRIBUTION --- so the one semantic decision, a spawn counts as discriminate work iff its mnemonic is in the owner's set, is pinned by a minimum delta of one mnemonic},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_otlp.py},
+  reads   = {.}
+}

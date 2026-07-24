@@ -46,6 +46,7 @@ filegroup(name = "files", srcs = [
         "//tools:closure.py",
         # Ζ·hook·index — bnd-hook-index gates the equivalence predicate's pure core.
         "//tools:hook_index.py",
+        "//tools:otlp_push.py",
     ], visibility = ["//visibility:public"])
 
 # The local CI: `bazel test //:hook` IS the pre-commit (Ζ·hook / Ζ·foot·hook) — it gates AND grades

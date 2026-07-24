@@ -155,7 +155,7 @@
           "@@//paperkit/bib.py": "1dfd9624974103512aa907213624f756b93eb05bb7684a55eca256d02369a259",
           "@@//paperkit/cache.py": "ebd537915ec7b40f95eea15d49578d35dadb9d7ca9aecebcd1aeb106de473a82",
           "@@//paperkit/coherence.py": "c4ace8cc41ad3afb16ad429e9b54ef9527b2e8f06c9fe91bf9bd46967ba7e42f",
-          "@@//paperkit/components.bzl": "76a3e99a58a6ef3c8b993c564958be5fd843189e46d46346d839f79b5ecf8642",
+          "@@//paperkit/components.bzl": "94ca6c6dc086578c7060ab6b1749949a61c9b157adb9bf09aeeb2e4412dd30de",
           "@@//paperkit/config.py": "2e4b8eb4c21405042c47e96f2e6662bb0aa62e725dcd6b0310bddf9d7c337868",
           "@@//paperkit/discriminate.py": "22dfe26cd66c32f97103ebc58b459e8ee9581ba7ad97c07818f5a9e773f03ca8",
           "@@//paperkit/driver.py": "f102c6efb796e846d68b55a78a12a869d27157b84472efa35183b77537da136e",

@@ -58,7 +58,7 @@
 % interned in delta beside the grading concepts rather than treated as build plumbing.
 @misc{slice-cache,
   section = {delta}, from = {edge-rests-grounds}, join = {. },
-  claim   = {a verdict is reusable exactly when nothing the check can REACH has changed, so the cache key is the check's slice --- its witness, the transitive closure of the module-level names it references, and the content of every module that closure reaches, the last of which is what a name-only slice misses when a witness imports inside its own body, serving a stale pass},
+  claim   = {a verdict is reusable exactly when nothing the check can REACH has changed, so the cache key is the check's slice --- its witness, the transitive closure of every top-level body it names, and the content of every module that closure reaches; a slice that reads only function bodies stops at a constant's own name and one that reads only names never leaves the file, and each omission serves a stale pass},
   check   = {cmd:python3 concepts.py slice-cache}
 }
 

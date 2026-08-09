@@ -203,15 +203,27 @@ def slice_cache_sound():
     # so the cache key is the check's SLICE: its witness function, the transitive closure of the
     # module-level names that function references, and the CONTENT of every module the slice reaches.
     #
-    # The file dimension is what makes it sound.  A name-only slice sees `ast.Name` nodes in one
-    # file, so a witness reaching code through a FUNCTION-LOCAL import (the minimal-capability
-    # discipline this library itself follows — `from _fixture_delta import discriminate` inside the
-    # witness) binds a local alias that is NOT a module-level name: edits to that module then do not
-    # invalidate, and the cache serves a stale PASS.  This asserts the closure against the real
-    # slicer, on a fixture with exactly that shape.
+    # TWO DIMENSIONS make it sound, and each closes a measured stale-PASS.
+    #
+    # THE FILE DIMENSION.  A name-only slice sees `ast.Name` nodes in one file, so a witness
+    # reaching code through a FUNCTION-LOCAL import (the minimal-capability discipline this library
+    # itself follows — `from _fixture_delta import discriminate` inside the witness) binds a local
+    # alias that is NOT a module-level name: edits to that module then do not invalidate.
+    #
+    # THE CONSTANT DIMENSION.  A slice that indexes only FUNCTION bodies stops at a constant's own
+    # name, so anything reachable only THROUGH a literal — a dispatch table, an operator registry —
+    # is invisible.  Measured downstream: a lifted library's NAND/IMP/CON/XNOR were named only by a
+    # `BINARY` dict, so editing an operator did not invalidate the witnesses that use it.
+    #
+    # Both are asserted against the real slicer, on a fixture carrying both shapes.
     import checkcache as CC
     src = ("import sys\n"
            "TOP = 1\n"
+           "def leaf(x):\n"
+           "    return x\n"
+           "TABLE = {'k': leaf}\n"          # leaf is reachable ONLY through this literal
+           "def reaches_via_constant(w):\n"
+           "    assert TABLE['k'](1)\n"
            "def reaches_local_import(w):\n"
            "    import helper as H\n"
            "    assert H.VALUE\n"
@@ -240,6 +252,21 @@ def slice_cache_sound():
         assert before_l != after_l, \
             "STALE-PASS: editing a function-locally imported module did not invalidate its check"
         assert before_n == after_n, "over-invalidation: an unreachable edit invalidated a check"
+        # THE CONSTANT DIMENSION: the walk goes THROUGH a literal, not up to it.  `leaf` is named
+        # only by TABLE, so a function-only index reaches TABLE and stops — and an edit to `leaf`
+        # would leave the key untouched, which is the stale PASS.
+        reach_const = CC.slice_of("reaches_via_constant", fns, names, imports)
+        assert "TABLE" in reach_const[0], "the slice missed a constant the witness names"
+        assert "leaf" in reach_const[0], \
+            "STALE-PASS: a definition reachable only THROUGH a constant is invisible to the slice"
+        assert "leaf" not in reach_none[0], "an unrelated witness picked up a name it cannot reach"
+        # and it is LOAD-BEARING: editing the transitively-reached definition moves the key.
+        before_c = key("reaches_via_constant", "r/const")
+        mutated = src.replace("    return x\n", "    return x + 0\n")
+        _t2, fns2, names2, segs2, imports2 = CC.module_index(mutated)
+        after_c = CC.slice_key("reaches_via_constant", "r/const", fns2, names2, segs2, imports2, search)
+        assert before_c != after_c, \
+            "STALE-PASS: editing a definition reached through a constant did not invalidate"
         # the ROUTE is part of the key — one witness serving two claims is two checks, one slice.
         assert key("reaches_nothing", "r/one") != key("reaches_nothing", "r/two"), \
             "two routes into one witness collapsed onto a single cache entry"

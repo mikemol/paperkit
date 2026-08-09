@@ -60,8 +60,12 @@ DEFAULT_CACHE = HERE / ".checkcache.json"
 # ── the slice ─────────────────────────────────────────────────────────────────────────────────
 
 def module_index(src: str):
-    """Module-level functions and assigned names, with their source segments, plus the module's
-    own import bindings (alias -> module name) so the slice can follow them to a FILE."""
+    """Module-level definitions and assigned names, with their source segments, plus the module's
+    own import bindings (alias -> module name) so the slice can follow them to a FILE.
+
+    The returned `bodies` map holds BOTH functions and assignments, keyed by the name they bind:
+    the walk in `slice_of` traverses through either, because a constant that names other
+    definitions is an edge in the dependency graph exactly as a call is."""
     tree = ast.parse(src)
     fns, names, segs, imports = {}, set(), {}, {}
     for node in tree.body:
@@ -74,6 +78,14 @@ def module_index(src: str):
                 if isinstance(t, ast.Name):
                     names.add(t.id)
                     segs[t.id] = ast.get_source_segment(src, node) or ""
+                    # A CONSTANT'S BODY IS A BODY.  It is indexed alongside the functions so the
+                    # walk can traverse THROUGH it: a dispatch table, an operator registry, or any
+                    # literal holding references is a real edge in the dependency graph, and
+                    # stopping at the constant's own name loses everything it names.  (Measured:
+                    # a lifted library's NAND/IMP/CON/XNOR were reachable only through a `BINARY`
+                    # dict literal, so a slice that stopped at `BINARY` never saw them — an edit
+                    # to the operator would not have invalidated its dependants.)
+                    fns[t.id] = node
         elif isinstance(node, ast.Import):
             for a in node.names:
                 imports[a.asname or a.name.split(".")[0]] = a.name
@@ -103,9 +115,13 @@ def _local_imports(node) -> dict:
 
 def slice_of(fn: str, fns, names, imports):
     """(names, modules) reachable from FN: the transitive closure of module-level names, and every
-    module reached by an import binding — at module level OR inside any function in the closure.
+    module reached by an import binding — at module level OR inside any body in the closure.
 
-    Returns None when FN is not a module-level function; the caller must then RUN the check."""
+    THROUGH CONSTANTS, NOT UP TO THEM.  `fns` holds every top-level body, assignments included, so
+    a name reached only via a literal (a dispatch table, an operator registry) is still reached.
+    Stopping at the constant's own name is a FAIL-OPEN: its contents change, the hash does not.
+
+    Returns None when FN is not a module-level definition; the caller must then RUN the check."""
     if fn not in fns:
         return None
     seen, mods, frontier = {fn}, set(), {fn}

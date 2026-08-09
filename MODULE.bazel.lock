@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "G+ac42ItpyAemIzGUPWSmP6PWjH623tpzUFyDNtXVyo=",
+        "bzlTransitiveDigest": "smTJSF63FlDPp8LwAstqSIAI+V0QYK1j8Re/5rCe474=",
         "usagesDigest": "ferZnsrS7mhDsGaHTHyimpD6mricmwD4voJQNZYF3hw=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "fdd02e137f1d0c5a4de7aeb96ec256b3210bfb4dfb899b3302e261746362dea4",
@@ -160,13 +160,13 @@
           "@@//paperkit/discriminate.py": "22dfe26cd66c32f97103ebc58b459e8ee9581ba7ad97c07818f5a9e773f03ca8",
           "@@//paperkit/driver.py": "f102c6efb796e846d68b55a78a12a869d27157b84472efa35183b77537da136e",
           "@@//paperkit/footdeps.py": "a8dfe5fab3ad940a22734194aa2885db4bdbf151d6bb1e48dd08b57f15ab0c10",
-          "@@//paperkit/gate.py": "f5a0882964a834af96bc80dde950d18af72d2ca4ab0959c63f0bc05661576d19",
+          "@@//paperkit/gate.py": "a85a44233c51e8a231e56054f9eb3a9e70c55cf4f5ccccae62b654218af031c2",
           "@@//paperkit/grade.py": "e7ff39b98918096675a7f021bc5c8759ca18344efc0a0f89f4c98c0892774dd1",
           "@@//paperkit/grader.py": "67ff15ceac5c910d19ed487ec8a1d4e8935af6ec5c1e1b2ca0d359d2b0de3b5b",
           "@@//paperkit/layout.py": "6bf81fee3ebd4f8cea78cda3ecec50974ceb0841dc95806a46c2b42bfa2990d9",
           "@@//paperkit/mutate.py": "f609f1a2667a94d2a8008c43801c253bcc44c22b46e93e4afd8941f9ef0bd504",
           "@@//paperkit/project.py": "eae4900b180e8e2d26fbda25cd0396452123bbb44ac7b25b2e0bb20b89cee445",
-          "@@//paperkit/resolver.py": "3156946135a88aab440a521268f3a7363ba30f188353e0729496c98b1e148eb0",
+          "@@//paperkit/resolver.py": "39184878468e8c7206da06d9736365b4ff1e372887c87cc3ab9cd3d5f6fb2daf",
           "@@//paperkit/rhetoric.py": "2b4ba52de01006ac87a87f48f5cd78c484afbc25a07be23e7b19e61c090a1518",
           "@@//paperkit/tests/_fixture_delta.py": "02b84200601b6e1250749ed462a56ee67da3e2ea17f771704ecb3c1dec08f744",
           "@@//paperkit/tests/_fixture_gate.py": "16b7aac5968ce99b3ca08c73d28db82589cabf8dd4bc3258c9daf79f7c051b64",

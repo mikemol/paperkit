@@ -6,3 +6,4 @@ model	Model: A Claim Is a Record
 resolver	Resolver: The Verifier and the Escape Hatch
 gate	Gate: Enforcing the Invariants
 projector	Projector: The Document Is the Projection
+cotype	Cotype: Gating the Reasoning, Not Only the Claims

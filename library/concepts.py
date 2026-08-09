@@ -24,6 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or ROOT / "paperkit")
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # this library — for routes (the graded walk)
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 from _fixture_model import entry  # noqa: E402  (the validated fixture kernel; capability helpers
@@ -31,6 +32,7 @@ from _fixture_model import entry  # noqa: E402  (the validated fixture kernel; c
 import project as P  # noqa: E402  — the bib parser (Μ·model), for the claim-is-record witness
 import gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
 import resolver  # noqa: E402  — VERBS, the engine's OWN verb set (never re-listed here; Λ·registry)
+import routes  # noqa: E402  — Λ·key·graded, the shared graded-key walk (this library is grade 0)
 
 
 def adequacy_pitch():
@@ -155,6 +157,151 @@ def document_is_projection():
     assert t.startswith("#"), "the projection does not lead with a document heading"
     for needle in ("# doc", "## sec one", "## sec two", "alpha thesis", "beta point"):
         assert needle in low, f"the projection is missing {needle!r}"
+
+
+def graded_key_resolves():
+    # Λ·key·graded — a concept key is GRADED: `family[/subfamily]/argument`, resolved by consuming
+    # `/`-separated segments to a `(fn, arg)` leaf.  Two properties make the grading worth having,
+    # and this asserts both against the REAL walk (routes.py), so mutating a walk def-site flips it.
+    #
+    # (1) DEPTH-AGNOSTIC.  One loop serves every grade, so grade 0 — a flat key, THIS library's own
+    #     shape — is the degenerate case rather than a separate mechanism.  A depth-bounded walk is
+    #     the defect this pins: a deeper family would resolve under one implementation and vanish
+    #     under another.
+    # (2) DISTINCT KEYS, SHARED IMPLEMENTATION.  `f/A` and `f/B` route to ONE function with
+    #     different arguments, which is what makes reuse and proof-relevance compatible: the gate
+    #     compares check STRINGS (--without-K), so the two are distinct witnesses to it.
+    seen = []
+    shared = seen.append          # ONE implementation, reached under two keys — the point of (2)
+    grid = {"flat": (lambda: seen.append("flat"), None),                       # grade 0 (nullary)
+            "f": {"A": (shared, "A"), "B": (shared, "B")},                     # grade 1
+            "d": {"s": {"deep": (shared, "deep")}}}                            # grade 2
+    for key in ("flat", "f/A", "f/B", "d/s/deep"):
+        assert routes.dispatch(grid, key, "t", report=False) == 0, f"a grade-valid key did not certify: {key}"
+    assert seen == ["flat", "A", "B", "deep"], f"the walk ran the wrong witnesses: {seen}"
+    # the two grade-1 keys share ONE implementation but arrive with DIFFERENT arguments
+    fa, fb = routes.walk(grid, "f/A"), routes.walk(grid, "f/B")
+    assert fa[0] is fb[0] and fa[1] != fb[1], "parameterised keys did not share one implementation"
+    # THE EXIT-CODE PROTOCOL: 2 is "not mine" (so a resolver can fall through), 1 is FAILED.  A
+    # leaf's KeyError must read as 2, NOT 1 — "this argument is not one I serve" is indistinguishable
+    # from an unresolved route, and reading it as failure would break the fallthrough resolver.py
+    # depends on (Λ·library·fallthrough).
+    def boom(a):
+        raise {"miss": KeyError, "bad": AssertionError}[a](a)
+    arm = {"x": {"miss": (boom, "miss"), "bad": (boom, "bad")}}
+    assert routes.dispatch(arm, "x/miss", "t", report=False) == 2, "a leaf's KeyError did not read as not-mine"
+    assert routes.dispatch(arm, "x/bad", "t", report=False) == 1, "a failing witness did not read as FAILED"
+    for absent in ("nope", "f/Z", "f", "flat/extra"):
+        assert routes.dispatch(grid, absent, "t", report=False) == 2, f"{absent!r} should be not-mine"
+    # THIS library is grade 0, and its table is DERIVED from CONCEPTS — so the two cannot drift.
+    assert set(ROUTES) == set(CONCEPTS), "the grade-0 route table drifted from CONCEPTS"
+    assert all(routes.walk(ROUTES, k)[1] is None for k in CONCEPTS), "grade 0 is not nullary"
+
+
+def slice_cache_sound():
+    # Λ·cache·slice — a check's verdict is reusable exactly when NOTHING IT CAN REACH has changed,
+    # so the cache key is the check's SLICE: its witness function, the transitive closure of the
+    # module-level names that function references, and the CONTENT of every module the slice reaches.
+    #
+    # The file dimension is what makes it sound.  A name-only slice sees `ast.Name` nodes in one
+    # file, so a witness reaching code through a FUNCTION-LOCAL import (the minimal-capability
+    # discipline this library itself follows — `from _fixture_delta import discriminate` inside the
+    # witness) binds a local alias that is NOT a module-level name: edits to that module then do not
+    # invalidate, and the cache serves a stale PASS.  This asserts the closure against the real
+    # slicer, on a fixture with exactly that shape.
+    import checkcache as CC
+    src = ("import sys\n"
+           "TOP = 1\n"
+           "def reaches_local_import(w):\n"
+           "    import helper as H\n"
+           "    assert H.VALUE\n"
+           "def reaches_nothing(w):\n"
+           "    assert TOP == 1\n")
+    d = tempfile.mkdtemp()
+    try:
+        base = Path(d)
+        (base / "concepts.py").write_text(src)
+        (base / "helper.py").write_text("VALUE = 'a'\n")
+        _t, fns, names, segs, imports = CC.module_index(src)
+        search = [base]
+
+        def key(fn, route):
+            return CC.slice_key(fn, route, fns, names, segs, imports, search)
+
+        # the local-import edge is SEEN: helper is in the reached-module set, and not in the other's
+        reach_local = CC.slice_of("reaches_local_import", fns, names, imports)
+        reach_none = CC.slice_of("reaches_nothing", fns, names, imports)
+        assert "helper" in reach_local[1], "a function-local import is invisible to the slice"
+        assert "helper" not in reach_none[1], "an unrelated witness picked up a module it cannot reach"
+        # and the edge is LOAD-BEARING: editing that module changes the dependent key, ONLY.
+        before_l, before_n = key("reaches_local_import", "r/local"), key("reaches_nothing", "r/none")
+        (base / "helper.py").write_text("VALUE = 'b'\n")
+        after_l, after_n = key("reaches_local_import", "r/local"), key("reaches_nothing", "r/none")
+        assert before_l != after_l, \
+            "STALE-PASS: editing a function-locally imported module did not invalidate its check"
+        assert before_n == after_n, "over-invalidation: an unreachable edit invalidated a check"
+        # the ROUTE is part of the key — one witness serving two claims is two checks, one slice.
+        assert key("reaches_nothing", "r/one") != key("reaches_nothing", "r/two"), \
+            "two routes into one witness collapsed onto a single cache entry"
+        # FAIL-CLOSED: a slice that cannot be computed yields NO key, so the check runs every time.
+        assert key("not_a_module_level_function", "r/x") is None, \
+            "an uncomputable slice produced a key instead of forcing the check to run"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def conclusion_needs_backing():
+    # Λ·conclusion·backed — the check apparatus covers LANDED CLAIMS: each carries a command that
+    # must pass.  PRINTED REASONING carries nothing, so an analysis script can print a conclusion
+    # beside output from the same run that refutes it and no gate notices.  This is the gate for
+    # that: a printed conclusion must be backed by an assertion that would fail if it were false.
+    #
+    # The asymmetry is the design, and it is what makes the gate honest: it CANNOT tell whether an
+    # assertion is the RIGHT one, only that a conclusion was staked with NOTHING behind it.  A gate
+    # that judged relevance would have to be right about meaning, and would fail OPEN when it was
+    # not — so the weak direction (pure prose naming no computed value) is passed deliberately.
+    # conclusiongate lives in THIS library (staged by its BUILD manifest), not in cotype/ —
+    # a witness may only import what the hermetic sandbox stages.
+    import conclusiongate as CG
+    staked = "x = 1 + 1\nprint(f'x is {x}')\nprint('=> therefore x is even')\n"
+    backed = staked.replace("print('=>", "assert x % 2 == 0, 'x is odd'\nprint('=>")
+    prose = "print('=> therefore the argument holds')\n"
+    assert CG.findings(staked)["ungated"], "a conclusion with no assertion anywhere was not flagged"
+    assert not CG.findings(backed)["unbacked"], "an assertion naming the same value did not count as backing"
+    assert not CG.findings(prose)["unbacked"], \
+        "a conclusion naming no computed value was flagged — the weak direction must stay weak"
+    # UNBACKED is distinct from UNGATED: assertions exist, but none touches the conclusion's subject.
+    other = "y = 5\nz = 2 + 2\nassert y == 5, 'y'\nprint(f'z is {z}')\nprint('=> so the z value is even')\n"
+    u = CG.findings(other)["unbacked"]
+    assert u and "z" in u[0][2], f"an assertion about an unrelated name was accepted as backing: {u}"
+
+
+def label_records_carrier():
+    # Λ·label·carrier — a LABEL is a point in an orbit: it names a concept FROM THE CARRIER one was
+    # standing in.  So a concept has ONE identity and MANY labels, and the map is
+    # `concept -> {carrier: label}` rather than `label -> concept`.  What it BUYS is ingestion:
+    # a foreign corpus splits into REUSE (an existing witness family already covers this, so the
+    # term becomes another ARGUMENT to it — the graded key) and WEDGE (transverse, needs new work).
+    import labelmap as LM
+    m = LM.LabelMap({"share": {"circuit": "current divider", "optimisation": "argmin"},
+                     "reuse": {"functional": "hash-consing"}},
+                    {"share": "operator/means/share"})          # PARTIAL — reuse has no route
+    assert m.lookup("Current-Divider")[:2] == ("share", "circuit"), "normalisation failed"
+    assert m.lookup("the argmin of it")[:2] == ("share", "optimisation"), "whole-word match failed"
+    # THE RESOLUTION LIMIT: matching is on WHOLE WORDS.  A substring rule matched `ratio` inside
+    # `bifibrational` and produced a hundred false hits — the instrument's own measured limit.
+    assert m.lookup("bifibrational") is None, "a substring matched — the false-hit rule is back"
+    reuse, wedge = m.contrast(["current divider", "hash-consing", "sheaf"])
+    assert set(reuse) == {"share", "reuse"} and wedge == ["sheaf"], \
+        f"contrast did not split the corpus into reuse and wedge: {reuse}, {wedge}"
+    # a concept with no route is UNRESOLVED — the third verdict, never a merge.
+    assert m.discriminate("argmin", "hash-consing", lambda r: 1)[0] == "unresolved", \
+        "a routeless concept was merged instead of reported unresolved"
+    # the index GROWS, and a collision is the DATUM (synonyms, or an under-parameterised concept) —
+    # which of the two is DERIVED by running the witnesses, never declared as a annotation.
+    m.add("potential divider", "share", "circuit")
+    assert sorted(m.collisions()[("share", "circuit")]) == ["current divider", "potential divider"], \
+        "the index did not grow, or the collision went undetected"
 
 
 def project_then_gate():
@@ -327,6 +474,16 @@ CONCEPTS = {
     "verifier-named": resolver_dispatches,
     "gate-dispatches": resolver_dispatches,
     "two-builtins": resolver_dispatches,
+    # the GRADED key (Λ·key·graded) — resolution of a key to its witness is itself a resolver
+    # capability, so it is interned beside the verb dispatch it parallels.
+    "graded-key": graded_key_resolves,
+    # the SLICE cache (Λ·cache·slice) — when a verdict may be REUSED is an adequacy question, so it
+    # is interned in delta beside the grading concepts.
+    "slice-cache": slice_cache_sound,
+    # the cotype layer (Λ·conclusion·backed, Λ·label·carrier) — gating REASONING, not claims.
+    "conclusion-backed": conclusion_needs_backing,
+    "conclusion-weak-direction": conclusion_needs_backing,
+    "label-carrier": label_records_carrier,
     # the projector component — one witness, THREE keys: README pitch (rm-pitch), the paper's
     # thesis (paper-is-projection), and its engine face (projector-emits).
     "rm-pitch": document_is_projection,
@@ -337,11 +494,23 @@ CONCEPTS = {
     "gate-rejects-drift": project_then_gate,
 }
 
+# Λ·key·graded — this library is a GRADE-0 route table, the degenerate case of the graded walk in
+# routes.py (`family[/subfamily]/argument`, resolved by consuming `/`-separated segments to a
+# `(fn, arg)` leaf).  Grade 0 is a flat key -> leaf map with no parameter axis, so adopting the
+# shared walk is a NO-OP here: the ~20 keys and every bib record are untouched, and each leaf holds
+# `arg = None` because these witnesses are nullary.
+#
+# DERIVED, never re-authored.  CONCEPTS above stays the authored form — its comments record which
+# VIEW cites each key, which is the reason several keys share one witness — and ROUTES is computed
+# from it, so the two cannot drift.  A library with a real parameter axis (mdt: `orbit/OR` vs
+# `orbit/XOR`) writes a nested table directly instead.
+ROUTES = {key: (fn, None) for key, fn in CONCEPTS.items()}
+
 
 def main(argv) -> int:
     prove_mode = "--prove" in argv
     argv = [a for a in argv if a != "--prove"]
-    if not argv or argv[0] not in CONCEPTS:
+    if not argv or routes.walk(ROUTES, argv[0]) is None:
         # Λ·doc·concept — name WHICH library answered.  `concept:` resolves to the consuming
         # project's library and falls back to the ENGINE's (resolver._library_for), and the
         # fallback is silent by design.  Without this path in the message, a downstream reader
@@ -363,8 +532,15 @@ def main(argv) -> int:
         import prove
         print(json.dumps(prove.certificate(argv[0]), indent=2))
         return 0
+    # The shared walk owns RESOLUTION and the exit-code protocol (0 certified / 1 FAILED /
+    # 2 not-mine, with a leaf's KeyError reading as 2 — see routes.py).  The verdict LINES stay
+    # in this format: `concept <key>: OK` is what this library has always emitted, and the
+    # message is a documented surface, so the port must not silently re-word it.
+    fn, arg = routes.walk(ROUTES, argv[0])
     try:
-        CONCEPTS[argv[0]]()
+        fn(arg) if arg is not None else fn()
+    except KeyError:
+        return 2                        # "not an argument I serve" — falls through, like no route
     except AssertionError as e:
         print(f"concept {argv[0]}: FAIL — {e}", file=sys.stderr)
         return 1

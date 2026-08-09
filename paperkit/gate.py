@@ -74,10 +74,31 @@ def cited_keys(prose: str) -> set:
     # Citations live in prose, not in emitted code blocks — strip fenced blocks so
     # an example containing `@misc{…}` is not misread as a citation [@misc].
     prose = re.sub(r"```.*?```", "", prose, flags=re.S)
+    # A `raw` placement is document syntax the engine did not construct, so it can
+    # forge the same markers.  The projector brackets it (project.RAW_OPEN/CLOSE)
+    # precisely so the shield fencing already gives code extends to it.
+    prose = re.sub(r"<!-- paperkit:raw -->.*?<!-- /paperkit:raw -->", "",
+                   prose, flags=re.S)
     # A citation materializes as a pandoc/web [@key] OR a footnote-target [^key] marker
     # (its document-end [^key]: definition names the same key) — count both as cited.
-    return (set(re.findall(r"@([A-Za-z0-9][\w.:-]*)", prose))
-            | set(re.findall(r"\[\^([A-Za-z0-9][\w.:-]*)\]", prose)))
+    #
+    # Λ·key·graded — `/` is IN the charset, so a key may be PARAMETERISED as
+    # `family[/subfamily]/argument`.  Without it a graded key cites as its own first segment:
+    # `[@f/A]` scans as a citation to `f`, which is simultaneously an undefined citation AND a
+    # "tagged section but not cited" coverage gap for `f/A` — two symptoms, one cause, and
+    # neither of them names the charset.  Admitting `/` is what lets the claim-DAG SEE the
+    # family axis (`rests-on` edges and coverage become family-aware) instead of the parameter
+    # hiding inside the check string, where only the witness can read it.
+    #
+    # The two markers carry DIFFERENT termination risk, which is why only one is guarded:
+    # `[^key]` is DELIMITED by its closing bracket, so widening the class cannot over-run.
+    # `@key` is UNDELIMITED — it ends at the first character outside the class — so every
+    # character added to the class extends how far it reaches.  A TRAILING `/` is therefore
+    # stripped: a citation at a clause boundary ("[@f/A]/") must not bind the separator, and a
+    # key with an empty last segment is not a key the walk can resolve anyway.  INTERIOR `/`
+    # is kept — that is the parameter axis itself.
+    return ({k.rstrip("/") for k in re.findall(r"@([A-Za-z0-9][\w.:/-]*)", prose)}
+            | set(re.findall(r"\[\^([A-Za-z0-9][\w.:/-]*)\]", prose)))
 
 
 def main(argv: list) -> int:

@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -233,15 +234,23 @@ def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str
     typ, _, target = check.partition(":")
     if typ == "file":
         return None
+    # Λ·trace·quote — result:/concept: build a SHELL string (footprint() runs it under strace),
+    # and the target comes from the bib, so it is interpolated with shlex.quote.  resolves()
+    # runs these two verbs through an argv LIST, never a shell, so the trace was the one place
+    # a target reached `sh -c` unquoted — a divergence between what runs and what is traced, on
+    # top of the injection seam.  Λ·key·graded (a key may carry `/`) does not itself break
+    # quoting, but it widens the charset a bib key can hold, so the latent seam gets closed
+    # rather than left resting on "no key has ever contained a metacharacter".
     if typ == "result":
-        return f"{sys.executable} {_GATE} --json --safe --without-K {target}"
+        return f"{sys.executable} {_GATE} --json --safe --without-K {shlex.quote(target)}"
     if typ == "concept":
         # The CANDIDATE library's command (the project's own first).  In the per-key fallthrough
         # case (Λ·library·fallthrough — the project library answers exit 2 and resolves() retries
         # the engine's) this traces the rc-2 probe, not the engine run: a bounded imprecision —
         # concept: carries no local footprint engine-side (bibtex.bzl skips it), and a downstream
         # fallthrough's footprint would need a run to discover, which a trace-string must not do.
-        return f"{sys.executable} {_library_for(project_dir) / 'concepts.py'} {target}"
+        return (f"{sys.executable} {shlex.quote(str(_library_for(project_dir) / 'concepts.py'))} "
+                f"{shlex.quote(target)}")
     if typ == "agree":   # trace every producer's reads — the footprint is their union
         return "; ".join(p.strip() for p in target.split("|||") if p.strip())
     if typ == "cmd":

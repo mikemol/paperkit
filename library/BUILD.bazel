@@ -4,6 +4,12 @@
 filegroup(name = "files", srcs = [
         "concepts.py",
         "prove.py",     # the self-proving face (concepts.py --prove); the build reuses the cached __dcalc
+        "routes.py",    # Λ·key·graded — the graded-key walk concepts.py resolves through (IMPORTED at
+                        # module scope, so an unstaged routes.py breaks EVERY project's concept: checks,
+                        # not just this library's: the hermetic sandbox stages only what is listed here.
+        "checkcache.py",  # Λ·cache·slice — the slice-keyed verdict cache (imported by slice-cache)
+        "labelmap.py",    # Λ·label·carrier — the concept/label/carrier index (imported by label-carrier)
+        "conclusiongate.py",  # Λ·conclusion·backed — the printed-conclusion gate (imported by conclusion-backed)
         "concepts.bib",
         "paper.toml",
         "rubric.tsv",

@@ -54,6 +54,14 @@
   check   = {cmd:python3 concepts.py edge-rests-grounds}
 }
 
+% Λ·cache·slice — WHEN a verdict may be reused is an adequacy question, so the slice cache is
+% interned in delta beside the grading concepts rather than treated as build plumbing.
+@misc{slice-cache,
+  section = {delta}, from = {edge-rests-grounds}, join = {. },
+  claim   = {a verdict is reusable exactly when nothing the check can REACH has changed, so the cache key is the check's slice --- its witness, the transitive closure of the module-level names it references, and the content of every module that closure reaches, the last of which is what a name-only slice misses when a witness imports inside its own body, serving a stale pass},
+  check   = {cmd:python3 concepts.py slice-cache}
+}
+
 @misc{rm-model,
   section = {model},
   claim   = {a claim is one bibliography entry --- a statement, its rubric section, its dependencies, and its check --- parsed by the engine's OWN bib reader, so mutating a parser def-site flips the witness and the certificate's fingerprint IS that parser},
@@ -150,6 +158,14 @@
   check   = {cmd:python3 concepts.py two-builtins}
 }
 
+% Λ·key·graded — resolving a KEY to its witness is the resolver's other half (the verb dispatch
+% above resolves a check's TYPE), so the graded key is interned here rather than in its own section.
+@misc{graded-key,
+  section = {resolver}, from = {two-builtins}, join = {; and },
+  claim   = {a concept key is GRADED --- family, optional subfamily, argument --- and one depth-agnostic walk resolves every grade, so a flat key is the degenerate case rather than a separate mechanism, while two keys differing only in argument share one implementation yet stay distinct witnesses to the gate},
+  check   = {cmd:python3 concepts.py graded-key}
+}
+
 @misc{rm-pitch,
   section = {projector},
   claim   = {the projector component's certificate --- a document IS the projection of its claim-DAG: the title, every rubric section, and every claim's prose appear in the emitted document, which leads with a heading},
@@ -178,4 +194,26 @@
   section = {projector},
   claim   = {the paper's drift face imports this same certificate --- the gate rejects any prose that has drifted from its projection},
   check   = {cmd:python3 concepts.py gate-rejects-drift}
+}
+
+% ── cotype: the layer that gates REASONING rather than claims.  A landed claim carries a command;
+% printed reasoning and a cross-session ledger carry nothing, and every gate above is blind to them.
+
+@misc{conclusion-backed,
+  section = {cotype},
+  claim   = {a printed conclusion must be backed by an assertion that would fail if it were false --- the check apparatus covers landed claims, each carrying a command, while printed reasoning carries nothing, so a conclusion can sit beside output from the same run that refutes it and no gate notices},
+  check   = {cmd:python3 concepts.py conclusion-backed}
+}
+
+@misc{conclusion-weak-direction,
+  section = {cotype}, from = {conclusion-backed}, join = {, and },
+  claim   = {the gate is deliberately weak in one direction and strong in the other --- it cannot tell whether an assertion is the RIGHT one, only that a conclusion was staked with nothing behind it, because a gate that judged relevance would have to be right about meaning and would fail open when it was not},
+  rests-on = {conclusion-backed},
+  check   = {cmd:python3 concepts.py conclusion-weak-direction}
+}
+
+@misc{label-carrier,
+  section = {cotype}, from = {conclusion-weak-direction}, join = {. },
+  claim   = {a label is a point in an orbit --- it names a concept from the carrier one was standing in, so a concept has one identity and many labels, and a foreign corpus splits into what to REUSE, where an existing witness family already covers the idea and the term becomes another argument to it, and what to WEDGE},
+  check   = {cmd:python3 concepts.py label-carrier}
 }

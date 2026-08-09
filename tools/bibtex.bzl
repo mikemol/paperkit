@@ -402,6 +402,16 @@ def _bib_repo_impl(repository_ctx):
             # result:); the GRADE + :cohere read the library's def-sweep certificate (__dcalc = verdict +
             # engine fingerprint), so the PROOF travels WITH the import — the view neither re-sweeps
             # (Λ·grid's cost) nor drops the fingerprint (naive-delegate's :cohere break).
+            # Λ·key·graded — the key may be PARAMETERISED (`family/subfamily/argument`), so it
+            # carries `/`, and it is used here UNFLATTENED on purpose.  Two reasons, both load-bearing:
+            #   (1) `/` is legal in a Bazel target NAME (it is a package-relative path fragment) —
+            #       verified: `//:shadow/110/cotype-unify` analyses and builds.
+            #   (2) BOTH SIDES derive from the same bib key.  @paperkit_library is a GENERATED repo
+            #       (MODULE.bazel bib.project(owns_concepts = True)) whose per-concept targets are
+            #       named `_lit(k)` from the library's own keys.  Flattening `/`→`_` HERE (as
+            #       _sitename/_filesitename do for perturbation sites) would desynchronise this
+            #       consumer's label from the emitter's target name and break the import — the
+            #       flatteners exist for mutation SITES, which have no such counterpart to match.
             key = check[len("concept:"):]
             out.append("pk_result(name = " + _lit(k) + ', sibling_verdict = "@paperkit_library//:' + key + '")')
             imported_cert[k] = "@paperkit_library//:" + key + "__dcalc"

@@ -33,6 +33,7 @@ The gate enforces three invariants: the committed prose equals its projection, e
 
 A verifier is named type:target, and one type ships built in per verb — exists, execs, parses, concurs, imports [@rm-resolver] --- the built-ins are [@rm-resolver-tbl].
 
+<!-- paperkit:raw -->
 | type | verb | passes when |
 | --- | --- | --- |
 | `file:<path>` | exists | the artifact exists |
@@ -42,6 +43,7 @@ A verifier is named type:target, and one type ships built in per verb — exists
 | `concept:<key>` | imports | the project's concept library --- else the engine's --- certifies that key |
 
 **When the mutation grade adds nothing.** If an `agree:` check's second producer is a *reference computation* --- a theorem or closed form the result must match --- rather than a *file read*, the agreement is already the whole falsification surface: a wrong result disagrees with the reference directly, so there is no separate "could this claim's data be corrupted" question for the mutation sweep to answer. paperkit's grade earns its keep when the oracle is a file whose *mutability* is the question, not when it is another computation.
+<!-- /paperkit:raw -->
 
 Cmd is the universal escape hatch every check reduces to, and a new domain adds named types in paper.toml without touching the engine [@rm-resolver-cmd]. A new domain declares them like this [@rm-resolver-eg].
 
@@ -59,6 +61,7 @@ A check ALSO names how a claim is verified, which the footnote and plain render 
 
 A passing check only proves a sentence named a verifier, not that the verifier entails it — so discriminate.py grades how much each check can actually fail [@adequacy-pitch] --- the grades are [@rm-delta-tbl].
 
+<!-- paperkit:raw -->
 | grade | meaning |
 | --- | --- |
 | `imported` | delegated to a separately-gated owner — a sibling's verdict, or the library's certificate |
@@ -67,6 +70,7 @@ A passing check only proves a sentence named a verifier, not that the verifier e
 | `indeterminate` | no generic mutation flips it — vacuous, or a negative-assertion check |
 | `vacuous` | provably can't fail — `file:` of an input the build already requires |
 | `broken` | does not pass in a pristine sandbox — the repo is not green |
+<!-- /paperkit:raw -->
 
 You run it as a report or as a gate, like this [@rm-delta-cmds].
 

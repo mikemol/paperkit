@@ -9,8 +9,13 @@ the PDF path (a downstream project points it at its own accessible deliverable) 
 paper's own pandoc→LibreOffice PDF is NOT PDF/UA-tagged, so this ships as an opt-in tool, not a
 warrant of the render project itself.
 
-  (1) PDF/UA-2   — veraPDF --flavour ua2 → require failedChecks==0 AND passedChecks>0 (a "0 of 0"
-                   empty run cannot pass vacuously).  veraPDF absent ⇒ FAIL LOUD, never skip-green.
+  (1) PDF/UA     — veraPDF --flavour <--flavour, default ua2> → require failedChecks==0 AND
+                   passedChecks>0 (a "0 of 0" empty run cannot pass vacuously).  veraPDF absent
+                   ⇒ FAIL LOUD, never skip-green.  Gate on the flavour the PRODUCER targets:
+                   LibreOffice emits UA-1 and declares pdfuaid:part=1, so a fully conformant
+                   UA-1 file validated as ua2 fails on metadata it never claimed.  The verdict
+                   line names the flavour checked, so a report cannot imply a standard it did
+                   not verify.
   (2) Tagged     — pdfinfo reports Tagged: yes.  With --mathml, a MathML sidecar must also exist
                    (the math is recoverable structure, not ink); without it, Tagged alone.
   (3) Measure    — WCAG 2.2 SC 1.4.8: glyphs-per-line (pdftotext -layout, non-blank body lines);
@@ -23,7 +28,7 @@ warrant of the render project itself.
 
     python3 checks/a11y.py DELIVERABLE.pdf [--mathml SIDECAR.html]
                            [--cpl-median 70] [--cpl-p90 80] [--flush-frac 0.38]
-                           [--verapdf /path/to/verapdf]
+                           [--verapdf /path/to/verapdf] [--flavour ua1|ua2]
 
 Thresholds are parameters with WCAG-derived defaults; --flush-frac separates justified (~0.45)
 from ragged (~0.28) — calibrate it against your producer if your body geometry differs.
@@ -69,21 +74,21 @@ def _find_verapdf(explicit: str | None) -> Path | None:
 
 
 # ── (1) PDF/UA-2 via veraPDF ─────────────────────────────────────────────────────────────────────
-def check_ua2(r: Result, pdf: Path, verapdf: str | None) -> None:
+def check_ua2(r: Result, pdf: Path, verapdf: str | None, flavour: str = "ua2") -> None:
     binp = _find_verapdf(verapdf)
     if binp is None:
-        r.add("(1) PDF/UA-2 (veraPDF)", False,
+        r.add("(1) PDF/UA (veraPDF)", False,
               "veraPDF not found (looked at --verapdf, PATH, ~/.local/bin) — "
               "cannot verify; refusing to skip-green")
         return
-    rc, out = _run([str(binp), "--flavour", "ua2", str(pdf)])
+    rc, out = _run([str(binp), "--flavour", flavour, str(pdf)])
     m = re.search(r'<details[^>]*passedChecks="(\d+)"[^>]*failedChecks="(\d+)"', out)
     if not m:
-        r.add("(1) PDF/UA-2 (veraPDF)", False, f"could not parse veraPDF report (rc={rc})")
+        r.add("(1) PDF/UA (veraPDF)", False, f"could not parse veraPDF report (rc={rc})")
         return
     passed, failed = int(m.group(1)), int(m.group(2))
     ok = failed == 0 and passed > 0            # a "0 of 0" empty run cannot pass vacuously
-    r.add("(1) PDF/UA-2 (veraPDF)", ok, f"passedChecks={passed} failedChecks={failed}")
+    r.add("(1) PDF/UA (veraPDF)", ok, f"passedChecks={passed} failedChecks={failed}")
 
 
 # ── (2) Tagged + optional MathML sidecar ───────────────────────────────────────────────────────────
@@ -162,7 +167,7 @@ def check_not_justified(r: Result, pdf: Path, flush_max: float) -> None:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="accessible-PDF gate (WCAG 2.2 SC 1.4.8 + PDF/UA-2)")
+    ap = argparse.ArgumentParser(description="accessible-PDF gate (WCAG 2.2 SC 1.4.8 + PDF/UA)")
     ap.add_argument("pdf", type=Path, help="the rendered PDF deliverable to gate")
     ap.add_argument("--mathml", type=Path, default=None,
                     help="a MathML sidecar that must exist (math is recoverable structure)")
@@ -171,13 +176,18 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--flush-frac", type=float, default=0.38,
                     help="max modal-right-edge flush fraction (<this = ragged)")
     ap.add_argument("--verapdf", default=None, help="path to the veraPDF binary")
+    ap.add_argument("--flavour", default="ua2",
+                    help="veraPDF conformance flavour (ua1|ua2).  A producer targets ONE: "
+                         "LibreOffice emits UA-1 and declares pdfuaid:part=1, so a fully "
+                         "conformant UA-1 deliverable validated as ua2 fails on metadata it "
+                         "never claimed.  Gate on what the producer targets, and say which.")
     args = ap.parse_args(argv)
 
     if not args.pdf.exists():
         print(f"a11y: PDF not found at {args.pdf} — build the deliverable first", file=sys.stderr)
         return 1
     r = Result()
-    check_ua2(r, args.pdf, args.verapdf)
+    check_ua2(r, args.pdf, args.verapdf, args.flavour)
     check_tagged(r, args.pdf, args.mathml)
     check_measure(r, args.pdf, args.cpl_median, args.cpl_p90)
     check_not_justified(r, args.pdf, args.flush_frac)
@@ -188,7 +198,7 @@ def main(argv: list[str]) -> int:
         print(f"  {'✓' if ok else '✗'} {name:<34} {detail}")
     print("  " + "-" * 66)
     if r.ok():
-        print("  a11y: PASS — WCAG 2.2 SC 1.4.8 + PDF/UA-2 verified")
+        print(f"  a11y: PASS — WCAG 2.2 SC 1.4.8 + PDF/{args.flavour.upper()} verified")
         return 0
     print("  a11y: FAIL — one or more accessibility criteria not met", file=sys.stderr)
     return 1

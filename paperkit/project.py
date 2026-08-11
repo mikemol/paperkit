@@ -18,6 +18,8 @@ DIR defaults to the current directory and must contain `paper.toml`.
 """
 from __future__ import annotations
 
+import csv
+import json
 import re
 import sys
 import tomllib
@@ -53,6 +55,12 @@ def clean(s: str) -> str:
     # is the same shield discipline as \{ \}, one level up: the whole math span is literal.
     math: list = []
     s = re.sub(r"(?<!\\)\$[^$]*\$",
+               lambda m: math.append(m.group(0)) or f"\x02{len(math) - 1}\x03", s)
+    # A code span is LITERAL for the same reason inline math is: `--flavour` is a
+    # command-line flag, not prose, and the en-dash rule below would silently
+    # rewrite it to `–flavour` -- a flag the reader cannot type. Shield it the
+    # same way, and restore it verbatim.
+    s = re.sub(r"`[^`\n]*`",
                lambda m: math.append(m.group(0)) or f"\x02{len(math) - 1}\x03", s)
     for pat, rep in _LATEX:
         s = re.sub(pat, rep, s)
@@ -121,29 +129,98 @@ def sentence(key: str, f: dict, primary: str, target: str = "pandoc") -> str:
 
 GLUE = ["and from that, ", "so "]
 
-# A placed (not woven) warrant emits a verbatim asset instead of a sentence; the
-# fence language is inferred from the asset's extension (empty = raw include, for
-# markdown tables and prose snippets).
+# A placed (not woven) warrant emits an asset instead of a sentence.  WHICH
+# renderer runs is DECLARED by `as`; the suffix map below is the legacy fallback
+# for warrants that predate the field.
 FENCE = {".sh": "sh", ".bash": "sh", ".py": "python", ".toml": "toml",
          ".bib": "bibtex", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
-         ".txt": "text", ".tsv": "text", ".md": ""}   # .md = raw include (tables)
+         ".txt": "text", ".tsv": "text", ".md": ""}   # .md = raw include (legacy)
 
 
 IMAGE_EXTS = {".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".emf"}
 
+RENDERERS = ("table", "image", "code", "raw")
+
+# A `raw` placement is document syntax the engine did not construct, so it can
+# forge the very markers the gate reads — [@key] citations and `## ` headings.
+# Fencing already shields code from cited_keys (gate.cited_keys strips ``` runs);
+# these sentinels give the raw arm the same shield.  Keep in sync with gate.py.
+RAW_OPEN, RAW_CLOSE = "<!-- paperkit:raw -->", "<!-- /paperkit:raw -->"
+
+
+def _cell(s: str) -> str:
+    """One table cell.  The FILE owns data; the ENGINE owns document syntax — so
+    nothing a cell contains may become markup, a citation, or a heading."""
+    s = " ".join(str(s).split())            # newlines would break the row
+    return (s.replace("\\", "\\\\").replace("|", "\\|")
+             .replace("[", "\\[").replace("]", "\\]"))   # kills [@key] citations
+
+
+def _rows(p: Path) -> list:
+    """(header, rows) from tabular DATA — never from pre-rendered markup."""
+    suf = p.suffix.lower()
+    if suf == ".json":
+        data = json.loads(p.read_text())
+        if isinstance(data, dict) and "columns" in data:
+            return [list(data["columns"])] + [list(r) for r in data.get("rows", [])]
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            cols = list(data[0].keys())
+            return [cols] + [[r.get(c, "") for c in cols] for r in data]
+        if isinstance(data, list):
+            return [list(r) for r in data]
+        raise ValueError(f"{p.name}: unrecognised table JSON shape")
+    delim = "," if suf == ".csv" else "\t"
+    with p.open(newline="") as fh:
+        return [r for r in csv.reader(fh, delimiter=delim) if r]
+
+
+def render_table(p: Path) -> list:
+    """A markdown table the ENGINE builds from data, with every cell escaped."""
+    rows = _rows(p)
+    if not rows:
+        return [f"<!-- emit: empty table {p.name} -->"]
+    width = max(len(r) for r in rows)
+    out = [[_cell(c) for c in r] + [""] * (width - len(r)) for r in rows]
+    head, body = out[0], out[1:]
+    return (["| " + " | ".join(head) + " |",
+             "|" + "|".join([" --- "] * width) + "|"]
+            + ["| " + " | ".join(r) + " |" for r in body])
+
+
+def _infer(p: Path) -> str:
+    """Legacy renderer inference from the filename.  Deprecated: declare `as`."""
+    if p.suffix.lower() in IMAGE_EXTS:
+        return "image"
+    return "code" if FENCE.get(p.suffix) else "raw"
+
 
 def emit_block(pdir: Path, f: dict) -> list:
-    """The lines for an `emit:` warrant.  An image asset is placed as a markdown
-    image (the claim is its caption/alt); any other asset is included verbatim,
-    fenced by the language its extension implies (raw if none)."""
+    """The lines for an `emit:` warrant, rendered by its DECLARED `as` kind:
+
+        table  data (.tsv/.csv/.json) → a markdown table the engine constructs,
+               every cell escaped, so an asset cannot inject document syntax
+        image  → a markdown image, the claim as its caption/alt
+        code   → a fenced block, language from the extension
+        raw    → included verbatim, shielded from cited_keys by sentinels
+
+    With `as` absent the kind is inferred from the extension, preserving the
+    behaviour of warrants written before the field existed.
+    """
     p = pdir / f["emit"]
-    if p.suffix.lower() in IMAGE_EXTS:
+    kind = (f.get("as") or "").strip().lower() or _infer(p)
+    if kind not in RENDERERS:
+        raise ValueError(f"{f['emit']}: unknown renderer as={kind!r}; "
+                         f"expected one of {', '.join(RENDERERS)}")
+    if kind == "image":
         return [f"![{clean(f.get('claim', 'figure'))}]({f['emit']})"]
     if not p.exists():
         return [f"<!-- emit: missing {f['emit']} -->"]
+    if kind == "table":
+        return render_table(p)
     content = p.read_text().rstrip("\n")
-    lang = FENCE.get(p.suffix, "")
-    return [f"```{lang}", content, "```"] if lang else [content]
+    if kind == "code":
+        return [f"```{FENCE.get(p.suffix, '')}", content, "```"]
+    return [RAW_OPEN, content, RAW_CLOSE]
 
 
 def transitive_reduction(rests: dict) -> dict:
@@ -336,6 +413,15 @@ def project(cfg: dict, target: str = "pandoc") -> str:
             else:
                 _close_list()
                 run.append(k)
+                # ISO 24495-1 asks for one topic per paragraph.  A claim IS one
+                # assertion, and dep_order has already topologically sorted the
+                # section, so flushing per claim satisfies that BY CONSTRUCTION
+                # rather than by editorial judgement.  The default stays `woven`:
+                # short, tightly-linked claims read better joined, and a claim
+                # written to follow a connective does not stand alone.
+                if cfg.get("paragraph") == "claim":
+                    _flush()
+                    _blank()
         _close_list()
         _flush()
         _blank()

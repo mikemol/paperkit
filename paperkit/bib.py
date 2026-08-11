@@ -23,7 +23,7 @@ import re
 
 # scalar fields carried verbatim (the projector + checks read these)
 _SCALAR = ("title", "author", "year", "note", "section", "claim",
-           "check", "glue", "join", "move", "emit", "mem", "link", "depth")
+           "check", "glue", "join", "move", "emit", "as", "mem", "link", "depth")
 # list-valued fields.  `from` = prose-order edge (dep_order + glue); `rests-on` =
 # grounding/entailment edge (adequacy clamping, NOT prose) — the two are often
 # reversed (prose runs general→specific, grounding specific→general); `reads` =
@@ -73,6 +73,9 @@ def load_config(project: Path) -> dict:
         "bibs": [_bibpath(project, b) for b in p.get("warrants", ["warrants.bib"])],
         "out": project / p.get("out", "paper.md"),
         "numbered": p.get("numbered", True),
+        # ISO 24495-1 one-topic-per-paragraph: "claim" gives each claim its
+        # own paragraph; "woven" (default) joins a section into running prose.
+        "paragraph": p.get("paragraph", "woven"),
         "references": p.get("references", True),
         "adequacy": p.get("adequacy", False),   # Ζ·project: emit a Δ-adequacy Bazel test for this project
     }

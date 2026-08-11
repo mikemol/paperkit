@@ -36,8 +36,8 @@ if str(ENGINE) not in sys.path:                  # Φ·spawn: the helpers import
 PROJECT, GATE, DISCRIMINATE = ENGINE / "project.py", ENGINE / "gate.py", ENGINE / "discriminate.py"
 
 
-def entry(key, *, claim=None, emit=None, frm=None, rests=None, glue=None, join=None,
-          move=None, check="file:w.bib", section="s", mem=None):
+def entry(key, *, claim=None, emit=None, as_=None, frm=None, rests=None, glue=None,
+          join=None, move=None, check="file:w.bib", section="s", mem=None):
     """A valid multi-line bibliography entry.  The parser requires the closing
     brace on its own line, so this never silently fails to parse.  section=None
     omits the field — a SECTIONLESS node (grounding-only, reachable via rests-on)."""
@@ -56,6 +56,8 @@ def entry(key, *, claim=None, emit=None, frm=None, rests=None, glue=None, join=N
         fs.append(f"  claim = {{{claim}}}")
     if emit:
         fs.append(f"  emit = {{{emit}}}")
+    if as_:
+        fs.append(f"  as = {{{as_}}}")
     fs.append(f"  check = {{{check}}}")
     if mem:
         fs.append(f"  mem = {{{mem}}}")

@@ -20,7 +20,15 @@ import config
 # live gaps: `setup/reference.json`, whose project prose asserts "Δ can corrupt it and flip the
 # verdict" while Δ could not, and `tools/grade.bzl`, which bnd-ladder makes assertions about and
 # could not falsify.  Admitted deliberately, off a measurement, rather than guessed.
-MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt", ".json", ".bzl"}
+# `.pm`, `.yaml`/`.yml` and `.conf` were the next live gaps, measured the same way: a paper written
+# ABOUT A SERVICE rather than about paperkit grounds its code-facts in that service's sources, and
+# every such check read a suffix the sweep could not corrupt.  Twelve checks in one such project
+# graded `indeterminate` while being plainly falsifiable in fact — edit the Perl and they go red —
+# so the grade was measuring the sweep's reach, not the check's strength.  Admitted off that
+# measurement.  The set is TEXT SOURCES a claim can be grounded in; binary and archive formats
+# (`.gz`, images) stay out, and a check reading only those is honestly reported as unmeasured.
+MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt", ".json", ".bzl",
+                    ".pm", ".pl", ".yaml", ".yml", ".conf"}
 # ...except DERIVED files, which are outputs rather than inputs.  A .pyc is excluded by SKIP_DIRS
 # (it lives in __pycache__); a Δ cache is not in any skip dir, so it is named here.  Corrupting an
 # output cannot falsify a claim — it only makes the sweep measure its own bookkeeping (and a cache

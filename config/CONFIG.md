@@ -10,6 +10,7 @@ Every configurable resolves the one way — an explicit argument over an environ
 
 The knobs, each with its flag, environment variable, config key, and default — generated from the introspected union of the engine's knob declarations, so this table cannot drift from the code [@cfg-table].
 
+<!-- paperkit:raw -->
 | knob | flag | env var | config | default |
 | --- | --- | --- | --- | --- |
 | `all` (flag) | `--all` | `PAPERKIT_ALL` | — | `—` |
@@ -33,3 +34,4 @@ The knobs, each with its flag, environment variable, config key, and default —
 | `state` (value) | `--state` | `PAPERKIT_STATE` | — | `—` |
 | `target` (value) | `--target` | `PAPERKIT_TARGET` | `target` | `pandoc` |
 | `without-K` (flag) | `--without-K` | `PAPERKIT_WITHOUT_K` | `without_k` | `—` |
+<!-- /paperkit:raw -->

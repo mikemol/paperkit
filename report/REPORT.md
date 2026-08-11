@@ -6,6 +6,7 @@
 
 Every document the local CI gates passes the gate with zero postulates [@rpt-status] — the verdict per document, each project discovered, not hand-listed [@rpt-status-out].
 
+<!-- paperkit:raw -->
 | document | gate (--safe) | prose ≡ projection | checks verified | sections | CI tier |
 | --- | --- | --- | --- | --- | --- |
 | paper | PASS | yes | 80 | 15 | //:hook |
@@ -16,6 +17,7 @@ Every document the local CI gates passes the gate with zero postulates [@rpt-sta
 | library | PASS | yes | 2 | 1 | //:hook |
 | render | on-demand | — | — | — | on-demand |
 | setup | on-demand | — | — | — | wired |
+<!-- /paperkit:raw -->
 
 Gate reproducibility splits the documents, and the report CHARACTERIZES the split rather than merely scoping around it — the sandbox-clean set gates deterministically and is run above, while render, image, and setup gate non-reproducibly because named checks shell named external toolchains: render's shell pandoc and libreoffice, image's shell podman whose build fetches over the network, and setup's shell systemd-run, so each on-demand verdict varies with build-cache and network state — determinism.py names the exact command behind each, so the non-reproducibility is itself reproducible on demand [@rpt-reproducible]. And the variance is bounded and disclosed, three mitigations proven in place — image's img-stable gates that two independent --no-cache builds yield the SAME content digest, so the artifact is reproducible even when building it is not, confining the non-determinism to build cost rather than to what is verified; the report's gate runner labels a document it cannot verify here as on-demand or n/a, never a false verification FAIL; and the cache-warmth variance is itself stabilized by retrying to a warm-cache fixpoint — rerun while the verdict changes, return the converged warm result — while a verdict that never converges is flagged as a non-cache clock or threshold cause for separate characterization, not laundered as reproducible [@rpt-mitigation].
 
@@ -23,6 +25,7 @@ Gate reproducibility splits the documents, and the report CHARACTERIZES the spli
 
 Δ grades each cited claim's check by whether it can actually fail [@rpt-delta] — the grade of every cited claim in every document, with why this grade and why not a higher or lower one [@rpt-delta-out].
 
+<!-- paperkit:raw -->
 ### paper
 
 _80 cited claims — self-grade: 1 imported, 79 behavioral; effective (clamped by entailment): 1 imported, 79 behavioral; 0 clamped below self._
@@ -179,11 +182,13 @@ _2 cited claims — self-grade: 2 behavioral; effective (clamped by entailment):
 | --- | --- | --- | --- | --- | --- |
 | `adequacy-pitch` | behavioral | `cmd:python3 concepts.py adequacy-pitch` | falsifiable — corrupting 15 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 15 input(s)) |
 | `grade-ladder` | behavioral | `cmd:python3 concepts.py grade-ladder` | falsifiable — corrupting 15 input(s) flips it red | behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined | not indeterminate/vacuous: a mutation DOES flip it (sensitive to 15 input(s)) |
+<!-- /paperkit:raw -->
 
 ## Proof-relevance (--without-K)
 
 In every document, every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another) [@rpt-proof] — as the proof-relevance check reports [@rpt-proof-out].
 
+<!-- paperkit:raw -->
 **paper** — every cited claim carries a distinct witness; `--without-K` is clean.
 
 **README** — every cited claim carries a distinct witness; `--without-K` is clean.
@@ -191,6 +196,7 @@ In every document, every cited claim carries a distinct witness, so --without-K 
 **boundaries** — every cited claim carries a distinct witness; `--without-K` is clean.
 
 **library** — every cited claim carries a distinct witness; `--without-K` is clean.
+<!-- /paperkit:raw -->
 
 ## Adequacy along the entailment DAG
 

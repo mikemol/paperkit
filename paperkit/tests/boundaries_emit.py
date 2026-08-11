@@ -25,6 +25,14 @@ P_MD = entry("p", claim="an example", emit="x.md", frm="c", check="file:x.md")
 SH = {"x.sh": "echo hi\n"}
 MD = {"x.md": "| a | b |\n| - | - |\n"}
 
+# The renderer is DECLARED by `as`, not inferred from the filename.  A `table`
+# asset carries DATA and the engine builds the markup, so a cell cannot inject
+# document syntax; a `raw` asset IS markup, so it is shielded from cited_keys the
+# way a fence already shields code.
+P_TAB = entry("p", claim="a table", emit="t.tsv", as_="table", frm="c", check="file:t.tsv")
+P_RAWTAB = entry("p", claim="a table", emit="t.tsv", frm="c", check="file:t.tsv")
+TAB = {"t.tsv": "metric\tvalue\nsee [@forged]\t1|2\n"}
+
 
 def main() -> int:
     fails = []
@@ -42,6 +50,14 @@ def main() -> int:
     check("additive: the example is CITED ([@p] in prose)", "[@p]" in proj_sh)
     check(".md asset is a raw include (no code fence)",
           "| a | b |" in proj_md and "```" not in proj_md)
+    proj_tab = project_text([C, P_TAB], assets=TAB)
+    check("as=table builds the markup from data (header + delimiter row)",
+          "| metric | value |" in proj_tab and "| --- | --- |" in proj_tab)
+    check("as=table escapes cells, so an asset cannot forge a citation or a pipe",
+          r"\[@forged\]" in proj_tab and r"1\|2" in proj_tab
+          and "[@forged]" not in proj_tab)
+    check("a raw placement is bracketed, so cited_keys cannot read markers inside it",
+          "<!-- paperkit:raw -->" in proj_md and "<!-- /paperkit:raw -->" in proj_md)
     proj_svg = project_text([entry("a", claim="a cited claim"),
                              entry("p", claim="a figure", emit="fig.svg", frm="a", check="file:fig.svg")],
                             assets={"fig.svg": "<svg/>\n"})
@@ -62,6 +78,13 @@ def main() -> int:
         ("fence inferred from the asset extension", "the emit target extension (.sh → .md)",
          ".sh → ```sh fence", "```sh" in project_text([C, P_CITE], assets=SH),
          ".md → raw, no fence", "```sh" not in project_text([C, P_MD], assets=MD)),
+        ("declared renderer overrides the suffix inference", "the as= field on the emit warrant",
+         "as=table → engine-built markup", "| --- | --- |" in project_text([C, P_TAB], assets=TAB),
+         "absent  → inferred, verbatim", "| --- | --- |" not in project_text([C, P_RAWTAB], assets=TAB)),
+        ("an asset can forge a citation only when it is NOT engine-rendered",
+         "the as= field on the same asset",
+         "as=table → escaped, inert", "[@forged]" not in project_text([C, P_TAB], assets=TAB),
+         "inferred → verbatim in prose", "[@forged]" in project_text([C, P_RAWTAB], assets=TAB)),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -74,7 +97,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (5 behaviors, 3 deltas)")
+    print("BOUNDARIES: PASS (8 behaviors, 5 deltas)")
     return 0
 
 

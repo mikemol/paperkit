@@ -45,6 +45,22 @@ SCAFFOLD = [rec("a", tests=["checks/claims.py::a"]),             # a measures no
 # fingerprint empty — a degraded def-sweep).  One engine site anywhere makes it non-vacuous.
 VAC = [rec("only", tests=["checks/claims.py::only"])]            # scaffolding only → measures nothing
 LIVE = [rec("only", tests=["paperkit/gate.py::resolves"])]      # one engine site → a real measurement
+# (c) the COMPUTED FRAME (Ζ·torsor) — `_engine_cap` quotients the sites EVERY cited claim trips
+# (`_universal_sites`), because a site all witnesses share cannot DISCRIMINATE two claims and so
+# makes any grounding overlap on it trivially true.  U is such a universal site; the ONLY grounding
+# overlap between a and b is U, so the frame's quotient exposes the edge as the genuine miss it is —
+# reflected WITHOUT the frame, a miss WITH it.  (The old frame hardcoded `paperkit/`-inclusion and
+# never computed this, so the whole quotient was untested.)
+U = "paperkit/bib.py::parse"
+UNIVFRAME = [rec("a", tests=[U, "paperkit/gate.py::resolves"]),
+             rec("b", rests=["a"], tests=[U, "paperkit/project.py::weave"])]
+# (d) the UNMEASURED face (Ζ·symdiff) — a `rests-on` edge whose TARGET was never graded is invisible
+# to grounding/emergence (both need a fingerprint at BOTH ends).  `pending` = target the bib declares
+# but no grade covers yet; `dangling` = target no bib entry declares at all (a broken edge, not a
+# thin grade).  Separating them keeps a partial reading from implying coverage it does not have.
+PENDING = [rec("x", rests=["y"])]                    # y declared (∈ all_keys) but ungraded → pending
+DANGLING = [rec("x", rests=["z"])]                   # z declared nowhere → dangling (broken edge)
+MEASURED_TGT = [rec("y"), rec("x", rests=["y"])]     # y graded → the edge is seen, nothing pending
 
 
 def main() -> int:
@@ -82,6 +98,20 @@ def main() -> int:
           C.report(VAC)["vacuous"] is True)
     check("vacuity (Ν·vac): one engine site → NOT vacuous (a real verdict is possible)",
           C.report(LIVE)["vacuous"] is False)
+    check("frame (c): _universal_sites is the intersection over cited fingerprints (≥2 claims)",
+          C._universal_sites(UNIVFRAME) == frozenset({U}))
+    check("frame (c): below two fingerprints the frame is undefined → identity quotient (empty)",
+          C._universal_sites([rec("a", tests=[U, "paperkit/gate.py::resolves"])]) == frozenset())
+    check("frame (c): un-quotiented, the shared universal site reflects the edge (undischarged 0)",
+          C.grounding_residual(UNIVFRAME)["undischarged"] == 0)
+    check("frame (c): report() quotients the universal site → the edge is a genuine miss (undischarged 1)",
+          C.report(UNIVFRAME)["grounding"]["undischarged"] == 1)
+    check("unmeasured (d): a rests-on to an ungraded-but-declared target is PENDING",
+          C.unmeasured_edges(PENDING, all_keys=frozenset({"x", "y"}))["pending"] == [["x", "y"]])
+    check("unmeasured (d): a rests-on to a target no bib entry declares is DANGLING (broken edge)",
+          C.unmeasured_edges(DANGLING, all_keys=frozenset({"x"}))["dangling"] == [["x", "z"]])
+    check("unmeasured (d): a graded target is seen by grounding → not counted",
+          C.unmeasured_edges(MEASURED_TGT, all_keys=frozenset({"x", "y"}))["unmeasured"] == 0)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -108,6 +138,16 @@ def main() -> int:
          "the lone claim's fingerprint (scaffolding-only → an engine site)",
          "engine site → not vacuous", C.report(LIVE)["vacuous"] is False,
          "scaffold only → vacuous", C.report(VAC)["vacuous"] is True),
+        ("frame (c): the computed quotient turns a trivial universal overlap into the genuine miss",
+         "whether _universal_sites is quotiented out (report frames; grounding_residual default does not)",
+         "un-quotiented → 0 (U reflects)", C.grounding_residual(UNIVFRAME)["undischarged"] == 0,
+         "quotiented → 1 (miss surfaces)", C.report(UNIVFRAME)["grounding"]["undischarged"] == 1),
+        ("unmeasured (d): an edge's target is pending until it is graded",
+         "whether the rests-on target has a record (ungraded → pending, graded → seen)",
+         "target graded → 0 unmeasured",
+         C.unmeasured_edges(MEASURED_TGT, all_keys=frozenset({"x", "y"}))["unmeasured"] == 0,
+         "target ungraded → 1 pending",
+         C.unmeasured_edges(PENDING, all_keys=frozenset({"x", "y"}))["unmeasured"] == 1),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -120,7 +160,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (13 behaviors, 5 deltas)")
+    print("BOUNDARIES: PASS (20 behaviors, 7 deltas)")
     return 0
 
 

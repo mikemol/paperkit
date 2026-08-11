@@ -240,6 +240,49 @@ def main(argv: list) -> int:
         else:
             stale.append(c)
 
+    # Δ·bank·cohere — a resumption token indexes into THIS `stale` list (the witness pumps a
+    # cursor over it), so a token is only meaningful against the set it was written against.
+    # Banking makes the cache move DURING a sweep, so the two interact, and the interaction has
+    # two very different cases that must not be conflated:
+    #
+    #   the EXPECTED shrink   banking removed exactly the checks this token already graded.  The
+    #                         cursor counted them; the new stale set no longer contains them.
+    #                         Resuming at that cursor would SKIP that many un-graded checks.  The
+    #                         grades are safe in the cache, so the repair is to reset the cursor
+    #                         to 0 and sweep what remains — no measurement is lost or repeated.
+    #
+    #   a genuine DIVERGENCE  the set changed some other way (an edit, a changed root, a
+    #                         different project).  A cursor into it names different claims, and
+    #                         no reset can make the old token mean anything.  Ν·loud: refuse.
+    #
+    # Telling them apart is what the sidecar is for: it records the stale set the token was
+    # written against, so the shrink can be checked for being a SUBSET (banking) rather than
+    # merely different (divergence).  Before banking, the cache never moved mid-sweep and this
+    # whole interaction was unreachable.
+    if state_file is not None and stale:
+        sidecar = Path(str(state_file) + ".stale")
+        prior = (sidecar.read_text().splitlines()
+                 if Path(state_file).exists() and sidecar.exists() else None)
+        if prior is not None and prior != stale:
+            if set(stale) <= set(prior):
+                # the expected shrink — banked grades left the stale set.  Drop the token: its
+                # cursor counts a longer list, and every grade it stood for is already cached.
+                Path(state_file).unlink(missing_ok=True)
+                print(f"paperkit-discriminate: {len(prior) - len(stale)} banked grade(s) left the "
+                      f"stale set; resumption token reset (the grades are durable in the cache, "
+                      f"so nothing is re-measured)", file=sys.stderr)
+            else:
+                print(f"Ν·loud: {state_file} was written against a stale set this run does not "
+                      f"extend ({len(prior)} check(s) then, {len(stale)} now, "
+                      f"{len(set(stale) - set(prior))} of them unseen) — an edit, a changed root "
+                      f"or a different project.  Its cursor no longer names the same claims.  "
+                      f"Delete it and re-run.", file=sys.stderr)
+                return 2
+        try:
+            sidecar.write_text("\n".join(stale))
+        except OSError:
+            pass                              # a read-only state dir is not a grading failure
+
     fresh, fresh_grader = {}, None
     if stale and state_file is None and budget_raw is None:
         # Batch grade — the default.  Test the RAW value (budget_raw): an absent --budget
@@ -253,8 +296,28 @@ def main(argv: list) -> int:
         witness = GradeWitness(project_dir, stale, custom, presupposed, resolution)
         meaning, steps, done = D.drive(witness, state_path=state_file, budget=budget)
         if not done:
+            # Δ·bank — BANK the increment's completed grades into the cache before returning.
+            # The resumption token already makes the next call CONTINUE; without this the graded
+            # records reach only the state file, which nothing but the driver reads — so a
+            # partial grade was invisible to every cache consumer (coherence --from-cache, a
+            # later sweep's `reuse` set) until a run happened to finish.  A grade is durable the
+            # moment it is measured, not the moment the sweep ends: bank it here on exactly the
+            # terms the completion path uses below, so N bounded increments and one long run
+            # leave the SAME cache.  Entries not yet graded are simply absent (a partial cache is
+            # a partial reading, never a wrong one); an untraceable footprint stays uncacheable.
+            if not no_cache:
+                banked = dict(reuse)
+                for c, rec in meaning["graded"].items():
+                    fp = rec.get("_footprint", [])
+                    if fp is None:
+                        continue                  # Φ·degrade — uncacheable, as below
+                    banked[c] = {"grade": {k: v for k, v in rec.items() if k != "_footprint"},
+                                 "footprint": fp, "fp": _footprint_hash(project_dir, fp)}
+                _save_cache(project_dir, {"engine": engine, "resolution": resolution,
+                                          "root": str(sandbox_root), "checks": banked})
             print(f"paperkit-discriminate: graded {meaning['progress']} in {steps} increment(s) — "
-                  f"not done; state persisted to {state_file}, re-run to resume", file=sys.stderr)
+                  f"not done; state persisted to {state_file} ({len(meaning['graded'])} grade(s) "
+                  f"banked to the cache), re-run to resume", file=sys.stderr)
             return 2
         fresh = meaning["graded"]
         fresh_grader = "GradeWitness"

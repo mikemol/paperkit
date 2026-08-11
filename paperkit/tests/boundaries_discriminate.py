@@ -286,11 +286,28 @@ def main() -> int:
     print(f"      F (flag side): --min-strength bogus → exit {bogus_rc}, 'must be one of' on stderr")
     print(f"      δ (min delta): one membership test against the ladder (bogus ∉ grade.ORDER)\n")
 
+    # ── Ζ·ladder·sentinel (finding A): the exit alphabet is TYPED so a resume loop can tell
+    # "call me again" (2) from "you asked wrong" (3).  An --only key that names no check is a
+    # caller bug and REFUSES with 3 — never 2 — so `until discriminate; do :; done` aborts on a
+    # typo instead of spinning (a downstream consumer measured 29 iterations in 15s on the old
+    # overloaded code).  A real key grades and exits 0.
+    print("Δ exit alphabet — Ζ·ladder·sentinel (finding A)\n")
+    refuse_rc, _ = discriminate(W("cmd:true"), "--only", "no-such-key")
+    ok_rc, _ = discriminate(W("cmd:true"), "--only", "w")
+    refuse_ok = refuse_rc == 3 and ok_rc == 0
+    if not refuse_ok:
+        fails.append(("refuse-code", refuse_rc, ok_rc))
+    print(f"  {'ok ' if refuse_ok else 'XX '}an unknown --only key REFUSES with 3 (≠ 2 resume); a real key exits 0")
+    print(f"      P (pass side): --only w          → exit {ok_rc} (grades the named check)")
+    print(f"      F (flag side): --only no-such-key → exit {refuse_rc} (refuse: a key naming nothing)")
+    print(f"      δ (min delta): whether the --only key names a check (present → grade; absent → refuse)\n")
+
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} case(s) drifted)")
         return 1
     print(f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas, "
-          f"1 grader-equivalence, 1 adequacy-composes, 1 def-engine-guard, 1 floor-refusal)")
+          f"1 grader-equivalence, 1 adequacy-composes, 1 def-engine-guard, 1 floor-refusal, "
+          f"1 exit-alphabet)")
     return 0
 
 

@@ -340,6 +340,14 @@ def _records(project_dir: Path) -> list:
     r = subprocess.run([sys.executable, str(_ENGINE / "discriminate.py"),
                         "--resolution", "def", "--json", str(project_dir)],
                        capture_output=True, text=True)
+    # Ν·loud — the sweep's exit code is a VERDICT, not noise.  A whole-project --json run returns 0;
+    # a non-zero is a real failure (a refused key, a crash) whose stdout is empty or partial, and
+    # `json.loads(... or "[]")` would silently read it as an EMPTY document — a vacuous report
+    # presented as a real one.  Surface it instead of banking the swallow (finding A's consumer face).
+    if r.returncode != 0:
+        raise SystemExit(f"Ν·loud: `discriminate --resolution def --json {project_dir}` exited "
+                         f"{r.returncode} — the ∂² faces have nothing sound to read.  "
+                         f"stderr:\n{r.stderr.strip()}")
     return json.loads(r.stdout or "[]")
 
 

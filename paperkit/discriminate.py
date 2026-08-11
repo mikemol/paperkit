@@ -47,6 +47,13 @@ signal split N ways.
                                                  grade under an S-second budget, persist the
                                                  token to F, exit 2 if not done — re-run to
                                                  resume.  A slow grade resumes, never dies.
+
+Exit codes are TYPED (a resume loop must tell "call me again" from "you asked wrong"):
+  0  done            1  an adequacy floor (--min-strength/--corroboration) was not met
+  2  INCOMPLETE, resume — the pump-witness spent its budget; re-run to continue
+  3  REFUSE          — a caller bug the engine will not answer (unknown --only key, or a
+                       resumption token written against a different stale set).  Distinct
+                       from 2 so a resume loop aborts on a bug instead of spinning on it.
     paperkit-discriminate --no-cache [DIR]       ignore the content-addressed cache
 
 Grades are memoized PER CHECK (Δ·footprint-cache): each check's grade is keyed on the
@@ -85,6 +92,16 @@ import grader  # noqa: E402
 import layout  # noqa: E402
 import project  # noqa: E402
 import resolver  # noqa: E402
+
+# Ζ·ladder·sentinel (exit alphabet) — main()'s returns are TYPED so a caller can tell "call me
+# again" from "you asked wrong".  0 done · 1 an adequacy FLOOR was not met · 2 INCOMPLETE, resume
+# (the pump-witness spent its budget — re-run to continue) · _REFUSE a caller BUG the engine will
+# not answer (a key that names no check, or a resumption token written against a different set).
+# Refuse used to share code 2 with resume, so a naive `until discriminate; do :; done` loop spun
+# forever on a typo'd key (a downstream consumer measured 29 iterations in 15s before killing it).
+# The distinct code lets the loop ABORT on a bug instead of retrying it; "not measured" is not a
+# measurement, and "you asked wrong" is not "ask again".
+_REFUSE = 3
 
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).
@@ -177,7 +194,7 @@ def main(argv: list) -> int:
             # (Reported by a downstream consumer, who lost a debugging cycle reading it as "repo red".)
             print(json.dumps({"claim": only,
                               "error": "no-check" if f else "no-such-claim"}), file=sys.stderr)
-            return 2
+            return _REFUSE                     # a key naming nothing is a caller bug, NOT a resume
         chk = f["check"]
         mutant = config.resolve(MUTANT)
         if mutant:
@@ -277,7 +294,7 @@ def main(argv: list) -> int:
                       f"{len(set(stale) - set(prior))} of them unseen) — an edit, a changed root "
                       f"or a different project.  Its cursor no longer names the same claims.  "
                       f"Delete it and re-run.", file=sys.stderr)
-                return 2
+                return _REFUSE                 # a token naming a different set is a bug, NOT a resume
         try:
             sidecar.write_text("\n".join(stale))
         except OSError:

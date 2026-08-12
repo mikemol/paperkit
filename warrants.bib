@@ -38,6 +38,13 @@
   emit    = {assets/claim.bib},
   check   = {claim:rm-model-eg}
 }
+@misc{rm-fields,
+  section = {model}, from = {rm-model-eg}, join = {. },
+  claim   = {and an entry may carry these fields, a project these paper keys --- generated from the parser's own field set (bib._SCALAR, _LIST) and the keys load_config reads, so this table cannot drift from what the engine actually does},
+  emit    = {assets/fields.md},
+  check   = {claim:rm-fields},
+  reads   = {.}
+}
 
 % ── commands ─────────────────────────────────────────────────────────────────
 @misc{rm-cmds,

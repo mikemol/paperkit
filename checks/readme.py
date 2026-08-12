@@ -11,6 +11,7 @@ README project at the repo root (deps are paperkit/, not ../paperkit).
 """
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -172,6 +173,18 @@ def rm_resolver_eg():
         "the resolver does not dispatch a config-declared custom type"
 
 
+def rm_fields():
+    # Ρ·surface·project — the fields/[paper]-keys table is GENERATED from bib's OWN field set
+    # (bib._SCALAR/_LIST + the keys load_config reads), never authored, so a new field cannot ship
+    # undocumented: gen_fields RAISES on a field with no gloss (check=True surfaces that as a red
+    # gate).  Fresh-by-construction, exactly as cfg-table gates config's knobs.md — the committed
+    # asset must equal a fresh regeneration.  Project, don't author.
+    gen = subprocess.run([sys.executable, "checks/gen_fields.py"],
+                         capture_output=True, text=True, check=True).stdout
+    assert (ROOT / "assets" / "fields.md").read_text().strip() == gen.strip(), \
+        "assets/fields.md drifted from bib's field set — regenerate: python3 checks/gen_fields.py > assets/fields.md"
+
+
 CLAIMS = {
     "rm-selfhost": rm_selfhost,
     "rm-resolver-premise": rm_resolver_premise,
@@ -179,6 +192,7 @@ CLAIMS = {
     "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,
     "rm-delta-cmds": rm_delta_cmds, "rm-layout": rm_layout, "rm-model-eg": rm_model_eg,
     "rm-delta-tbl": rm_delta_tbl, "rm-resolver-tbl": rm_resolver_tbl, "rm-resolver-eg": rm_resolver_eg,
+    "rm-fields": rm_fields,
 }
 
 

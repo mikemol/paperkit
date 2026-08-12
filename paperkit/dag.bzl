@@ -17,6 +17,7 @@ IMPORTS = {
     "tests/_fixture_gate.py": ["_fixture_model", "_fixture_project", "gate"],
     "tests/_fixture_project.py": ["_fixture_model", "project"],
     "tests/boundaries_agree.py": ["resolver"],
+    "tests/boundaries_bib.py": ["bib"],
     "tests/boundaries_coherence.py": ["coherence"],
     "tests/boundaries_config.py": ["config"],
     "tests/boundaries_corroboration.py": ["_fixture_delta", "_fixture_model"],

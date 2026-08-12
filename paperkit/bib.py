@@ -29,6 +29,34 @@ _SCALAR = ("title", "author", "year", "note", "section", "claim",
 # reversed (prose runs general→specific, grounding specific→general); `reads` =
 # the declared cross-package footprint (the declare+audit source, Ζ·foot).
 _LIST = ("from", "rests-on", "reads")
+# Standard BibTeX reference metadata paperkit TOLERATES on a references.bib citation but does
+# not consume (the projector reads only title/author/year).  Kept so the unknown-field warning
+# below fires on a MEANINGFUL dropped field (a downstream author's `points`, a mistyped `check`)
+# and stays quiet on ordinary bibliography metadata that is expected to be carried and ignored.
+_BIBTEX = frozenset({
+    "journal", "volume", "number", "pages", "booktitle", "doi", "url", "publisher", "editor",
+    "address", "month", "isbn", "issn", "organization", "school", "institution", "series",
+    "chapter", "edition", "howpublished", "eprint", "archiveprefix", "primaryclass", "keywords",
+})
+_WARNED: set = set()          # (file, key, field) already reported — a build parses each bib many times
+
+
+def _top_fields(body: str) -> list:
+    """The TOP-LEVEL `name = {` field names in an entry body, tracking brace depth so an `=`
+    inside a value (set notation `x = {1,2}` in a claim) is not mistaken for a field.  Used to
+    catch a field the parser does not consume — which it would otherwise drop in silence."""
+    names, depth = [], 0
+    for m in re.finditer(r"([A-Za-z][\w-]*)\s*=\s*\{|[{}]", body):
+        tok = m.group(0)
+        if tok == "{":
+            depth += 1
+        elif tok == "}":
+            depth = max(0, depth - 1)
+        else:                                    # a `name = {` — only a field when at top level
+            if depth == 0:
+                names.append(m.group(1))
+            depth += 1                           # entered the value's brace
+    return names
 
 
 def parse(path: Path) -> dict:
@@ -46,6 +74,22 @@ def parse(path: Path) -> dict:
             for name in _LIST:
                 fr = re.search(r"\b" + name + r"\s*=\s*\{([^}]*)\}", body)
                 f[name] = [a for a in re.split(r"[,\s]+", fr.group(1)) if a] if fr else []
+            # Ζ·ladder·sentinel (the parser's face) — a field paperkit does not consume is DROPPED,
+            # and a silent drop is a silent failure: a downstream author's `points` (a real grounding
+            # relation) vanished on 14 entries with no signal.  Name it LOUD rather than drop it in
+            # silence — but stay quiet on standard BibTeX metadata (_BIBTEX), which references carry
+            # and paperkit is expected to ignore.  A warning, not a refusal: the field may be
+            # deliberate human documentation, and breaking a downstream's build is not the point —
+            # being SEEN is.  Deduped, since a build parses each bib many times.
+            unknown = [n for n in _top_fields(body)
+                       if n not in _SCALAR and n not in _LIST and n not in _BIBTEX]
+            for n in unknown:
+                if (path.name, key, n) not in _WARNED:
+                    _WARNED.add((path.name, key, n))
+                    print(f"paperkit-bib: {path.name} @{key}: field '{n}' is not a paperkit field "
+                          f"and was DROPPED (not silently) — paperkit reads "
+                          f"{', '.join(list(_SCALAR) + list(_LIST))}; use one, or remove it",
+                          file=sys.stderr)
             out[key] = f
     return out
 

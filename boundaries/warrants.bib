@@ -169,3 +169,8 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_otlp.py},
   reads   = {.}
 }
+@misc{bnd-bib,
+  section = {engine}, from = {bnd-otlp}, join = {. },
+  claim   = {the bib PARSER's boundary --- it carries the known fields (_SCALAR, _LIST) and NAMES any other field loudly on stderr rather than dropping it in silence, staying quiet only on the standard BibTeX metadata a references.bib citation is expected to carry, and its top-level field scan tracks brace depth so an equals sign inside a value is not mistaken for a field},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_bib.py}
+}

@@ -44,6 +44,7 @@ COMPONENTS = {
         "tests/_fixture_model.py",
         "tests/_fixture_project.py",
         "tests/boundaries_agree.py",
+        "tests/boundaries_bib.py",
         "tests/boundaries_check.py",
         "tests/boundaries_coherence.py",
         "tests/boundaries_components.py",

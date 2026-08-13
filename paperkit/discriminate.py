@@ -132,6 +132,13 @@ REGISTRY = [MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE, BUDGET, ALL, FOOTPRINT, 
             project.TARGET, project.CHECK]
 
 
+def _fine(rec: dict) -> list:
+    """Δ·grain — the sensitivity set to key on, or [] when there is none to trust.  Only a
+    BEHAVIORAL grade has a measured surface: an indeterminate one was flipped by nothing, so it
+    has no definitions to key on and must keep the whole-file key."""
+    return list(rec.get("tests") or []) if rec.get("grade") == "behavioral" else []
+
+
 def main(argv: list) -> int:
     config.apply_args(argv, REGISTRY)   # Ω·config: capture args process-locally (arg overrides env)
     pos = config.positionals(argv, REGISTRY)
@@ -252,7 +259,7 @@ def main(argv: list) -> int:
     reuse, stale = {}, []
     for c in share:
         e = entries.get(c)
-        if e and _footprint_hash(project_dir, e["footprint"]) == e["fp"]:
+        if e and _footprint_hash(project_dir, e["footprint"], _fine(e.get("grade", {}))) == e["fp"]:
             reuse[c] = e
         else:
             stale.append(c)
@@ -329,7 +336,8 @@ def main(argv: list) -> int:
                     if fp is None:
                         continue                  # Φ·degrade — uncacheable, as below
                     banked[c] = {"grade": {k: v for k, v in rec.items() if k != "_footprint"},
-                                 "footprint": fp, "fp": _footprint_hash(project_dir, fp)}
+                                 "footprint": fp,
+                                 "fp": _footprint_hash(project_dir, fp, _fine(rec))}
                 _save_cache(project_dir, {"engine": engine, "resolution": resolution,
                                           "root": str(sandbox_root), "checks": banked})
             print(f"paperkit-discriminate: graded {meaning['progress']} in {steps} increment(s) — "
@@ -350,7 +358,8 @@ def main(argv: list) -> int:
         if fp is None:
             continue                          # Φ·degrade: untraceable footprint — UNCACHEABLE (re-grade
             # every run).  Storing it under [] would over-reuse a grade whose inputs we never saw.
-        new_entries[c] = {"grade": fresh[c], "footprint": fp, "fp": _footprint_hash(project_dir, fp)}
+        new_entries[c] = {"grade": fresh[c], "footprint": fp,
+                          "fp": _footprint_hash(project_dir, fp, _fine(fresh[c]))}
 
     if not no_cache:
         _save_cache(project_dir, {"engine": engine, "resolution": resolution,

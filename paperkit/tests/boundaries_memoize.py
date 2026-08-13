@@ -4,7 +4,9 @@
 A Δ grade is a pure function of the content a check reads — content_key(project) is the
 coarse soundness basis (project + engine files).  The cache realizes it PER CHECK: each
 grade is keyed on its read footprint (Φ) plus the engine epoch, so editing a file re-grades
-only the checks that READ it, leaving the rest reused.  Bounds: content_key is deterministic
+only the checks that READ it, leaving the rest reused — and for a behavioral grade at DEFINITION
+granularity (Δ·grain), so editing a def re-grades only the checks measured sensitive to that def,
+while a file-granular grade keeps the whole-file key.  Bounds: content_key is deterministic
 and tracks mutable inputs only; the cache reuses grades on unchanged inputs; an edit
 invalidates exactly the checks whose footprint it touches; and --no-cache recomputes the same.
 
@@ -87,6 +89,28 @@ def main() -> int:
         cb_reused = g.get("cmd:grep -q BAR fb.txt") == "cache"
         check("editing fa.txt re-grades the check that READS it (ca fresh)", ca_fresh)
         check("...and leaves the check that does not (cb) reused from cache", cb_reused)
+
+        # Δ·grain — the per-check key is DEF-granular when the grade MEASURES def sensitivity
+        # (behavioral, `tests` naming `file::qual`): a module edit then re-grades only the checks
+        # sensitive to the DEFINITIONS it changed, not every check that reads the module.
+        gd = Path(tempfile.mkdtemp())
+        mod = gd / "mod.py"
+        fh, fine = D._footprint_hash, D._fine
+        DEF = fine({"grade": "behavioral", "tests": ["mod.py::foo"]})   # sensitive to foo, not bar
+        FILE = fine({"grade": "behavioral", "tests": ["mod.py"]})       # whole-file sensitive
+        mod.write_text("def foo():\n    return 1\n\ndef bar():\n    return 2\n")
+        k_def0, k_file0 = fh(gd, ["mod.py"], DEF), fh(gd, ["mod.py"], FILE)
+        mod.write_text("def foo():\n    return 1\n\ndef bar():\n    return 999\n")     # non-depended
+        reuse_nondep = fh(gd, ["mod.py"], DEF) == k_def0
+        mod.write_text("def foo():\n    return 42\n\ndef bar():\n    return 2\n")      # depended
+        regrade_dep = fh(gd, ["mod.py"], DEF) != k_def0
+        mod.write_text("def foo():\n    return 12345\n\ndef bar():\n    return 2\n")   # def-body edit
+        sound_file = fh(gd, ["mod.py"], FILE) != k_file0
+        shutil.rmtree(gd, ignore_errors=True)
+        check("Δ·grain: a def the check does NOT depend on → grade reused (the def key holds)", reuse_nondep)
+        check("Δ·grain: a def the check DEPENDS on → re-graded (the def key changes)", regrade_dep)
+        check("Δ·grain SOUNDNESS: a FILE-granular grade keeps the WHOLE-file key — a def-body edit invalidates",
+              sound_file)
         print()
 
         print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -100,6 +124,10 @@ def main() -> int:
             ("the cache invalidates PER CHECK, on its footprint", "which check's footprint the edited file is in",
              "ca reads fa.txt (edited) → re-graded", ca_fresh,
              "cb reads fb.txt (untouched) → reused", cb_reused),
+            ("Δ·grain keys on the DEFINITIONS a check depends on, not the whole file",
+             "whether the edited def is in the check's measured sensitivity set",
+             "non-depended def edited → grade reused", reuse_nondep,
+             "depended def edited → grade re-graded", regrade_dep),
         ]
         for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
             ok = p_ok and f_ok
@@ -114,7 +142,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (9 behaviors, 3 deltas)")
+    print("BOUNDARIES: PASS (12 behaviors, 4 deltas)")
     return 0
 
 

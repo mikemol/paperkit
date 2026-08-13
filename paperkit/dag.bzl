@@ -3,7 +3,7 @@
 # pk_pyc's deps are its imports, so a consumer stages a module's transitive .pyc closure,
 # not the flat engine.  REGENERATE (never hand-edit): tools/imports.py over ENGINE_SRCS.
 IMPORTS = {
-    "cache.py": ["layout"],
+    "cache.py": ["layout", "mutate"],
     "coherence.py": ["bib"],
     "discriminate.py": ["bib", "cache", "config", "driver", "gate", "grade", "grader", "layout", "project", "resolver"],
     "footdeps.py": ["bib", "resolver"],

@@ -59,6 +59,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bib  # noqa: E402  (the parser/data-model leaf — read the bib structure + `link` acknowledgments)
 
 _ENGINE = Path(__file__).resolve().parent
+# Ζ·ladder·sentinel — the same REFUSE rung discriminate types (a caller bug the tool will not
+# answer), kept numerically identical so a caller reads one alphabet across the engine.
+_REFUSE = 3
 
 
 def _linearize(records: list) -> dict:
@@ -393,17 +396,22 @@ def _records_from_cache(project_dir: Path) -> list:
     would feed the sensitivity, grounding and emergence faces a measurement that cannot
     discriminate — and `_vacuous_exit` would then report a vacuous DOCUMENT rather than a wrong
     tool.  Ν·loud: refuse, naming the resolution found, rather than degrade."""
+    # Both refusals below are REFUSE (_REFUSE = 3, discriminate's alphabet), not a floor-unmet 1:
+    # pointing this at a project with no cache, or with a file-resolution one, is a CALLER BUG the
+    # tool will not answer — the same category as an unknown --only key.  `raise SystemExit(str)`
+    # exits 1, which read as "a threshold was missed" and put a caller bug in the verdict channel.
     p = project_dir / ".delta-cache.json"
     if not p.is_file():
-        raise SystemExit(f"Ν·loud: no .delta-cache.json in {project_dir} — run "
-                         "`discriminate.py --resolution def --state S --budget N` first")
+        print(f"Ν·loud: no .delta-cache.json in {project_dir} — run "
+              "`discriminate.py --resolution def --state S --budget N` first", file=sys.stderr)
+        raise SystemExit(_REFUSE)
     cached = json.loads(p.read_text())
     if cached.get("resolution") != "def":
-        raise SystemExit(
-            f"Ν·loud: .delta-cache.json is {cached.get('resolution')!r} resolution, not 'def' — "
-            "at file resolution every witness collapses to the import-crash signature, so the "
-            "sensitivity, grounding and emergence faces would read a measurement that cannot "
-            "discriminate.  Re-grade with --resolution def.")
+        print(f"Ν·loud: .delta-cache.json is {cached.get('resolution')!r} resolution, not 'def' — "
+              "at file resolution every witness collapses to the import-crash signature, so the "
+              "sensitivity, grounding and emergence faces would read a measurement that cannot "
+              "discriminate.  Re-grade with --resolution def.", file=sys.stderr)
+        raise SystemExit(_REFUSE)
     F = {}
     for b in bib.load_config(project_dir)["bibs"]:
         F.update(bib.parse(b))

@@ -158,6 +158,25 @@ def main(argv: list) -> int:
     else:
         info(f"paperkit-gate: {out.name} ≡ projection")
 
+    # SAID-SOMETHING — a claim projected into PROSE must carry prose, never fall back to its bare
+    # KEY.  bib.parse matches `claim` with a brace-balanced regex, so a claim whose closing brace
+    # lands a field late (the value runs on and cannot close within the entry) simply does NOT
+    # match: the field is ABSENT rather than malformed, and the projector (project.py:119-123)
+    # falls back to `title`, then to the KEY.  PROJECT/RESOLVE/COVERAGE all still hold — the
+    # committed prose IS that projection, `check` parsed, the claim is cited — so a placeholder
+    # reading its own bibtex key (e.g. `Add-privacy.`) ships inside a gated document with nothing
+    # asserting that a projected claim said anything.  A section-tagged prose claim with neither
+    # `claim` nor `title` would render as its key; refuse it.  An emit PLACEMENT projects a BLOCK
+    # (not a sentence) and a reference carries a title, so both are exempt by construction.
+    mute = sorted(k for k, f in F.items()
+                  if f.get("section") and not f.get("emit")
+                  and not f.get("claim") and not f.get("title"))
+    if mute:
+        print(f"paperkit-gate: {len(mute)} claim(s) would project as their bare KEY, carrying no "
+              f"prose — {mute} — a claim projected into prose must SAY something (a dropped `claim`, "
+              f"likely a closing brace that lands a field late)", file=sys.stderr)
+        rc = 1
+
     # RESOLVE — every cited claim's check passes; references at least defined.
     # Placed warrants (emit:/figure) carry no citation but ARE in the document by
     # construction, so their checks must pass too.  And a claim's GROUNDING

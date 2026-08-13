@@ -78,7 +78,23 @@ def main() -> int:
     check("Δ grades the sectionless grounding nodes too (they appear in the records)",
           {"g", "h"} <= keys)
 
-    print("\n⟨P, F, δ⟩ minimum-delta pair\n")
+    # SAID-SOMETHING (summit ask-degenerate-claim-passes) — a claim whose `claim` brace lands a
+    # field late loses its text to bib.parse's brace-balanced regex; the projector then renders the
+    # bare KEY as the paragraph and PROJECT/RESOLVE/COVERAGE all still hold.  The gate refuses a
+    # section claim that would project as its key (no `claim`, no `title`).  δ = the closing brace.
+    GOOD = entry("good", claim="a good claim")
+    RUNAWAY = ("@misc{mute,\n  section = {s}, from = {good}, join = {. },\n"
+               "  claim   = {this claim loses its closing brace and the next field swallows it,\n"
+               "  check   = {cmd:true}\n}\n")
+    CLOSED = ("@misc{mute,\n  section = {s}, from = {good}, join = {. },\n"
+              "  claim   = {this claim closes its brace},\n  check   = {cmd:true}\n}\n")
+    rc_mute, e_mute = gate([GOOD, RUNAWAY], assets=PLAIN)
+    rc_said, _ = gate([GOOD, CLOSED], assets=PLAIN)
+    check("a claim whose `claim` brace runs away projects as its bare KEY — the gate REFUSES",
+          rc_mute == 1 and "bare KEY" in e_mute and "mute" in e_mute)
+    check("the same claim with its brace closed says something — the gate PASSES", rc_said == 0)
+
+    print("\n⟨P, F, δ⟩ minimum-delta pairs\n")
     ok = rc_p == 0 and rc_f == 1
     fails.append("grounding-delta") if not ok else None
     print(f"  {'ok ' if ok else 'XX '}the grounded leaf's check alone flips the gate")
@@ -86,10 +102,17 @@ def main() -> int:
     print("      F (flag side): h's check breaks (file:nope absent) → gate FAIL, [@h] named")
     print("      δ (min delta): one grounded (sectionless, uncited) claim's check target\n")
 
+    ok2 = rc_mute == 1 and rc_said == 0
+    fails.append("said-something-delta") if not ok2 else None
+    print(f"  {'ok ' if ok2 else 'XX '}a claim that says nothing (projects as its key) flips the gate")
+    print("      P (pass side): the `claim` brace closes → the paragraph carries prose → PASS")
+    print("      F (flag side): the brace runs away → the paragraph is the bare KEY → FAIL")
+    print("      δ (min delta): the claim's closing brace\n")
+
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (8 behaviors, 1 delta)")
+    print("BOUNDARIES: PASS (10 behaviors, 2 deltas)")
     return 0
 
 

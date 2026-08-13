@@ -160,7 +160,7 @@
           "@@//paperkit/discriminate.py": "cc066cdcd79f25eae642601fc5c481a729897b39160dd66ee7996d46a5abb927",
           "@@//paperkit/driver.py": "f102c6efb796e846d68b55a78a12a869d27157b84472efa35183b77537da136e",
           "@@//paperkit/footdeps.py": "a8dfe5fab3ad940a22734194aa2885db4bdbf151d6bb1e48dd08b57f15ab0c10",
-          "@@//paperkit/gate.py": "a85a44233c51e8a231e56054f9eb3a9e70c55cf4f5ccccae62b654218af031c2",
+          "@@//paperkit/gate.py": "eca987dd8fbd2d925f2589451ec9abbc3ea1bab20f31096224004960f0d31a7a",
           "@@//paperkit/grade.py": "e7ff39b98918096675a7f021bc5c8759ca18344efc0a0f89f4c98c0892774dd1",
           "@@//paperkit/grader.py": "67ff15ceac5c910d19ed487ec8a1d4e8935af6ec5c1e1b2ca0d359d2b0de3b5b",
           "@@//paperkit/layout.py": "f93582bb4a665271b8a216d6d7a04e86a08f54f7da4fb0ccad6b2d0b3fcd5838",

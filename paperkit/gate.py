@@ -262,8 +262,12 @@ def main(argv: list) -> int:
     # whose artifact is absent is at least as strong a signal.  Absence gets denoted, never defaulted.
     # (Reported by a downstream consumer whose `out` lived outside the project dir, so the generator
     # and the projector resolved the asset to two different paths.)
+    # Resolve the asset against the PROJECT dir (where warrants + assets live), matching
+    # project.py's pdir — NOT out.parent, which is the output location and may sit outside the
+    # project (out = "../../note.md"); resolving there was the two-different-paths bug above.
+    pdir = cfg.get("project_dir") or cfg["out"].parent
     for k, f in F.items():
-        if f.get("emit") and not (cfg["out"].parent / f["emit"]).exists():
+        if f.get("emit") and not (pdir / f["emit"]).exists():
             gaps.append(f"placement [@{k}] emits {f['emit']} — the artifact is ABSENT, so the "
                         f"document renders a placeholder comment where the evidence should be")
     for k, f in F.items():

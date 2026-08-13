@@ -113,6 +113,10 @@ def load_config(project: Path) -> dict:
     return {
         "title": p.get("title", "Untitled"),
         "subtitle": p.get("subtitle", ""),
+        # The project DIRECTORY — where warrants, rubric and emit: assets live.  Distinct from
+        # out.parent, which is the OUTPUT location and may point outside the project (out can be
+        # `../../foo.md`).  emit: assets resolve against THIS, not the output dir.
+        "project_dir": project,
         "rubric": project / p.get("rubric", "rubric.tsv"),
         "bibs": [_bibpath(project, b) for b in p.get("warrants", ["warrants.bib"])],
         "out": project / p.get("out", "paper.md"),

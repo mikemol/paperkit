@@ -16,3 +16,8 @@ setup/.loadtest.lock
 
 # Ζ·sched-batch — the lazy-built helper binary (arch-specific; source tools/sched-batch.rs is tracked)
 tools/sched-batch
+
+# The summit drop zone: incoming letters must not dirty this tree.
+# Ruling: ~/github/summit/proceedings/rulings/inbox-drop-zone.md
+# Ignored from HERE rather than by a file inside it, so provisioning adds nothing to git status.
+/inbox/

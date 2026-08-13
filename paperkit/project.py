@@ -344,7 +344,9 @@ def project(cfg: dict, target: str = "pandoc") -> str:
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
         F.update(entries(b))
-    pdir = cfg["out"].parent
+    # emit: assets resolve against the PROJECT dir (where warrants + assets live), not out.parent
+    # (the OUTPUT location, which may point outside the project — e.g. out = "../../note.md").
+    pdir = cfg.get("project_dir") or cfg["out"].parent
     by_sec = {}
     for k, f in F.items():
         if f.get("section"):

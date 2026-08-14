@@ -113,9 +113,11 @@ def load_config(project: Path) -> dict:
     return {
         "title": p.get("title", "Untitled"),
         "subtitle": p.get("subtitle", ""),
-        # The project DIRECTORY — where warrants, rubric and emit: assets live.  Distinct from
-        # out.parent, which is the OUTPUT location and may point outside the project (out can be
-        # `../../foo.md`).  emit: assets resolve against THIS, not the output dir.
+        # The project DIRECTORY — where warrants and rubric live, and the FIRST anchor emit: assets
+        # resolve against (see emit_anchors): a project whose `out` points OUTSIDE itself keeps its
+        # assets here.  out.parent (the OUTPUT location, which `out = "../../foo.md"` can push
+        # outside the project) is the SECOND anchor, for a project whose assets sit beside `out`
+        # (the mirror layout).  The two coincide for an in-repo project.
         "project_dir": project,
         "rubric": project / p.get("rubric", "rubric.tsv"),
         "bibs": [_bibpath(project, b) for b in p.get("warrants", ["warrants.bib"])],
@@ -161,6 +163,43 @@ def is_placed(f: dict) -> bool:
     """A warrant projected as a block (emit:) or a figure — placed verbatim, not
     woven into prose, and so covered by its placement rather than a citation."""
     return bool(f.get("emit")) or f.get("check", "").startswith("figure:")
+
+
+def emit_anchors(cfg: dict, emit: str) -> list:
+    """The DISTINCT directories that hold a placement asset, in RESOLUTION ORDER — beside the
+    warrants (`project_dir`) FIRST, then beside the output (`out.parent`).  An index-extension,
+    NOT a choice of anchors: a project whose `out` points OUTSIDE itself keeps its assets by the
+    project dir, and a project whose assets sit BESIDE `out` (the mirror layout) keeps them there;
+    the two coincide for an in-repo project, so this returns ONE entry there.
+
+    `[]`      — the asset is at NEITHER anchor: genuinely ABSENT.
+    `len 1`   — resolved unambiguously (the common case, always so in-repo).
+    `len 2`   — it is at BOTH distinct anchors, which is a LAYOUT AMBIGUITY the caller must SURFACE
+                (the gate does) rather than silently resolve — a silent patch is silent debt.
+
+    (629af60 keyed emit: on `project_dir` UNCONDITIONALLY — `cfg.get("project_dir") or out.parent`,
+    the `or` dead because load_config always sets project_dir — which fixed the out-outside case
+    and broke the mirror layout it did not consider.  The real fallback its message promised is
+    this ordered lookup over both.)"""
+    seen, hits = set(), []
+    for anchor in (cfg["project_dir"], cfg["out"].parent):
+        d = Path(anchor).resolve()
+        if d in seen:                            # in-repo: the two anchors are one dir
+            continue
+        seen.add(d)
+        p = d / emit
+        if p.exists():
+            hits.append(p)
+    return hits
+
+
+def emit_path(cfg: dict, emit: str) -> "Path | None":
+    """The path a placement asset RESOLVES to for READING — the first anchor that holds it
+    (project_dir before out.parent, deterministic so the projection is stable), or None when
+    neither does.  The projector reads this; the GATE surfaces the ambiguity when BOTH hold it
+    (emit_anchors, len 2), so a coin-flip the author did not intend never resolves in silence."""
+    hits = emit_anchors(cfg, emit)
+    return hits[0] if hits else None
 
 
 def rests_closure(seed: set, F: dict) -> tuple:

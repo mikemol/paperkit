@@ -262,14 +262,26 @@ def main(argv: list) -> int:
     # whose artifact is absent is at least as strong a signal.  Absence gets denoted, never defaulted.
     # (Reported by a downstream consumer whose `out` lived outside the project dir, so the generator
     # and the projector resolved the asset to two different paths.)
-    # Resolve the asset against the PROJECT dir (where warrants + assets live), matching
-    # project.py's pdir — NOT out.parent, which is the output location and may sit outside the
-    # project (out = "../../note.md"); resolving there was the two-different-paths bug above.
-    pdir = cfg.get("project_dir") or cfg["out"].parent
+    # The asset resolves against BOTH legitimate anchors — project_dir (assets beside the warrants)
+    # then out.parent (assets beside the output) — via bib.emit_anchors, the SAME resolver
+    # project.py's emit_block reads, so the gate and the projector cannot diverge (that split WAS
+    # the two-different-paths bug).  ABSENT when neither holds it; AMBIGUOUS, and NOISY, when both
+    # distinct anchors do — the projector reads the first, so which content ships would otherwise
+    # be a silent coin-flip.  (629af60 keyed on project_dir alone and broke the mirror layout.)
     for k, f in F.items():
-        if f.get("emit") and not (pdir / f["emit"]).exists():
+        if not f.get("emit"):
+            continue
+        hits = bib.emit_anchors(cfg, f["emit"])
+        if not hits:
             gaps.append(f"placement [@{k}] emits {f['emit']} — the artifact is ABSENT, so the "
                         f"document renders a placeholder comment where the evidence should be")
+        elif len(hits) > 1:
+            differ = len({p.read_bytes() for p in hits}) > 1
+            detail = ("DIFFERENT content — the projector reads the first, the second is silently "
+                      "ignored" if differ else "identical content, but the layout is ambiguous")
+            gaps.append(f"placement [@{k}] emits {f['emit']} — AMBIGUOUS: it resolves at BOTH "
+                        f"{' and '.join(str(p) for p in hits)} ({detail}); keep the asset at ONE "
+                        f"anchor (beside the warrants OR beside the output, not both)")
     for k, f in F.items():
         if f.get("section") and k not in cited:
             if bib.is_placed(f):

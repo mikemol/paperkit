@@ -10,13 +10,16 @@ default, rejected under --safe.  Both documentation and a test (exit 0 iff all h
 """
 from __future__ import annotations
 
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _fixture_gate import gate  # noqa: E402
 from _fixture_model import entry  # noqa: E402
 from _fixture_project import project_text  # noqa: E402
+import bib  # noqa: E402  (the owner of emit_anchors/emit_path — the two-anchor resolver)
 
 C = entry("c", claim="a cited claim")                                       # base prose
 P_CITE = entry("p", claim="an example", emit="x.sh", frm="c", check="file:x.sh")  # derived term
@@ -65,6 +68,32 @@ def main() -> int:
           "![a figure](fig.svg)" in proj_svg and "```" not in proj_svg)
     check("uncited placement passes by default but raises a postulate advisory",
           rc_default == 0 and "postulate" in err_default)
+
+    # Ζ·emit·fallback — a placement asset resolves against BOTH legitimate anchors: project_dir
+    # (beside the warrants) FIRST, then out.parent (beside the output).  A project whose `out`
+    # points outside itself keeps its assets by the project dir; the MIRROR layout keeps them
+    # beside `out`.  629af60 keyed on project_dir alone (a dead `or out.parent`) and broke the
+    # mirror layout — this is the coverage whose absence let that land green.  Both distinct
+    # anchors holding it is AMBIGUOUS (the gate names it; the projector reads the first).
+    root = Path(tempfile.mkdtemp())
+    proj, docs = root / "proj", root / "docs"
+    proj.mkdir(); docs.mkdir()
+    OUT = {"project_dir": proj, "out": docs / "p.md"}     # out OUTSIDE the project (out.parent ≠ proj)
+    IN = {"project_dir": proj, "out": proj / "README.md"}  # in-repo — the two anchors coincide
+    (proj / "byw.tsv").write_text("by-warrants")           # only beside the warrants
+    (docs / "beo.tsv").write_text("beside-out")            # only beside the output (mirror)
+    (proj / "both.tsv").write_text("X"); (docs / "both.tsv").write_text("Y")   # at both (ambiguous)
+    r_byw = bib.emit_path(OUT, "byw.tsv") == proj / "byw.tsv"
+    r_beo = bib.emit_path(OUT, "beo.tsv") == docs / "beo.tsv"
+    r_absent = bib.emit_path(OUT, "nope.tsv") is None
+    r_ambig = len(bib.emit_anchors(OUT, "both.tsv")) == 2
+    r_inrepo = len(bib.emit_anchors(IN, "byw.tsv")) == 1
+    shutil.rmtree(root, ignore_errors=True)
+    check("emit·fallback: out-outside, asset beside the WARRANTS → resolves via project_dir", r_byw)
+    check("emit·fallback: the MIRROR layout, asset beside OUT → resolves via out.parent (629af60's break)", r_beo)
+    check("emit·fallback: at NEITHER anchor → ABSENT (None)", r_absent)
+    check("emit·fallback: at BOTH distinct anchors → AMBIGUOUS (2 anchors; the gate names it)", r_ambig)
+    check("emit·fallback: in-repo (anchors coincide) → ONE hit, never ambiguous", r_inrepo)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -85,6 +114,10 @@ def main() -> int:
          "the as= field on the same asset",
          "as=table → escaped, inert", "[@forged]" not in project_text([C, P_TAB], assets=TAB),
          "inferred → verbatim in prose", "[@forged]" in project_text([C, P_RAWTAB], assets=TAB)),
+        ("emit·fallback resolves against project_dir first, then out.parent (both layouts served)",
+         "which anchor holds the asset — the mirror layout 629af60 regressed",
+         "asset beside the warrants → project_dir", r_byw,
+         "asset beside the output   → out.parent", r_beo),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -97,7 +130,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (8 behaviors, 5 deltas)")
+    print("BOUNDARIES: PASS (13 behaviors, 6 deltas)")
     return 0
 
 

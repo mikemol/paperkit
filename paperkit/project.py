@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
 import bib  # noqa: E402  (paperkit.bib — the one .bib parser + data model)
 # the projector parses then renders, so it uses the bib data model internally (short names).
-from bib import dep_order, is_placed, load_config, rubric  # noqa: E402,F401
+from bib import dep_order, emit_path, is_placed, load_config, rubric  # noqa: E402,F401
 from bib import parse as entries  # noqa: E402,F401
 # top-level now: after Μ·cycle rhetoric imports bib (a leaf), NOT project, so project→rhetoric is
 # one-way — the project↔rhetoric cycle is gone and this need no longer be a function-local import.
@@ -194,7 +194,7 @@ def _infer(p: Path) -> str:
     return "code" if FENCE.get(p.suffix) else "raw"
 
 
-def emit_block(pdir: Path, f: dict) -> list:
+def emit_block(cfg: dict, f: dict) -> list:
     """The lines for an `emit:` warrant, rendered by its DECLARED `as` kind:
 
         table  data (.tsv/.csv/.json) → a markdown table the engine constructs,
@@ -204,17 +204,20 @@ def emit_block(pdir: Path, f: dict) -> list:
         raw    → included verbatim, shielded from cited_keys by sentinels
 
     With `as` absent the kind is inferred from the extension, preserving the
-    behaviour of warrants written before the field existed.
+    behaviour of warrants written before the field existed.  The asset is resolved
+    by bib.emit_path (project_dir, then out.parent), so BOTH legitimate layouts work
+    and the projector and the gate resolve to the SAME path.
     """
-    p = pdir / f["emit"]
-    kind = (f.get("as") or "").strip().lower() or _infer(p)
+    emit = f["emit"]
+    p = emit_path(cfg, emit)                       # project_dir first, then out.parent; None = absent
+    kind = (f.get("as") or "").strip().lower() or _infer(Path(emit))
     if kind not in RENDERERS:
-        raise ValueError(f"{f['emit']}: unknown renderer as={kind!r}; "
+        raise ValueError(f"{emit}: unknown renderer as={kind!r}; "
                          f"expected one of {', '.join(RENDERERS)}")
     if kind == "image":
-        return [f"![{clean(f.get('claim', 'figure'))}]({f['emit']})"]
-    if not p.exists():
-        return [f"<!-- emit: missing {f['emit']} -->"]
+        return [f"![{clean(f.get('claim', 'figure'))}]({emit})"]
+    if p is None:
+        return [f"<!-- emit: missing {emit} -->"]
     if kind == "table":
         return render_table(p)
     content = p.read_text().rstrip("\n")
@@ -344,9 +347,6 @@ def project(cfg: dict, target: str = "pandoc") -> str:
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
         F.update(entries(b))
-    # emit: assets resolve against the PROJECT dir (where warrants + assets live), not out.parent
-    # (the OUTPUT location, which may point outside the project — e.g. out = "../../note.md").
-    pdir = cfg.get("project_dir") or cfg["out"].parent
     by_sec = {}
     for k, f in F.items():
         if f.get("section"):
@@ -408,7 +408,7 @@ def project(cfg: dict, target: str = "pandoc") -> str:
                     run.append(k)
                 _flush()
                 _blank()
-                lines += emit_block(pdir, f)
+                lines += emit_block(cfg, f)
                 _blank()
             elif f.get("check", "").startswith("figure:"):
                 continue

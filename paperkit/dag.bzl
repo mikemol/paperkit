@@ -25,7 +25,7 @@ IMPORTS = {
     "tests/boundaries_discriminate.py": ["_fixture_delta", "_fixture_model", "_fixture_project"],
     "tests/boundaries_dispatch.py": ["grader", "resolver"],
     "tests/boundaries_driver.py": ["driver"],
-    "tests/boundaries_emit.py": ["_fixture_gate", "_fixture_model", "_fixture_project"],
+    "tests/boundaries_emit.py": ["_fixture_gate", "_fixture_model", "_fixture_project", "bib"],
     "tests/boundaries_env.py": ["resolver"],
     "tests/boundaries_footprint.py": ["_fixture_delta", "_fixture_model", "resolver"],
     "tests/boundaries_gate_json.py": ["_fixture_gate", "_fixture_model", "_fixture_project"],

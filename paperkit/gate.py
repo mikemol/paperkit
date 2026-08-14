@@ -45,8 +45,10 @@ import project as P  # noqa: E402  (the PROJECTOR — gate's only genuine need f
 # (_REFUSE = 3), so a caller can tell "you asked wrong / I could not run" from "I ran and it failed":
 #   0 pass · 1 RAN-AND-FAILED (an invariant did not hold) · _REFUSE CANNOT RUN — the gate could not
 # even set up to evaluate this project (no/unloadable paper.toml, a bad --only key).  AVAILABILITY thus
-# lives in the exit code (and in --json.available); WHICH invariant failed stays in --json.gaps, never
-# crammed into the code.  The gate has NO resume, so there is no `2`.  A missing paper.toml used to
+# lives in the exit code (and in --json.available); WHICH invariant failed is NOT crammed into the code
+# but read from --json, one field per invariant: RESOLVE → `bad` (the failing check keys), COVERAGE →
+# `gaps` (a missing section, an uncited claim, a placement whose asset is missing or ambiguous), PROJECT → `project_ok`
+# (prose ≡ projection).  The gate has NO resume, so there is no `2`.  A missing paper.toml used to
 # crash with an unhandled traceback at exit 1 — indistinguishable from a real failure, so a consumer
 # read "the tool is missing / this is not a project" as "the paper is broken" (summit ask-typed-gate-exit).
 _REFUSE = 3

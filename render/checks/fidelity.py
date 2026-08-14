@@ -3,18 +3,19 @@
 # confirm the READER's view is faithful: every non-ASCII glyph the paper uses survives into
 # the PDF text layer (no missing-glyph tofu), and every heading is present there.  What the
 # consumer copies / searches / hears via a screen reader is the paper.  cwd = render/.
-import re, subprocess, tempfile
+import re, subprocess, sys, tempfile
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lo   # office convert: isolated profile + unlink-first, so an absence is loud (Ρ·render·provenance)
 
 src = Path("../paper/paper.md").read_text()
 glyphs = sorted({c for c in src if ord(c) > 127})
 heads = [re.sub(r'^#{1,6}\s+', '', ln).rstrip() for ln in src.splitlines() if re.match(r'^#{1,6}\s', ln)]
 with tempfile.TemporaryDirectory() as d:
-    docx, pdf, txt = Path(d) / "p.docx", Path(d) / "p.pdf", Path(d) / "p.txt"
+    docx, txt = Path(d) / "p.docx", Path(d) / "p.txt"
     subprocess.run(["pandoc", "../paper/paper.md", "-o", str(docx)], check=True)
-    subprocess.run(["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", d,
-                    str(docx), f"-env:UserInstallation=file://{d}/lo"],
-                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=180)
+    pdf = lo.convert(docx, "pdf", d)
+    assert pdf is not None, "docx did not convert to a PDF (soffice produced no output)"
     subprocess.run(["pdftotext", "-layout", str(pdf), str(txt)], check=True)
     rendered = txt.read_text()
     norm = " ".join(rendered.split())

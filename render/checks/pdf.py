@@ -3,8 +3,10 @@
 # → PDF) into the human-readable PDF a reader receives.  Gated complete and polished: no
 # citation left as a bare marker, the References list rendered, the content present.  The last
 # rung of the agreement chain — the artifact, not an intermediate.  cwd = render/ ; .. = repo.
-import re, subprocess, tempfile
+import re, subprocess, sys, tempfile
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lo   # office convert: isolated profile + unlink-first, so an absence is loud (Ρ·render·provenance)
 
 MARK = {"file": "(present)", "result": "(verdict imported)"}
 mk = {}
@@ -18,13 +20,11 @@ for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", _bibtext, re.S):
 split = re.sub(r"\[@([A-Za-z][\w:.+-]*)\]", lambda x: mk.get(x.group(1), x.group(0)),
                Path("../paper/paper.md").read_text())
 with tempfile.TemporaryDirectory() as d:
-    md, docx, pdf, txt = (Path(d) / n for n in ("p.md", "p.docx", "p.pdf", "p.txt"))
+    md, docx, txt = (Path(d) / n for n in ("p.md", "p.docx", "p.txt"))
     md.write_text(split)
     subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography", "../paper/references.bib", "-o", str(docx)], check=True)
-    subprocess.run(["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", d, str(docx),
-                    f"-env:UserInstallation=file://{d}/lo"], check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=180)
-    assert pdf.exists() and pdf.stat().st_size > 0, "no PDF deliverable produced"
+    pdf = lo.convert(docx, "pdf", d)
+    assert pdf is not None and pdf.stat().st_size > 0, "no PDF deliverable produced (soffice produced no output)"
     pages = int(re.search(r'Pages:\s*(\d+)', subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout).group(1))
     assert pages >= 1, "empty PDF deliverable"
     subprocess.run(["pdftotext", str(pdf), str(txt)], check=True)

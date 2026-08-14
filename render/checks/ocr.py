@@ -4,16 +4,17 @@
 # that maps right in the TEXT layer (pdftotext, ·integrity) but renders as a box.  Robust by
 # construction: a font/render regression that turned the body to tofu would crater recovery
 # (measured: a faithful render recovers ~100% of the body words).  cwd = render/ ; .. = repo.
-import re, subprocess, tempfile
+import re, subprocess, sys, tempfile
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lo   # office convert: isolated profile + unlink-first, so an absence is loud (Ρ·render·provenance)
 
 words = sorted(set(re.findall(r'[a-z]{4,}', Path("../paper/paper.md").read_text().lower())))
 with tempfile.TemporaryDirectory() as d:
-    docx, pdf = Path(d) / "p.docx", Path(d) / "p.pdf"
+    docx = Path(d) / "p.docx"
     subprocess.run(["pandoc", "../paper/paper.md", "-o", str(docx)], check=True)
-    subprocess.run(["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", d, str(docx),
-                    f"-env:UserInstallation=file://{d}/lo"], check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=180)
+    pdf = lo.convert(docx, "pdf", d)
+    assert pdf is not None, "docx did not convert to a PDF (soffice produced no output)"
     subprocess.run(["pdftoppm", "-r", "150", "-png", str(pdf), str(Path(d) / "page")], check=True, timeout=120)
     ocr = ""
     for png in sorted(Path(d).glob("page*.png")):

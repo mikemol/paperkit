@@ -19,5 +19,11 @@ tools/sched-batch
 
 # The summit drop zone: incoming letters must not dirty this tree.
 # Ruling: ~/github/summit/proceedings/rulings/inbox-drop-zone.md
-# Ignored from HERE rather than by a file inside it, so provisioning adds nothing to git status.
-/inbox/
+#
+# Satisfied by `/inbox/*` + `!/inbox/archive/` above, which already ignores an incoming drop at
+# /inbox/<letter>.md while keeping the promoted archive tracked. Summit's provisioner previously
+# appended a generic `/inbox/` HERE; because gitignore is last-match-wins that overrode the
+# `!/inbox/archive/` negation on line 15, so a NEWLY promoted settled letter was silently ignored
+# (the five already-tracked ones kept working, which is what hid it). Removed by summit
+# 2026-08-14 — floor/reports.bib `friction-provisioner-clobbers-a-carve-out`, reported by
+# cassian-observability after the same clobber hit its A119 archive.

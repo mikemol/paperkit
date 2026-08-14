@@ -41,6 +41,17 @@ import bib  # noqa: E402  (the parser/data-model leaf)
 import project as P  # noqa: E402  (the PROJECTOR — gate's only genuine need for project, the PROJECT invariant)
 
 
+# Ζ·gate·exit (exit alphabet) — main()'s returns are TYPED, engine-aligned with discriminate/coherence
+# (_REFUSE = 3), so a caller can tell "you asked wrong / I could not run" from "I ran and it failed":
+#   0 pass · 1 RAN-AND-FAILED (an invariant did not hold) · _REFUSE CANNOT RUN — the gate could not
+# even set up to evaluate this project (no/unloadable paper.toml, a bad --only key).  AVAILABILITY thus
+# lives in the exit code (and in --json.available); WHICH invariant failed stays in --json.gaps, never
+# crammed into the code.  The gate has NO resume, so there is no `2`.  A missing paper.toml used to
+# crash with an unhandled traceback at exit 1 — indistinguishable from a real failure, so a consumer
+# read "the tool is missing / this is not a project" as "the paper is broken" (summit ask-typed-gate-exit).
+_REFUSE = 3
+
+
 # The check-RESOLUTION core lives in resolver.py — a small, standalone module (no projector,
 # no parallel gate loop, no config/CLI) so it can be imported and tested with a small blast
 # radius.  Re-exported here so callers reaching gate.resolves / gate.clean_env / gate.footprint
@@ -105,12 +116,33 @@ def main(argv: list) -> int:
     config.apply_args(argv, REGISTRY)     # Ω·config: capture args (arg overrides env), process-local
     pos = config.positionals(argv, REGISTRY)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
-    raw = tomllib.loads((project_dir / "paper.toml").read_text())
+    as_json = config.resolve(JSON)                   # structured stdout (human lines suppressed)
+
+    # Ζ·gate·exit — CANNOT RUN is not RAN-AND-FAILED.  The boundary is not "did tomllib raise" but
+    # "does the config ASSEMBLE INTO A GATEABLE PROJECT": no paper.toml, malformed TOML, no [paper]
+    # table, or a declared INPUT (a warrant bib / the rubric) that does not exist.  Any of these →
+    # REFUSE (_REFUSE), because the gate could not set up — and CRUCIALLY the verdict must NOT be the
+    # downstream "not built — run paperkit-project" line: that predicate measures only a MISSING out
+    # and would actively MISDIAGNOSE an unusable config as staleness, looping a consumer into a
+    # projector that cannot help (A67 — a verdict may not assert more than it measured; summit
+    # friction-cannot-gate-guard-misses-unloadable-config).  A stale-but-buildable doc is a genuine
+    # ran-state (exit 1, below) reachable ONLY once the config's inputs exist.
+    def cannot_run(reason):
+        if as_json:
+            print(json.dumps({"available": False, "reason": reason, "pass": False}, indent=2))
+        print(f"paperkit-gate: CANNOT RUN — {reason}", file=sys.stderr)
+        return _REFUSE
+    ptoml = project_dir / "paper.toml"
+    try:
+        raw = tomllib.loads(ptoml.read_text())
+    except (FileNotFoundError, tomllib.TOMLDecodeError) as e:
+        return cannot_run(f"no or unloadable paper.toml at {project_dir} ({e})")
+    if "paper" not in raw:
+        return cannot_run(f"paper.toml at {project_dir} has no [paper] table — not a gateable project")
     pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
     safe = config.resolve(SAFE, pol)                 # zero-postulate: uncited placements FAIL
     without_k = config.resolve(WITHOUT_K, pol)       # forbid two cited claims sharing a witness
     inv_only = config.resolve(INVARIANTS)            # Ζ·starlark: the invariants NODE (no per-check resolve)
-    as_json = config.resolve(JSON)                   # structured stdout (human lines suppressed)
     # The bib IS the makefile: a project's distinct checks are independent targets, so the gate
     # runs them concurrently (default = all cores; jobs=1 forces serial).
     jobs = int(config.resolve(JOBS) or (os.cpu_count() or 4))
@@ -119,6 +151,15 @@ def main(argv: list) -> int:
         if not as_json:
             print(msg)
     cfg = bib.load_config(project_dir)
+    # A declared INPUT that does not exist means the config cannot assemble a gateable project — the
+    # gate CANNOT RUN, not "ran and failed" (Ζ·gate·exit): warrants naming a missing .bib, or a
+    # missing rubric.  This is measured BEFORE the built-artifact check so an unusable config never
+    # reaches (and never gets misreported by) the "not built — run paperkit-project" line.
+    missing = [str(b) for b in cfg["bibs"] if not b.exists()]
+    if not cfg["rubric"].exists():
+        missing.append(str(cfg["rubric"]))
+    if missing:
+        return cannot_run(f"declared input(s) do not exist: {', '.join(missing)}")
 
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
@@ -131,7 +172,7 @@ def main(argv: list) -> int:
     if only:
         if only not in F or not F[only].get("check"):
             print(f"paperkit-gate: no check for claim {only!r}", file=sys.stderr)
-            return 2
+            return _REFUSE      # a key naming no check is a caller BUG, not a ran-and-failed verdict
         ok = resolves(F[only]["check"], project_dir, custom)
         info(f"paperkit-gate: {only} {'ok' if ok else 'FAIL'} — {F[only]['check']}")
         return 0 if ok else 1
@@ -306,6 +347,7 @@ def main(argv: list) -> int:
 
     if as_json:
         print(json.dumps({
+            "available": True,
             "document": out.name, "pass": rc == 0, "project_ok": proj_ok,
             "verified": len(to_verify), "undefined": undefined, "bad": bad,
             "dangling": sorted(list(e) for e in dangling),

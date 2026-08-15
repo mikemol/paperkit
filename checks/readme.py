@@ -56,7 +56,7 @@ def rm_resolver_premise():
         "the premise provenance note does not surface 'not machine-checked'"
     assert "Machine-verified" in P._verify_note("cmd:true"), "the cmd provenance note regressed"
     assert "Agda-proved" in P._verify_note("agda:Foo.bar"), "the agda provenance note regressed"
-    assert gate.resolves("premise:x", ENGINE, {}) is False, \
+    assert gate.resolves("premise:x", ENGINE, {}) is resolver.UNAVAILABLE, \
         "premise resolved as a built-in gate verb — it must be a provenance KIND, not a verb"
 
 
@@ -156,9 +156,9 @@ def rm_resolver_tbl():
         arg = spec["arg"].replace("|", r"\|")          # markdown escapes agree:'s ||| separator
         row = f"| `{typ}:{arg}` | {spec['verb']} | {spec['passes']} |"
         assert row in tbl, f"the table's {typ}: row does not match the engine's declaration\n  want: {row}"
-    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("file:gate.py", ENGINE, {}) is True, \
+    assert gate.resolves("cmd:true", ENGINE, {}).passed and gate.resolves("file:gate.py", ENGINE, {}).passed, \
         "the tabled built-in verbs do not dispatch"
-    assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, "the built-in set is not closed"
+    assert gate.resolves("nosuchverb:x", ENGINE, {}) is resolver.UNAVAILABLE, "the built-in set is not closed"
 
 
 def rm_resolver_eg():
@@ -169,7 +169,7 @@ def rm_resolver_eg():
     assert checks, "the example declares no [checks.<type>]"
     for typ, spec in checks.items():
         assert "{target}" in spec.get("cmd", ""), f"[checks.{typ}] has no {{target}} cmd template"
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true {target}"}}) is True, \
+    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true {target}"}}).passed, \
         "the resolver does not dispatch a config-declared custom type"
 
 

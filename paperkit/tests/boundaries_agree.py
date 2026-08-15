@@ -32,17 +32,17 @@ def main() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     print("Δ·agree behaviors\n")
-    check("two producers that concur pass", ag("printf 42 ||| printf 42") is True)
-    check("two producers that disagree flag", ag("printf 42 ||| printf 43") is False)
-    check("three producers that all concur pass", ag("printf x ||| printf x ||| printf x") is True)
-    check("three producers, one dissenting, flag", ag("printf x ||| printf x ||| printf y") is False)
-    check("a lone producer (no independence) flags", ag("printf 42") is False)
-    check("a producer that FAILS cannot concur", ag("printf 42 ||| false") is False)
-    check("agreement is on OUTPUT, not exit code alone", ag("printf A ||| printf B") is False)
+    check("two producers that concur pass", ag("printf 42 ||| printf 42").passed)
+    check("two producers that disagree flag", not ag("printf 42 ||| printf 43").passed)
+    check("three producers that all concur pass", ag("printf x ||| printf x ||| printf x").passed)
+    check("three producers, one dissenting, flag", not ag("printf x ||| printf x ||| printf y").passed)
+    check("a lone producer (no independence) flags", not ag("printf 42").passed)
+    check("a producer that FAILS cannot concur", not ag("printf 42 ||| false").passed)
+    check("agreement is on OUTPUT, not exit code alone", not ag("printf A ||| printf B").passed)
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     P, F = ag("printf 42 ||| printf 42"), ag("printf 42 ||| printf 43")
-    ok = P is True and F is False
+    ok = P.passed and not F.passed
     fails.append("one-byte-delta") if not ok else None
     print(f"  {'ok ' if ok else 'XX '}one byte of disagreement flips concurrence to dissent")
     print("      P (pass side): printf 42 ||| printf 42  — identical output, producers concur")

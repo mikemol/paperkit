@@ -175,7 +175,7 @@ def main(argv: list) -> int:
         if only not in F or not F[only].get("check"):
             print(f"paperkit-gate: no check for claim {only!r}", file=sys.stderr)
             return _REFUSE      # a key naming no check is a caller BUG, not a ran-and-failed verdict
-        ok = resolves(F[only]["check"], project_dir, custom)
+        ok = resolves(F[only]["check"], project_dir, custom).passed
         info(f"paperkit-gate: {only} {'ok' if ok else 'FAIL'} — {F[only]['check']}")
         return 0 if ok else 1
 
@@ -243,11 +243,12 @@ def main(argv: list) -> int:
         # generated check targets), so the node skips it and verifies only the whole-project
         # invariants (PROJECT above, plus COVERAGE and --without-K below).
         bad: list = []
+        unresolvable: list = []
     else:
         distinct = sorted({F[k]["check"] for k in to_verify})
 
-        def resolve1(c: str) -> bool:
-            return resolves(c, project_dir, custom)
+        def resolve1(c: str):
+            return resolves(c, project_dir, custom)   # the Verdict — bad/unresolvable split below
 
         if len(distinct) > 1 and jobs > 1:
             with ThreadPoolExecutor(max_workers=max(1, jobs)) as ex:
@@ -255,7 +256,15 @@ def main(argv: list) -> int:
         else:
             cache = {c: resolve1(c) for c in distinct}
 
-        bad = sorted(k for k in to_verify if not cache[F[k]["check"]])
+        # A non-passing check splits by KIND (ask-result-tristate): a check that RAN and did not hold
+        # is `bad` (a real failure — the gate reds); one that could not be EVALUATED (an unreachable
+        # sibling, a verb this engine lacks) is `unresolvable` — surfaced so a caller reads WHY, not
+        # just not-pass, and does not read "I could not check it" as "the claim is false".  Both
+        # keep the premise from certifying (fail-closed), but only across a repo boundary; in-repo
+        # every sibling is present so `unresolvable` is empty.
+        bad = sorted(k for k in to_verify if not cache[F[k]["check"]].passed
+                     and cache[F[k]["check"]] is not resolver.UNAVAILABLE)
+        unresolvable = sorted(k for k in to_verify if cache[F[k]["check"]] is resolver.UNAVAILABLE)
     if undefined:
         print(f"paperkit-gate: undefined citations: {', '.join(undefined)}", file=sys.stderr)
         rc = 1
@@ -268,9 +277,17 @@ def main(argv: list) -> int:
         for k in bad:
             print(f"paperkit-gate: check FAILED for [@{k}]: {F[k]['check']}", file=sys.stderr)
         rc = 1
+    if unresolvable:
+        # ask-result-tristate — the check could NOT be evaluated (unreachable sibling, unknown verb),
+        # not refuted.  Named distinctly from FAILED so a caller reads "I could not check this", not
+        # "the claim is false" — and the gate still reds (fail-closed: an unverified claim cannot ship).
+        for k in unresolvable:
+            print(f"paperkit-gate: check UNRESOLVABLE for [@{k}]: {F[k]['check']} — could not evaluate "
+                  "(unreachable delegate or unknown verb), NOT a refutation", file=sys.stderr)
+        rc = 1
     if inv_only:
         info(f"paperkit-gate: invariants node — {len(to_verify)} claim check(s) deferred to the leaf targets")
-    elif not undefined and not bad and not dangling:
+    elif not undefined and not bad and not unresolvable and not dangling:
         info(f"paperkit-gate: {len(to_verify)} cited/placed/grounded claim(s) all resolve to passing checks")
 
     # WITHOUT-K — proof-relevance.  The gate reduces each check to a boolean, so it
@@ -352,6 +369,7 @@ def main(argv: list) -> int:
             "available": True,
             "document": out.name, "pass": rc == 0, "project_ok": proj_ok,
             "verified": len(to_verify), "undefined": undefined, "bad": bad,
+            "unresolvable": unresolvable,             # ask-result-tristate: could-not-evaluate ≠ failed
             "dangling": sorted(list(e) for e in dangling),
             "sections": secs, "gaps": gaps,
             "postulates": sorted(k for k, f in F.items()

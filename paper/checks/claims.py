@@ -53,10 +53,10 @@ def agree_builtin():
     # agree CONCURS — ≥2 independent producers (split on |||) must all exit 0 and emit
     # IDENTICAL output; agreement across implementations rules out a shared bug.
     import gate
-    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: of two concurring producers failed"
-    assert gate.resolves("agree:printf 42 ||| printf 43", ENGINE, {}) is False, "agree: of two disagreeing producers passed"
-    assert gate.resolves("agree:printf 42", ENGINE, {}) is False, "agree: with a single producer (no independence) passed"
-    assert gate.resolves("agree:printf 42 ||| false", ENGINE, {}) is False, "agree: tolerated a producer that failed"
+    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}).passed, "agree: of two concurring producers failed"
+    assert not gate.resolves("agree:printf 42 ||| printf 43", ENGINE, {}).passed, "agree: of two disagreeing producers passed"
+    assert not gate.resolves("agree:printf 42", ENGINE, {}).passed, "agree: with a single producer (no independence) passed"
+    assert not gate.resolves("agree:printf 42 ||| false", ENGINE, {}).passed, "agree: tolerated a producer that failed"
 
 
 def result_builtin():
@@ -78,9 +78,9 @@ def result_builtin():
             (sib / "out.md").write_text(P.project(P.load_config(sib)))
 
         write("cmd:true")
-        assert gate.resolves("result:g", d, {}) is True, "result: did not PARSE a green sibling's verdict as pass"
+        assert gate.resolves("result:g", d, {}).passed, "result: did not PARSE a green sibling's verdict as pass"
         write("cmd:false")
-        assert gate.resolves("result:g", d, {}) is False, "result: did not PARSE a red sibling's verdict as fail"
+        assert not gate.resolves("result:g", d, {}).passed, "result: did not PARSE a red sibling's verdict as fail"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -95,9 +95,9 @@ def dataset_backed():
         custom = {"data": {"cmd": "python3 -c \"import json,sys; "
                                   "sys.exit(0 if json.load(open('d.json'))['k']=='ok' else 1)\""}}
         (d / "d.json").write_text('{"k": "ok"}')
-        assert gate.resolves("data:x", d, custom) is True, "a dataset-backed check over matching data must resolve"
+        assert gate.resolves("data:x", d, custom).passed, "a dataset-backed check over matching data must resolve"
         (d / "d.json").write_text('{"k": "drift"}')
-        assert gate.resolves("data:x", d, custom) is False, "a single edit to the shipped dataset must flip the verdict"
+        assert not gate.resolves("data:x", d, custom).passed, "a single edit to the shipped dataset must flip the verdict"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -116,9 +116,9 @@ def dataset_fresh():
         (d / "producer.sh").write_text("echo CANON-V1\n")
         custom = {"fresh": {"cmd": 'test "$(cat asset.txt)" = "$(sh producer.sh)"'}}
         (d / "asset.txt").write_text("CANON-V1\n")
-        assert gate.resolves("fresh:x", d, custom) is True, "a committed asset matching its producer must pass"
+        assert gate.resolves("fresh:x", d, custom).passed, "a committed asset matching its producer must pass"
         (d / "asset.txt").write_text("STALE\n")
-        assert gate.resolves("fresh:x", d, custom) is False, "an asset drifted from its producer must fail"
+        assert not gate.resolves("fresh:x", d, custom).passed, "an asset drifted from its producer must fail"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -126,15 +126,15 @@ def dataset_fresh():
 def file_builtin():
     # "file, that an artifact exists"
     import gate
-    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: of an existing path failed"
-    assert gate.resolves("file:does-not-exist.xyz", ENGINE, {}) is False, "file: of a missing path passed"
+    assert gate.resolves("file:gate.py", ENGINE, {}).passed, "file: of an existing path failed"
+    assert not gate.resolves("file:does-not-exist.xyz", ENGINE, {}).passed, "file: of a missing path passed"
 
 
 def cmd_builtin():
     # "cmd, that a script exits zero"
     import gate
-    assert gate.resolves("cmd:true", ENGINE, {}) is True, "cmd:true did not pass"
-    assert gate.resolves("cmd:false", ENGINE, {}) is False, "cmd:false did not fail"
+    assert gate.resolves("cmd:true", ENGINE, {}).passed, "cmd:true did not pass"
+    assert not gate.resolves("cmd:false", ENGINE, {}).passed, "cmd:false did not fail"
 
 
 # ── engine section ───────────────────────────────────────────────────────────

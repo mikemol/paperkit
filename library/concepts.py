@@ -75,7 +75,7 @@ def claim_bears_check():
     # RESOLVES it (runs it).  Parser and resolver are engine, so the certificate's fingerprint IS them.
     rec = _parse("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")["c"]
     assert rec.get("check") == "cmd:true", "the claim carries no check"
-    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("cmd:false", ENGINE, {}) is False, \
+    assert gate.resolves("cmd:true", ENGINE, {}).passed and not gate.resolves("cmd:false", ENGINE, {}).passed, \
         "the verifier is not machine-checkable"
 
 
@@ -83,9 +83,9 @@ def custom_type_resolves():
     # cmd is the escape hatch every check reduces to, and a new domain adds a verifier in config
     # without touching the engine: a config-supplied type resolves by running its cmd; an unregistered
     # one does not.  The resolver dispatch is engine, so mutating a dispatch def-site flips this.
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
+    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}).passed, \
         "a config-supplied check type did not resolve to its cmd"
-    assert gate.resolves("demo:x", ENGINE, {}) is False, \
+    assert not gate.resolves("demo:x", ENGINE, {}).passed, \
         "an unregistered check type resolved with nothing behind it"
 
 
@@ -131,16 +131,16 @@ def resolver_dispatches():
     # no count, no list, nothing to drift (Λ·registry) — the built-in set is CLOSED, and a custom
     # [checks.X] type dispatches through the registry.  The SUPERSET of the four view faces it
     # certifies; the fingerprint is the resolver's own def-sites.
-    assert gate.resolves("cmd:true", ENGINE, {}) is True and gate.resolves("file:true", ENGINE, {}) is False, \
+    assert gate.resolves("cmd:true", ENGINE, {}).passed and not gate.resolves("file:true", ENGINE, {}).passed, \
         "the type prefix does not select the verb (a verifier is named type:target)"
-    assert gate.resolves("file:gate.py", ENGINE, {}) is True, "file: verb"
-    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}) is True, "agree: verb"
+    assert gate.resolves("file:gate.py", ENGINE, {}).passed, "file: verb"
+    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}).passed, "agree: verb"
     for typ in resolver.VERBS:
-        assert gate.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}) is False, \
+        assert not gate.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}).passed, \
             f"{typ}: is declared in VERBS but does not dispatch to a real branch"
-    assert gate.resolves("nosuchverb:x", ENGINE, {}) is False, \
+    assert gate.resolves("nosuchverb:x", ENGINE, {}) is resolver.UNAVAILABLE, \
         "an unregistered type resolved — the built-in set is not closed"
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}) is True, \
+    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}).passed, \
         "a custom [checks.X] type did not dispatch through the registry"
 
 

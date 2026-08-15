@@ -211,7 +211,7 @@ def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
         for f, node, _ in group:
             if node is None:
                 f.write_bytes(CORRUPT)
-        return not resolver.resolves(chk, sandbox_project, custom)
+        return not resolver.resolves(chk, sandbox_project, custom).passed
     finally:
         for f, b in saved.items():
             f.write_bytes(b)
@@ -231,7 +231,7 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     `path`, corrupted).  Monotonicity (a cleared group truly holds no flipper) is by
     construction — the uncatchable raise in _mutate_lines.  engine_dir is None ⇒ file
     resolution (the whole-file scan); a path ⇒ def resolution over project + engine."""
-    baseline = resolver.resolves(chk, sandbox_project, custom)
+    baseline = resolver.resolves(chk, sandbox_project, custom).passed
     if not baseline:
         return False, []
     if engine_dir is None:
@@ -248,7 +248,7 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
                 orig = f.read_bytes()
                 f.write_bytes(CORRUPT)
                 try:
-                    flipped = not resolver.resolves(chk, sandbox_project, custom)
+                    flipped = not resolver.resolves(chk, sandbox_project, custom).passed
                 finally:
                     f.write_bytes(orig)
                 if flipped:
@@ -372,6 +372,10 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     # PAPERKIT_DELTA_REPEAT=N (default 1, off) re-runs the pristine baseline N times; if
     # they disagree the check is PROVABLY non-deterministic, so the sweep would be noise.
     reps = max(1, int(config.resolve(DELTA_REPEAT)))
+    # The set is over the raw Verdict IDENTITY, NOT `.passed`: an UNAVAILABLE-then-PASS across reps
+    # IS a real non-determinism (the verdict is not a function of project content), and collapsing
+    # via `.passed` to {False, False} would HIDE it as a stable fail.  Verdict is identity-hashable
+    # with no __bool__ precisely so this set has three distinguishable outcomes (ask-result-tristate).
     if reps > 1 and len({resolver.resolves(chk, sandbox_project, custom) for _ in range(reps)}) > 1:
         return {"grade": "broken", "tests": [], "determinism": "flaky",
                 "why": f"non-deterministic — {reps} baseline runs in a pristine sandbox disagreed; "
@@ -409,7 +413,7 @@ def _vacuity_source(rec: dict, chk: str, sandbox_project: Path,
     try:
         for f in files:
             f.write_bytes(CORRUPT)
-        still_green = resolver.resolves(chk, sandbox_project, custom)
+        still_green = resolver.resolves(chk, sandbox_project, custom).passed
     finally:
         for f, b in saved.items():
             f.write_bytes(b)

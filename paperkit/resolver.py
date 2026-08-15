@@ -34,6 +34,57 @@ _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess 
 _LIBRARY = Path(__file__).resolve().parent.parent / "library"  # the ENGINE's own concept library
 
 
+class Verdict:
+    """Ω·verdict — `resolves()` answers a TRISTATE, not a bool (ask-result-tristate).
+
+    PASS / FAIL are the two real outcomes; UNAVAILABLE is the third state: the check could not be
+    EVALUATED — a crossing sibling gate that would not run (its own cannot-run, `--json.available`
+    false since the typed-gate-exit work), an UNREACHABLE sibling (an exception), or a verb this
+    engine does not have.  Across a repo boundary that must NOT read as a REFUTATION: an absent or
+    mid-refactor sibling is "I cannot tell", not "the claim is false".  In-repo UNAVAILABLE never
+    fires (all nine projects are siblings that are always present) — which is the point; it only
+    bites across repos, the case paperkit itself records as untested (Λ·location).
+
+    It is a LIFT of paperkit's own typed alphabet, NOT a substitution: `discriminate`'s `3 REFUSE`
+    means "you asked WRONG" (an internal caller bug); UNAVAILABLE means "I could not REACH the
+    thing to ask" (external).  Folding one onto the other is the very fold this type removes.
+
+    Deliberately NO `__bool__`: an implicit truth-test is the fold the ask exists to delete, so
+    every consumer must say `.passed` OUT LOUD (a named local collapse, never a hidden one).
+    Hashable + equatable BY IDENTITY (three singletons, default object semantics) so a determinism
+    SET over reps has well-defined cardinality: {UNAVAILABLE, PASS} across reps is a REAL
+    non-determinism, which `.passed`-collapse would hide as a stable fail.
+
+    Owner-agnostic on purpose (the ARM, not the Π INDEX): a consumer needs "your thing could not
+    run", not "which of the sibling / library / tool / unknown-verb owners couldn't".  If a
+    downstream consumer ever measures a need to route on the owner, UNAVAILABLE widens to carry one
+    (an `owner` slot + factory) WITHOUT touching PASS/FAIL or `.passed` — a non-breaking widening,
+    precisely because `__eq__`/`__hash__` are not overridden here (interning per-owner variants then
+    Just Works on identity)."""
+    __slots__ = ("_name",)
+
+    def __init__(self, name: str) -> None:
+        object.__setattr__(self, "_name", name)
+
+    @property
+    def passed(self) -> bool:
+        return self is PASS
+
+    def __repr__(self) -> str:
+        return f"Verdict.{self._name}"
+
+
+PASS = Verdict("PASS")
+FAIL = Verdict("FAIL")
+UNAVAILABLE = Verdict("UNAVAILABLE")
+
+
+def _pf(ok: bool) -> Verdict:
+    """A check that RAN and decided: True → PASS, False → FAIL.  (Never UNAVAILABLE — that is the
+    could-not-evaluate seam, returned explicitly at each such site.)"""
+    return PASS if ok else FAIL
+
+
 def _library_for(project_dir: Path | None) -> Path:
     """Λ·library·seam — WHOSE concept library resolves a `concept:<key>`?  The CONSUMING project's,
     if it has one; only then the engine's.
@@ -151,18 +202,22 @@ def clean_env(env: dict | None = None) -> dict:
     return out
 
 
-def run_ok(cmd: str, cwd: Path) -> bool:
+def run_ok(cmd: str, cwd: Path) -> Verdict:
+    """Run a shell command: it RAN and exited 0 → PASS, ran and exited non-zero → FAIL, could not
+    be SPAWNED at all → UNAVAILABLE.  The last arm is the same could-not-evaluate seam as the
+    crossing verbs, one verb down: an un-spawnable cmd is not a refuted claim, it is an unchecked
+    one, and folding it into FAIL would be the exact bug this change removes for the most-used verb."""
     try:
-        return subprocess.run(cmd, shell=True, cwd=cwd, env=clean_env(),
-                              capture_output=True).returncode == 0
+        return _pf(subprocess.run(cmd, shell=True, cwd=cwd, env=clean_env(),
+                                  capture_output=True).returncode == 0)
     except Exception:
-        return False
+        return UNAVAILABLE
 
 
-def resolves(check: str, project_dir: Path, custom: dict) -> bool:
+def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
     typ, _, target = check.partition(":")
     if typ == "file":
-        return (project_dir / target).exists()        # EXISTS — no subprocess → no lease
+        return _pf((project_dir / target).exists())   # EXISTS — no subprocess → no lease; absent = FAIL
     if typ == "result":
         # Ξ·seam — result PARSES (VERBS names every verb; no ordinal here, an ordinal would
         # hardcode the set's size).  It imports a sibling project's gate VERDICT (gate --json) and
@@ -170,13 +225,22 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
         # what the sibling owns and separately gates.  cwd = this project's dir, so the
         # target is the sibling's path relative to it.  Δ grades it "imported" (run once),
         # never mutation-sweeping a whole sub-gate.
+        #
+        # TWO unavailables (ask-result-tristate): the sibling gate RAN but reports it could not set
+        # ITSELF up (`--json.available` false, since the typed-gate-exit work) → UNAVAILABLE; and the
+        # subprocess could not run at all (sibling UNREACHABLE — absent path, mid-refactor) → also
+        # UNAVAILABLE.  Neither is a REFUTATION of the importing claim; only a sibling that RAN and
+        # reported not-pass is FAIL.
         try:
             argv = [sys.executable, str(_GATE), "--json", "--safe", "--without-K", target]
             r = subprocess.run(argv, cwd=project_dir, env=clean_env(),
                                capture_output=True, text=True)
-            return bool(json.loads(r.stdout or "{}").get("pass"))
-        except Exception:
-            return False
+            rec = json.loads(r.stdout or "{}")
+            if rec.get("available") is False:         # the sibling's own cannot-run
+                return UNAVAILABLE
+            return _pf(bool(rec.get("pass")))
+        except Exception:                             # the sibling is unreachable
+            return UNAVAILABLE
     if typ == "concept":
         # Λ·witness — a concept: check IMPORTS a concept authored and GRADED once in the library.
         # For the LIVE verdict (the direct-CLI gate path; the Bazel //:hook path reads the library's
@@ -195,9 +259,13 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
             if r.returncode == 2 and lib != _LIBRARY:
                 r = subprocess.run([sys.executable, str(_LIBRARY / "concepts.py"), target],
                                    cwd=_LIBRARY, env=clean_env(), capture_output=True)
-            return r.returncode == 0
-        except Exception:
-            return False
+            # exit 2 from the FINAL owner = "nobody owns this key": the concept is UNAVAILABLE (no
+            # library can witness it), NOT refuted.  Any other exit is the owning library's verdict.
+            if r.returncode == 2:
+                return UNAVAILABLE
+            return _pf(r.returncode == 0)
+        except Exception:                             # the library is unreachable
+            return UNAVAILABLE
     if typ == "agree":
         # Δ·agree (Ε·agree) — agree CONCURS (see VERBS; no ordinal, no count).
         # The SAME fact established by N INDEPENDENT producers (split on |||) that
@@ -206,24 +274,28 @@ def resolves(check: str, project_dir: Path, custom: dict) -> bool:
         # single check cannot catch: stronger evidence, a distinct KIND.
         producers = [p.strip() for p in target.split("|||") if p.strip()]
         if len(producers) < 2:
-            return False                              # agreement needs ≥2 independent producers
+            return FAIL                               # agreement needs ≥2 producers — a real defect, not unavailable
         outs = set()
         for prod in producers:
             try:
                 r = subprocess.run(prod, shell=True, cwd=project_dir, env=clean_env(),
                                    capture_output=True, text=True)
             except Exception:
-                return False
+                return UNAVAILABLE                    # a producer could not be SPAWNED — cannot evaluate
             if r.returncode != 0:
-                return False                          # a producer that fails cannot concur
+                return FAIL                           # a producer that RAN and failed cannot concur
             outs.add(r.stdout.rstrip())
-        return len(outs) == 1                         # green iff every producer agreed
+        return _pf(len(outs) == 1)                    # green iff every producer agreed
     if typ == "cmd":
         cmd = target
     elif typ in custom:
         cmd = custom[typ]["cmd"].replace("{target}", target)
     else:
-        return False
+        # A verb this engine does not have (not a builtin, not a project [checks.<type>]) is
+        # UNAVAILABLE, not FAIL: an engine that lacks a verb a bib names has not REFUTED the claim,
+        # it CANNOT CHECK it — so a bib written for a newer engine does not read as silently refuted
+        # on an older one (the version-skew-as-silent-refutation hazard, ask-result-tristate).
+        return UNAVAILABLE
     return run_ok(cmd, project_dir)
 
 

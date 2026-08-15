@@ -53,13 +53,15 @@ def main() -> int:
 
     print("\n⟨every site derives⟩\n")
     # 1. the VERDICT path — every declared verb reaches a real branch.  An unknown TARGET under a
-    #    declared verb resolves False (ran, failed); an undeclared TYPE also returns False but is
-    #    refused, so the discriminating assertion is that no verb RAISES and the set stays closed.
+    #    declared verb resolves to a non-passing Verdict (file/cmd: FAIL, a crossing verb whose
+    #    sibling is absent: UNAVAILABLE); an undeclared TYPE returns UNAVAILABLE (cannot check, not
+    #    refuted — ask-result-tristate).  The discriminating assertion: no verb RAISES, none PASSES a
+    #    bogus target, and the set stays closed.
     dispatched = all(
-        resolver.resolves(f"{v}:no-such-target-{v}", ENGINE, {}) is False for v in resolver.VERBS)
+        not resolver.resolves(f"{v}:no-such-target-{v}", ENGINE, {}).passed for v in resolver.VERBS)
     check("resolver.resolves dispatches every declared verb (no fallthrough, no raise)", dispatched)
-    check("the built-in set is CLOSED — an undeclared type does not resolve",
-          resolver.resolves("nosuchverb:x", ENGINE, {}) is False)
+    check("the built-in set is CLOSED — an undeclared type is UNAVAILABLE (cannot check ≠ refuted)",
+          resolver.resolves("nosuchverb:x", ENGINE, {}) is resolver.UNAVAILABLE)
 
     # 2. the FOOTPRINT command — file: opens only its target (None); every other verb runs something.
     cmds = {v: resolver._check_cmd(f"{v}:t", {}) for v in resolver.VERBS}
@@ -124,11 +126,11 @@ def main() -> int:
         # finding: directory-level selection eclipsed ALL engine keys from any repo owning a
         # library, the exact inverse of the shadowing the seam was built to fix).
         check("a key the project library OWNS resolves project-side",
-              resolver.resolves("concept:mine", far / "doc", {}) is True)
+              resolver.resolves("concept:mine", far / "doc", {}).passed)
         check("a key it answers 'not mine' (exit 2) FALLS THROUGH to the engine's library",
-              resolver.resolves("concept:claim-is-record", far / "doc", {}) is True)
-        check("a key owned NOWHERE fails (exit 2 everywhere is not a pass)",
-              resolver.resolves("concept:no-such-concept", far / "doc", {}) is False)
+              resolver.resolves("concept:claim-is-record", far / "doc", {}).passed)
+        check("a key owned NOWHERE is UNAVAILABLE (exit 2 everywhere = cannot witness, not refuted)",
+              resolver.resolves("concept:no-such-concept", far / "doc", {}) is resolver.UNAVAILABLE)
     check("in-repo resolution is UNCHANGED by the seam (every project here shares the root library)",
           resolver._library_for(ROOT / "paper") == ROOT / "library")
 
@@ -144,10 +146,32 @@ def main() -> int:
     print("      F (reverted): the literal returns → concept: is straced, a whole library witness reruns")
     print("      δ (min delta): one token, `resolver.CROSSING` → `\"result:\"`\n")
 
+    # ── ask-result-tristate: the ARM — UNAVAILABLE ≠ FAIL ─────────────────────────────────────────
+    # resolves() answers a Verdict, not a bool: a crossing check whose sibling is UNREACHABLE is
+    # UNAVAILABLE (could not evaluate), NOT FAIL (refuted).  The δ is exactly the fold that shipped:
+    # an absent sibling and a ran-and-failed sibling must NOT read the same.  This is the coverage
+    # whose absence let the bare-bool fold stand (Λ·location — untested across a repo boundary).
+    absent = resolver.resolves("result:no-such-sibling-here", ENGINE, {})
+    unknown = resolver.resolves("bogusverb:x", ENGINE, {})
+    cmd_ran_failed = resolver.resolves("cmd:false", ENGINE, {})
+    cmd_ran_passed = resolver.resolves("cmd:true", ENGINE, {})
+    no_bool = not hasattr(resolver.Verdict, "__bool__")
+    arm_ok = (absent is resolver.UNAVAILABLE and unknown is resolver.UNAVAILABLE
+              and cmd_ran_failed is resolver.FAIL and cmd_ran_passed is resolver.PASS
+              and not resolver.UNAVAILABLE.passed and no_bool
+              # the determinism set needs three DISTINGUISHABLE outcomes, identity-hashable
+              and len({resolver.PASS, resolver.FAIL, resolver.UNAVAILABLE}) == 3)
+    fails.append("tristate-arm") if not arm_ok else None
+    print(f"  {'ok ' if arm_ok else 'XX '}an UNREACHABLE crossing check is UNAVAILABLE, not FAIL")
+    print("      P (arm):     result:absent → UNAVAILABLE, unknown verb → UNAVAILABLE (cannot evaluate)")
+    print("      F (folded):  a ran-and-failed check (cmd:false) → FAIL; the two must NOT coincide")
+    print("      δ (min delta): the sibling is present/reachable vs absent/unreachable")
+    print("      (no __bool__ so no consumer folds silently; identity-hashable so the determinism set works)\n")
+
     if fails:
         print(f"DISPATCH: FAIL ({len(fails)} sites drifted from resolver.VERBS)")
         return 1
-    print(f"DISPATCH: PASS ({len(resolver.VERBS)} verbs, {len(CROSSING)} crossing, 5 sites, 1 delta)")
+    print(f"DISPATCH: PASS ({len(resolver.VERBS)} verbs, {len(CROSSING)} crossing, 5 sites, 2 deltas)")
     return 0
 
 

@@ -1,0 +1,59 @@
+% result-tristate.bib — the design DAG for ask-result-tristate (summit, open against paperkit).
+%
+% NOT a value fork (three states) but a TYPING fork: resolves() should be Π-typed — a dependent
+% function whose result type is indexed by WHICH VERB resolved it, each verb delegating to the
+% OWNER of its semantics, never scalar-collapsing at the boundary. The tristate is the degenerate
+% scalar shadow of the real thing. Design-first (the shape converges on the floor, not here);
+% rests-on the exit-alphabet work landed this session and the pi-typed-delegation memory.
+% Session 2026-08-15. No check fields (design claims, graded indeterminate until built).
+
+@misc{the-fold-is-a-scalar-collapse,
+  section = {problem},
+  claim   = {resolver.resolves returns a bare bool and folds EVERY verb's outcome AND every exception into it (three except-Exception:return-False sites). This loses two things at once: the three states (available / pass / fail --- the ask's framing) AND which KIND of thing answered. In-repo harmless (nine sibling projects always present); across repositories it reports a fact about the METHOD (I could not reach it) as a fact about the WORK (it failed)}
+}
+
+@misc{tristate-is-still-a-sum-type,
+  section = {problem}, from = {the-fold-is-a-scalar-collapse},
+  claim   = {a tagged tristate (available|pass|fail) is BETTER but still a SUM type --- it flattens result:-unavailable and concept:-unavailable and cmd:-unavailable into one `unavailable`, when those are DIFFERENT unavailabilities owned by DIFFERENT resolvers. The sibling project being unable to run, the library not owning a key, and a shell tool being absent are three distinct facts with three distinct owners. A single `unavailable` tag re-collapses them one level up},
+  rests-on = {the-fold-is-a-scalar-collapse}
+}
+
+@misc{the-answer-is-pi-typed,
+  section = {design}, from = {tristate-is-still-a-sum-type},
+  claim   = {THE SHAPE (user, 2026-08-15): the right solution looks like the concept library and parameterizable witnesses --- Pi types all the way down. resolves is a DEPENDENT FUNCTION: its result TYPE is indexed by which verb resolved it, and each verb's resolver returns ITS OWNER's evidence (the sibling's available/pass/fail from gate --json; the library's not-mine/pass/fail from the exit-2 sentinel; the shell's tool-absent/ran), delegated to the owner of that verb's semantics. Stop scalar-collapsing at the boundary; dispatch on ownership all the way down. This is pi-typed-boundary-delegation (grade a cross-boundary dependency by DELEGATION to its owner, dispatch on OWNERSHIP) applied to the resolver itself}
+}
+
+@misc{crosses-is-already-the-index,
+  section = {design}, from = {the-answer-is-pi-typed},
+  claim   = {the Pi-index ALREADY EXISTS: VERBS carries `crosses` (resolver.py:74-95) --- the STRUCTURAL bit saying whether a verb crosses a boundary, stored as data precisely so every site derives from it. And the dispatch is HALF-BUILT: concept: already does per-OWNER sentinel dispatch (exit 2 = "not mine", fall through to the true owner, Λ·library·fallthrough); result: already READS the sibling's own typed exit (gate --json, which since the exit-alphabet work emits available/pass/fail). Both reach the owner and get a typed answer --- then BOTH collapse it to bool at the return. The engine computes the ownership-typed evidence and flattens it on the way out},
+  rests-on = {the-answer-is-pi-typed}
+}
+
+@misc{the-fix-is-stop-the-flatten,
+  section = {design}, from = {crosses-is-already-the-index},
+  claim   = {so the fix is NOT to invent a tristate --- it is to STOP THE FLATTEN. Let each verb's resolver return its owner's evidence, typed by which verb answered; let resolves be the dependent function that dispatches on the verb (crosses and beyond) to the right owner's evidence-type. The tristate (available/pass/fail) is the degenerate SCALAR SHADOW projected when a consumer needs a flat answer; the real return is the Pi-type. A consumer that only wants pass/fail projects the shadow explicitly (a named local collapse), never a hidden one},
+  rests-on = {crosses-is-already-the-index, rests-on-the-exit-alphabet}
+}
+
+@misc{rests-on-the-exit-alphabet,
+  section = {design},
+  claim   = {this rests on the typed-gate-exit work landed this session (gate.py a7f9909): the gate ALREADY emits 0 pass / 1 ran-and-failed / 3 cannot-run + --json.available. So the sibling a result: check imports ALREADY reports available-vs-failed through the typed exit; the resolver is the one consumer still discarding it. The gate types it; the resolver must propagate it. Without the exit-alphabet this ask would need the gate typed first --- it isn't blocked, it's UNBLOCKED, by prior work}
+}
+
+@misc{delta-is-the-first-consumer,
+  section = {consumers}, from = {the-fix-is-stop-the-flatten},
+  claim   = {resolves() has 5 consumers: gate.py (verdict, x2) and grader.py's Δ sweep (x4: baseline, flip, repeat-determinism). The Δ sweep asks a DIFFERENT question --- "does mutating this flip the check" --- where "unavailable" has a SPECIFIC meaning: an unavailable premise CANNOT BE FLIPPED, which is exactly the unfalsifiable-component hole ask-delta-extensionless names. So the resolver's new unavailable state is the INPUT the Δ mutation surface needs to stop folding immutable-data and cant-mutate into one False. This is the dependency edge: result-tristate must land BEFORE delta-extensionless, because it hands delta-extensionless its type},
+  rests-on = {the-fix-is-stop-the-flatten}
+}
+
+@misc{design-first-not-unilateral,
+  section = {process}, from = {the-fix-is-stop-the-flatten},
+  claim   = {this is a CORE CONTRACT every consumer AND every downstream repo reads (the ask recurs because every boundary-crossing verb currently scalar-collapses --- it is the most-frequently-hit shape across repos). The ask is EVIDENCE, not a spec. So the shape converges on the FLOOR, not unilaterally in resolver.py: put the Pi-typed framing to summit (like the per-edge-trust RFC), confirm the crosses-index and per-owner-evidence shape with the consumers, THEN build. Coding resolver.py now would propagate a guessed fold instead of fixing the class},
+  rests-on = {the-fix-is-stop-the-flatten}
+}
+
+@misc{open-what-is-the-evidence-type,
+  section = {open},
+  claim   = {OPEN: what EXACTLY is each verb's owner-evidence type? result: = the sibling's {available, pass, gaps} (already in gate --json). concept: = {owned?, pass} (the exit-2 sentinel + verdict). cmd: = {tool-present?, exit} (Τ·path territory --- a tool absent is unavailable, not fail). file: = probably degenerate (present|absent, no unavailable arm). agree: = per-producer {present?, concurs}. Are these ONE parameterized shape (family/argument, like Λ·key·graded) or genuinely distinct per-verb records? The parameterizable-witness precedent says try the family first. Unresolved --- no witness yet},
+  rests-on = {the-answer-is-pi-typed}
+}

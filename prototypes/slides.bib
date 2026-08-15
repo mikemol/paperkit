@@ -165,3 +165,40 @@
   claim   = {CORRECTS the terminus: the sole new primitive is NOT "a modularity measure on rests-on" --- it is the RESIDUAL d(sigma, P*) between the authored section-grouping and the derived one. Do not gate "is the modularity optimal" (unfalsifiable, a value judgment); gate the residual. d(sigma, P*) = 0 is green (section IS a projection of the grounding); a nonzero residual NAMES the claims to look at --- a claim P* pulls out of its section because its grounding lives elsewhere is either MISFILED or a deliberate cross-reference the deck should show as a callback. This is paper-is-projection one level up: the authored grouping is a checkable projection of the structural grounding, and paperkit is a system whose whole point is checkable residuals},
   rests-on = {sigma-is-also-the-canonicalizer, measured-grounding-is-sparse-and-section-aligned}
 }
+
+% ── idiom test (2026-08-15, session 3): intern one motif, MEASURE the quotient ─────────
+
+@misc{idiom-is-rests-on-quotiented,
+  section = {idiom},
+  claim   = {an idiom-relation ("X is idiomatic because it mirrors Y") is NOT a new edge --- it is a rests-on edge with CONTEXT QUOTIENTED AWAY: keep the grounding SHAPE, forget the operands. Two subgraphs are idiomatic iff their rests-on motifs are ISOMORPHIC up to operand-substitution. paperkit already has the quotient: Λ·key·graded (library/concepts.py) --- a graded key family/argument routes DISTINCT arguments to ONE implementation (f/A and f/B share fa[0] is fb[0]). The family IS the motif (context forgotten); the argument IS the context. So "document an idiom" = intern the motif as a concept family; each instance is concept:motif/instance; the citation is the idiom-edge, graded and gated. No reduces-to primitive; the quotient is the graded key}
+}
+
+@misc{motif-declared-hint-on-derived-order,
+  section = {idiom}, from = {idiom-is-rests-on-quotiented},
+  claim   = {THE MOTIF, stated as a shape with holes: a DERIVED order/structure D (computed from the DAG, not authored); a DECLARED per-item hint H (authored, SPARSE, OPTIONAL); H changes how an item MATERIALIZES within D but does NOT reorder D; absent H, D alone fully determines the output. The operand-substitution for an instance must fill three holes: D, H, and what-H-changes-without-reordering},
+  rests-on = {idiom-is-rests-on-quotiented}
+}
+
+@misc{motif-holds-for-three-instances,
+  section = {idiom}, from = {motif-declared-hint-on-derived-order},
+  claim   = {MEASURED against code, the motif has exactly THREE clean instances, not the five prose claimed. depth (VERIFIED project.py:393: D=dep_order, H=depth per-claim, renders as indented list item, keys already fixed so no reorder). paragraph=claim (VERIFIED project.py:418: D=dep_order run, H=paragraph, inserts a break, order is dep_order's so no reorder). slide=break (PROPOSED, fits clean: D=derived pagination, H=slide per-claim, pins a break, reveal-order is the DAG's). All three per-item, sparse, materialization-not-order. The quotient HOLDS --- these three genuinely hash-cons to one motif, not merely rhyme},
+  rests-on = {motif-declared-hint-on-derived-order}
+}
+
+@misc{two-instances-failed-and-that-is-the-finding,
+  section = {idiom}, from = {motif-holds-for-three-instances},
+  claim   = {rubric-override and gamma FAILED the isomorphism, and the failures reveal TWO DIFFERENT motifs the prose had smeared into one. (1) gamma is a GLOBAL SCALAR (one number for the whole projection), not a per-item sparse hint --- it belongs to a distinct motif GLOBAL-GENRE-PARAMETER-ON-A-DERIVED-STRUCTURE, the family of target / --min-strength / genre. (2) rubric is not a hint on the cut at all --- it is a WHOLE AUTHORED ORDERED DOCUMENT (rubric.tsv, mandatory, global) that the derived decomposition is CHECKED AGAINST. That is a THIRD motif, AUTHORED-STRUCTURE-D-IS-VERIFIED-AGAINST --- which is the residual gate d(sigma,P*), i.e. the paper-is-projection motif, NOT the depth motif. rubric was in the wrong family},
+  rests-on = {motif-holds-for-three-instances}
+}
+
+@misc{paragraph-bridges-two-motifs,
+  section = {idiom}, from = {two-instances-failed-and-that-is-the-finding},
+  claim   = {paragraph appears in BOTH the hint motif and the global-parameter motif depending on granularity: paragraph=claim is a GLOBAL MODE (motif 2, the knob), but the per-claim break it produces is a LOCAL materialization (motif 1). The global knob SELECTS how the local materialization works --- so paragraph is the BRIDGE between the two motifs, not a contradiction. This is itself a datum: a genre parameter (global) and a per-item hint (local) are the same operator at two scales, which is the (target, genre) indexing one level down},
+  rests-on = {two-instances-failed-and-that-is-the-finding}
+}
+
+@misc{idiom-test-vindicates-measure-first,
+  section = {idiom}, from = {two-instances-failed-and-that-is-the-finding},
+  claim   = {the discipline paid: interning ONE motif before generalizing caught that "five instances of one idiom" was 3 + a smear of two others. Asserting the five would have banked a false quotient (rhyming read as isomorphism). This is the enumeration-count / measure-the-frame class one more time, on IDIOMS: a set of analogies taken from prose describes the prose; only exhibiting the operand-substitution per instance describes the actual quotient. Three motifs now stand where prose had one},
+  rests-on = {two-instances-failed-and-that-is-the-finding}
+}

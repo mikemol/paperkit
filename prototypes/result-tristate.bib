@@ -57,3 +57,29 @@
   claim   = {OPEN: what EXACTLY is each verb's owner-evidence type? result: = the sibling's {available, pass, gaps} (already in gate --json). concept: = {owned?, pass} (the exit-2 sentinel + verdict). cmd: = {tool-present?, exit} (Τ·path territory --- a tool absent is unavailable, not fail). file: = probably degenerate (present|absent, no unavailable arm). agree: = per-producer {present?, concurs}. Are these ONE parameterized shape (family/argument, like Λ·key·graded) or genuinely distinct per-verb records? The parameterizable-witness precedent says try the family first. Unresolved --- no witness yet},
   rests-on = {the-answer-is-pi-typed}
 }
+
+% ── corroboration (mat230, 2026-08-15): measured from its consumer AND provider code ──
+
+@misc{mat230-datum-the-arm-not-the-index,
+  section = {corroboration},
+  claim   = {mat230 --- the one consumer that hit the bare-bool across a REAL repo boundary --- answered from its code: a FLAT tristate (available|pass|fail) would have been enough. It needed the `available` ARM and never the Π-typed per-owner INDEX; both its boundaries collapse all unavailability into one bucket and never route on which owner produced it. So the record separates NECESSARY from VALUE: the third ARM is load-bearing (a consumer that lacks it is forced to fake it); the per-owner INDEX is genuine value for OTHER consumers, not one mat230 would have exercised. This REFINES the design --- do not present the index as THE fix; the arm is the fix, the index is separable improvement},
+  rests-on = {tristate-is-still-a-sum-type, the-answer-is-pi-typed}
+}
+
+@misc{mat230-faked-the-arm-both-directions,
+  section = {corroboration}, from = {mat230-datum-the-arm-not-the-index},
+  claim   = {the EVIDENCE is stronger than the answer: lacking the arm, mat230 faked it at BOTH boundaries in OPPOSITE directions. CONSUMER (coursework.py:_gate_state) reconstructs available-vs-not by SCRAPING bin/pk gate stdout for marker strings; no marker → None = "gate did not really run", kept distinct from ran-and-not-green so an absent gate never overrides a user's done-mark --- the availability fact was not in the signal, so it was reconstructed from TEXT. PROVIDER (agda_check.py, a [checks.agda] verb the resolver calls) has exit {0 pass, 1 fail, 2 usage}, NO cannot-run arm, so it folded "toolchain absent" into exit 0 (pass) + a loud stderr SKIP note --- resolver:226's hazard from the other side, paid by making "unverified" legible only in text, invisible to any exit-code reader: a machine sees green and cannot tell verified from skipped},
+  rests-on = {mat230-datum-the-arm-not-the-index}
+}
+
+@misc{version-skew-bites-both-ways-inconsistently,
+  section = {corroboration}, from = {mat230-faked-the-arm-both-directions},
+  claim   = {THE SHARPEST BIT, and it corroborates version-skew-as-silent-refutation concretely: agda_check folds the TWO flavours of unavailable into DIFFERENT wrong arms --- a missing Agda BRIDGE file → exit 1 (fail), a missing agda BINARY → exit 0 (pass). Same "can't check this", split across BOTH wrong arms by a hand-picked which-is-safer-default judgement, INCONSISTENT within one file. That is "three facts with three owners, flattened" made concrete: with no cannot-run inhabitant the implementer is FORCED to fold arbitrarily and will pick inconsistent defaults. It does NOT require routing on owner --- give it a cannot-run arm and both flavours return it and the inconsistency vanishes; mat230 would not care which owner. Hence "the arm, not the index"},
+  rests-on = {mat230-faked-the-arm-both-directions, the-fix-is-stop-the-flatten}
+}
+
+@misc{the-one-forced-inhabitant,
+  section = {corroboration}, from = {version-skew-bites-both-ways-inconsistently},
+  claim   = {the one inhabitant the Π-design MUST carry, from this datum: cannot-run must be reachable WITHOUT the consumer knowing which owner could not run --- the unknown-verb inhabitant already flagged (resolver:226) is exactly it. So the design's minimal core is: (1) a cannot-run ARM, owner-agnostic, always reachable (closes mat230 and every arm-only consumer, eliminates BOTH fakes --- the consumer text-scrape and the provider skip-green-with-note); (2) the per-owner INDEX as a REFINEMENT the arm-only consumer projects away. The Π-type is the general shape; the flat-tristate-with-a-real-cannot-run-arm is its degenerate-but-sufficient shadow for a consumer that does not route on owner. Both close the ask's witness},
+  rests-on = {version-skew-bites-both-ways-inconsistently, open-what-is-the-evidence-type}
+}

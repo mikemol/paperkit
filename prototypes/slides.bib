@@ -20,13 +20,13 @@
 @misc{targets-are-total-linearizations,
   section = {foundation}, from = {projection-is-coalgebra},
   claim   = {every EXISTING target unfolds the DAG to ONE flat stream (String) --- a TOTAL LINEARIZATION seeded by rubric-order x dep-order. The gate's PROJECT invariant is prose == project(cfg, target), i.e. byte-equality of one committed artifact against one projection},
-  'rests-on' = {projection-is-coalgebra}
+  rests-on = {projection-is-coalgebra}
 }
 
 @misc{docx-pdf-are-transforms-not-observations,
   section = {foundation}, from = {targets-are-total-linearizations},
   claim   = {docx and pdf are NOT new observations of the DAG --- they are downstream TRANSFORMS of the pandoc observation (pandoc then LibreOffice). So an exporter-of-finished-prose would make a deck a second-class artifact that has ALREADY lost the DAG structure; observing the DAG directly is what keeps rests-on as build-order},
-  'rests-on' = {targets-are-total-linearizations}
+  rests-on = {targets-are-total-linearizations}
 }
 
 % ── the cut: slides break the linearization invariant ─────────────────────────────────
@@ -34,19 +34,19 @@
 @misc{slides-break-linearization,
   section = {cut}, from = {targets-are-total-linearizations},
   claim   = {a slide deck is NOT a linearization --- it is a SEGMENTATION into a sequence of bounded observation-windows, each showing a SUBSET of the DAG. So the observation type changes: not S -> String but S -> List(Slide), where Slide is itself a bounded observation of a sub-DAG},
-  'rests-on' = {targets-are-total-linearizations}
+  rests-on = {targets-are-total-linearizations}
 }
 
 @misc{cut-is-derived-refined-by-declared,
   section = {cut}, from = {slides-break-linearization},
   claim   = {the cut is NOT derived-XOR-declared (a false fork). Like a word processor: DERIVED pagination by default, a manual Ctrl-Enter override the flow reflows around. The override is a PROJECTION INPUT, not authored content --- the deck stays project(cfg, slides), byte-stable, gate-verified as committed == observation},
-  'rests-on' = {slides-break-linearization, depth-is-the-precedent}
+  rests-on = {slides-break-linearization, depth-is-the-precedent}
 }
 
 @misc{depth-is-the-precedent,
   section = {cut},
   claim   = {`depth` ALREADY is the Ctrl-Enter pattern: a DECLARED per-claim field (in _SCALAR beside emit/as/move/link) that annotates rendering (a proof-step nests as an indented list item) WITHOUT reordering --- dep_order still produces the sequence, depth only changes materialization. A `slide = break` field is depth's sibling, one _SCALAR member, honored by the windowing},
-  'rests-on' = {}
+  rests-on = {}
 }
 
 % ── the invariant grouping: emergent from rests-on, not authored ──────────────────────
@@ -54,19 +54,19 @@
 @misc{grouping-is-recursive,
   section = {grouping}, from = {slides-break-linearization},
   claim   = {a slide is a composite of claims; a chapter a composite of slides; a deck a composite of chapters --- ONE grouping operation applied RECURSIVELY. The coalgebra is S -> RoseTree(S): an anamorphism into a tree (deck > chapters > slides > claims), not three ad-hoc levels},
-  'rests-on' = {slides-break-linearization}
+  rests-on = {slides-break-linearization}
 }
 
 @misc{grouping-emerges-from-rests-on,
   section = {grouping}, from = {grouping-is-recursive},
   claim   = {EMERGENT (not forced) grouping means the tree's branching comes from a MEASURE on the DAG, not authored fields. The measure is MODULARITY on the reduced rests-on graph: a group boundary falls where grounding-connectivity is WEAKEST (between argument-steps), the way a good page-break falls between paragraphs. This is the ONE genuinely-new primitive --- paperkit has rests-on and its transitive reduction but NO clustering operator today},
-  'rests-on' = {grouping-is-recursive}
+  rests-on = {grouping-is-recursive}
 }
 
 @misc{grade-is-the-prominence-axis,
   section = {grouping}, from = {grouping-emerges-from-rests-on},
   claim   = {a full DAG (~84 claims) cannot be ~84 slides, so a deck may observe a FILTERED carrier. rests-on-modularity gives the GROUPING; effective_grade/centrality gives the PROMINENCE (spine vs detail). The two compose: a slide is a strongly-grounded cluster, low-grade detail falls to speaker-notes/appendix AUTOMATICALLY. Structure from grounding, emphasis from grade, neither authored},
-  'rests-on' = {grouping-emerges-from-rests-on}
+  rests-on = {grouping-emerges-from-rests-on}
 }
 
 % ── composition <-> decomposition: one operator, two directions ───────────────────────
@@ -74,25 +74,25 @@
 @misc{carrier-is-a-union-of-a-collection,
   section = {composition},
   claim   = {the carrier was NEVER one document's DAG --- load_config UNIONS a warrants list (12 fragments: F.update(entries(b))) into one graph, and result:/concept: fold a sibling project's graph one level up. The paper is already union(collection). Composition is the primitive; the individual documents are ONE decomposition of the union},
-  'rests-on' = {}
+  rests-on = {}
 }
 
 @misc{compose-decompose-is-an-adjunction,
   section = {composition}, from = {carrier-is-a-union-of-a-collection},
   claim   = {compose (union the fragments) and decompose (cut the union into the collection that best coheres) are the SAME operator run in opposite directions on one carrier. compose is left adjoint to decompose. Today paperkit has the LEFT adjoint FREE (union is structural) and the RIGHT adjoint HAND-AUTHORED (section + rubric are declared, not emergent)},
-  'rests-on' = {carrier-is-a-union-of-a-collection, grouping-emerges-from-rests-on}
+  rests-on = {carrier-is-a-union-of-a-collection, grouping-emerges-from-rests-on}
 }
 
 @misc{deck-and-collection-are-two-serializations,
   section = {composition}, from = {compose-decompose-is-an-adjunction},
   claim   = {"decompose into a deck OR a more optimal document collection" is ONE carrier, ONE grouping, two SERIALIZATIONS of the rose-tree: deck flattens a subtree to reveal-order; collection materializes each subtree as a standalone doc (its warrants/rubric DERIVED, not authored). Same decomposition, different observation functor on the tree},
-  'rests-on' = {compose-decompose-is-an-adjunction, genre-supplies-pagination}
+  rests-on = {compose-decompose-is-an-adjunction, genre-supplies-pagination}
 }
 
 @misc{rubric-becomes-the-override,
   section = {composition}, from = {compose-decompose-is-an-adjunction},
   claim   = {rubric does NOT disappear under emergent decomposition --- it becomes the DECLARED OVERRIDE on the emergent document-cut, exactly as `slide = break` overrides emergent pagination. Author section boundaries where rhetoric wants them; the measure fills the rest. The derive-default/declare-override shape holds all the way up, from paragraph to document},
-  'rests-on' = {compose-decompose-is-an-adjunction, cut-is-derived-refined-by-declared}
+  rests-on = {compose-decompose-is-an-adjunction, cut-is-derived-refined-by-declared}
 }
 
 % ── genre: pagination is a named objective, separate from grouping ─────────────────────
@@ -100,25 +100,25 @@
 @misc{grouping-is-not-pagination,
   section = {genre}, from = {grouping-emerges-from-rests-on},
   claim   = {CORRECTION (2026-08-15): a slide is NOT a rests-on cluster --- that fused two axes. The cluster is the GROUPING (structural, emergent, genre-invariant: what coheres). WHERE a slide break falls is a RHETORIC/GENRE choice ON TOP: the same cluster can be one dense staged slide, N slide-per-claim, or one summary line, chosen by TARGET GENRE. Grouping and pagination are independent axes},
-  'rests-on' = {grouping-emerges-from-rests-on}
+  rests-on = {grouping-emerges-from-rests-on}
 }
 
 @misc{paragraph-is-the-genre-precedent,
   section = {genre}, from = {grouping-is-not-pagination},
   claim   = {this two-axis shape ALREADY exists one level down: paragraph = woven|claim is a PROJECT-LEVEL genre knob (bib.py) on ONE grouping. `woven` stages a run of claims into one paragraph (= staged bullets on one slide); `claim` gives each its own paragraph (ISO 24495-1, = slide-per-claim). Same grouping, two presentations, chosen by a knob --- not per-claim, not derived},
-  'rests-on' = {grouping-is-not-pagination, depth-is-the-precedent}
+  rests-on = {grouping-is-not-pagination, depth-is-the-precedent}
 }
 
 @misc{genre-supplies-pagination,
   section = {genre}, from = {paragraph-is-the-genre-precedent},
   claim   = {the slide coalgebra needs a GENRE parameter, sibling to `paragraph` and `target`, that paginates the emergent clusters: slides = staged (cluster -> one staged-reveal slide, conference talk) | atomic (cluster -> slide-per-claim, teaching) | summary (cluster -> one line, exec brief) | collection (subtree -> standalone doc). The observation functor is now indexed by (target, genre), not target alone},
-  'rests-on' = {paragraph-is-the-genre-precedent, grouping-is-not-pagination}
+  rests-on = {paragraph-is-the-genre-precedent, grouping-is-not-pagination}
 }
 
 @misc{genre-names-the-objective,
   section = {genre}, from = {genre-supplies-pagination},
   claim   = {the genre knob and the "optimal collection" objective function are the SAME choice viewed twice. A genre IS a named objective on pagination (talk = minimise high-load slides; teaching = one concept per unit; brief = maximise coverage per slide; collection = e.g. minimise cross-document rests-on edges --- where the dangling-premise gate becomes the COST function). You do not pick an abstract cost AND a genre; the genre is a reusable named cost, the way paragraph=woven is a reusable named choice},
-  'rests-on' = {genre-supplies-pagination, grade-is-the-prominence-axis}
+  rests-on = {genre-supplies-pagination, grade-is-the-prominence-axis}
 }
 
 % ── terminus: the whole design in one statement ───────────────────────────────────────
@@ -126,11 +126,42 @@
 @misc{the-slide-coalgebra,
   section = {terminus}, from = {genre-names-the-objective},
   claim   = {THE DESIGN: project was S -> String indexed by `target`; slides make it S -> RoseTree(S) indexed by (target, genre). ONE carrier (the union DAG, already composed). ONE invariant grouping (rests-on-modularity + grade-prominence, EMERGENT). ONE recursive functor cut at a chosen resolution. Genre picks the pagination of the emergent grouping (a named objective). Sparse declared overrides (slide/depth/rubric = the Ctrl-Enter) layer on top. The SOLE new primitive is the rests-on cluster-measure; everything else --- the union, the recursion, grade, the declared-override family, result:/concept: for cross-boundary subtrees, the gate-as-projection --- paperkit already runs},
-  'rests-on' = {the-slide-coalgebra-open-questions, genre-names-the-objective, grade-is-the-prominence-axis, deck-and-collection-are-two-serializations, cut-is-derived-refined-by-declared}
+  rests-on = {the-slide-coalgebra-open-questions, genre-names-the-objective, grade-is-the-prominence-axis, deck-and-collection-are-two-serializations, cut-is-derived-refined-by-declared}
 }
 
 @misc{the-slide-coalgebra-open-questions,
   section = {terminus},
   claim   = {OPEN (the unforced decisions, none blocking): (1) the rests-on modularity measure's OBJECTIVE --- minimise-cross-edges vs maximise-internal-density vs grade-weighted --- is a knob (the deck-analog of --min-strength), now understood to be NAMED BY GENRE. (2) are the genres a small CLOSED set or open like check-verbs. (3) full DAG vs grade-filtered spine collapses INTO the grouping question (both are "which emergent measure cuts the deck"). None require new architecture; they are the choices the measure and genre leave open},
-  'rests-on' = {}
+  rests-on = {}
+}
+
+% ── formalization + measurement (2026-08-15, session 2): the operator, made precise ───
+
+@misc{measured-grounding-is-sparse-and-section-aligned,
+  section = {formalization},
+  claim   = {MEASURED on paper's real composed DAG (84 claims, 57 rests-on edges, density 0.68): section ALREADY captures 61% of grounding (35 of 57 edges stay within-section), and the rests-on graph has 46 weakly-connected components of which 34 are SINGLETONS. So "a slide is a rests-on cluster" FAILS for ~40% of claims --- they have no grounding edge to be clustered by. This REFUTES the pure-emergent premise: rests-on does not discover hidden structure section missed; section is already doing most of the clustering, and the tail is ungrounded}
+}
+
+@misc{refinement-was-the-wrong-word,
+  section = {formalization}, from = {measured-grounding-is-sparse-and-section-aligned},
+  claim   = {"refinement operator" was LOOSE and is wrong. Refinement has a lattice meaning (P <= P_sigma, only SPLITS a section), which the 22 cross-section edges refute --- a cross-section grounding edge must be able to MERGE across sections, which pure lattice-refinement cannot. The honest object is sigma-REGULARIZED COMMUNITY DETECTION: the authored partition sigma is a PRIOR, not a ceiling},
+  rests-on = {measured-grounding-is-sparse-and-section-aligned, grouping-emerges-from-rests-on}
+}
+
+@misc{the-operator-formally,
+  section = {formalization}, from = {refinement-was-the-wrong-word},
+  claim   = {THE OPERATOR: P* = argmax_P [ Q_E(P) - gamma * d(P, P_sigma) ], where Q_E is rests-on modularity, d is a partition-lattice distance to the authored sigma, gamma the resolution knob. "Dense enough to say anything" is FORMAL, not a bolt-on threshold: modularity's null term [A_ij - k_i k_j/2m] means a single edge contributes ~0 (its chance-expectation cancels it) while a dense cluster contributes a lot --- so sparse regions are argmax-INDIFFERENT and the -gamma*d(P,P_sigma) term dominates there, i.e. the tail FALLS BACK TO sigma by construction, not by a special case. gamma is the deck-analog of --min-strength: gamma->inf recovers pure section, gamma->0 recovers pure modularity (the 34 singletons)},
+  rests-on = {refinement-was-the-wrong-word, genre-names-the-objective}
+}
+
+@misc{sigma-is-also-the-canonicalizer,
+  section = {formalization}, from = {the-operator-formally},
+  claim   = {modularity argmax is NOT unique (near-degenerate optima, the resolution-limit degeneracy), so rests-on-modularity ALONE is not a function --- it needs a tie-break. The sigma prior IS the tie-break: among near-equal Q_E, prefer the partition closest to sigma. So sigma does double duty --- fallback where E is sparse AND canonicalizer where E is degenerate. The authored grouping is what makes the derived grouping DETERMINED},
+  rests-on = {the-operator-formally}
+}
+
+@misc{the-primitive-is-the-residual,
+  section = {formalization}, from = {sigma-is-also-the-canonicalizer},
+  claim   = {CORRECTS the terminus: the sole new primitive is NOT "a modularity measure on rests-on" --- it is the RESIDUAL d(sigma, P*) between the authored section-grouping and the derived one. Do not gate "is the modularity optimal" (unfalsifiable, a value judgment); gate the residual. d(sigma, P*) = 0 is green (section IS a projection of the grounding); a nonzero residual NAMES the claims to look at --- a claim P* pulls out of its section because its grounding lives elsewhere is either MISFILED or a deliberate cross-reference the deck should show as a callback. This is paper-is-projection one level up: the authored grouping is a checkable projection of the structural grounding, and paperkit is a system whose whole point is checkable residuals},
+  rests-on = {sigma-is-also-the-canonicalizer, measured-grounding-is-sparse-and-section-aligned}
 }

@@ -39,14 +39,14 @@
 
 @misc{cut-is-derived-refined-by-declared,
   section = {cut}, from = {slides-break-linearization},
-  claim   = {the cut is NOT derived-XOR-declared (a false fork). Like a word processor: DERIVED pagination by default, a manual Ctrl-Enter override the flow reflows around. The override is a PROJECTION INPUT, not authored content --- the deck stays project(cfg, slides), byte-stable, gate-verified as committed == observation},
-  rests-on = {slides-break-linearization, depth-is-the-precedent}
+  claim   = {the cut is NOT derived-XOR-declared (a false fork). Like a word processor: DERIVED pagination by default, a manual Ctrl-Enter override the flow reflows around (NB: sigma-regularized, not lattice-REFINEMENT --- the operator can MERGE across sections, which refinement cannot). The override is a PROJECTION INPUT, not authored content --- the deck stays project(cfg, slides), byte-stable, gate-verified as committed == observation},
+  rests-on = {slides-break-linearization, depth-is-the-precedent},
 }
 
 @misc{depth-is-the-precedent,
   section = {cut},
-  claim   = {`depth` ALREADY is the Ctrl-Enter pattern: a DECLARED per-claim field (in _SCALAR beside emit/as/move/link) that annotates rendering (a proof-step nests as an indented list item) WITHOUT reordering --- dep_order still produces the sequence, depth only changes materialization. A `slide = break` field is depth's sibling, one _SCALAR member, honored by the windowing},
-  rests-on = {}
+  claim   = {`depth` ALREADY is the Ctrl-Enter pattern: a DECLARED per-claim field (in _SCALAR beside emit/as/move/link) that annotates rendering (a proof-step nests as an indented list item) WITHOUT reordering --- dep_order still produces the sequence, depth only changes materialization. A `slide = break` field is one of exactly THREE verified instances of the motif declared-hint-on-derived-order (with depth and paragraph; see idiom section), one _SCALAR member honored by the windowing},
+  rests-on = {},
 }
 
 % ── the invariant grouping: emergent from rests-on, not authored ──────────────────────
@@ -59,8 +59,8 @@
 
 @misc{grouping-emerges-from-rests-on,
   section = {grouping}, from = {grouping-is-recursive},
-  claim   = {EMERGENT (not forced) grouping means the tree's branching comes from a MEASURE on the DAG, not authored fields. The measure is MODULARITY on the reduced rests-on graph: a group boundary falls where grounding-connectivity is WEAKEST (between argument-steps), the way a good page-break falls between paragraphs. This is the ONE genuinely-new primitive --- paperkit has rests-on and its transitive reduction but NO clustering operator today},
-  rests-on = {grouping-is-recursive}
+  claim   = {EMERGENT (not forced) grouping means the tree's branching comes from a MEASURE on the DAG, not authored fields. The measure is MODULARITY on the reduced rests-on graph: a group boundary falls where grounding-connectivity is WEAKEST (between argument-steps), the way a good page-break falls between paragraphs. But MEASURED, this is a REFINEMENT not a replacement: section already carries 61% of grounding (35/57 edges within-section) and the rests-on graph is 46 components / 34 singletons, so section clusters and rests-on refines where the graph is dense enough. The new primitive is not the cluster-measure but the residual d(sigma,P*) (see formalization)},
+  rests-on = {grouping-is-recursive},
 }
 
 @misc{grade-is-the-prominence-axis,
@@ -125,14 +125,26 @@
 
 @misc{the-slide-coalgebra,
   section = {terminus}, from = {genre-names-the-objective},
-  claim   = {THE DESIGN: project was S -> String indexed by `target`; slides make it S -> RoseTree(S) indexed by (target, genre). ONE carrier (the union DAG, already composed). ONE invariant grouping (rests-on-modularity + grade-prominence, EMERGENT). ONE recursive functor cut at a chosen resolution. Genre picks the pagination of the emergent grouping (a named objective). Sparse declared overrides (slide/depth/rubric = the Ctrl-Enter) layer on top. The SOLE new primitive is the rests-on cluster-measure; everything else --- the union, the recursion, grade, the declared-override family, result:/concept: for cross-boundary subtrees, the gate-as-projection --- paperkit already runs},
-  rests-on = {the-slide-coalgebra-open-questions, genre-names-the-objective, grade-is-the-prominence-axis, deck-and-collection-are-two-serializations, cut-is-derived-refined-by-declared}
+  claim   = {THE DESIGN: project was S -> String indexed by `target`; slides make it S -> RoseTree(S) indexed by (target, genre). ONE carrier (the union DAG, already composed). ONE invariant grouping (rests-on-modularity + grade-prominence, EMERGENT). ONE recursive functor cut at a chosen resolution. Genre picks the pagination of the emergent grouping (a named objective). Sparse declared overrides (slide/depth/rubric = the Ctrl-Enter) layer on top. The new primitive is the RESIDUAL d(sigma,P*) (gate the disagreement between authored section and derived grouping, not 'is the measure optimal'); and the design interns THREE motifs, not one (declared-hint-on-derived-order, global-genre-parameter, authored-structure-verified-against). Everything else --- the union, the recursion, grade, the declared-override family, result:/concept: for cross-boundary subtrees, the gate-as-projection --- paperkit already runs},
+  rests-on = {open-gamma-set, open-objective-per-genre, open-full-dag-vs-spine-collapses, genre-names-the-objective, grade-is-the-prominence-axis, deck-and-collection-are-two-serializations, cut-is-derived-refined-by-declared},
 }
 
-@misc{the-slide-coalgebra-open-questions,
-  section = {terminus},
-  claim   = {OPEN (the unforced decisions, none blocking): (1) the rests-on modularity measure's OBJECTIVE --- minimise-cross-edges vs maximise-internal-density vs grade-weighted --- is a knob (the deck-analog of --min-strength), now understood to be NAMED BY GENRE. (2) are the genres a small CLOSED set or open like check-verbs. (3) full DAG vs grade-filtered spine collapses INTO the grouping question (both are "which emergent measure cuts the deck"). None require new architecture; they are the choices the measure and genre leave open},
-  rests-on = {}
+@misc{open-gamma-set,
+  section = {open},
+  claim   = {OPEN: is the genre-set (which fixes gamma, the resolution knob) a SMALL CLOSED set of named objectives --- talk / teaching / brief / collection --- or OPEN like the check-verbs (any consumer registers its own pagination objective)? The paragraph precedent has exactly two values (woven|claim), suggesting closed; but decks have visibly more genres than prose, and genre-names-the-objective makes each genre a reusable named cost function, which is the shape of an OPEN registry. Unresolved --- no witness yet},
+  rests-on = {genre-names-the-objective, the-operator-formally}
+}
+
+@misc{open-objective-per-genre,
+  section = {open},
+  claim   = {OPEN: what IS each genre's objective function on the modularity operator --- minimise-cross-document-edges (each unit self-contained) vs maximise-internal-density vs grade-weighted? genre-names-the-objective says the genre NAMES it, but the actual functions are unwritten. Note the collection genre's objective is likely "minimise cross-document rests-on edges", where the dangling-premise gate becomes the COST function --- a concrete lead, not yet a witness},
+  rests-on = {genre-names-the-objective, the-primitive-is-the-residual}
+}
+
+@misc{open-full-dag-vs-spine-collapses,
+  section = {open},
+  claim   = {RESOLVED-AS-COLLAPSE (was open): "does the deck observe the full DAG or a grade-filtered spine" is NOT a separate question --- it collapses INTO grouping. Both "which claims are on the deck" and "how are they grouped" are answered by the same two emergent measures (rests-on-modularity for grouping, effective_grade for prominence). Grade-filtering IS prominence; there is no third mechanism. This open question closed by recognising it was the grouping question in disguise},
+  rests-on = {grade-is-the-prominence-axis, the-primitive-is-the-residual}
 }
 
 % ── formalization + measurement (2026-08-15, session 2): the operator, made precise ───

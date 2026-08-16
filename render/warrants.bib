@@ -25,6 +25,11 @@
   claim   = {and the paper's EQUATIONS transport as native Office Math (OMML), not pixels --- the effective-grade clamp, the emergence increment and the coherence disjointness render from the claim prose's inline math into editable, well-formed $<$m:oMath$>$ elements that scale and stay in the text layer, with no equation leaked to a rasterized image and no math delimiter surviving as literal text; and the presentation-agreement check DELEGATES the equations to this OMML owner rather than compare their plain-text flattenings (which differ across the two render paths), so the cross-path difference is REGISTERED against a bounded set of glyph variants and witnessed to stay within it, not erased --- the hardest document-fidelity case demonstrated on the paper's own content (mat260's OMML doctrine)},
   check   = {cmd:python3 checks/omml.py}
 }
+@misc{rnd-widen,
+  section = {integrity}, from = {rnd-omml}, join = {. },
+  claim   = {and a wide equation in a TABLE cell is sized to fit rather than clipped --- an OMML run cannot wrap (LibreOffice never breaks inside it, and renders it at a fixed base size that ignores the run's own size hints, so column WIDTH is the only lever), and a formula wider than its fixed column paints past the margin and is truncated, so before the export each table's columns are sized to their MEASURED rendered ink and a cell that still would not fit under that sizing is named rather than silently clipped --- the ink measured with the same rasterizer the reader sees, not estimated from a character count (mat260's measured-column-width, whose CLIPS verdict is first-pass under column sizing, a wider page or a broken equation left untried)},
+  check   = {cmd:python3 checks/widen_tables.py --selftest}
+}
 @misc{rnd-ocr,
   section = {visual},
   claim   = {the reader's EYE sees the paper, not just a screen reader: rendered to a PDF and rasterized to images, OCR recovers the paper's text from the pixels themselves --- a font or render regression that turned the body to tofu would crater that recovery, so the visual layer is gated, not only the text layer},

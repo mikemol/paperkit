@@ -35,6 +35,7 @@ import a11y            # the measurement owner — import, never re-implement
 import linkalt
 import lo
 import mathalt
+import widen_tables
 
 
 def _load(name, filename):
@@ -64,6 +65,8 @@ def _build_deliverable(d: Path) -> Path:
     md.write_text(split)
     subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography", "../paper/references.bib",
                     "--metadata", f"title={title}", "-o", str(docx)], check=True)
+    widen_tables.widen(docx, d / "sized.docx")               # size columns before export (pandoc→widen→export)
+    docx = d / "sized.docx"
     pdf = lo_export.export_pdfua(docx, d / "p.pdf") or lo.convert(docx, "pdf", d)
     assert pdf is not None and pdf.stat().st_size > 0, "no PDF deliverable produced"
     linkalt.describe_links(pdf)                                       # links: PDF/UA 7.18.1/7.18.5

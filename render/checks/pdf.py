@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import linkalt      # describe source-document links the office export leaves bare (Ρ·render·linkalt)
 import mathalt      # give each equation a text alternative — PDF/UA 7.7 (Ρ·render·mathalt)
 import lo           # office convert: isolated profile + unlink-first (Ρ·render·provenance)
+import widen_tables  # size table columns to measured ink so a wide math cell can't clip (Ρ·render·widen)
 
 
 def _load(name, filename):
@@ -40,6 +41,13 @@ with tempfile.TemporaryDirectory() as d:
     md.write_text(split)
     subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography", "../paper/references.bib",
                     "--metadata", f"title={title}", "-o", str(docx)], check=True)
+    # size table columns to their MEASURED rendered ink BEFORE the export (pandoc → widen → export),
+    # so a wide OMML math cell — un-wrappable, since LibreOffice never breaks inside an oMath run — is
+    # never clipped at the page edge (mat260's measured-column-width; copies through if a dep is
+    # absent, so the deliverable never breaks on it).
+    sized = Path(d) / "sized.docx"
+    widen_tables.widen(docx, sized)
+    docx = sized
     # the deliverable is a tagged PDF/UA-1: the UNO export sets the pdfuaid schema, DisplayDocTitle
     # and dc:title and refreshes indexes (what LibreOffice owns); linkalt then describes the
     # source-document links the export leaves bare (7.18.1/7.18.5), and mathalt gives each equation

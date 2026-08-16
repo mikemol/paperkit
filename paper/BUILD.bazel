@@ -2,6 +2,8 @@
 # @paperkit_paper check graph; the bib is the source, this just lists the files.
 filegroup(name = "files", srcs = [
         "checks/claims.py",
+        "checks/gen_formulas.py",   # generates assets/formulas.md from the formula-bearing claims (edge-formulas fresh)
+        "assets/formulas.md",       # the generated formula table (placed by edge-formulas, as=raw)
         "paper.md",
         "paper.toml",
         "references.bib",

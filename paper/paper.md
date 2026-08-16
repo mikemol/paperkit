@@ -12,7 +12,16 @@ A claim is a single record — a statement, the rubric section it belongs to, it
 
 ## 3. The Dependency Graphs: Prose Order, Grounding, and the Typed Move
 
-A claim's from-edges fix its place in the prose — the projector emits a claim only after the claims it lists, so document order is a topological sort of the from-graph [@edge-from-orders]. Rests-on is a separate grounding edge — a claim's effective grade is clamped to the weakest grade along it, $\mathrm{eff}(c) = \min\{\, \mathrm{grade}(c)\,\} \cup \{\, \mathrm{eff}(d) : d \in \mathrm{rests\text{-}on}(c)\,\}$, regardless of prose order [@edge-rests-grounds], and the two graphs are independent and often reversed: prose runs general to specific while grounding runs specific to general, so one pair of claims is at once a forward prose edge and a backward grounding edge [@edge-chiral]. The move field names the typed rhetorical relation binding a claim to the prior beat — its kind decides its role (an entail move also grounds; turn, extend, parallel, and restate moves are prose only) and a section's declared scheme admits only certain move-kinds [@edge-move-types].
+A claim's from-edges fix its place in the prose — the projector emits a claim only after the claims it lists, so document order is a topological sort of the from-graph [@edge-from-orders]. Rests-on is a separate grounding edge — a claim's effective grade is clamped to the weakest grade along it, $\mathrm{eff}(c) = \min\{\, \mathrm{grade}(c)\,\} \cup \{\, \mathrm{eff}(d) : d \in \mathrm{rests\text{-}on}(c)\,\}$, regardless of prose order [@edge-rests-grounds], and the two graphs are independent and often reversed: prose runs general to specific while grounding runs specific to general, so one pair of claims is at once a forward prose edge and a backward grounding edge [@edge-chiral]. The move field names the typed rhetorical relation binding a claim to the prior beat — its kind decides its role (an entail move also grounds; turn, extend, parallel, and restate moves are prose only) and a section's declared scheme admits only certain move-kinds [@edge-move-types]. The grounding relations gather into a table of their own formulas, itself a projection of the claim-DAG — the clamp, the disjointness the measurement reads, the sensitivity increment and its collapse, GENERATED from the very claims that state them so the table cannot drift, and carried into the rendered document as native, accessible Office Math, so the paper both states these relations and demonstrates that equations survive the render intact, in a table cell [@edge-formulas].
+
+<!-- paperkit:raw -->
+| relation | claim | formula |
+|----------|-------|---------|
+| clamp | the effective grade is the weakest along `rests-on` | $\mathrm{eff}(c) = \min\{\, \mathrm{grade}(c)\,\} \cup \{\, \mathrm{eff}(d) : d \in \mathrm{rests\text{-}on}(c)\,\}$ |
+| disjoint | a grounding edge the measurement cannot see | $\mathrm{fp}(c) \cap \mathrm{fp}(d) = \emptyset$ |
+| increment | the claim's irreducible sensitivity residual | $\mathrm{incr}(c) = \mathrm{fp}(c) \setminus \bigcup_{d \in \mathrm{rests\text{-}on}(c)} \mathrm{fp}(d)$ |
+| collapse | the claim adds no sensitivity beyond its grounding | $\mathrm{incr}(c) = \emptyset$ |
+<!-- /paperkit:raw -->
 
 ## 4. The Engine: Projection and Gate
 

@@ -15,6 +15,11 @@
   claim   = {and the OpenDocument format is a first-class NODE too --- md becomes a valid .odt (a package carrying content.xml and the OpenDocument-text mimetype) by the same pandoc morphism from the same resolved source; ODF is LibreOffice's NATIVE format, the object the office edges already pass through, so surfacing it as its own node makes the hidden intermediate a terminal-capable deliverable a consumer may render or route on to a PDF},
   check   = {cmd:python3 checks/odf.py}
 }
+@misc{rnd-matrix,
+  section = {graph}, from = {rnd-odf}, join = {. },
+  claim   = {and a SECOND matrix over the same format objects is owned as data --- capability by FORMAT: which render target AFFORDS which accessibility or fidelity capability (native math, link and math alternatives, PDF/UA conformance, per-row accessible table rules, and the rest), each cell stating whether the format carries it BY CONSTRUCTION, only AFTER a post-processing pass, or is TOOLCHAIN-EXCEPTED (a named exception, never a silent gap), and naming the warrant that demonstrates it --- so a capability's reach across formats lives in ONE place, every demonstrated cell is backed by a passing warrant, and the PDF/UA row agrees with the render coalgebra's own per-edge accessibility field: the conversion graph and the capability grid are two faces of one owned coalgebra, composing into the capabilities-by-formats-by-conversions whole},
+  check   = {cmd:python3 checks/matrix.py --check}
+}
 @misc{rnd-emit,
   section = {emit},
   claim   = {the paper renders to a Word document --- pandoc turns paper.md into a valid .docx (a well-formed OOXML package that pandoc can read back), the first presentation beyond markdown},
@@ -114,4 +119,14 @@
   section = {latex}, from = {rnd-a11y-latex}, join = {. },
   claim   = {and WHICH route a consumer builds their PDF through is one selector, resolved the paperkit way (Ω·config) --- an environment knob picks a graph ROUTE (docx, odf, or latex), each terminating at the PDF node through its own intermediate, defaulting to docx and REFUSING an unknown value rather than silently falling back, and it lives in the render project rather than the engine registry because the engine projects the paper format-agnostically and never branches on the format, so a knob there would be one the engine does not own --- the routes stay independently gated regardless, so the selector chooses what to BUILD, never what to VERIFY},
   check   = {cmd:sh checks/render.sh --selftest}
+}
+@misc{rnd-ruler,
+  section = {colour}, from = {rnd-format}, join = {. },
+  claim   = {and every table in the LaTeX deliverable carries its binary row structure in the RULE PATTERN, a redundant non-colour cue --- the rule between two rows is chosen by the cycle order of that boundary (the 2-adic valuation of the row index, which bit rolls over there) and drawn as a self-similar dot-dash motif, so a reader who cannot perceive colour still recovers the counting structure (WCAG 2.2 use-of-colour, the producing side); the rules are applied BY CONSTRUCTION to every rendered table, and a table is exempt only through a NAMED marker that the deliverable records rather than a silent absence, so the paper's own formula table is ruled with no author effort and the exception stays legible --- the capability vendored from mat230 as the target-independent generator it should have been (uncapped, encoding any unsigned row count, with tex, html and markdown readings), not its order-capped reified form},
+  check   = {cmd:python3 checks/ruler.py}
+}
+@misc{rnd-colour,
+  section = {colour}, from = {rnd-ruler}, join = {. },
+  claim   = {and the deliverable is audited so colour is never the SOLE cue --- every table row that uses a meaning colour must also carry a weight cue (a bold command) in that same row, so a distinction the colour was carrying survives for a reader who cannot perceive it (WCAG 2.2 use-of-colour, the verifying side that pairs with the ruler-sequence producing side) --- a sufficient-condition auditor over the LaTeX source, vendored from mat230 so the one accessibility criterion is covered from both ends},
+  check   = {cmd:python3 checks/use_of_colour.py}
 }

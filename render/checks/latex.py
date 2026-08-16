@@ -62,13 +62,15 @@ def _deps_absent() -> str | None:
     return None
 
 
-import source  # the render graph's md node — the ONE resolved-source logic every format node shares
+import source        # the render graph's md node — the ONE resolved-source logic every format node shares
+import ruler_inject  # apply ruler-sequence rules to every table by construction (WCAG 1.4.1, the latex route affords it)
 
 
-def _assemble_tex(body: str, title: str) -> str:
+def _assemble_tex(body: str, title: str, ruler_preamble: str = "") -> str:
     """Assemble the .tex with `\\DocumentMetadata` FIRST (it must precede `\\documentclass`, so
-    pandoc's standalone preamble cannot carry it), the minimal mat230 tagging preamble, and the
-    per-codepoint font fallback."""
+    pandoc's standalone preamble cannot carry it), the minimal mat230 tagging preamble, the
+    per-codepoint font fallback, and the ruler-sequence nicematrix definitions (empty if the
+    document has no rulable table)."""
     return "\n".join([
         _METADATA,                                           # first line — before \documentclass
         r"\documentclass{article}",
@@ -77,6 +79,7 @@ def _assemble_tex(body: str, title: str) -> str:
         rf'\directlua{{luaotfload.add_fallback("pkfallback", {{"{_FALLBACK_FONT}:mode=harf;"}})}}',
         r"\setmainfont{Latin Modern Roman}[RawFeature={fallback=pkfallback}]",
         r"\usepackage{hyperref}",
+        ruler_preamble,                                      # nicematrix + \Rule<k> custom-lines
         rf"\title{{{title}}}",
         r"\begin{document}",
         r"\maketitle",
@@ -102,8 +105,13 @@ def build(paper_md: Path, out_pdf: Path, work: Path) -> Path | None:
         ["pandoc", str(md), "-t", "latex", "--citeproc",
          "--bibliography", str(paper_md.parent / "references.bib")],
         capture_output=True, text=True, check=True).stdout
+    # by construction: rule every table with the ruler-sequence non-colour cue (WCAG 1.4.1), and
+    # size the nicematrix preamble to the orders the document's tables actually reach.
+    body, report = ruler_inject.inject(body)
+    ruler_preamble = (ruler_inject.preamble_defs(ruler_inject.max_order_of(report))
+                      if any(not t["excepted"] and t["rows"] >= 2 for t in report) else "")
     tex = work / "p.tex"
-    tex.write_text(_assemble_tex(body, title))
+    tex.write_text(_assemble_tex(body, title, ruler_preamble))
     # twice: the first pass writes the .aux (refs, the struct tree); the second resolves them.
     for _ in range(2):
         subprocess.run(["lualatex", "-interaction=nonstopmode", "-output-directory", str(work),

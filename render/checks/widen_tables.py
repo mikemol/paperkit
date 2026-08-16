@@ -115,33 +115,37 @@ def measure_cells(pngs):
 
     PIL-only port of mat260's numpy version (paperkit stays numpy-free; PIL is already a
     render-layer dep via ocr.py).  The row STATE MACHINE is byte-identical to the original —
-    only the per-row ink arrays (any_ink / leftmost / rightmost) are built with PIL instead
-    of numpy: a cheap `resize((1, h))` collapses each row to one averaged pixel (a row with
-    any ink, pre-binarized to 0/255, drops below 255), and `getbbox()` on each ink-bearing
-    row gives its left/right ink extent.  Cross-page accumulation (left/right/have/in_rule
-    initialized ONCE before the png loop) is preserved exactly — a cell split by a page break
-    is measured whole."""
-    from PIL import Image, ImageChops
+    only the per-row ink arrays (any-ink / leftmost / rightmost) are built with PIL: the image
+    is binarized at mat260's exact <150 threshold (so the measured ink set equals numpy's
+    `arr < 150`, not the antialias halo a raw getbbox would sweep in), and each row's ink extent
+    is `getbbox()` on that row's 1px strip — a TRUE EXISTENTIAL (None iff no ink), the PIL equal
+    of `arr.any(axis=1)` + argmax.  It deliberately does NOT collapse the row with `resize`: a
+    downscale filter averages a lone dark pixel back to white and would silently drop a thin
+    stroke, biasing columns too narrow (measured).  Cross-page accumulation (left/right/have/
+    in_rule initialized ONCE before the png loop) is preserved exactly — a cell split by a page
+    break is measured whole, and `margin` is recomputed per page (relative rule detection, so a
+    page whose rule is not full-width still segments)."""
+    from PIL import Image
     Image.MAX_IMAGE_PIXELS = None            # the probe page is intentionally huge
     widths = []
     left, right, have, in_rule = 10 ** 9, 0, False, False
     for png in pngs:
-        bw = Image.open(png).convert("L").point(lambda p: 0 if p < 150 else 255)  # pre-binarize (=<150 ink)
+        # Pre-binarize at mat260's exact <150 threshold, so getbbox measures ONLY the ink darker
+        # than 150 (not the antialias halo a getbbox on the raw image would sweep in) and matches
+        # numpy's `arr < 150` set exactly.
+        bw = Image.open(png).convert("L").point(lambda p: 255 if p < 150 else 0)   # ink → 255
         w, h = bw.size
-        # any_ink per row: average each row to one pixel; any ink (0) pulls it below 255.
-        col1 = bw.resize((1, h))
-        row_avg = list(col1.getdata())                         # getdata: portable across PIL versions
-        any_ink = [v < 255 for v in row_avg]
-        if not any(any_ink):
-            continue
-        # left/right ink extent per ink-bearing row (getbbox on the inverted 1px-tall strip)
-        inv = ImageChops.invert(bw)                             # ink = 255 now, so getbbox finds it
+        # Ink extent per row by getbbox on the 1px-tall strip — a TRUE EXISTENTIAL (None iff the
+        # strip has no ink), the PIL equal of numpy's `arr.any(axis=1)` + argmax leftmost/rightmost.
+        # NOT resize-to-one-pixel: a downscale filter AVERAGES a lone dark pixel back to white and
+        # would silently DROP a thin stroke (a fraction bar, a minus) — biasing columns too narrow
+        # (mat260's flag; measured: resize((1,h)) returns 255 for one ink pixel in 12000).  getbbox
+        # sees the single pixel.
         extent = {}                                            # y -> (leftmost, rightmost) ink column
         for y in range(h):
-            if any_ink[y]:
-                b = inv.crop((0, y, w, y + 1)).getbbox()       # (l, 0, r_exclusive, 1) or None
-                if b:
-                    extent[y] = (b[0], b[2] - 1)
+            b = bw.crop((0, y, w, y + 1)).getbbox()            # (l, 0, r_exclusive, 1) or None
+            if b:
+                extent[y] = (b[0], b[2] - 1)
         if not extent:
             continue
         margin = max(r for _l, r in extent.values())           # widest ink on the page = the rule/border
@@ -151,7 +155,7 @@ def measure_cells(pngs):
                 if not in_rule:                                 # close the cell once, on rule entry
                     widths.append((max(0, right - left) / DPI) if have else 0.0)
                     left, right, have, in_rule = 10 ** 9, 0, False, True
-            elif any_ink[y]:
+            elif y in extent:                                   # a content (non-rule) ink row
                 in_rule = False
                 lm, rm = extent[y]
                 left = min(left, lm)
@@ -342,6 +346,33 @@ def _selftest():
     def check_(desc, cond):
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
+
+    # measurement accuracy against a KNOWN width — a synthetic probe page (a cell of known ink width
+    # + a near-full-width rule), so the measured band is checkable against ground truth.  This is the
+    # guard against the silent-bias class (a resize-averaged any-ink test drops a thin stroke and
+    # under-measures; a raw getbbox sweeps the antialias halo and over-measures) — both pass a
+    # thick-math ⟨P,F,δ⟩ while shifting every width.  (mat260's proposed one-run check, made permanent.)
+    from PIL import Image, ImageDraw
+    with tempfile.TemporaryDirectory() as t:
+        pg = Path(t) / "pg-1.png"
+        img = Image.new("L", (2000, 30), 255)
+        dr = ImageDraw.Draw(img)
+        dr.rectangle([100, 5, 500, 10], fill=0)          # cell ink: exactly 400 px wide
+        dr.rectangle([0, 20, 1900, 25], fill=0)          # rule: 95% of the page width
+        img.save(pg)
+        measured = measure_cells([pg])
+        want = 400 / DPI
+        check_(f"measures a known 400px band as {want:.3f}in (±1px) — not resize-biased narrow "
+               "nor halo-biased wide",
+               len(measured) == 1 and abs(measured[0] - want) < 2 / DPI)
+        # a single ink pixel in a wide row is SEEN (the thin-stroke existential) — a resize-averaged
+        # any-ink test returns white for one dark pixel in 2000 and would miss it.  Assert the binarized
+        # row's getbbox finds it, the exact property the fix restores.
+        thin = Image.new("L", (2000, 1), 255)
+        thin.putpixel((1000, 0), 0)
+        bw = thin.point(lambda p: 255 if p < 150 else 0)
+        check_("a lone ink pixel in a wide row is seen (getbbox existential, not a resize average)",
+               bw.getbbox() is not None)
 
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)

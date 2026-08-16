@@ -1,4 +1,5 @@
 # render-project sections, in document order.
+graph	The Render Coalgebra: Format Nodes and Conversion Edges
 emit	Emit: paper.md → docx
 agree	Presentation Agreement
 integrity	Output Integrity & Fidelity
@@ -7,3 +8,4 @@ cite	Citations: Warrants Inline, Sources Referenced
 deliver	The PDF Deliverable
 figure	Figures: Vector and Legible
 a11y	Accessibility: PDF/UA by Construction
+latex	The LaTeX Format: Tagged PDF/UA-2

@@ -1,72 +1,107 @@
 #!/usr/bin/env python3
-# Ρ·render·pdf — the DELIVERABLE: the paper rendered END-TO-END (cite_split → citeproc → docx
-# → PDF) into the human-readable PDF a reader receives.  Gated complete and polished: no
-# citation left as a bare marker, the References list rendered, the content present.  The last
-# rung of the agreement chain — the artifact, not an intermediate.  cwd = render/ ; .. = repo.
-import importlib.util, re, subprocess, sys, tempfile, tomllib
+r"""Ρ·render·pdf — the render graph's PDF node: the terminal deliverable, reached by a chosen route.
+
+The PDF is where every route in the render coalgebra (graph.py) terminates, and it is reached from
+several intermediates — a docx or an odt through the office suite, a LaTeX source through lualatex.
+So this is a ROUTER: it takes an intermediate (`--via docx|odf|latex`, default docx), produces that
+format from the one resolved source (the docx/odf/latex nodes), runs the pdf-producing morphism, and
+applies the route's accessibility by construction:
+
+  - the office routes (docx, odf) reach PDF/UA-1: the UNO export sets the pdfuaid/title/DisplayDocTitle
+    metadata and refreshes indexes, then linkalt describes the source-document links the export leaves
+    bare (7.18) and mathalt gives each equation a text alternative (7.7); table columns are sized to
+    measured ink first so a wide math cell cannot clip.  This is the "post" a11y the graph records for
+    those edges — PDF-level repair after the office export.
+  - the latex route reaches PDF/UA-2 natively (the a11y is "native" in the graph): the tagging is in
+    the source (\DocumentMetadata), so this route delegates wholesale to the latex node, no repair.
+
+    python3 checks/pdf.py [--via docx|odf|latex]   # produce + gate the PDF via the chosen route
+"""
+from __future__ import annotations
+
+import importlib.util
+import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import linkalt      # describe source-document links the office export leaves bare (Ρ·render·linkalt)
-import mathalt      # give each equation a text alternative — PDF/UA 7.7 (Ρ·render·mathalt)
-import lo           # office convert: isolated profile + unlink-first (Ρ·render·provenance)
-import widen_tables  # size table columns to measured ink so a wide math cell can't clip (Ρ·render·widen)
+import docx as docx_node
+import graph
+import latex as latex_node
+import linkalt      # 7.18 link descriptions (office routes)
+import lo           # office convert: isolated profile + unlink-first
+import mathalt      # 7.7 equation alternatives (office routes)
+import odf as odf_node
+import source
+import widen_tables  # size table columns to measured ink so a wide math cell can't clip
 
 
 def _load(name, filename):
-    """Import a sibling check whose filename is not a valid module name (lo-export.py)."""
     spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().parent / filename)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
-lo_export = _load("lo_export", "lo-export.py")   # docx → tagged PDF/UA over the UNO bridge (Ρ·render·lo-export)
+lo_export = _load("lo_export", "lo-export.py")   # docx/odt → tagged PDF/UA over the UNO bridge
 
-MARK = {"file": "(present)", "result": "(verdict imported)"}
-mk = {}
-# bib-list-aware: read every ../paper/*.bib (the warrants may be authored across concept modules);
-# references carry no `check`, so the `if c:` guard below excludes them.
-_bibtext = "".join(p.read_text() for p in sorted(Path("../paper").glob("*.bib")))
-for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", _bibtext, re.S):
-    c = re.search(r"\bcheck\s*=\s*\{(\w+):", m.group(2))
-    if c:
-        mk[m.group(1)] = MARK.get(c.group(1), "(machine-checked)")
-split = re.sub(r"\[@([A-Za-z][\w:.+-]*)\]", lambda x: mk.get(x.group(1), x.group(0)),
-               Path("../paper/paper.md").read_text())
-# the document title travels from the paper's own paper.toml through pandoc's core metadata into the
-# docx and out through the UA export as dc:title — the RIGHT layer, not a post-hoc stamp.
-title = tomllib.loads(Path("../paper/paper.toml").read_text())["paper"]["title"]
-with tempfile.TemporaryDirectory() as d:
-    md, docx, txt = (Path(d) / n for n in ("p.md", "p.docx", "p.txt"))
-    md.write_text(split)
-    subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography", "../paper/references.bib",
-                    "--metadata", f"title={title}", "-o", str(docx)], check=True)
-    # size table columns to their MEASURED rendered ink BEFORE the export (pandoc → widen → export),
-    # so a wide OMML math cell — un-wrappable, since LibreOffice never breaks inside an oMath run — is
-    # never clipped at the page edge (mat260's measured-column-width; copies through if a dep is
-    # absent, so the deliverable never breaks on it).
-    sized = Path(d) / "sized.docx"
-    widen_tables.widen(docx, sized)
-    docx = sized
-    # the deliverable is a tagged PDF/UA-1: the UNO export sets the pdfuaid schema, DisplayDocTitle
-    # and dc:title and refreshes indexes (what LibreOffice owns); linkalt then describes the
-    # source-document links the export leaves bare (7.18.1/7.18.5), and mathalt gives each equation
-    # a text alternative (7.7) — the export tags each formula as /Formula but sets no /Alt — the two
-    # genuine post-export steps.  Together the paper is UA-1 conformant by construction (rnd-a11y
-    # gates failedChecks==0).  Falls back to a plain CLI convert if no uno-capable python is present,
-    # so the deliverable still renders where the bridge cannot run.
-    pdf = lo_export.export_pdfua(docx, Path(d) / "p.pdf") or lo.convert(docx, "pdf", d)
-    assert pdf is not None and pdf.stat().st_size > 0, "no PDF deliverable produced (soffice produced no output)"
-    linkalt.describe_links(pdf)
-    mathalt.describe_formulas(pdf, mathalt.paper_equations(Path("../paper/paper.md")))
-    pages = int(re.search(r'Pages:\s*(\d+)', subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout).group(1))
-    assert pages >= 1, "empty PDF deliverable"
-    subprocess.run(["pdftotext", str(pdf), str(txt)], check=True)
-    out = txt.read_text()
-    bare = re.findall(r'\[@[A-Za-z][\w:.+-]*\]', out)
-    assert not bare, f"the deliverable PDF still has bare citation markers: {bare[:5]}"
-    words = sorted(set(re.findall(r'[a-z]{4,}', Path("../paper/paper.md").read_text().lower())))
-    seen = set(re.findall(r'[a-z]{4,}', out.lower()))
-    rate = sum(w in seen for w in words) / len(words)
-    assert rate >= 0.85, f"the deliverable PDF is missing content — only {rate:.0%} of the paper's words present (truncated?)"
-print(f"pdf ok: {pages}-page deliverable, citations resolved, {rate:.0%} of body content present")
+
+def _office_pdf(intermediate: Path, out_pdf: Path, work: Path) -> Path | None:
+    """The office pdf-producing morphism (soffice) + its "post" a11y: UA export → linkalt → mathalt.
+    Table columns are sized to measured ink BEFORE the export (a wide oMath run cannot wrap).  Falls
+    back to a plain convert if no uno-capable python is present, so the deliverable still renders."""
+    sized = work / ("sized" + intermediate.suffix)
+    widen_tables.widen(intermediate, sized)
+    pdf = lo_export.export_pdfua(sized, out_pdf) or lo.convert(sized, "pdf", work)
+    if pdf is None or pdf.stat().st_size == 0:
+        return None
+    if pdf != out_pdf:
+        out_pdf.write_bytes(pdf.read_bytes())
+    linkalt.describe_links(out_pdf)                                              # 7.18
+    mathalt.describe_formulas(out_pdf, mathalt.paper_equations(Path("../paper/paper.md")))  # 7.7
+    return out_pdf
+
+
+def render(paper_md: Path, out_pdf: Path, via: str, work: Path) -> Path | None:
+    """Produce `paper_md` as a PDF via route `via`, composing the graph's morphisms.  None if the
+    route's toolchain is unavailable (loud) — so a box lacking one route's tools still serves another."""
+    path = graph.ROUTES[via]                                    # e.g. ["md","docx","pdf"]
+    a11y = graph.route_a11y(via)                                # "post" (office) | "native" (latex)
+    if a11y == "native":                                        # the latex route: tagging is in source
+        return latex_node.build(paper_md, out_pdf, work)
+    # an office route: produce the intermediate node, then the office pdf edge + post-a11y
+    inter_fmt = path[1]                                         # "docx" or "odt"
+    producer = {"docx": docx_node.docx, "odt": odf_node.odt}[inter_fmt]
+    intermediate = producer(paper_md, work / f"p.{inter_fmt}")
+    return _office_pdf(intermediate, out_pdf, work)
+
+
+def main(argv: list[str]) -> int:
+    via = argv[argv.index("--via") + 1] if "--via" in argv else "docx"
+    if via not in graph.ROUTES:
+        print(f"pdf: unknown route --via {via} (expected {'|'.join(graph.ROUTES)})", file=sys.stderr)
+        return 2
+    with tempfile.TemporaryDirectory() as t:
+        d = Path(t)
+        pdf = render(Path("../paper/paper.md"), d / "p.pdf", via, d)
+        if pdf is None:
+            print(f"pdf: CANNOT BUILD via {via} — the route's toolchain is unavailable", file=sys.stderr)
+            return 2                                            # cannot-run, not a false pass
+        info = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout
+        pages = int((re.search(r"Pages:\s*(\d+)", info) or [0, 0])[1])
+        txt = subprocess.run(["pdftotext", str(pdf), "-"], capture_output=True, text=True).stdout
+        bare = re.findall(r"\[@[A-Za-z][\w:.+-]*\]", txt)
+        words = sorted(set(re.findall(r"[a-z]{4,}", source.cite_split(Path("../paper/paper.md")).lower())))
+        seen = set(re.findall(r"[a-z]{4,}", txt.lower()))
+        rate = sum(w in seen for w in words) / len(words)
+        ok = pages >= 1 and not bare and rate >= 0.85
+        print(f"pdf: {'ok' if ok else 'FAIL'} via {via} — {pages}-page deliverable "
+              f"({'no bare markers, ' if not bare else f'{len(bare)} bare markers, '}"
+              f"{rate:.0%} of body content present)")
+        return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

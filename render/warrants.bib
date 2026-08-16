@@ -1,5 +1,20 @@
 % warrants.bib — Ρ·render: the paper renders to a document, and the document is gated to
 % present the VERIFIED paper.  On-demand (pandoc); not the pre-commit hook.
+@misc{rnd-graph,
+  section = {graph},
+  claim   = {the render pipeline is a COALGEBRA tracked as data --- format OBJECTS (md, docx, odt, latex, pdf) and conversion MORPHISMS (pandoc from markdown, the office suite between docx/odt/pdf, lualatex from latex) live as an explicit many-to-many adjacency matrix with ONE owner, and the format-node producers and the pdf router DERIVE their edges from it rather than each hardcoding a tool --- so every declared morphism's tool is present (the graph cannot claim an edge the toolchain cannot perform) and every route to the terminal PDF composes real edges, and a new node or edge (a slide-deck target) is added in ONE place},
+  check   = {cmd:python3 checks/graph.py --check}
+}
+@misc{rnd-docx,
+  section = {graph}, from = {rnd-graph}, join = {. },
+  claim   = {and the docx format is a first-class NODE --- md becomes a Word document by the pandoc morphism the graph declares (asserted against the matrix, not hardcoded), from the ONE resolved source every node shares (each internal warrant inlined as its verification marker, the title carried from paper.toml through pandoc's core metadata), a well-formed OOXML package that pandoc reads back --- terminal-capable (a consumer may want the .docx itself) or the intermediate the docx-to-pdf route reads},
+  check   = {cmd:python3 checks/docx.py}
+}
+@misc{rnd-odf,
+  section = {graph}, from = {rnd-docx}, join = {. },
+  claim   = {and the OpenDocument format is a first-class NODE too --- md becomes a valid .odt (a package carrying content.xml and the OpenDocument-text mimetype) by the same pandoc morphism from the same resolved source; ODF is LibreOffice's NATIVE format, the object the office edges already pass through, so surfacing it as its own node makes the hidden intermediate a terminal-capable deliverable a consumer may render or route on to a PDF},
+  check   = {cmd:python3 checks/odf.py}
+}
 @misc{rnd-emit,
   section = {emit},
   claim   = {the paper renders to a Word document --- pandoc turns paper.md into a valid .docx (a well-formed OOXML package that pandoc can read back), the first presentation beyond markdown},
@@ -84,4 +99,19 @@
   section = {deliver}, from = {rnd-pdf}, join = {. },
   claim   = {and the deliverable is exported as a tagged PDF/UA over the office suite's UNO scripting bridge rather than its command-line conversion --- the bridge sets the PDF/UA export flags and refreshes each document index, since the command-line path exports a plain PDF and never populates a table-of-contents field, and it owns the office process explicitly (a private pipe, a deadline, and a kill if it will not exit) so that sre-troubleshooting's first attempt, a document macro that hung the build with no output, becomes a LOUD bounded failure instead of a silent stall --- the export path falls back to the plain conversion where no scripting-bridge interpreter is present, so the deliverable still renders},
   check   = {cmd:python3 checks/lo-export.py --selftest}
+}
+@misc{rnd-latex,
+  section = {latex},
+  claim   = {and the SAME verified paper renders through a SECOND format --- a LaTeX pipeline beside the docx one, for a reader who wants latex and PDF where another wants docx and PDF --- pandoc turns the projected prose into a LaTeX body, the engine assembles it under a tagged-PDF preamble with a per-codepoint font fallback so a prose glyph the main font lacks is covered rather than dropped, and lualatex compiles it to a tagged PDF, so one claim-DAG reaches two delivered formats and neither degrades the other},
+  check   = {cmd:python3 checks/latex.py --selftest}
+}
+@misc{rnd-a11y-latex,
+  section = {latex}, from = {rnd-latex}, join = {. },
+  claim   = {and the LaTeX format is held to AT LEAST the docx format's accessibility, and better --- paperkit's own paper renders through it to a PDF that veraPDF validates at PDF/UA-2 with zero failed checks, a LATER standard than the docx route's UA-1, reached BY CONSTRUCTION (native document tagging, not post-export surgery) with every equation carrying an ASSOCIATED MathML file rather than a stamped alt string, so the math is recoverable structure a screen reader reads; and because a zero-failure UA-2 verdict forbids a .notdef glyph, the conformance gate SUBSUMES the missing-glyph tofu check the arbitrary-prose format needs --- the recipe vendored from mat230 (its minimal tagged preamble, pinned to its validated TeX Live), the arbitrary-prose font fallback authored for paperkit's own route},
+  check   = {cmd:python3 checks/a11y_latex.py}
+}
+@misc{rnd-format,
+  section = {latex}, from = {rnd-a11y-latex}, join = {. },
+  claim   = {and WHICH route a consumer builds their PDF through is one selector, resolved the paperkit way (Ω·config) --- an environment knob picks a graph ROUTE (docx, odf, or latex), each terminating at the PDF node through its own intermediate, defaulting to docx and REFUSING an unknown value rather than silently falling back, and it lives in the render project rather than the engine registry because the engine projects the paper format-agnostically and never branches on the format, so a knob there would be one the engine does not own --- the routes stay independently gated regardless, so the selector chooses what to BUILD, never what to VERIFY},
+  check   = {cmd:sh checks/render.sh --selftest}
 }

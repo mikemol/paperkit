@@ -79,7 +79,7 @@
 
 @misc{edge-rests-grounds,
   section = {edges}, from = {edge-from-orders}, join = {. },
-  claim   = {rests-on is a separate grounding edge --- a claim's effective grade is clamped to the weakest grade along it, regardless of prose order},
+  claim   = {rests-on is a separate grounding edge --- a claim's effective grade is clamped to the weakest grade along it, $\mathrm{eff}(c) = \min\{\, \mathrm{grade}(c)\,\} \cup \{\, \mathrm{eff}(d) : d \in \mathrm{rests\text{-}on}(c)\,\}$, regardless of prose order},
   check   = {concept:edge-rests-grounds}
 }
 

@@ -7,6 +7,7 @@ import importlib.util, re, subprocess, sys, tempfile, tomllib
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import linkalt      # describe source-document links the office export leaves bare (Ρ·render·linkalt)
+import mathalt      # give each equation a text alternative — PDF/UA 7.7 (Ρ·render·mathalt)
 import lo           # office convert: isolated profile + unlink-first (Ρ·render·provenance)
 
 
@@ -41,13 +42,15 @@ with tempfile.TemporaryDirectory() as d:
                     "--metadata", f"title={title}", "-o", str(docx)], check=True)
     # the deliverable is a tagged PDF/UA-1: the UNO export sets the pdfuaid schema, DisplayDocTitle
     # and dc:title and refreshes indexes (what LibreOffice owns); linkalt then describes the
-    # source-document links the export leaves bare (7.18.1/7.18.5) — the one genuine post-export
-    # step.  Together the paper is UA-1 conformant by construction (rnd-a11y gates failedChecks==0,
-    # ask-adopt-pdfua-render-workarounds).  Falls back to a plain CLI convert if no uno-capable
-    # python is present, so the deliverable still renders where the bridge cannot run.
+    # source-document links the export leaves bare (7.18.1/7.18.5), and mathalt gives each equation
+    # a text alternative (7.7) — the export tags each formula as /Formula but sets no /Alt — the two
+    # genuine post-export steps.  Together the paper is UA-1 conformant by construction (rnd-a11y
+    # gates failedChecks==0).  Falls back to a plain CLI convert if no uno-capable python is present,
+    # so the deliverable still renders where the bridge cannot run.
     pdf = lo_export.export_pdfua(docx, Path(d) / "p.pdf") or lo.convert(docx, "pdf", d)
     assert pdf is not None and pdf.stat().st_size > 0, "no PDF deliverable produced (soffice produced no output)"
     linkalt.describe_links(pdf)
+    mathalt.describe_formulas(pdf, mathalt.paper_equations(Path("../paper/paper.md")))
     pages = int(re.search(r'Pages:\s*(\d+)', subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout).group(1))
     assert pages >= 1, "empty PDF deliverable"
     subprocess.run(["pdftotext", str(pdf), str(txt)], check=True)

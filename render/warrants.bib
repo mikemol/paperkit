@@ -20,6 +20,11 @@
   claim   = {and the reader's view is faithful: rendered all the way to a PDF, every non-ASCII glyph the paper uses survives into the text layer with no missing-glyph tofu, and every heading is present there --- what the consumer copies, searches, or hears through a screen reader is the paper, not a broken rendering},
   check   = {cmd:python3 checks/fidelity.py}
 }
+@misc{rnd-omml,
+  section = {integrity}, from = {rnd-fidelity}, join = {. },
+  claim   = {and the paper's EQUATIONS transport as native Office Math (OMML), not pixels --- the effective-grade clamp, the emergence increment and the coherence disjointness render from the claim prose's inline math into editable, well-formed $<$m:oMath$>$ elements that scale and stay in the text layer, with no equation leaked to a rasterized image and no math delimiter surviving as literal text; and the presentation-agreement check DELEGATES the equations to this OMML owner rather than compare their plain-text flattenings (which differ across the two render paths), so the cross-path difference is REGISTERED against a bounded set of glyph variants and witnessed to stay within it, not erased --- the hardest document-fidelity case demonstrated on the paper's own content (mat260's OMML doctrine)},
+  check   = {cmd:python3 checks/omml.py}
+}
 @misc{rnd-ocr,
   section = {visual},
   claim   = {the reader's EYE sees the paper, not just a screen reader: rendered to a PDF and rasterized to images, OCR recovers the paper's text from the pixels themselves --- a font or render regression that turned the body to tofu would crater that recovery, so the visual layer is gated, not only the text layer},
@@ -60,9 +65,14 @@
   claim   = {every link annotation in the deliverable carries a text description --- a pass over the finished PDF reads the words whose boxes OVERLAP each undescribed link's rectangle and writes them back as that link's description, on the reasoning that the words a sighted reader sees are what a screen reader should hear, so a citation link announces its destination rather than a bare "link" (PDF/UA 7.18.1 and 7.18.5) --- adopted from sre-troubleshooting, carrying its half-description fix forward: selection is by BOX OVERLAP not word centre, so two adjacent citations that extract as one word are both described},
   check   = {cmd:python3 checks/linkalt.py --selftest}
 }
-@misc{rnd-a11y,
+@misc{rnd-math-alt,
   section = {a11y}, from = {rnd-link-alt}, join = {. },
-  claim   = {so paperkit's OWN paper is PDF/UA-1 conformant BY CONSTRUCTION --- the deliverable is built as the pdf check builds it (the title carried from paper.toml through pandoc metadata, the export driven in PDF/UA mode so LibreOffice sets the pdfuaid schema, DisplayDocTitle and dc:title AT THE LAYER THAT OWNS THEM, then link descriptions restored), and veraPDF validates it at UA-1 with zero failed checks over a Tagged PDF, gating on the flavour the producer targets (LibreOffice emits UA-1 and declares pdfuaid part 1) --- what was an opt-in measurement a downstream deliverable pointed at is now a live warrant of the render project's own output, earned rather than asserted},
+  claim   = {and every equation carries a text alternative so the math is accessible --- the office export tags each formula as a Formula structure element but sets no alternate text, which a screen reader announces as nothing (PDF/UA 7.7), so a post-export pass writes each equation's own LaTeX source, the recoverable structure, as the Formula's alt text in document order, refusing loudly if the formula and equation counts disagree rather than describing a partial set (mat230's per-formula math-alternative doctrine, on the office route)},
+  check   = {cmd:python3 checks/mathalt.py --selftest}
+}
+@misc{rnd-a11y,
+  section = {a11y}, from = {rnd-math-alt}, join = {. },
+  claim   = {so paperkit's OWN paper is PDF/UA-1 conformant BY CONSTRUCTION --- the deliverable is built as the pdf check builds it (the title carried from paper.toml through pandoc metadata, the export driven in PDF/UA mode so LibreOffice sets the pdfuaid schema, DisplayDocTitle and dc:title AT THE LAYER THAT OWNS THEM, then link and equation descriptions restored), and veraPDF validates it at UA-1 with zero failed checks over a Tagged PDF including its equations, gating on the flavour the producer targets (LibreOffice emits UA-1 and declares pdfuaid part 1) --- what was an opt-in measurement a downstream deliverable pointed at is now a live warrant of the render project's own output, earned rather than asserted},
   check   = {cmd:python3 checks/a11y_own.py}
 }
 @misc{rnd-index,

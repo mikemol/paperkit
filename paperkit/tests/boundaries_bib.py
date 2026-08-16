@@ -56,6 +56,20 @@ def main() -> int:
     bibtex_err, _ = _warns("  title = {T},\n  author = {A},\n  journal = {J},\n  year = {2020}")
     check("standard BibTeX metadata a reference carries is tolerated — no warning",
           bibtex_err == "")
+    # A claim carrying inline math extracts INTACT: the value is brace-counted to arbitrary depth
+    # (a set-builder \min\{ … \mathrm{eff}(d) : … \} nests deeper than one level) and LaTeX-escaped
+    # braces \{ \} are literal CONTENT, not structure — the one-level regex this replaced stopped
+    # at the first inner `}` and returned a truncated/empty claim (the projector then fell back to
+    # the bare key — the degenerate-claim class one layer down).
+    _, math = _warns(r"  claim = {clamp: $\mathrm{eff}(c) = \min\{\, \mathrm{grade}(c)\,\} \cup \{\, \mathrm{eff}(d) : d \in S\,\}$ holds},"
+                     "\n  check = {cmd:true}")
+    check("a claim with DEEP-nested inline math extracts intact (not truncated to empty)",
+          math.get("claim", "").startswith("clamp:") and math["claim"].endswith("holds")
+          and "$" in math["claim"])
+    check("_scalar_value counts to arbitrary depth (nested \\mathrm{} inside \\{ \\})",
+          bib._scalar_value(r"claim = {a \min\{\mathrm{x}\} b}", "claim") == r"a \min\{\mathrm{x}\} b")
+    check("_top_fields ignores escaped braces in math (they are not structural depth)",
+          bib._top_fields(r"claim = {$\{x\}$ text}, check = {cmd:true}") == ["claim", "check"])
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -68,6 +82,12 @@ def main() -> int:
          "whether the `= {` sits at brace depth 0 or inside a value",
          "top level → a field", bib._top_fields("points = {q}") == ["points"],
          "inside a value → not", bib._top_fields("claim = {a points = {q} b}") == ["claim"]),
+        ("a claim's value is brace-counted, and an escaped brace is content not structure",
+         "whether a `}` is a real closing brace or a LaTeX-escaped literal `\\}`",
+         "unescaped } closes the value",
+         bib._scalar_value(r"claim = {a {b} c}", "claim") == "a {b} c",
+         "escaped \\} does NOT close it early",
+         bib._scalar_value(r"claim = {a \} b}", "claim") == r"a \} b"),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -80,7 +100,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (7 behaviors, 2 deltas)")
+    print("BOUNDARIES: PASS (10 behaviors, 3 deltas)")
     return 0
 
 

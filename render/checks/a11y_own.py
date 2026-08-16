@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import a11y            # the measurement owner — import, never re-implement
 import linkalt
 import lo
+import mathalt
 
 
 def _load(name, filename):
@@ -65,7 +66,8 @@ def _build_deliverable(d: Path) -> Path:
                     "--metadata", f"title={title}", "-o", str(docx)], check=True)
     pdf = lo_export.export_pdfua(docx, d / "p.pdf") or lo.convert(docx, "pdf", d)
     assert pdf is not None and pdf.stat().st_size > 0, "no PDF deliverable produced"
-    linkalt.describe_links(pdf)                                       # the one genuine post-export step
+    linkalt.describe_links(pdf)                                       # links: PDF/UA 7.18.1/7.18.5
+    mathalt.describe_formulas(pdf, mathalt.paper_equations(Path("../paper/paper.md")))  # 7.7
     return pdf
 
 

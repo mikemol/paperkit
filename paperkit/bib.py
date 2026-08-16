@@ -41,21 +41,56 @@ _BIBTEX = frozenset({
 _WARNED: set = set()          # (file, key, field) already reported — a build parses each bib many times
 
 
+def _unescaped_braces(s: str):
+    """Yield (index, char) for every `{`/`}` in `s` that is NOT LaTeX-escaped (`\\{` `\\}`).
+    Inline math in a claim carries literal braces — set notation `\\{ x : … \\}`, `\\mathrm{}` —
+    that are CONTENT, not structure; counting them as structural braces miscounts the depth and
+    truncates the field.  A brace is escaped iff preceded by an odd run of backslashes."""
+    for i, ch in enumerate(s):
+        if ch in "{}":
+            bs = 0
+            j = i - 1
+            while j >= 0 and s[j] == "\\":
+                bs += 1
+                j -= 1
+            if bs % 2 == 0:                      # even (incl. zero) backslashes → a real brace
+                yield i, ch
+
+
+def _scalar_value(body: str, name: str) -> str | None:
+    """The value of scalar field `name` by TRUE brace-counting from its `name = {` — handles
+    arbitrary nesting depth (`\\min\\{ \\mathrm{eff}(d) : … \\}`) and skips LaTeX-escaped braces,
+    where the one-level regex it replaces would stop at the first inner `}`.  None if absent."""
+    m = re.search(r"\b" + re.escape(name) + r"\s*=\s*\{", body)
+    if not m:
+        return None
+    start = m.end()                              # first char inside the opening brace
+    depth = 1
+    for i, ch in _unescaped_braces(body[start:]):
+        depth += 1 if ch == "{" else -1
+        if depth == 0:
+            return body[start:start + i]
+    return None                                  # unbalanced — no closing brace (caller sees absent)
+
+
 def _top_fields(body: str) -> list:
     """The TOP-LEVEL `name = {` field names in an entry body, tracking brace depth so an `=`
     inside a value (set notation `x = {1,2}` in a claim) is not mistaken for a field.  Used to
-    catch a field the parser does not consume — which it would otherwise drop in silence."""
+    catch a field the parser does not consume — which it would otherwise drop in silence.  Skips
+    LaTeX-escaped braces (`\\{` `\\}`) so inline math does not throw off the depth (same fix as
+    _scalar_value)."""
     names, depth = [], 0
+    real = dict(_unescaped_braces(body))                 # index → real brace char (escaped skipped)
     for m in re.finditer(r"([A-Za-z][\w-]*)\s*=\s*\{|[{}]", body):
         tok = m.group(0)
-        if tok == "{":
-            depth += 1
-        elif tok == "}":
-            depth = max(0, depth - 1)
-        else:                                    # a `name = {` — only a field when at top level
+        if tok in "{}":
+            if m.start() in real:                        # count only UNescaped structural braces
+                depth += 1 if tok == "{" else -1
+                depth = max(0, depth)
+        else:                                            # a `name = {` — a field only at top level
             if depth == 0:
                 names.append(m.group(1))
-            depth += 1                           # entered the value's brace
+            depth += 1                                   # entered the value's brace
     return names
 
 
@@ -68,9 +103,9 @@ def parse(path: Path) -> dict:
             key, body = m.group(1), m.group(2)
             f = {"_src": path.name}
             for name in _SCALAR:
-                fm = re.search(r"\b" + name + r"\s*=\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", body)
-                if fm:
-                    f[name] = fm.group(1)
+                v = _scalar_value(body, name)            # true brace-counting, escaped-brace-safe
+                if v is not None:
+                    f[name] = v
             for name in _LIST:
                 fr = re.search(r"\b" + name + r"\s*=\s*\{([^}]*)\}", body)
                 f[name] = [a for a in re.split(r"[,\s]+", fr.group(1)) if a] if fr else []

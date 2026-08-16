@@ -152,7 +152,7 @@
           "@@//paper.toml": "5f9ad08942219d85ba68074f848bddd43096ee9321b93333b698ca3c02e6e0c4",
           "@@//paper/checks/claims.py": "d095f80852784d4c1636f455a9aad5ec1175522d951156b4ecc4d9b18157d684",
           "@@//paper/paper.toml": "d4a36ac3e13d52468701d7b4ae0370c0072d84588c59221f27383593a2aea192",
-          "@@//paperkit/bib.py": "4b2c4b5852636c18a6fadaab7f8079b095bf39dcceb2470c7a20d658cb432d2d",
+          "@@//paperkit/bib.py": "3c02cce5680893c44a1abd16d1f2e685ebc94bded5e2d023b35b2644de9cc899",
           "@@//paperkit/cache.py": "c285a4dd121e2cbece9f145ca3725eab10b48e9cbb1d01b87d626f5d40c2d894",
           "@@//paperkit/coherence.py": "4a19d978b9b57827a994c36631e73d17392edb72638a132cd80c19a6d554b7d2",
           "@@//paperkit/components.bzl": "f2cecc66d49e86d17b742644b40b54dfc476f13b3b5d1722b38f083d7f2fe38b",
@@ -222,6 +222,8 @@
               "emerge": true,
               "owns_concepts": false,
               "sites": [
+                "paperkit/bib.py\t_unescaped_braces",
+                "paperkit/bib.py\t_scalar_value",
                 "paperkit/bib.py\t_top_fields",
                 "paperkit/bib.py\tparse",
                 "paperkit/bib.py\t_bibpath",
@@ -1067,6 +1069,8 @@
               "emerge": true,
               "owns_concepts": false,
               "sites": [
+                "paperkit/bib.py\t_unescaped_braces",
+                "paperkit/bib.py\t_scalar_value",
                 "paperkit/bib.py\t_top_fields",
                 "paperkit/bib.py\tparse",
                 "paperkit/bib.py\t_bibpath",
@@ -1640,6 +1644,8 @@
               "emerge": true,
               "owns_concepts": true,
               "sites": [
+                "paperkit/bib.py\t_unescaped_braces",
+                "paperkit/bib.py\t_scalar_value",
                 "paperkit/bib.py\t_top_fields",
                 "paperkit/bib.py\tparse",
                 "paperkit/bib.py\t_bibpath",

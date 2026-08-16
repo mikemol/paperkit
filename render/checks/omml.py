@@ -90,12 +90,21 @@ def _rungs(docx: Path) -> list[tuple[str, bool, str]]:
     rows.append(("R6 oMath well-formed", bad is None,
                  f"{len(blocks)} block(s)" + (f"; {bad}" if bad else " all parse")))
 
-    # R7 — every line-break inside an oMath block
+    # R7 — every line-break inside an oMath block, WITH A POPULATION WITNESS.  The verdict
+    # `outside == 0` is True at ZERO breaks (0 - 0), which is indistinguishable in the exit code
+    # from "N of N conformed" — the ∀x∈∅ vacuity.  So the detail names the population's third state
+    # (summit's conformed / non-conformed / nothing-to-conform, the same triad as pass/fail/
+    # cannot-run): "0 of 0" reads FROZEN, not live.  On paperkit's route pandoc emits no <m:brk/>, so
+    # R7 is vacuously satisfied here — it guards a downstream that DOES emit breaks (mat260's Agda
+    # renderOMML, whose emission survives as the committed omml-manifest.tsv even as its producer is
+    # deleted): a regression test against a frozen corpus, not a growing conformance check.
     all_brks = _BRK.findall(doc)
     in_omath = sum(len(_BRK.findall(b)) for b in blocks)
     outside = len(all_brks) - in_omath
-    rows.append(("R7 breaks inside oMath", outside == 0,
-                 f"{len(all_brks)} <m:brk/>, {outside} outside oMath"))
+    n = len(all_brks)
+    detail = (f"0 of 0 — no <m:brk/> to conform (vacuous on this route; pandoc emits none)"
+              if n == 0 else f"{n - outside} of {n} <m:brk/> inside oMath")
+    rows.append(("R7 breaks inside oMath", outside == 0, detail))
     return rows
 
 
@@ -178,6 +187,23 @@ def _selftest() -> int:
         check("P: math renders as native OMML (R1) with no leaked $ (R3), well-formed (R6)",
               p["R1 native OMML"] and p["R3 no bare $"] and p["R6 oMath well-formed"])
         check("P: no rasterized equation (R2)", p["R2 no raster equation"])
+
+        # R7 population witness (summit's catch): a break-free doc reports "0 of 0" (vacuous/frozen),
+        # DISTINCT from "N of N conformed" — so N→0 is visible in the verdict, not a silent 0==0 pass.
+        r7_none = dict((n, det) for n, _ok, det in _rungs(p_docx))["R7 breaks inside oMath"]
+        check("R7 reports 0 of 0 when there are no breaks (population witness, not a silent pass)",
+              "0 of 0" in r7_none)
+        # a doc WITH an m:brk inside an oMath: R7 conforms AND reports the population (N of N)
+        with zipfile.ZipFile(p_docx) as zin:
+            doc_xml = zin.read("word/document.xml").decode()
+        doc_xml = re.sub(r"(<m:oMath\b[^>]*>)", r"\1<m:r><m:brk/></m:r>", doc_xml, count=1)
+        b_docx = d / "brk.docx"
+        with zipfile.ZipFile(p_docx) as zin, zipfile.ZipFile(b_docx, "w") as zout:
+            for item in zin.namelist():
+                zout.writestr(item, doc_xml.encode() if item == "word/document.xml" else zin.read(item))
+        r7_brk = dict((n, det) for n, _ok, det in _rungs(b_docx))["R7 breaks inside oMath"]
+        check("R7 reports N of N when breaks are present (conformed, distinct from the vacuous case)",
+              " of 1" in r7_brk and "0 of 0" not in r7_brk)
 
         # F: force the same equation to a raster image (the leak R1/R2 catch).  Synthesize a docx
         # with a PNG in word/media and NO oMath, by post-editing the package.

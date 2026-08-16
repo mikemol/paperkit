@@ -25,6 +25,13 @@ with tempfile.TemporaryDirectory() as d:
     subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography", "../paper/references.bib", "-o", str(docx)], check=True)
     pdf = lo.convert(docx, "pdf", d)
     assert pdf is not None and pdf.stat().st_size > 0, "no PDF deliverable produced (soffice produced no output)"
+    # accessibility repair, in place: the office export leaves some link annotations undescribed and
+    # emits no PDF/UA identification metadata (linkalt + pdfua_meta — the adopted sre workarounds,
+    # ask-adopt-pdfua-render-workarounds).  Together these take the deliverable to veraPDF UA-1
+    # failedChecks==0, so the a11y gate (rnd-a11y) can hold the OWN paper conformant.
+    import linkalt, pdfua_meta
+    linkalt.describe_links(pdf)
+    pdfua_meta.stamp(pdf, pdfua_meta._title(Path("../paper/paper.toml")))
     pages = int(re.search(r'Pages:\s*(\d+)', subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout).group(1))
     assert pages >= 1, "empty PDF deliverable"
     subprocess.run(["pdftotext", str(pdf), str(txt)], check=True)

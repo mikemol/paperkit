@@ -55,3 +55,28 @@
   claim   = {the figure's legend SURVIVES into the rendered PDF text layer --- every label selectable, searchable, and screen-readable rather than locked inside the pixels --- the accessibility of the report's Okabe-Ito claim-DAG figure, preserved through the render},
   check   = {cmd:python3 checks/fig_legible.py}
 }
+@misc{rnd-fig-pad,
+  section = {figure}, from = {rnd-fig-legible}, join = {. },
+  claim   = {and a figure's edges survive the vector conversion --- the SVG viewport is PADDED by a symmetric margin before the SVG-to-EMF step, because that step shaves each edge and clips titles and legends flush against the drawing's bounding box, so the boundary the clipper trims is empty space and the drawing keeps its full extent --- adopted from sre-troubleshooting's third render workaround, classified by mat230's audit-table frame as RENDER FIDELITY and NOT a WCAG criterion, so it lives with the figure checks and never in the accessibility gate},
+  check   = {cmd:python3 checks/svgpad.py --selftest}
+}
+@misc{rnd-link-alt,
+  section = {a11y},
+  claim   = {every link annotation in the deliverable carries a text description --- a pass over the finished PDF reads the words whose boxes OVERLAP each undescribed link's rectangle and writes them back as that link's description, on the reasoning that the words a sighted reader sees are what a screen reader should hear, so a citation link announces its destination rather than a bare "link" (PDF/UA 7.18.1 and 7.18.5) --- adopted from sre-troubleshooting, carrying its half-description fix forward: selection is by BOX OVERLAP not word centre, so two adjacent citations that extract as one word are both described},
+  check   = {cmd:python3 checks/linkalt.py --selftest}
+}
+@misc{rnd-pdfua-meta,
+  section = {a11y}, from = {rnd-link-alt}, join = {. },
+  claim   = {and the deliverable declares the PDF/UA identification metadata the office export omits --- a post-export stamp writes the document title (READ from the paper's own paper.toml, never hardcoded), the pdfuaid identification schema, and the ViewerPreferences DisplayDocTitle flag, closing the three identification clauses (ISO 14289-1 section 5 test 1, 7.1 tests 9 and 10) that a headless LibreOffice conversion leaves unset --- none is content, all three are a stamp},
+  check   = {cmd:python3 checks/pdfua_meta.py --selftest}
+}
+@misc{rnd-a11y,
+  section = {a11y}, from = {rnd-pdfua-meta}, join = {. },
+  claim   = {so paperkit's OWN paper is PDF/UA-1 conformant BY CONSTRUCTION --- the deliverable is built as the pdf check builds it and then repaired (link descriptions restored, identification metadata stamped), and veraPDF validates it at UA-1 with zero failed checks over a Tagged PDF, gating on the flavour the producer targets (LibreOffice emits UA-1 and declares pdfuaid part 1) --- what was an opt-in measurement a downstream deliverable pointed at is now a live warrant of the render project's own output, earned by the adopted repair rather than asserted},
+  check   = {cmd:python3 checks/a11y_own.py}
+}
+@misc{rnd-index,
+  section = {deliver}, from = {rnd-pdf}, join = {. },
+  claim   = {and a document index or table of contents is refreshed by driving the export over the office suite's UNO scripting bridge on a PRIVATE SOCKET, held to a deadline and killed if it will not exit, because the headless command-line conversion never populates the index field --- adopted from sre-troubleshooting, carrying forward the fix for its first attempt (a document macro that hung the build with no output): the socket path and the deadline-kill turn a hang into a LOUD bounded failure rather than a silent stall --- the mechanism is proven on the bridge itself; paperkit's current paper carries no index field, so this warrant is dormant on the present deliverable and live for a downstream paper that has a table of contents},
+  check   = {cmd:python3 checks/lo-export.py --selftest}
+}

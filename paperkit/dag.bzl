@@ -33,6 +33,7 @@ IMPORTS = {
     "tests/boundaries_jobs.py": ["_fixture_gate", "_fixture_model"],
     "tests/boundaries_ladder.py": ["grade"],
     "tests/boundaries_memoize.py": ["_fixture_model", "discriminate"],
+    "tests/boundaries_mutable.py": ["layout"],
     "tests/boundaries_path.py": ["config", "resolver"],
     "tests/boundaries_references.py": ["project"],
     "tests/boundaries_sandbox.py": ["layout"],

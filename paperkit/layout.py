@@ -38,7 +38,7 @@ MUTABLE_SUFFIXES = {".bib", ".tsv", ".toml", ".md", ".sh", ".py", ".txt", ".json
 DERIVED_NAMES = {".delta-cache.json"}
 # `bazel-*` are convenience symlinks into the multi-GB Bazel cache; a glob (ignore_patterns
 # is fnmatch) keeps _copy_sandbox from following them and exploding the Δ sandbox (Ζ·skip).
-SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", "out", "bazel-*"}
+SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", ".venv", "node_modules", "out", "bazel-*"}
 _ENGINE = Path(__file__).resolve().parent
 
 # Ω·config — the knob this module RESOLVES, declared here (place-by-ownership; the kernel hosts
@@ -109,11 +109,38 @@ def _nested_roots(base: Path) -> list:
     return out
 
 
+def _suffixless_text(f: Path) -> bool:
+    """A file with NO suffix that decodes as text — the CLASS of extensionless versioned commands
+    (`scripts/summit`, `scripts/check`, `bin/pk`, a `.githooks/` hook, a `Containerfile`): a witness
+    reads it and mutating its content can change a claim, so Δ must be able to corrupt it.  This
+    generalizes the old one-off `.githooks` exception to the class it belonged to (summit's
+    ask-delta-extensionless): the exception was drawn around ONE artifact, not the property.  Keyed
+    on CONTENT (a NUL byte ⇒ binary, so a compiled command like `tools/sched-batch` is excluded)
+    because the Δ sandbox is a copy without `.git` and mode is not reliable there — content is the
+    only signal always present.  MUTABLE_SUFFIXES still owns the SUFFIXED text files; this owns the
+    suffixless ones, and together they are a closer proxy for "could this file's content change a
+    claim's truth" than suffix alone (Ζ·surface·admit)."""
+    if f.suffix != "":
+        return False
+    try:
+        head = f.read_bytes()[:4096]
+    except OSError:
+        return False
+    if b"\x00" in head:
+        return False
+    try:
+        head.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
 def _mutable(f: Path) -> bool:
-    """A text input Δ may corrupt: a known source suffix, or a versioned git hook
-    (no suffix, but a checked artifact — the README's ci claim names it)."""
+    """A text input Δ may corrupt: a known source suffix, or a suffixless text command (a versioned
+    executable a witness reads — `scripts/*`, `bin/pk`, `.githooks/` hooks; the CLASS, not the one
+    `.githooks` artifact the exception used to name — ask-delta-extensionless)."""
     return (f.is_file() and f.name not in DERIVED_NAMES
-            and (f.suffix in MUTABLE_SUFFIXES or ".githooks" in f.parts))
+            and (f.suffix in MUTABLE_SUFFIXES or _suffixless_text(f)))
 
 
 def _copy_sandbox(root: Path, dest: Path) -> None:

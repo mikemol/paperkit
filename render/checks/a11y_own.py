@@ -3,38 +3,52 @@ r"""Ρ·render·a11y-own — gate paperkit's OWN paper PDF on PDF/UA-1 conforman
 
 `a11y.py` is the parametrized, opt-in accessibility gate a downstream project points at its own
 deliverable.  This check points it at PAPERKIT'S paper: it builds the deliverable exactly as
-`pdf.py` does — pandoc→LibreOffice, then the adopted repair (linkalt describes the undescribed
-links, pdfua_meta stamps the PDF/UA identification metadata) — and runs `a11y.check_ua2(..,
-flavour="ua1")` on the result, requiring veraPDF UA-1 failedChecks==0.
+`pdf.py` does — pandoc (with the paper's title as core metadata) → the UNO PDF/UA export (which sets
+the pdfuaid schema, DisplayDocTitle and dc:title and refreshes indexes) → linkalt (describes the
+source-document links the export leaves bare) — and runs `a11y.check_ua2(.., flavour="ua1")` on the
+result, requiring veraPDF UA-1 failedChecks==0.
 
-This is what the adoption EARNS: before it, LibreOffice's export left the paper at 5 UA-1 failures
-(one undescribed link → 7.18.1/7.18.5, and three metadata clauses → 5/1, 7.1/9, 7.1/10); after the
-two adopted post-export methods it reaches failedChecks==0, so the own paper can be gated conformant
-by construction rather than measured opt-in.  The flavour is UA-1 because LibreOffice emits UA-1 and
-declares pdfuaid:part=1 (a11y.py's own note) — gate on what the producer targets.
+This is what the adoption EARNS: a plain office conversion leaves the paper non-conformant (a bare
+link → 7.18.1/7.18.5, and the identification metadata unset → 5/1, 7.1/9, 7.1/10).  Driving the
+export in PDF/UA mode closes the metadata clauses AT THE RIGHT LAYER (LibreOffice owns them), and
+linkalt closes the link clauses, so the paper reaches failedChecks==0 by construction rather than
+by a post-hoc stamp.  The flavour is UA-1 because LibreOffice emits UA-1 and declares pdfuaid:part=1
+(a11y.py's own note) — gate on what the producer targets.
 
 veraPDF absent ⇒ FAIL LOUD (a11y.check_ua2 refuses to skip-green).  The check reuses a11y.py's
 functions rather than re-implementing them (one owner for the measurement).
 
-    python3 checks/a11y_own.py            # build the repaired deliverable, gate it UA-1==0
+    python3 checks/a11y_own.py            # build the conformant deliverable, gate it UA-1==0
 """
 from __future__ import annotations
 
+import importlib.util
 import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import a11y            # the measurement owner — import, never re-implement
 import linkalt
 import lo
-import pdfua_meta
+
+
+def _load(name, filename):
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().parent / filename)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+lo_export = _load("lo_export", "lo-export.py")
 
 
 def _build_deliverable(d: Path) -> Path:
-    """Reproduce pdf.py's pipeline + the adopted accessibility repair, returning the PDF path."""
+    """Reproduce pdf.py's deliverable pipeline (pandoc-title → UA export → linkalt), returning the
+    PDF path.  The same right-layer chain — kept in step with pdf.py."""
     _bibtext = "".join(p.read_text() for p in sorted(Path("../paper").glob("*.bib")))
     mark = {"file": "(present)", "result": "(verdict imported)"}
     mk = {}
@@ -44,14 +58,14 @@ def _build_deliverable(d: Path) -> Path:
             mk[m.group(1)] = mark.get(c.group(1), "(machine-checked)")
     split = re.sub(r"\[@([A-Za-z][\w:.+-]*)\]", lambda x: mk.get(x.group(1), x.group(0)),
                    Path("../paper/paper.md").read_text())
+    title = tomllib.loads(Path("../paper/paper.toml").read_text())["paper"]["title"]
     md, docx = d / "p.md", d / "p.docx"
     md.write_text(split)
-    subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography",
-                    "../paper/references.bib", "-o", str(docx)], check=True)
-    pdf = lo.convert(docx, "pdf", d)
+    subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography", "../paper/references.bib",
+                    "--metadata", f"title={title}", "-o", str(docx)], check=True)
+    pdf = lo_export.export_pdfua(docx, d / "p.pdf") or lo.convert(docx, "pdf", d)
     assert pdf is not None and pdf.stat().st_size > 0, "no PDF deliverable produced"
-    linkalt.describe_links(pdf)                                       # the adopted repair
-    pdfua_meta.stamp(pdf, pdfua_meta._title(Path("../paper/paper.toml")))
+    linkalt.describe_links(pdf)                                       # the one genuine post-export step
     return pdf
 
 

@@ -59,6 +59,11 @@ def svg(records):
 
     used = {g for r in records for g in (r["grade"], eff(r))}
     bands = [g for g in GRADE_ORDER if g in used]
+    # L/R/T/B are the plot's margins inside the viewport — and they double as CLIP-SAFETY: an
+    # SVG→EMF conversion (render/) shaves a hairline at the viewport boundary, so a label flush at
+    # x=0 or y=0 would lose pixels.  Because every drawn element sits inside these margins (content
+    # spans [L, L+plotW]×[T, H-B], the legend at T-16), the generated figure is clip-safe BY
+    # CONSTRUCTION — the margin lives at the author, not a downstream pad.  Keep them non-trivial.
     L, R, T, B, BH, plotW = 132, 30, 34, 48, 60, 560
     W, H = L + plotW + R, T + B + BH * len(bands)
     band_y = {g: T + i * BH + BH // 2 for i, g in enumerate(bands)}

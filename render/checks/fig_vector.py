@@ -7,13 +7,12 @@ import subprocess, sys, tempfile, zipfile
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lo   # office convert: isolated profile + unlink-first, so an absence is loud (Ρ·render·provenance)
-import svgpad  # pad the SVG viewport so the EMF step cannot shave edges (Ρ·render·svgpad, fidelity)
 
 svg = Path("../report/assets/dag.svg")
 assert svg.exists(), "the report's figure is missing"
 with tempfile.TemporaryDirectory() as t:
     d = Path(t)
-    (d / "dag.svg").write_bytes(svgpad.pad_svg(svg.read_bytes()))
+    (d / "dag.svg").write_bytes(svg.read_bytes())
     emf = lo.convert(d / "dag.svg", "emf", d, timeout=120)
     assert emf is not None and emf.stat().st_size > 1000, "SVG did not convert to an EMF vector"
     (d / "m.md").write_text("# Figure\n\n![the claim-DAG](dag.emf)\n")

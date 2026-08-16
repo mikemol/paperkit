@@ -34,54 +34,68 @@ from pathlib import Path
 import pikepdf
 
 
-def _words(pdf: Path) -> list[list[tuple[float, float, float, float, str]]]:
-    """Per-page word boxes from `pdftotext -bbox` (top-left, y-down): [(x0,y0,x1,y1,text), ...]."""
-    out = subprocess.run(["pdftotext", "-bbox", str(pdf), "-"],
+def _words_by_page(pdf: Path) -> dict[int, list[tuple[float, float, float, float, str]]]:
+    """{1-based page: [(x0,y0,x1,y1,word)]} in PDF coordinates (y-up, bottom origin).
+    The page height comes from each `<page height=...>` element — pdftotext measures from the top,
+    PDF annotations from the bottom, so each word is flipped through its own page's height."""
+    xml = subprocess.run(["pdftotext", "-bbox", str(pdf), "-"],
                          capture_output=True, text=True).stdout
-    pages: list[list[tuple[float, float, float, float, str]]] = []
-    for chunk in out.split("</page>")[:-1]:
+    out: dict[int, list[tuple[float, float, float, float, str]]] = {}
+    page = 0
+    for chunk in xml.split("<page")[1:]:
+        page += 1
+        h = re.match(r'[^>]*height="([\d.]+)"', chunk)
+        if not h:
+            continue
+        height = float(h.group(1))
         ws: list[tuple[float, float, float, float, str]] = []
         for m in re.finditer(
                 r'<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)</word>',
                 chunk):
             x0, y0, x1, y1 = (float(g) for g in m.groups()[:4])
-            ws.append((x0, y0, x1, y1, m.group(5)))
-        pages.append(ws)
-    return pages
+            ws.append((x0, height - y1, x1, height - y0, m.group(5)))   # top-down → bottom-up
+        out[page] = ws
+    return out
 
 
 def describe_links(pdf: Path) -> int:
-    """Describe every undescribed `/Link` from the words whose box OVERLAPS its rect.  Saves in
-    place.  Returns the number of links given a `/Contents`."""
-    words = _words(pdf)
+    """Give EVERY undescribed `/Link` a `/Contents`: the words whose box OVERLAPS its rect by at
+    least half a word's width (so a text extractor that merges two adjacent links into one word,
+    whose centre lies in neither rect, still describes both), joined; a link with no text under it
+    gets the literal "link" (PDF/UA requires a description on every link, even an empty target).
+    Saves in place.  Returns the count described from their OWN text (excludes the "link" fallback).
+
+    Vendored from sre-troubleshooting's linkalt.py (summit floor, ask-adopt-pdfua-render-workarounds)
+    — the authoritative method, preserved before that tree is retired."""
+    words = _words_by_page(pdf)
     doc = pikepdf.open(str(pdf), allow_overwriting_input=True)
-    restored = 0
-    for i, page in enumerate(doc.pages):
-        mb = page.MediaBox
-        ph = float(mb[3]) - float(mb[1])                      # page height, for the y-flip
-        ws = words[i] if i < len(words) else []
+    filled = 0
+    for pno, page in enumerate(doc.pages, 1):
         for a in page.get("/Annots", []):
-            if a.get("/Subtype") != "/Link" or a.get("/Contents"):
+            if a.get("/Subtype") != "/Link" or a.get("/Contents") is not None:
                 continue
-            r = [float(x) for x in a["/Rect"]]
-            rx0, rx1 = min(r[0], r[2]), max(r[0], r[2])
-            ry0, ry1 = ph - max(r[1], r[3]), ph - min(r[1], r[3])   # /Rect (y-up) → pdftotext (y-down)
-            hits = [w for w in ws
-                    if not (w[2] < rx0 or w[0] > rx1 or w[3] < ry0 or w[1] > ry1)]  # BOX OVERLAP
-            hits.sort(key=lambda w: (round(w[1] / 3), w[0]))    # reading order: line then x
-            desc = " ".join(w[4] for w in hits).strip()
-            if desc:
-                a["/Contents"] = pikepdf.String(desc)
-                restored += 1
-    if restored:
-        doc.save(str(pdf))
-    return restored
+            r = [float(v) for v in a["/Rect"]]
+            x0, y0, x1, y1 = min(r[0], r[2]), min(r[1], r[3]), max(r[0], r[2]), max(r[1], r[3])
+            hit = []
+            for wx0, wy0, wx1, wy1, w in words.get(pno, []):
+                ox = min(x1, wx1) - max(x0, wx0)
+                oy = min(y1, wy1) - max(y0, wy0)
+                if ox > 0 and oy > 0 and ox >= 0.5 * min(x1 - x0, wx1 - wx0):   # ≥ half a word wide
+                    hit.append(w)
+            text = " ".join(hit).strip()
+            if text:
+                a["/Contents"] = pikepdf.String(text)
+                filled += 1
+            else:
+                a["/Contents"] = pikepdf.String("link")        # never leave a link undescribed
+    doc.save(str(pdf))
+    return filled
 
 
 def _undescribed(pdf: Path) -> int:
     doc = pikepdf.open(str(pdf))
     return sum(1 for pg in doc.pages for a in pg.get("/Annots", [])
-               if a.get("/Subtype") == "/Link" and not a.get("/Contents"))
+               if a.get("/Subtype") == "/Link" and a.get("/Contents") is None)
 
 
 def _selftest() -> int:
@@ -149,20 +163,17 @@ def _describe_by_centre(pdf: Path) -> int:
     """The sre-bug reference: select a word only if its CENTRE lies inside the rect.  A word that
     extracts as one token straddling two links has a centre in neither → described by neither.
     Returns the count that WOULD be described (does not save)."""
-    words = _words(pdf)
+    words = _words_by_page(pdf)
     doc = pikepdf.open(str(pdf))
     n = 0
-    for i, page in enumerate(doc.pages):
-        ph = float(page.MediaBox[3]) - float(page.MediaBox[1])
-        ws = words[i] if i < len(words) else []
+    for pno, page in enumerate(doc.pages, 1):
         for a in page.get("/Annots", []):
-            if a.get("/Subtype") != "/Link" or a.get("/Contents"):
+            if a.get("/Subtype") != "/Link" or a.get("/Contents") is not None:
                 continue
-            r = [float(x) for x in a["/Rect"]]
-            rx0, rx1 = min(r[0], r[2]), max(r[0], r[2])
-            ry0, ry1 = ph - max(r[1], r[3]), ph - min(r[1], r[3])
-            hit = [w for w in ws
-                   if rx0 <= (w[0] + w[2]) / 2 <= rx1 and ry0 <= (w[1] + w[3]) / 2 <= ry1]
+            r = [float(v) for v in a["/Rect"]]
+            x0, y0, x1, y1 = min(r[0], r[2]), min(r[1], r[3]), max(r[0], r[2]), max(r[1], r[3])
+            hit = [w for w in words.get(pno, [])
+                   if x0 <= (w[0] + w[2]) / 2 <= x1 and y0 <= (w[1] + w[3]) / 2 <= y1]
             if hit:
                 n += 1
     return n

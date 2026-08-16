@@ -1,31 +1,39 @@
 #!/usr/bin/env python3
-r"""Ρ·render·lo-export — refresh a document's index/TOC by exporting over the office scripting
-bridge instead of the command-line conversion.
+r"""Ρ·render·lo-export — docx → tagged PDF/UA-1, driven over the office scripting bridge.
 
-Adopted from sre-troubleshooting's `workaround-uno-bridge-export` (summit floor,
-ask-adopt-pdfua-render-workarounds).  LibreOffice's headless `--convert-to pdf` never populates a
-document index field — a Writer table-of-contents renders empty, because the CLI path does not run
-the index update the bridge does.  The fix drives the export over the office suite's UNO scripting
-bridge: load the document, update its `DocumentIndexes`, then `storeToURL` to PDF.
+Vendored from sre-troubleshooting's lo-export.py (summit floor, ask-adopt-pdfua-render-workarounds)
+— the authoritative method, preserved before that tree is retired.  The office suite's command-line
+`--convert-to pdf` cannot produce a conformant deliverable two ways:
 
-sre's first attempt drove the same refresh through a document MACRO and hung the build with no
-output — "a worse failure than the one it was fixing".  This carries the fix forward on two counts:
+  - it exports a PLAIN PDF, not a PDF/UA one — no `pdfuaid` identification schema, no
+    DisplayDocTitle, no tag structure the standard requires;
+  - pandoc writes a table of contents as a Writer index FIELD, and headless conversion never
+    populates it, so the heading ships with nothing under it.
 
-  - the bridge is reached over a **private socket** (`--accept=socket,...;urp;`), not a macro;
-  - the whole export is **held to a deadline and killed** if it will not exit, so a hang becomes a
-    LOUD, bounded failure (return None / exit 1) rather than a silent stall.
+Driving the export over UNO instead fixes both: `storeToURL` with a `writer_pdf_Export` filter and
+`FilterData` of `PDFUACompliance=True, UseTaggedPDF=True, ExportBookmarks=True` writes a tagged
+PDF/UA file with the identification metadata LibreOffice owns, and `doc.refresh()` + each index's
+`.update()` (before AND after — an index has no pages to cite until the layout exists) populates the
+TOC.  The document title carried in the docx core properties (pandoc `--metadata title=…`)
+propagates into the PDF's `dc:title` through this export — so the title, the pdfuaid schema and
+DisplayDocTitle all come from the RIGHT layer (the export), not a post-hoc stamp.
+
+sre's first attempt drove the refresh through a Basic macro over `macro:///` and hung the build with
+no output — the process stayed resident and the build blocked.  This carries the fix forward: the
+office process is owned explicitly — started on a PRIVATE PIPE, waited for under a deadline, used,
+terminated, and KILLED if it will not leave.  A build step that can hang forever is worse than one
+that fails, so every step has a deadline.
 
 Interpreter note (measured on this host): `import uno` is available under the SYSTEM python
-(`/usr/bin/python3`), not the mise interpreter the checks run under — no bundled LibreOffice python
-binary exists.  So the bridge driver runs as a subprocess of the system python; this check
-orchestrates it from wherever it is invoked.  The reachable interpreter is resolved at runtime and
-the check SKIPS LOUD (never skip-green) if no uno-capable python is found.
+(`/usr/bin/python3`), not the interpreter the checks run under — no bundled LibreOffice python binary
+exists.  So the UNO driver runs as a subprocess of a uno-capable python; this check resolves one at
+runtime and SKIPS LOUD (never skip-green) if none is found.
 
-    python3 checks/lo-export.py SRC.docx OUT.pdf [--timeout 180]   # bridge-export
+    python3 checks/lo-export.py SRC.docx OUT.pdf [--timeout 900]   # tagged-PDF/UA export
     python3 checks/lo-export.py --selftest                         # ⟨P,F,δ⟩
 
-`convert_via_bridge(src, out, timeout=180) -> Path|None` is the API; None means the bridge could
-not run (unavailable) or was killed at the deadline — an ABSENCE, loud, never a stale pass.
+`export_pdfua(src, out, timeout=900) -> Path|None` is the API; None means no uno-capable python, or
+the bridge was killed at the deadline — a loud absence, never a stale pass.
 """
 from __future__ import annotations
 
@@ -37,99 +45,110 @@ from pathlib import Path
 
 _LO = "/usr/lib/libreoffice/program"
 
-# The driver, run under a uno-capable python as a subprocess.  It launches a private headless
-# soffice on a socket, resolves the bridge, loads the doc, refreshes every DocumentIndex, and
-# exports to PDF — all under the parent's deadline (the parent kills this whole process group on
-# expiry, so a hang here is bounded from outside).
+# The driver, run under a uno-capable python (sre's lo-export.py, adapted to take a private-pipe
+# name and a deadline from the parent).  It owns the office process explicitly and exports a tagged
+# PDF/UA file with indexes refreshed.
 _DRIVER = r'''
-import os, subprocess, time, tempfile, sys, shutil
-src, out, port = sys.argv[1], sys.argv[2], int(sys.argv[3])
-prof = tempfile.mkdtemp()
-sof = subprocess.Popen(
-    ["soffice", "-env:UserInstallation=file://" + prof, "--headless", "--invisible",
-     "--nologo", "--norestore", "--accept=socket,host=127.0.0.1,port=%d;urp;" % port],
-    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-rc = 1
-try:
-    import uno
-    from com.sun.star.connection import NoConnectException
-    from com.sun.star.beans import PropertyValue
-    def prop(n, v):
-        p = PropertyValue(); p.Name = n; p.Value = v; return p
-    lc = uno.getComponentContext()
-    res = lc.ServiceManager.createInstanceWithContext("com.sun.star.bridge.UnoUrlResolver", lc)
-    ctx = None
-    for _ in range(60):
+import os, subprocess, sys, time, uuid, shutil, tempfile
+src, dst, timeout = sys.argv[1], sys.argv[2], float(sys.argv[3])
+import uno
+from com.sun.star.beans import PropertyValue
+def prop(name, value):
+    p = PropertyValue(); p.Name, p.Value = name, value; return p
+def connect(pipe, deadline):
+    ctx = uno.getComponentContext()
+    resolver = ctx.ServiceManager.createInstanceWithContext(
+        "com.sun.star.bridge.UnoUrlResolver", ctx)
+    url = "uno:pipe,name=%s;urp;StarOffice.ComponentContext" % pipe
+    while time.time() < deadline:
         try:
-            ctx = res.resolve("uno:socket,host=127.0.0.1,port=%d;urp;StarOffice.ComponentContext" % port)
-            break
-        except NoConnectException:
+            return resolver.resolve(url)
+        except Exception:
             time.sleep(0.5)
-    if ctx is None:
-        print("lo-export: could not reach the office bridge socket", file=sys.stderr); sys.exit(1)
+    raise SystemExit("lo-export: office did not accept a connection in time")
+profile = tempfile.mkdtemp()
+pipe = "pk" + uuid.uuid4().hex[:12]
+proc = subprocess.Popen(
+    ["soffice", "--headless", "--norestore", "--invisible", "--nologo",
+     "-env:UserInstallation=file://" + os.path.abspath(profile),
+     "--accept=pipe,name=%s;urp;" % pipe],
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+deadline = time.time() + timeout
+try:
+    ctx = connect(pipe, deadline)
     desktop = ctx.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", ctx)
-    doc = desktop.loadComponentFromURL(uno.systemPathToFileUrl(src), "_blank", 0, (prop("Hidden", True),))
-    try:
-        idxs = doc.getDocumentIndexes()
-        for i in range(idxs.getCount()):
-            idxs.getByIndex(i).update()
-    except Exception:
-        pass  # a document with no indexes is fine — the export still refreshes fields
-    doc.storeToURL(uno.systemPathToFileUrl(out), (prop("FilterName", "writer_pdf_Export"),))
+    doc = desktop.loadComponentFromURL(
+        uno.systemPathToFileUrl(os.path.abspath(src)), "_blank", 0,
+        (prop("Hidden", True), prop("ReadOnly", False)))
+    if doc is None:
+        raise SystemExit("lo-export: could not open " + src)
+    # fill in the index the field only declares — each index updates itself, after the layout
+    # exists, or the entries have no pages to cite.
+    doc.refresh()
+    indexes = doc.getDocumentIndexes()
+    for i in range(indexes.getCount()):
+        indexes.getByIndex(i).update()
+    doc.refresh()
+    filt = uno.Any("[]com.sun.star.beans.PropertyValue",
+                   (prop("PDFUACompliance", True), prop("UseTaggedPDF", True),
+                    prop("ExportBookmarks", True)))
+    doc.storeToURL(
+        uno.systemPathToFileUrl(os.path.abspath(dst)),
+        (prop("FilterName", "writer_pdf_Export"), prop("FilterData", filt)))
     doc.close(False)
-    rc = 0
-finally:
-    sof.terminate()
     try:
-        sof.wait(timeout=5)
+        desktop.terminate()
     except Exception:
-        sof.kill()
-    shutil.rmtree(prof, ignore_errors=True)
-sys.exit(rc)
+        pass
+finally:
+    try:
+        proc.wait(timeout=max(5.0, min(60.0, deadline - time.time())))
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=30)
+    shutil.rmtree(profile, ignore_errors=True)
+if not (os.path.exists(dst) and os.path.getsize(dst) > 0):
+    raise SystemExit("lo-export: no PDF produced")
 '''
 
 
 def _uno_python() -> str | None:
-    """A python interpreter that can `import uno` (system python, LibreOffice's), or None.
-    Probed, not assumed — the mise interpreter running the checks cannot import uno on this host."""
+    """A python interpreter that can `import uno` (system python, LibreOffice's), or None — probed,
+    not assumed.  The mise interpreter running the checks cannot import uno on this host."""
     env = {**os.environ,
            "URE_BOOTSTRAP": f"file://{_LO}/fundamentalrc",
            "PYTHONPATH": f"{_LO}:/usr/lib/python3/dist-packages",
            "LD_LIBRARY_PATH": _LO}
     for cand in ("/usr/bin/python3", "python3"):
         try:
-            r = subprocess.run([cand, "-c", "import uno"], env=env,
-                               capture_output=True, timeout=20)
-            if r.returncode == 0:
+            if subprocess.run([cand, "-c", "import uno"], env=env,
+                              capture_output=True, timeout=20).returncode == 0:
                 return cand
         except Exception:
             continue
     return None
 
 
-def convert_via_bridge(src: Path, out: Path, timeout: int = 180) -> Path | None:
-    """Export `src` to PDF at `out` over the UNO bridge, refreshing indexes.  Returns `out` on
-    success, None if no uno-capable python is available OR the bridge is killed at the deadline
-    (a loud absence, never a stale/empty pass)."""
+def export_pdfua(src: Path, out: Path, timeout: int = 900) -> Path | None:
+    """Export `src` (docx) to a tagged PDF/UA-1 at `out` over the UNO bridge, indexes refreshed.
+    Returns `out` on success, None if no uno-capable python is available OR the bridge is killed at
+    the deadline (a loud absence, never a stale/empty pass)."""
     py = _uno_python()
     if py is None:
         print("lo-export: no uno-capable python found (looked at /usr/bin/python3) — "
-              "cannot drive the bridge; refusing to skip-green", file=sys.stderr)
+              "cannot drive the tagged-PDF export; refusing to skip-green", file=sys.stderr)
         return None
     env = {**os.environ,
            "URE_BOOTSTRAP": f"file://{_LO}/fundamentalrc",
            "PYTHONPATH": f"{_LO}:/usr/lib/python3/dist-packages",
            "LD_LIBRARY_PATH": _LO}
-    port = 2002 + (os.getpid() % 4000)                      # a per-process port, avoids collisions
-    out.unlink(missing_ok=True)                             # unlink-first (Ρ·render·provenance)
+    out.unlink(missing_ok=True)                                # unlink-first (Ρ·render·provenance)
     try:
-        subprocess.run([py, "-c", _DRIVER, str(src), str(out), str(port)],
-                       env=env, timeout=timeout, start_new_session=True, check=True)
+        subprocess.run([py, "-c", _DRIVER, str(src), str(out), str(timeout)],
+                       env=env, timeout=timeout + 30, start_new_session=True, check=True)
     except subprocess.TimeoutExpired:
-        # the deadline fired — the bridge would not exit; the loud, bounded failure sre's macro
-        # path lacked.  (start_new_session groups the soffice child so the runtime reaps it.)
-        print(f"lo-export: bridge export exceeded {timeout}s — killed (a hang is a LOUD failure, "
-              "never a silent stall)", file=sys.stderr)
+        print(f"lo-export: export exceeded {timeout}s — killed (a hang is a LOUD failure, never a "
+              "silent stall)", file=sys.stderr)
         return None
     except subprocess.CalledProcessError:
         return None
@@ -137,12 +156,12 @@ def convert_via_bridge(src: Path, out: Path, timeout: int = 180) -> Path | None:
 
 
 def _selftest() -> int:
-    """⟨P, F, δ⟩ — the hang-safe bridge export:
-      P: the bridge exports a real PDF from a docx (mechanism works: connect, load, refresh, store).
-      F: an impossibly short deadline kills the bridge → None (a LOUD, bounded failure — never a
-         silent hang, which is exactly the failure sre's macro path had).
-      δ: the deadline — a generous one exports, a 1s one is killed.
-    If no uno-capable python exists, SKIP LOUD (never skip-green) and report it."""
+    """⟨P, F, δ⟩ — the tagged-PDF/UA export over the hang-safe bridge:
+      P: the bridge exports a Tagged PDF from a docx (connect→refresh→UA export→store).
+      F: an impossibly short deadline kills the bridge → None (a LOUD, bounded failure — the failure
+         sre's macro path lacked, a silent hang).
+      δ: the deadline — a generous one exports a Tagged PDF, a 1s one is killed.
+    If no uno-capable python exists, SKIP LOUD (never skip-green)."""
     fails = []
 
     def check(desc, cond):
@@ -151,9 +170,10 @@ def _selftest() -> int:
 
     if _uno_python() is None:
         print("  -- uno-capable python not found on this host; bridge cannot be exercised.\n"
-              "     lo-export SELFTEST: SKIP (loud) — the mechanism is present but unrunnable here")
-        return 0                                            # portable: don't fail a host without UNO
+              "     LO-EXPORT SELFTEST: SKIP (loud) — the method is present but unrunnable here")
+        return 0
 
+    import re
     with tempfile.TemporaryDirectory() as d:
         dd = Path(d)
         md, docx = dd / "toc.md", dd / "toc.docx"
@@ -161,15 +181,19 @@ def _selftest() -> int:
         subprocess.run(["pandoc", str(md), "--toc", "-o", str(docx)], check=True)
 
         p_out = dd / "p.pdf"
-        got = convert_via_bridge(docx, p_out, timeout=180)
-        check("P: the bridge exports a PDF from a docx (connect→load→refresh→store)",
-              got is not None and p_out.exists() and p_out.stat().st_size > 0)
+        got = export_pdfua(docx, p_out, timeout=180)
+        tagged = False
+        if got is not None and p_out.exists():
+            info = subprocess.run(["pdfinfo", str(p_out)], capture_output=True, text=True).stdout
+            tagged = bool(re.search(r"Tagged:\s+yes", info))
+        check("P: the bridge exports a Tagged PDF from a docx (UA export path)",
+              got is not None and tagged)
 
         f_out = dd / "f.pdf"
-        killed = convert_via_bridge(docx, f_out, timeout=1)   # deadline shorter than LO startup
+        killed = export_pdfua(docx, f_out, timeout=1)          # deadline shorter than LO startup
         check("F: an impossibly short deadline is killed → None (loud, never a silent hang)",
               killed is None)
-        check("δ: the deadline decides — generous exports, 1s is killed",
+        check("δ: the deadline decides — generous exports a Tagged PDF, 1s is killed",
               got is not None and killed is None)
 
     if fails:
@@ -186,16 +210,15 @@ def main(argv: list[str]) -> int:
         print("usage: lo-export.py SRC.docx OUT.pdf [--timeout N] | --selftest", file=sys.stderr)
         return 2
     src, out = Path(argv[0]), Path(argv[1])
-    timeout = int(argv[argv.index("--timeout") + 1]) if "--timeout" in argv else 180
+    timeout = int(argv[argv.index("--timeout") + 1]) if "--timeout" in argv else 900
     if not src.exists():
         print(f"lo-export: source not found at {src}", file=sys.stderr)
         return 1
-    got = convert_via_bridge(src, out, timeout=timeout)
+    got = export_pdfua(src, out, timeout=timeout)
     if got is None:
-        print("lo-export: FAIL — the bridge did not produce a PDF (unavailable or killed)",
-              file=sys.stderr)
+        print("lo-export: FAIL — no tagged PDF produced (unavailable or killed)", file=sys.stderr)
         return 1
-    print(f"lo-export: ok — exported {out} over the office bridge with indexes refreshed")
+    print(f"lo-export: ok — exported {out} as a tagged PDF/UA over the office bridge, indexes refreshed")
     return 0
 
 

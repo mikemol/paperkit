@@ -6,7 +6,6 @@ import re, subprocess, sys, tempfile
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lo   # office convert: isolated profile + unlink-first, so an absence is loud (Ρ·render·provenance)
-import svgpad  # pad the SVG viewport so the EMF step cannot clip legend words (Ρ·render·svgpad)
 
 svg = Path("../report/assets/dag.svg")
 labels = re.findall(r"<text[^>]*>([^<]+)</text>", svg.read_text())
@@ -14,7 +13,7 @@ words = sorted({w for lab in labels for w in re.findall(r"[a-z]{4,}", lab.lower(
 assert words, "the figure has no text legend to preserve"
 with tempfile.TemporaryDirectory() as t:
     d = Path(t)
-    (d / "dag.svg").write_bytes(svgpad.pad_svg(svg.read_bytes()))
+    (d / "dag.svg").write_bytes(svg.read_bytes())
     emf = lo.convert(d / "dag.svg", "emf", d, timeout=120)
     assert emf is not None, "SVG did not convert to an EMF vector (soffice produced no output)"
     (d / "m.md").write_text("# Figure\n\n![the claim-DAG](dag.emf)\n")

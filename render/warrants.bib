@@ -135,3 +135,20 @@
   claim   = {and the deliverable is audited so colour is never the SOLE cue --- every table row that uses a meaning colour must also carry a weight cue (a bold command) in that same row, so a distinction the colour was carrying survives for a reader who cannot perceive it (WCAG 2.2 use-of-colour, the verifying side that pairs with the ruler-sequence producing side) --- a sufficient-condition auditor over the LaTeX source, vendored from mat230 so the one accessibility criterion is covered from both ends},
   check   = {cmd:python3 checks/use_of_colour.py}
 }
+@misc{rnd-wcag-model,
+  section = {compliance},
+  claim   = {and the accessibility STANDARDS themselves are modeled as sourced, versioned data --- the 86 WCAG 2.2 success criteria (completeness proven by checkable arithmetic, not a trusted number: WCAG 2.1's 78 plus the 9 added in 2.2 less the one removed), the Revised Section 508 incorporation of WCAG 2.0 A and AA, and the EN 301 549 non-web clauses, each tracing to its primary source, with the version skew modeled explicitly because a criterion new in 2.2 is out of 508 scope and out of EN's 2.1 scope BY VERSION, not by choice --- a conformance claim rests on a verified model of the law, not a hand-guessed one},
+  check   = {cmd:python3 checks/wcag_model.py --check}
+}
+@misc{rnd-wcag-entail,
+  section = {compliance}, from = {rnd-wcag-model}, join = {. },
+  claim   = {and a criterion is claimed conformant only where a warrant PROVES it, never merely NAMES it --- a Supports verdict is admissible only when a warrant's own falsification arm reds on that criterion's violation, or when the deliverable passes the standard's own validator (veraPDF for PDF/UA), so the falsifiability that grades every paperkit claim becomes the entailment evidence a regulatory claim needs; the check RUNS those falsification arms, so a broken one cannot back a Supports, and a criterion whose entailment is unproven is disclosed conservatively rather than claimed --- the warrant-adequacy gap closed at the regulatory tier, under-claiming by construction because a false Supports is a false legal claim},
+  check   = {cmd:python3 checks/wcag_entail.py --check}
+}
+@misc{rnd-wcag,
+  section = {compliance}, from = {rnd-wcag-entail}, join = {. },
+  emit    = {assets/wcag-vpat.md},
+  as      = {raw},
+  claim   = {and paperkit's own accessibility conformance is DISCLOSED as a self-attesting report --- a VPAT International conformance statement (WCAG 2.2 by level, Section 508, and EN 301 549), generated as a projection of the standards model and the proven entailment verdicts, per render route, so the two deliverables disclose their genuine difference (the office route reaches PDF/UA-1, the LaTeX route the later PDF/UA-2) and every Supports carries in its remarks the warrant that entails it --- the engine's own thesis, that a document is a projection of a verified claim-DAG, applied to the highest-stakes claim a document makes about itself, so the conformance statement and its machine-checked proof are one object gated fresh},
+  check   = {cmd:python3 checks/wcag.py --check}
+}

@@ -34,6 +34,7 @@ IMPORTS = {
     "tests/boundaries_ladder.py": ["grade"],
     "tests/boundaries_memoize.py": ["_fixture_model", "discriminate"],
     "tests/boundaries_mutable.py": ["layout"],
+    "tests/boundaries_mutate_atom.py": ["mutate"],
     "tests/boundaries_path.py": ["config", "resolver"],
     "tests/boundaries_references.py": ["project"],
     "tests/boundaries_sandbox.py": ["layout"],

@@ -170,8 +170,13 @@
   claim   = {the mutation SURFACE has a boundary of its own, and the grade must say where it runs --- a claim's falsifiability is measured over the inputs the sweep can corrupt, so an input it merely READS and cannot mutate (excluded by suffix, or living outside the project entirely) leaves the grade narrower than it looks, and reporting that gap is what keeps indeterminate meaning ONE thing: every input was corrupted and none flipped it, never we did not look --- an orthogonal axis like corroboration, never a rung, since incompleteness is not a weaker grade and no adequacy floor may fail a claim for it},
   check   = {cmd:python3 ../paperkit/tests/boundaries_surface.py}
 }
-@misc{bnd-mutable,
+@misc{bnd-mutate-atom,
   section = {engine}, from = {bnd-surface}, join = {. },
+  claim   = {the mutation ATOM decomposes without losing its monotonicity --- the def-sweep drops a whole def body to an UNCATCHABLE raise, so no witness's own except-Exception swallows it, and a finer per-branch-arm atom keeps that guarantee by using the same raise, but an arm a bare or BaseException handler would CATCH is REFUSED because a raise planted there is swallowed and the arm reads reached-but-covered when it is neither --- the finer cell is ADDITIVE, the coarse def cell is byte-identical and survives beside it so no committed grade re-keys, and a condition-inversion is a separate NON-monotone op that a value assertion alone can catch, kept out of the sensitivity sweep by construction},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_mutate_atom.py}
+}
+@misc{bnd-mutable,
+  section = {engine}, from = {bnd-mutate-atom}, join = {. },
   claim   = {the surface admits a file by the FILE, not just its suffix --- an extensionless versioned command a witness reads (scripts/summit, bin/pk, a .githooks hook, a Containerfile) was a file the sweep could not corrupt, so any claim reading one carried an unfalsifiable component, and the fix generalizes the one-off .githooks exception to the CLASS it named: a suffixless file that decodes as text is mutable, keyed on CONTENT because the sandbox is a copy without .git and mode is not reliable there --- a single NUL byte, the minimum delta, flips such a command out of the surface as binary, while the suffix path (MUTABLE_SUFFIXES) and derived-name exclusion are untouched},
   check   = {cmd:python3 ../paperkit/tests/boundaries_mutable.py},
   reads   = {.}

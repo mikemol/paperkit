@@ -63,6 +63,7 @@ COMPONENTS = {
         "tests/boundaries_jobs.py",
         "tests/boundaries_ladder.py",
         "tests/boundaries_memoize.py",
+        "tests/boundaries_mutate_atom.py",
         "tests/boundaries_mutable.py",
         "tests/boundaries_otlp.py",
         "tests/boundaries_path.py",

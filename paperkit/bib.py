@@ -21,13 +21,14 @@ from pathlib import Path
 
 import re
 
-# scalar fields carried verbatim (the projector + checks read these).  `local` is a per-warrant
-# enforcement-tier flag consumed by the GENERATOR (bibtex.bzl), not by any engine code here — a
-# `local` check runs on the host outside the hermetic sandbox (a toolchain-coupled check), so it is
-# gated but never mutation-swept.  paperkit parses and carries it so it is a quiet, owned field
-# rather than a loud-dropped unknown; the generator reads the same bib text (Ζ·tier).
+# scalar fields carried verbatim (the projector + checks read these).  `tier` is a per-warrant
+# enforcement-tier flag consumed by the GENERATOR (bibtex.bzl), not by any engine code here —
+# tier ∈ {sandbox (hermetic, mutation-swept), local (host-coupled, uncached), toolchain (host
+# toolchain, cached + stamped)}; a non-sandbox check runs on the host, gated but not swept.  paperkit
+# parses and carries it so it is a quiet, owned field, not a loud-dropped unknown; the generator
+# reads the same bib text (Ζ·tier).
 _SCALAR = ("title", "author", "year", "note", "section", "claim",
-           "check", "glue", "join", "move", "emit", "as", "mem", "link", "depth", "local")
+           "check", "glue", "join", "move", "emit", "as", "mem", "link", "depth", "tier")
 # list-valued fields.  `from` = prose-order edge (dep_order + glue); `rests-on` =
 # grounding/entailment edge (adequacy clamping, NOT prose) — the two are often
 # reversed (prose runs general→specific, grounding specific→general); `reads` =

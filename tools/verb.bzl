@@ -40,17 +40,29 @@ def _cmd_impl(ctx):
     inner = "sh -c " + _sq(ctx.attr.cmd)
     if ctx.attr.project and ctx.attr.project != ".":
         inner = "cd " + _sq(ctx.attr.project) + " && " + inner  # cwd = the project dir (relative paths)
+    # Ζ·tier — the check's enforcement tier decides how it runs and whether it is cached/swept:
+    #   sandbox (default): hermetic linux-sandbox, cached, mutation-swept — a pure check.
+    #   local: a HOST-COUPLED check (setup probes the live /proc,/sys, runs a cgroup experiment) — NOT
+    #     hermetic AND NOT a function of declared inputs (the machine is unpinned), so run on the host
+    #     unsandboxed AND UNCACHED (a cached verdict would bank a host-dependent die-roll).
+    #   toolchain: a TOOLCHAIN-COUPLED check (render's veraPDF/lualatex/soffice/pandoc) — needs a real
+    #     toolchain the sandbox lacks, so run on the host unsandboxed, BUT it is DETERMINISTIC given a
+    #     PINNED toolchain, so it is CACHED and STAMPED with the toolchain fingerprint (ctx.info_file,
+    #     the STABLE_TOOLCHAIN_* keys): a toolchain change invalidates it precisely, an unchanged
+    #     toolchain is a cache hit — enforceable every commit AND fast.  Cacheable = omit no-cache.
+    tier = ctx.attr.tier
     er = {}
-    if ctx.attr.local:
-        # Ζ·resist — a HOST-COUPLED check (setup probes the live /proc,/sys and runs a cgroup
-        # experiment): NOT hermetic, so run on the host, unsandboxed, and uncached (the machine
-        # is not a declared input, so a cached verdict would be unsound).  The sanctioned escape.
+    stamp_inputs = []
+    if tier == "local":
         er = {"local": "1", "no-sandbox": "1", "no-cache": "1", "no-remote": "1"}
+    elif tier == "toolchain":
+        er = {"local": "1", "no-sandbox": "1", "no-remote": "1"}   # cacheable (no no-cache)
+        stamp_inputs = [ctx.info_file]   # depend on the stable toolchain fingerprint → precise invalidation
     # The ONE irreducibly-shell oracle: run the arbitrary `cmd` and read its exit code → $V; the
     # record itself is emitted by verdict.py (no JSON built in shell).
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.data, transitive = [py.files]),
+        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.data + stamp_inputs, transitive = [py.files]),
         # Ζ·sched-batch·phase2 — the check `inner` is an arbitrary compound shell command, not a
         # single exec, so we tune the ACTION SHELL ($$, single-threaded) and inner + the emit inherit
         # (SCHED_BATCH + nice 19 + 100ms slice), matching the per-cell tuning of the grid rules.
@@ -64,13 +76,15 @@ def _cmd_impl(ctx):
 
 pk_cmd = rule(
     implementation = _cmd_impl,
-    doc = "EXECS — verdict pass iff `cmd` exits 0 (cwd=project) under the toolchain; local=host escape (Ζ·resist).",
+    doc = "EXECS — verdict pass iff `cmd` exits 0 (cwd=project) under the toolchain.  Ζ·tier: tier = " +
+          "sandbox (hermetic, swept) | local (host-coupled, uncached — Ζ·resist) | toolchain (host " +
+          "toolchain, cached + stamped with the toolchain fingerprint).",
     toolchains = [_PY],
     attrs = {
         "cmd": attr.string(mandatory = True),
         "project": attr.string(default = "."),
         "data": attr.label_list(allow_files = True),
-        "local": attr.bool(default = False),
+        "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),
         "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },

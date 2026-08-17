@@ -1,5 +1,13 @@
 common --enable_bzlmod
 test --test_output=errors --test_summary=terse
+# Ζ·tier·toolchain — stamp every build with the host toolchain fingerprint (STABLE_TOOLCHAIN_* keys:
+# pandoc/veraPDF/lualatex/soffice versions + the veraPDF JAR sha256).  A `toolchain`-tier check
+# (verb.bzl) is a STAMPED action depending on the stable status, so a toolchain change invalidates it
+# precisely (measured: a changed stable key re-runs the action, an unchanged one is a cache hit) while
+# an unchanged toolchain keeps it cached — the check is enforceable every commit AND fast.  The same
+# keys are the fingerprint a consumer needs to trust which environment proved a claim (the VPAT tier
+# disclosure).  Cheap: the status command runs once per build; stable keys invalidate only on change.
+build --stamp --workspace_status_command=tools/toolchain_status.sh
 # Memory bounding is Τ·mem: each pk_calc declares a resource_set (the learned mem.json bucket via
 # the bib generator's ladder), and Bazel's local scheduler bounds concurrent sweeps against
 # --local_ram_resources (default HOST_RAM*.67) — no rc pool needed.  The old --local_extra_resources

@@ -31,18 +31,18 @@ def _entries(content):
     sib = ""        # for a result:<sibling> check — the sibling it definitionally reads
     reads = []
     rests = []      # rests-on: the premise claims this one is grounded on (Ζ·compose deps)
-    loc = ""        # Ζ·tier — per-warrant `local = {true}`: this check runs on the host, gated but not swept
+    tier = ""       # Ζ·tier — per-warrant `tier = {sandbox|local|toolchain}` ("" = inherit the project default)
     for raw in content.splitlines():
         s = raw.strip()
         if s.startswith("@") and "{" in s:
             if key != None:
-                out.append((key, check, sib, reads, rests, loc))
+                out.append((key, check, sib, reads, rests, tier))
             key = s.split("{", 1)[1].split(",", 1)[0].strip()
             check = ""
             sib = ""
             reads = []
             rests = []
-            loc = ""
+            tier = ""
         elif key != None and "=" in s:
             name = s.split("=", 1)[0].strip()
             if name == "check":
@@ -55,10 +55,10 @@ def _entries(content):
             elif name == "rests-on" and "{" in s and "}" in s:
                 inner = s.split("{", 1)[1].rsplit("}", 1)[0]
                 rests = [t.strip() for t in inner.split(",") if t.strip()]
-            elif name == "local" and "{" in s and "}" in s:
-                loc = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
+            elif name == "tier" and "{" in s and "}" in s:
+                tier = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
     if key != None:
-        out.append((key, check, sib, reads, rests, loc))
+        out.append((key, check, sib, reads, rests, tier))
     return out
 
 def _data(tokens, files, imports = [], engine = True):
@@ -135,19 +135,21 @@ def _body(check, custom):
         return custom[typ].replace("{target}", target)
     return None
 
-def _verb_rule(name, check, proj, files, reads, custom, local, imports = []):
+def _verb_rule(name, check, proj, files, reads, custom, tier, imports = []):
     """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
     script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd (the exit-code
-    oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `local` marks
-    a host-coupled project (setup): pk_cmd runs on the host, unsandboxed (Ζ·resist)."""
+    oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `tier` is the
+    warrant's enforcement tier (Ζ·tier): sandbox (hermetic, swept) | local (host-coupled, uncached) |
+    toolchain (host toolchain, cached + stamped with the toolchain fingerprint).  Only pk_cmd carries
+    a tier (the others are always hermetic-sandbox records)."""
     i = check.find(":")
     typ = check[:i]
     target = check[i + 1:]
     dl = ", ".join([_lit(d) for d in _data(reads, files, imports)])
     pj = "" if proj == "." else ", project = " + _lit(proj)
-    lc = ", local = True" if local else ""
+    tc = "" if tier == "sandbox" else ", tier = " + _lit(tier)
     if typ == "cmd":
-        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + lc + ", data = [" + dl + "])"
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + tc + ", data = [" + dl + "])"
     elif typ == "file":
         return "pk_file(name = " + _lit(name) + ", path = " + _lit(target) + ", data = [" + dl + "])"
     elif typ == "result":   # records-as-deps: depend on the sibling's aggregate verdict record
@@ -157,7 +159,7 @@ def _verb_rule(name, check, proj, files, reads, custom, local, imports = []):
         return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "])"
     elif typ in custom:     # a config-declared cmd template — {target} substituted, run as a cmd oracle
         cmd = custom[typ].replace("{target}", target)
-        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + lc + ", data = [" + dl + "])"
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + tc + ", data = [" + dl + "])"
     else:
         fail("Ζ·verb·wire: check type '" + typ + ":' is neither builtin nor a [checks." + typ +
              "] template — claim '" + name + "'")
@@ -286,10 +288,11 @@ def _bib_repo_impl(repository_ctx):
     bibp = repository_ctx.path(repository_ctx.attr.bib)
     proj = repository_ctx.attr.project
     files = "@@//:files" if proj == "." else "@@//%s:files" % proj
-    # Ζ·tier — the project `local` attr is now the DEFAULT enforcement tier for a warrant that does not
-    # declare its own `local = {true}`.  A warrant's effective tier `wlocal` is computed per-loop below:
-    # `local` (host-run, gated but not swept) if the warrant declares it, else this project default.
-    proj_local = repository_ctx.attr.local
+    # Ζ·tier — the project `tier` attr is the DEFAULT enforcement tier for a warrant that does not
+    # declare its own `tier = {…}`.  A warrant's effective tier is `wt` = its own `tier` or this default:
+    #   sandbox (hermetic, cached, mutation-SWEPT) | local (host-coupled, uncached — setup) |
+    #   toolchain (host toolchain, cached + stamped).  Only `sandbox` is swept and footprint-audited.
+    proj_tier = repository_ctx.attr.tier
 
     # Custom check types AND the project's WARRANTS LIST both come from paper.toml (watched, so an
     # edit re-fetches).  Multi-bib composition is the same thing project.py does over `warrants`
@@ -328,14 +331,13 @@ def _bib_repo_impl(repository_ctx):
         repository_ctx.watch(wp)
         parsed = parsed + _entries(repository_ctx.read(wp))
 
-    # Ζ·tier — a project is all-local iff EVERY checked warrant runs on the host (either it declares
-    # `local = {true}` or the project default is local and it does not override to sandbox).  The
-    # footprint audit (which needs the host per host-coupled warrant) is emitted iff SOME warrant is
-    # sandbox — so its symbols load iff `not all_local`.
-    all_local = True
-    for _pk, _pc, _ps, _pr, _prr, _pl in parsed:
-        if _pc and not ((_pl == "true") if _pl else proj_local):
-            all_local = False
+    # Ζ·tier — a project is all-HOST iff EVERY checked warrant runs on the host (its effective tier is
+    # local or toolchain, never sandbox).  The footprint audit (a per-sandbox-warrant declare-vs-strace
+    # cross-check) is emitted iff SOME warrant is sandbox — so its symbols load iff `not all_host`.
+    all_host = True
+    for _pk, _pc, _ps, _pr, _prr, _pt in parsed:
+        if _pc and ((_pt if _pt else proj_tier) == "sandbox"):
+            all_host = False
             break
 
     # Τ·mem·learn — the per-project learned reservation manifest (a projection of observed peaks,
@@ -352,7 +354,7 @@ def _bib_repo_impl(repository_ctx):
     syms = []
     if repository_ctx.attr.adequacy:
         syms += ["pk_adequacy", "pk_grade_claim"]
-    if not all_local:                   # Ζ·foot·act — the footprint audit (emitted iff some warrant is sandbox)
+    if not all_host:                    # Ζ·foot·act — the footprint audit (emitted iff some warrant is sandbox)
         syms += ["pk_footaudit", "pk_footprint"]
     if syms:
         out.append("load(\"@@//tools:grade.bzl\", " + ", ".join([_lit(s) for s in sorted(syms)]) + ")")
@@ -410,14 +412,14 @@ def _bib_repo_impl(repository_ctx):
     imported_cert = {}   # Λ·witness — k → the owner library's __dcalc cert label (a concept: import edge)
     owns = repository_ctx.attr.owns_concepts
     vis = ', visibility = ["//visibility:public"]'  # the owner EXPORTS per-concept records for views to import
-    for k, check, sib, reads, rests, loc in parsed:
+    for k, check, sib, reads, rests, tier in parsed:
         if not check:
             continue
-        # Ζ·tier — the warrant's effective enforcement tier: `local` (host-run, gated but NOT
-        # mutation-swept — a toolchain-coupled check the hermetic sweep cannot run) if it declares
-        # `local = {true}`, else the project default.  A local warrant takes the `else` verb-rule
-        # branch (so it is gated, in gate_rec) and never the sweep branch below.
-        wlocal = (loc == "true") if loc else proj_local
+        # Ζ·tier — the warrant's effective tier: its own `tier = {…}`, else the project default.  A
+        # NON-sandbox warrant (local or toolchain) runs on the host and takes the `else` verb-rule
+        # branch (so it is gated, in gate_rec) and never the hermetic sweep branch below — the sweep
+        # mutates engine bytecode in the sandbox, which a host-run check cannot use.
+        wt = tier if tier else proj_tier
         if check.startswith("concept:"):
             # Λ·witness — a concept: check IMPORTS a concept authored + GRADED once in the library.  The
             # VERDICT is the library's per-concept verdict record (pk_result, records-as-deps, like
@@ -439,10 +441,10 @@ def _bib_repo_impl(repository_ctx):
             imported_cert[k] = "@paperkit_library//:" + key + "__dcalc"
             recs.append('":%s"' % k)
             continue
-        if calc and not wlocal and _body(check, custom) != None:
+        if calc and wt == "sandbox" and _body(check, custom) != None:
             # Ζ·calc·interp — ONE cached sweep (pk_calc) feeds the verdict reading here (and the grade
             # reading below); the redundant verdict run + the adequacy re-sweep collapse into it.
-            # Ζ·tier — a `local` warrant is excluded (the `and not wlocal`): the sweep is hermetic
+            # Ζ·tier — only a SANDBOX warrant is swept (the `wt == "sandbox"`): the sweep is hermetic
             # (calc.bzl has no host-escape), so a host-coupled check cannot be mutation-swept; it falls
             # to the `else` verb-rule branch and is GATED but not graded.
             dl = ", ".join([_lit(d) for d in _data(reads, files, imports)])
@@ -529,7 +531,7 @@ def _bib_repo_impl(repository_ctx):
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
                            str(_membucket(mem, k, "def")) + ", data = [" + dl + "]" + (vis if owns else "") + ")")
         else:
-            out.append(_verb_rule(k, check, proj, files, reads, custom, wlocal, imports))
+            out.append(_verb_rule(k, check, proj, files, reads, custom, wt, imports))
         recs.append('":%s"' % k)
 
     if calc_claims:
@@ -558,9 +560,9 @@ def _bib_repo_impl(repository_ctx):
                    'visibility = ["//visibility:public"])')
 
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an irreducibly
-    # GENERAL oracle, kept as a cmd: drop (Ζ·resist).  It runs local iff the PROJECT default is local
-    # (a whole-bib oracle has no single warrant's tier).
-    lc = ", local = True" if proj_local else ""
+    # GENERAL oracle, kept as a cmd: drop (Ζ·resist).  It runs at the PROJECT default tier (a whole-bib
+    # oracle has no single warrant's tier); it is pure engine, so sandbox for most projects.
+    lc = "" if proj_tier == "sandbox" else ", tier = " + _lit(proj_tier)
     inv = "\"$(command -v python3)\" paperkit/gate.py --invariants --safe --without-K " + proj
     out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + "".join([", " + _lit(i) for i in imports]) + ', "@@//paperkit:engine"])')
     recs.append('":invariants"')
@@ -575,15 +577,15 @@ def _bib_repo_impl(repository_ctx):
         # pk_adequacy; the assert-test puts it in //:hook.  (The old discriminate.py sweep sh_test
         # is retired; discriminate.py stays as the per-claim grade ORACLE behind pk_grade_claim.)
         grades = []
-        for k, check, sib, reads, rests, loc in parsed:
+        for k, check, sib, reads, rests, tier in parsed:
             if not check:
                 continue
-            # Ζ·tier — a `local` warrant is GATED but not GRADED: the adequacy sweep (a hermetic
-            # mutation grade) cannot soundly grade a host-coupled check, so it is excluded from the
-            # adequacy record entirely (it is not in calc_claims, and file-resolution grading its
-            # source under the sandbox would be the same unsoundness).  Its verdict still gates via
+            # Ζ·tier — a NON-sandbox warrant (local or toolchain) is GATED but not GRADED: the adequacy
+            # sweep (a hermetic mutation grade) cannot soundly grade a host-run check, so it is excluded
+            # from the adequacy record entirely (it is not in calc_claims, and file-resolution grading
+            # its source under the sandbox would be the same unsoundness).  Its verdict still gates via
             # gate_rec above; adequacy asserts falsifiability only over the sandbox subset.
-            if ((loc == "true") if loc else proj_local):
+            if (tier if tier else proj_tier) != "sandbox":
                 continue
             if k in imported_cert:
                 # Λ·witness — grade = the IMPORTED library certificate, read via read_grade → behavioral
@@ -623,10 +625,10 @@ def _bib_repo_impl(repository_ctx):
     # (not in //:hook).  Ζ·tier — a `local` (host-coupled) WARRANT's footprint needs the host, so it
     # is skipped per-warrant; the audit is still emitted for a project with ANY sandbox warrant.
     foots = []
-    for k, check, sib, reads, rests, loc in parsed:
+    for k, check, sib, reads, rests, tier in parsed:
         if not check or sib or check.startswith("concept:"):  # result:/concept: are import edges — no local footprint
             continue
-        if ((loc == "true") if loc else proj_local):
+        if (tier if tier else proj_tier) != "sandbox":   # a host-run warrant's footprint needs the host
             continue
         out.append("pk_footprint(name = " + _lit(k + "__foot") + ", claim = " + _lit(k) +
                    ", project = " + _lit(proj) + ", data = [" + _ALL_DATA + "])")
@@ -638,10 +640,10 @@ def _bib_repo_impl(repository_ctx):
         # Ζ·compose — each claim's WITNESS as a build artifact; rests-on as build DEPS (the grounding
         # DAG IS the build DAG).  `bazel build //<proj>:proof` builds every witness — build-success =
         # proven, and an unproven premise blocks every claim resting on it.  On-demand (not //:hook yet).
-        checked = {k: True for k, check, sib, reads, rests, loc in parsed if check}
+        checked = {k: True for k, check, sib, reads, rests, tier in parsed if check}
         wits = []
         pj = "" if proj == "." else ", project = " + _lit(proj)
-        for k, check, sib, reads, rests, loc in parsed:
+        for k, check, sib, reads, rests, tier in parsed:
             if not check:
                 continue
             prem = ['":%s__witness"' % r for r in rests if r in checked]
@@ -667,7 +669,7 @@ bib_repo = repository_rule(
         "bib": attr.label(mandatory = True, allow_single_file = True),
         "project": attr.string(mandatory = True),
         "adequacy": attr.bool(default = False),
-        "local": attr.bool(default = False),  # Ζ·resist: host-coupled project (setup) — pk_cmd runs on the host
+        "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),  # Ζ·tier: the PROJECT-default enforcement tier for warrants that don't override
         "compose": attr.bool(default = False),  # Ζ·compose: project the witness DAG (rests-on as build deps) + :proof
         "calc": attr.bool(default = False),  # Ζ·calc·interp: one cached pk_calc per claim → verdict + grade readings
         "emerge": attr.bool(default = False),  # Ζ·emerge·gate: a def-calc per claim + pk_cohere (∂² faces in //:hook)
@@ -685,7 +687,7 @@ def _bib_ext_impl(module_ctx):
     sites = _surface(module_ctx, core)
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, local = tag.local, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [])
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [])
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -695,7 +697,7 @@ bib = module_extension(
             "bib": attr.label(mandatory = True),
             "project": attr.string(mandatory = True),
             "adequacy": attr.bool(default = False),
-            "local": attr.bool(default = False),
+            "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
             "compose": attr.bool(default = False),
             "calc": attr.bool(default = False),
             "emerge": attr.bool(default = False),

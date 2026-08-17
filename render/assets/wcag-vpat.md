@@ -18,7 +18,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content | Supports | rnd-math-alt entails this (farm) |
+| 1.1.1 Non-text Content | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -36,7 +36,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 2.4.1 Bypass Blocks | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.2 Page Titled | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.4 Link Purpose (In Context) | Supports | rnd-link-alt entails this (farm) |
+| 2.4.4 Link Purpose (In Context) | Partially Supports | rnd-link-alt proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
 | 2.5.1 Pointer Gestures | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.2 Pointer Cancellation | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.3 Label in Name | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -48,7 +48,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 3.3.1 Error Identification | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.3.2 Labels or Instructions | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.3.7 Redundant Entry | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 4.1.2 Name, Role, Value | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires structure-element roles (name, role, value) in the tag tree) |
+| 4.1.2 Name, Role, Value | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 
 ### Table 2: Success Criteria, Level AA
 
@@ -121,7 +121,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content (A) | Supports | rnd-math-alt entails this (farm) |
+| 1.1.1 Non-text Content (A) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
 | 1.2.1 Audio-only and Video-only (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -143,7 +143,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 | 2.4.1 Bypass Blocks (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.2 Page Titled (A) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
 | 2.4.3 Focus Order (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.4 Link Purpose (In Context) (A) | Supports | rnd-link-alt entails this (farm) |
+| 2.4.4 Link Purpose (In Context) (A) | Partially Supports | rnd-link-alt proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
 | 2.4.5 Multiple Ways (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.6 Headings and Labels (AA) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires headings in the structure tree (headings and labels)) |
 | 2.4.7 Focus Visible (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -157,7 +157,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 | 3.3.2 Labels or Instructions (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.3.3 Error Suggestion (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.3.4 Error Prevention (Legal, Financial, Data) (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 4.1.2 Name, Role, Value (A) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires structure-element roles (name, role, value) in the tag tree) |
+| 4.1.2 Name, Role, Value (A) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 
 ## EN 301 549 V3.2.1 Report (Chapter 10, Non-web Documents)
 
@@ -165,7 +165,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 
 | EN Clause | Criteria | Status | Remarks and Explanations |
 | --- | --- | --- | --- |
-| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-math-alt entails this (farm) |
+| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
 | 10.1.2.1 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.2 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.3 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -210,7 +210,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.2.4.1 | 2.4.1 Bypass Blocks | Void | not applicable to non-web documents per EN |
 | 10.2.4.2 | 2.4.2 Page Titled | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
 | 10.2.4.3 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 10.2.4.4 | 2.4.4 Link Purpose (In Context) | Supports | rnd-link-alt entails this (farm) |
+| 10.2.4.4 | 2.4.4 Link Purpose (In Context) | Partially Supports | rnd-link-alt proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
 | 10.2.4.5 | 2.4.5 Multiple Ways | Void | not applicable to non-web documents per EN |
 | 10.2.4.6 | 2.4.6 Headings and Labels | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires headings in the structure tree (headings and labels)) |
 | 10.2.4.7 | 2.4.7 Focus Visible | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -249,7 +249,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | — | 3.3.7 Redundant Entry | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
 | — | 3.3.8 Accessible Authentication (Minimum) | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
 | — | 3.3.9 Accessible Authentication (Enhanced) | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
-| 10.4.1.2 | 4.1.2 Name, Role, Value | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires structure-element roles (name, role, value) in the tag tree) |
+| 10.4.1.2 | 4.1.2 Name, Role, Value | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 10.4.1.3 | 4.1.3 Status Messages | Not Applicable | does not apply to a static, non-interactive print PDF |
 
 ## Sources
@@ -285,7 +285,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 1.3.1 Info and Relationships | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a tagged structure tree encoding info and relationships) |
 | 1.3.2 Meaningful Sequence | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a correct reading order in the tag tree (meaningful sequence)) |
 | 1.3.3 Sensory Characteristics | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
-| 1.4.1 Use of Color | Supports | rnd-ruler entails this (farm) |
+| 1.4.1 Use of Color | Partially Supports | rnd-ruler proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
 | 1.4.2 Audio Control | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.1.1 Keyboard | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.1.2 No Keyboard Trap | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -308,7 +308,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 3.3.1 Error Identification | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.3.2 Labels or Instructions | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.3.7 Redundant Entry | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 4.1.2 Name, Role, Value | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires structure-element roles (name, role, value) in the tag tree) |
+| 4.1.2 Name, Role, Value | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 
 ### Table 2: Success Criteria, Level AA
 
@@ -390,7 +390,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 | 1.3.1 Info and Relationships (A) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a tagged structure tree encoding info and relationships) |
 | 1.3.2 Meaningful Sequence (A) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a correct reading order in the tag tree (meaningful sequence)) |
 | 1.3.3 Sensory Characteristics (A) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
-| 1.4.1 Use of Color (A) | Supports | rnd-ruler entails this (farm) |
+| 1.4.1 Use of Color (A) | Partially Supports | rnd-ruler proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
 | 1.4.2 Audio Control (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.4.3 Contrast (Minimum) (AA) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 1.4.4 Resize Text (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -417,7 +417,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 | 3.3.2 Labels or Instructions (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.3.3 Error Suggestion (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.3.4 Error Prevention (Legal, Financial, Data) (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 4.1.2 Name, Role, Value (A) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires structure-element roles (name, role, value) in the tag tree) |
+| 4.1.2 Name, Role, Value (A) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 
 ## EN 301 549 V3.2.1 Report (Chapter 10, Non-web Documents)
 
@@ -441,7 +441,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.1.3.4 | 1.3.4 Orientation | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.3.5 | 1.3.5 Identify Input Purpose | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.3.6 | 1.3.6 Identify Purpose | Void | not applicable to non-web documents per EN |
-| 10.1.4.1 | 1.4.1 Use of Color | Supports | rnd-ruler entails this (farm) |
+| 10.1.4.1 | 1.4.1 Use of Color | Partially Supports | rnd-ruler proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
 | 10.1.4.2 | 1.4.2 Audio Control | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.4.3 | 1.4.3 Contrast (Minimum) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 10.1.4.4 | 1.4.4 Resize Text | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -509,7 +509,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | — | 3.3.7 Redundant Entry | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
 | — | 3.3.8 Accessible Authentication (Minimum) | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
 | — | 3.3.9 Accessible Authentication (Enhanced) | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
-| 10.4.1.2 | 4.1.2 Name, Role, Value | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires structure-element roles (name, role, value) in the tag tree) |
+| 10.4.1.2 | 4.1.2 Name, Role, Value | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 10.4.1.3 | 4.1.3 Status Messages | Not Applicable | does not apply to a static, non-interactive print PDF |
 
 ## Sources

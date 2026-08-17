@@ -44,17 +44,29 @@ import wcag_model as wm
 # The route → its final delivered format (matrix format names) + PDF/UA version.
 ROUTE_FINAL = {"docx": ("pdf-office", "UA-1"), "latex": ("pdf-latex", "UA-2")}
 
-# Per-warrant ENTAILMENT FORM.  "farm" = a ⟨P,F,δ⟩ selftest proves the violation is caught (verified
-# by running it); "oracle" = the check delegates to veraPDF (the PDF/UA validator, authoritative).
+# Per-warrant ENTAILMENT: (form, cmd, scope).
+#   form  — "farm" (a ⟨P,F,δ⟩ selftest proves the violation is caught, verified by running it) or
+#           "oracle" (the check delegates to veraPDF, the PDF/UA validator, authoritative).
+#   cmd   — the selftest command for a farm (None for an oracle).
+#   scope — "full" (the warrant entails the WHOLE criterion) or "fragment" (it entails only a
+#           SUB-PART of the criterion — a table-scoped check does not cover document-wide colour use;
+#           a formula-alt check does not cover figures).  A FRAGMENT can only ever yield "Partially
+#           Supports", NEVER "Supports": a warrant that proves a sub-part of an SC does not entail the
+#           SC, and claiming it does is the naming-not-entailment gap this whole layer exists to close.
+#           (The adversary caught three such fragment-as-full overclaims; scope is the fix.)
 # A warrant not listed here has NO proven entailment → its cells cannot yield "Supports".
 ENTAILMENT = {
-    "rnd-ruler":     ("farm",   ["python3", "checks/ruler.py"]),          # 1.4.1 producing (nicematrix rules)
-    "rnd-colour":    ("farm",   ["python3", "checks/use_of_colour.py"]),  # 1.4.1 verifying (weight cue)
-    "rnd-math-alt":  ("farm",   ["python3", "checks/mathalt.py", "--selftest"]),
-    "rnd-link-alt":  ("farm",   ["python3", "checks/linkalt.py", "--selftest"]),
-    "rnd-widen":     ("farm",   ["python3", "checks/widen_tables.py", "--selftest"]),
-    "rnd-a11y":      ("oracle", None),   # a11y_own.py → veraPDF UA-1 zero-fail (the PDF/UA validator)
-    "rnd-a11y-latex":("oracle", None),   # a11y_latex.py → veraPDF UA-2 zero-fail
+    # ruler + use-of-colour prove 1.4.1 only within TABLES; 1.4.1 is document-wide → fragment.
+    "rnd-ruler":     ("farm",   ["python3", "checks/ruler.py"],                    "fragment"),
+    "rnd-colour":    ("farm",   ["python3", "checks/use_of_colour.py"],            "fragment"),
+    # math-alt proves alt text for FORMULAS only; 1.1.1 covers all non-text (figures too) → fragment.
+    "rnd-math-alt":  ("farm",   ["python3", "checks/mathalt.py", "--selftest"],    "fragment"),
+    # link-alt proves a /Contents STRING exists; 2.4.4 needs the PURPOSE determinable → fragment.
+    "rnd-link-alt":  ("farm",   ["python3", "checks/linkalt.py", "--selftest"],    "fragment"),
+    "rnd-widen":     ("farm",   ["python3", "checks/widen_tables.py", "--selftest"], "full"),
+    # the veraPDF oracle validates the WHOLE deliverable against PDF/UA → full for the SCs UA covers.
+    "rnd-a11y":      ("oracle", None,                                              "full"),
+    "rnd-a11y-latex":("oracle", None,                                              "full"),
     # rnd-wf / rnd-fidelity / rnd-fig-legible / rnd-fig-vector validate against the real artifact but
     # carry no synthetic F-arm and are not the UA oracle; their SCs are entailed (if at all) through
     # the PDF/UA oracle below, not through these warrants directly.  Left UNPROVEN here on purpose.
@@ -71,7 +83,11 @@ PDFUA_TO_WCAG = {
     "2.4.2": "UA requires a document title (and the viewer to display it)",
     "2.4.6": "UA requires headings in the structure tree (headings and labels)",
     "3.1.1": "UA requires the document's primary language to be set",
-    "4.1.2": "UA requires structure-element roles (name, role, value) in the tag tree",
+    # 4.1.2 Name, Role, Value is DELIBERATELY OMITTED.  UA tags STATIC structure roles, but 4.1.2
+    # normatively covers the name/role/VALUE and change-notification of interactive components; the
+    # paper's citation links are interactive annotations, and a tagged role does not establish their
+    # name/value are exposed.  The ISO-14289 → 4.1.2 correspondence is plausible-but-incomplete on that
+    # surface, so it is not claimed here (conservative — the adversary flagged it UNCERTAIN).
 }
 _UA_SOURCE = ("ISO 14289 (PDF/UA) tagging requirements ↔ WCAG, per the PDF/UA-WCAG correspondence "
               "(Matterhorn Protocol / PDF Association guidance); only the directly-established "
@@ -99,9 +115,18 @@ NOT_APPLICABLE = {
 }
 
 
+# PDF/UA clause numbers a capability may carry (matrix.py tags e.g. 7.7 math, 7.18 links) → the WCAG
+# SC that clause SATISFIES.  This is a bridge like PDFUA_TO_WCAG but for a DIRECT warrant (not the UA
+# oracle): a clause-tagged warrant entails its WCAG SC only to the extent the warrant proves — the
+# scope in ENTAILMENT decides full vs fragment, so a link-alt warrant tagged 7.18 maps to 2.4.4 but,
+# being scope="fragment", can only yield Partially Supports (proving a /Contents exists ≠ purpose).
+CLAUSE_TO_WCAG = {"7.7": "1.1.1", "7.18": "2.4.4"}
+
+
 def _warrants_tagging(sc: str, fmt: str) -> list:
     """Warrants whose matrix cell (afforded native/post on `fmt`) tags this SC — directly via the
-    capability's wcag clause, or via PDFUA_TO_WCAG when the capability is pdf-ua."""
+    capability's wcag clause, via a PDF/UA clause (CLAUSE_TO_WCAG), or via the UA oracle
+    (PDFUA_TO_WCAG when the capability is pdf-ua)."""
     out = []
     for cap, spec in matrix.CAPABILITIES.items():
         st, warrant = spec["cells"].get(fmt, (None, None))
@@ -110,10 +135,16 @@ def _warrants_tagging(sc: str, fmt: str) -> list:
         tag = spec.get("wcag", "")
         direct = (tag == sc)
         via_ua = (cap == "pdf-ua" and sc in PDFUA_TO_WCAG)
-        via_clause = (tag == "7.7" and sc == "1.1.1") or (tag == "7.18" and sc == "2.4.4")
+        via_clause = (CLAUSE_TO_WCAG.get(tag) == sc)
         if direct or via_ua or via_clause:
             out.append(warrant)
     return out
+
+
+def _scope(warrant: str) -> str:
+    """A warrant's entailment scope: 'full' (entails the whole SC) or 'fragment' (a sub-part only)."""
+    e = ENTAILMENT.get(warrant)
+    return e[2] if e else "fragment"
 
 
 def _proven(warrant: str, run_farm: bool) -> str | None:
@@ -123,7 +154,7 @@ def _proven(warrant: str, run_farm: bool) -> str | None:
     form = ENTAILMENT.get(warrant)
     if form is None:
         return None
-    kind, cmd = form
+    kind, cmd, _scope_ = form
     if kind == "oracle":
         return "oracle"
     if kind == "farm":
@@ -136,21 +167,29 @@ def _proven(warrant: str, run_farm: bool) -> str | None:
 
 
 def entail(sc: str, route: str, run_farm: bool = False) -> dict:
-    """The entailment verdict for one SC on one route.  Conservative: Supports only with a proven
-    entailing warrant; else Partially / Does Not Support / Not Applicable / Not Evaluated."""
+    """The entailment verdict for one SC on one route.  Conservative: Supports only when a proven
+    warrant entails the WHOLE criterion; a warrant that proves only a FRAGMENT of the criterion yields
+    Partially Supports, never Supports (proving a sub-part does not entail the SC).  Else Partially /
+    Does Not Support / Not Applicable."""
     fmt, _ua = ROUTE_FINAL[route]
     if sc in NOT_APPLICABLE:
         return {"verdict": "Not Applicable", "warrant": None, "form": None,
                 "remark": "does not apply to a static, non-interactive print PDF"}
     warrants = _warrants_tagging(sc, fmt)
-    # a proven entailing warrant → Supports
-    for w in warrants:
-        form = _proven(w, run_farm)
-        if form:
+    # a proven, FULL-scope warrant → Supports.  Scan for one before settling for a fragment.
+    full = [(w, _proven(w, run_farm)) for w in warrants]
+    for w, form in full:
+        if form and _scope(w) == "full":
             via = f" (via PDF/UA: {PDFUA_TO_WCAG[sc]})" if sc in PDFUA_TO_WCAG and w in ("rnd-a11y", "rnd-a11y-latex") else ""
             return {"verdict": "Supports", "warrant": w, "form": form,
                     "remark": f"{w} entails this ({form}){via}"}
-    # tagged but the entailment is a "post"/"excepted" partial (a warrant is present but not proven full)
+    # a proven FRAGMENT-scope warrant → Partially Supports (it proves a sub-part, not the whole SC).
+    for w, form in full:
+        if form and _scope(w) == "fragment":
+            return {"verdict": "Partially Supports", "warrant": w, "form": form,
+                    "remark": f"{w} proves only part of this criterion (a table/formula/annotation "
+                              f"sub-part), not the whole — a full claim needs document-wide coverage"}
+    # tagged but no proven entailment (a "post"/"excepted" cell present but unproven) → Partially.
     if warrants:
         return {"verdict": "Partially Supports", "warrant": warrants[0], "form": None,
                 "remark": f"{warrants[0]} addresses this but its entailment is not proven for a full claim"}
@@ -166,13 +205,13 @@ def check() -> tuple[bool, list[str]]:
     problems = []
     # the entailment registry must name real warrants (in warrants.bib) and real check commands.
     bib = (Path(__file__).resolve().parent.parent / "warrants.bib").read_text()
-    for w, (kind, cmd) in ENTAILMENT.items():
+    for w, (kind, cmd, _sc) in ENTAILMENT.items():
         if f"@misc{{{w}," not in bib and f"@misc{{{w} ," not in bib:
             problems.append(f"entailment names warrant {w!r} absent from warrants.bib")
         if kind not in ("farm", "oracle"):
             problems.append(f"{w}: entailment form {kind!r} is not farm/oracle")
     # every farm warrant's selftest must PASS (a Supports backed by a red F-arm is a false claim).
-    for w, (kind, cmd) in ENTAILMENT.items():
+    for w, (kind, cmd, _sc) in ENTAILMENT.items():
         if kind == "farm":
             rc = subprocess.run(cmd, capture_output=True,
                                 cwd=Path(__file__).resolve().parent.parent).returncode

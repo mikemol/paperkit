@@ -7,7 +7,7 @@ of the law rather than a hand-guessed one.  Three standards, three DIFFERENT WCA
 version skew is load-bearing and modeled explicitly, because a criterion in scope for one standard is
 out of scope for another BY VERSION, not by choice, and a conformance claim must say so:
 
-  WCAG 2.2            (W3C Recommendation, 2024-12-12) — 87 success criteria, the report's own baseline.
+  WCAG 2.2            (W3C Recommendation, 2024-12-12) — 86 success criteria, the report's own baseline.
   Revised Section 508 (US, 2017, 36 CFR Part 1194)    — incorporates WCAG 2.0 Level A+AA by reference.
   EN 301 549 V3.2.1   (ETSI, 2021-03)                 — Chapter 10 (non-web docs) references WCAG 2.1.
 
@@ -25,7 +25,7 @@ flagged gap):
     inferred.
 
     python3 checks/wcag_model.py            # print the standards model (counts + skew)
-    python3 checks/wcag_model.py --check     # completeness: 87 SCs, 32/24/31 by level, mappings sourced
+    python3 checks/wcag_model.py --check     # completeness: 86 SCs, 31/24/31 by level, mappings sourced
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ SOURCES = {
 # The WCAG version each standard references (the skew — a criterion is out of scope BY VERSION).
 STANDARD_WCAG_VERSION = {"WCAG22": "2.2", "508": "2.0", "EN301549": "2.1"}
 
-# The 87 WCAG 2.2 success criteria: number → (name, level).  4.1.1 Parsing was REMOVED in 2.2 and is
+# The 86 WCAG 2.2 success criteria: number → (name, level).  4.1.1 Parsing was REMOVED in 2.2 and is
 # absent by construction.  Transcribed from the W3C Recommendation (SOURCES["WCAG22"]).
 SC = {
     "1.1.1": ("Non-text Content", "A"),
@@ -199,7 +199,7 @@ def counts() -> dict:
 def check() -> tuple[bool, list[str]]:
     """Completeness + internal consistency of the model, against the published counts.  A missing or
     extra SC would make a conformance report claim it evaluated a set it did not — so the count is
-    gated against the W3C Recommendation's own totals (32 A + 24 AA + 31 AAA = 87)."""
+    gated against the W3C Recommendation's own totals (31 A + 24 AA + 31 AAA = 86)."""
     problems = []
     c = counts()
     # WCAG 2.2 as PUBLISHED = 86 criteria, DERIVED and checkable: WCAG 2.1 has 78 SCs; 2.2 adds the 9

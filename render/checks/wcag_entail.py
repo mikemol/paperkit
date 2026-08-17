@@ -114,9 +114,21 @@ ENTAILMENT = {
 # order CORRECT against the visual sequence), UA establishes valid MACHINERY but not the full criterion
 # → "fragment" (→ Partially Supports).  The adversary drove this per-SC distinction.
 PDFUA_TO_WCAG = {
-    # presence/absence facts veraPDF checks directly → full
-    "1.1.1": ("full", "UA requires (and veraPDF checks) alternate text / MathML on non-text content"),
-    "2.4.2": ("full", "UA requires (and veraPDF checks) a document title and DisplayDocTitle"),
+    # presence/absence facts veraPDF checks directly.  1.1.1 is ROUTE-DEPENDENT (a per-route scope dict,
+    # resolved by _eff_scope): veraPDF confirms /Alt is PRESENT on both routes, but presence is not
+    # equivalence.  On the docx route the math /Alt is the RAW LATEX SOURCE (mathalt.py stamps
+    # `\mathrm{fp}(c)\cap\mathrm{fp}(d)=\emptyset`) — a screen reader speaks it token-by-token, NOT the
+    # "equivalent purpose" 1.1.1 requires → fragment.  On the latex route the math is a tagged Formula
+    # with an ASSOCIATED MathML file (/AF) — recoverable structure a screen reader reads (latex.py) →
+    # full.  The adversary caught the docx-route overclaim; the route split is the fix.
+    "1.1.1": ({"docx": "fragment", "latex": "full"},
+              "veraPDF confirms /Alt PRESENT; on docx it is the raw-LaTeX source (not an equivalent a "
+              "screen reader can speak) → fragment, on latex it is recoverable MathML (/AF) → full"),
+    # 2.4.2 is presence-not-completeness like 1.3.1/2.4.6: veraPDF checks a title EXISTS (+ DisplayDocTitle),
+    # NOT that it DESCRIBES topic or purpose (the SC's actual bar) — a generic "Untitled" passes veraPDF
+    # yet fails 2.4.2.  So UA establishes the machinery, not the criterion → fragment (the adversary's find).
+    "2.4.2": ("fragment", "UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it "
+                          "DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness"),
     "3.1.1": ("full", "UA requires (and veraPDF checks) the document's primary language be set"),
     # valid tagging MACHINERY, but completeness-against-layout is a human checkpoint → fragment
     "1.3.1": ("fragment", "UA validates the structure tree, but veraPDF cannot confirm EVERY visual "
@@ -244,6 +256,9 @@ def entail(sc: str, route: str, run_farm: bool = False) -> dict:
         full, some fragment); otherwise the warrant's own scope."""
         if w in ("rnd-a11y", "rnd-a11y-latex") and sc in PDFUA_TO_WCAG:
             sc_scope, why = PDFUA_TO_WCAG[sc]
+            # a route-dependent SC (1.1.1) carries a {route: scope} dict; resolve it for THIS route.
+            if isinstance(sc_scope, dict):
+                sc_scope = sc_scope.get(route, "fragment")   # unknown route → conservative fragment
             return sc_scope, f"{w} (veraPDF): {why}"
         return _scope(w), f"{w} entails this"
 
@@ -331,11 +346,11 @@ def _selftest() -> int:
     """⟨P, F, δ⟩ for Ρ·wcag·oracle-edge — the oracle Supports is admissible ONLY when the CONSUMED
     veraPDF record reads pass; a fail record drops it (the false-green the adversary found, closed).
     Stubs _CONSUMED in-memory (no bazel, no 37s veraPDF), so it gates the record-consumption logic
-    cheaply.  δ = the consumed record's verdict (pass vs fail) flips 1.1.1 between Supports and not."""
+    cheaply.  δ = the consumed record's verdict (pass vs fail) flips 3.1.1 (a full UA-bridge SC — /Lang presence IS its bar) between Supports and not."""
     import tempfile
     fails = []
 
-    def _with_record(verdict: str, sc: str = "1.1.1", route: str = "docx") -> str:
+    def _with_record(verdict: str, sc: str = "3.1.1", route: str = "docx") -> str:
         with tempfile.TemporaryDirectory() as d:
             for w in ("rnd-a11y", "rnd-a11y-latex"):
                 p = Path(d) / f"{w}.verdict.json"
@@ -353,26 +368,26 @@ def _selftest() -> int:
             fails.append(desc)
 
     print("Ρ·wcag·oracle-edge — the oracle Supports is proof-backed by the consumed record\n")
-    # P: a consumed record that reads PASS backs the full Supports (1.1.1 is a full UA-bridge SC).
-    check("consumed record = pass → 1.1.1 Supports (reads the cached veraPDF, no re-run)",
+    # P: a consumed record that reads PASS backs a full Supports (3.1.1 = /Lang presence, a full UA-bridge SC).
+    check("consumed record = pass → 3.1.1 Supports (reads the cached veraPDF, no re-run)",
           _with_record("pass") == "Supports")
     # F: a consumed record that reads FAIL drops the Supports — the adversary's counterexample, closed.
-    check("consumed record = fail → 1.1.1 NOT Supports (a red veraPDF cannot back a Supports)",
+    check("consumed record = fail → 3.1.1 NOT Supports (a red veraPDF cannot back a Supports)",
           _with_record("fail") != "Supports")
     # cannot-run: an absent/cannot-run record is Not-Evaluated-conservative, never a false Supports.
-    check("consumed record = cannot-run → 1.1.1 NOT Supports (unverified, conservative)",
+    check("consumed record = cannot-run → 3.1.1 NOT Supports (unverified, conservative)",
           _with_record("cannot-run") != "Supports")
     # standalone (no record staged) → the oracle is cannot-run, never a false-asserted Supports.
-    check("no consumed record staged → 1.1.1 NOT Supports (standalone cannot assert the oracle)",
-          entail("1.1.1", "docx", run_farm=True)["verdict"] != "Supports")
+    check("no consumed record staged → 3.1.1 NOT Supports (standalone cannot assert the oracle)",
+          entail("3.1.1", "docx", run_farm=True)["verdict"] != "Supports")
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     P, F = _with_record("pass"), _with_record("fail")
     ok = P == "Supports" and F != "Supports"
     fails.append("record-verdict-delta") if not ok else None
-    print(f"  {'ok ' if ok else 'XX '}the consumed record's verdict flips 1.1.1 Supports on/off")
-    print("      P (pass side): consumed rnd-a11y record reads pass — 1.1.1 Supports (veraPDF passed)")
-    print("      F (flag side): consumed rnd-a11y record reads fail — 1.1.1 not Supports (veraPDF failed)")
+    print(f"  {'ok ' if ok else 'XX '}the consumed record's verdict flips 3.1.1 Supports on/off")
+    print("      P (pass side): consumed rnd-a11y record reads pass — 3.1.1 Supports (veraPDF passed)")
+    print("      F (flag side): consumed rnd-a11y record reads fail — 3.1.1 not Supports (veraPDF failed)")
     print("      δ (min delta): the single verdict field pass→fail in the consumed record\n")
 
     if fails:

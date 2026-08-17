@@ -18,7 +18,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
+| 1.1.1 Non-text Content | Partially Supports | rnd-math-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -34,7 +34,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 2.2.2 Pause, Stop, Hide | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.3.1 Three Flashes or Below Threshold | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.1 Bypass Blocks | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.2 Page Titled | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
+| 2.4.2 Page Titled | Partially Supports | rnd-a11y (veraPDF): UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.4 Link Purpose (In Context) | Partially Supports | rnd-link-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.5.1 Pointer Gestures | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -121,7 +121,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content (A) | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
+| 1.1.1 Non-text Content (A) | Partially Supports | rnd-math-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 1.2.1 Audio-only and Video-only (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -141,7 +141,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 | 2.2.2 Pause, Stop, Hide (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.3.1 Three Flashes or Below Threshold (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.1 Bypass Blocks (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.2 Page Titled (A) | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
+| 2.4.2 Page Titled (A) | Partially Supports | rnd-a11y (veraPDF): UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.3 Focus Order (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.4 Link Purpose (In Context) (A) | Partially Supports | rnd-link-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.5 Multiple Ways (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -165,7 +165,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 
 | EN Clause | Criteria | Status | Remarks and Explanations |
 | --- | --- | --- | --- |
-| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
+| 10.1.1.1 | 1.1.1 Non-text Content | Partially Supports | rnd-math-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.1.2.1 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.2 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.3 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -208,7 +208,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.2.3.2 | 2.3.2 Three Flashes | Void | not applicable to non-web documents per EN |
 | 10.2.3.3 | 2.3.3 Animation from Interactions | Void | not applicable to non-web documents per EN |
 | 10.2.4.1 | 2.4.1 Bypass Blocks | Void | not applicable to non-web documents per EN |
-| 10.2.4.2 | 2.4.2 Page Titled | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
+| 10.2.4.2 | 2.4.2 Page Titled | Partially Supports | rnd-a11y (veraPDF): UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.2.4.3 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.2.4.4 | 2.4.4 Link Purpose (In Context) | Partially Supports | rnd-link-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.2.4.5 | 2.4.5 Multiple Ways | Void | not applicable to non-web documents per EN |
@@ -278,7 +278,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
+| 1.1.1 Non-text Content | Supports | rnd-a11y-latex (veraPDF): veraPDF confirms /Alt PRESENT; on docx it is the raw-LaTeX source (not an equivalent a screen reader can speak) → fragment, on latex it is recoverable MathML (/AF) → full (oracle) |
 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -294,7 +294,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 2.2.2 Pause, Stop, Hide | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.3.1 Three Flashes or Below Threshold | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.1 Bypass Blocks | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.2 Page Titled | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
+| 2.4.2 Page Titled | Partially Supports | rnd-a11y-latex (veraPDF): UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.4 Link Purpose (In Context) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 2.5.1 Pointer Gestures | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -381,7 +381,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content (A) | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
+| 1.1.1 Non-text Content (A) | Supports | rnd-a11y-latex (veraPDF): veraPDF confirms /Alt PRESENT; on docx it is the raw-LaTeX source (not an equivalent a screen reader can speak) → fragment, on latex it is recoverable MathML (/AF) → full (oracle) |
 | 1.2.1 Audio-only and Video-only (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -401,7 +401,7 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 | 2.2.2 Pause, Stop, Hide (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.3.1 Three Flashes or Below Threshold (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.1 Bypass Blocks (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.2 Page Titled (A) | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
+| 2.4.2 Page Titled (A) | Partially Supports | rnd-a11y-latex (veraPDF): UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.3 Focus Order (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.4 Link Purpose (In Context) (A) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 2.4.5 Multiple Ways (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -425,7 +425,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 
 | EN Clause | Criteria | Status | Remarks and Explanations |
 | --- | --- | --- | --- |
-| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
+| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-a11y-latex (veraPDF): veraPDF confirms /Alt PRESENT; on docx it is the raw-LaTeX source (not an equivalent a screen reader can speak) → fragment, on latex it is recoverable MathML (/AF) → full (oracle) |
 | 10.1.2.1 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.2 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.3 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -468,7 +468,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.2.3.2 | 2.3.2 Three Flashes | Void | not applicable to non-web documents per EN |
 | 10.2.3.3 | 2.3.3 Animation from Interactions | Void | not applicable to non-web documents per EN |
 | 10.2.4.1 | 2.4.1 Bypass Blocks | Void | not applicable to non-web documents per EN |
-| 10.2.4.2 | 2.4.2 Page Titled | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
+| 10.2.4.2 | 2.4.2 Page Titled | Partially Supports | rnd-a11y-latex (veraPDF): UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.2.4.3 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.2.4.4 | 2.4.4 Link Purpose (In Context) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 10.2.4.5 | 2.4.5 Multiple Ways | Void | not applicable to non-web documents per EN |

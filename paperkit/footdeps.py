@@ -31,7 +31,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bib  # noqa: E402  (the parser/data-model leaf — footdeps needs only the bib, not the projector)
 import resolver  # noqa: E402
 
-WIRED = ["boundaries", "config", "paper", "setup", "."]   # projects with per-claim Bazel graphs
+def _wired(repo_root: Path) -> list:
+    """The projects the footprint audit gates — DERIVED, never hardcoded (guard-must-not-copy: a hand-
+    maintained list drifts, and it had: `render` was missing).  The audit applies to SANDBOX-tier
+    warrants (bibtex.bzl: only sandbox is swept and footprint-audited), so WIRED = the bib.project set
+    (MODULE.bazel — the ONE registry that maps project→its bib file; on-demand projects like report/image
+    are not bib.projects, correctly excluded) that has at least one sandbox-tier check.  Single source:
+    the tier declarations in each project's own bib."""
+    module = (repo_root / "MODULE.bazel").read_text()
+    out = []
+    for m in re.finditer(r'bib\.project\([^)]*\)', module, re.S):
+        proj = re.search(r'project = "([^"]+)"', m.group(0))
+        bib_lbl = re.search(r'bib = "([^"]+)"', m.group(0))
+        if not (proj and bib_lbl):
+            continue
+        bib_path = repo_root / bib_lbl.group(1).lstrip("/").replace(":", "/")
+        if not bib_path.is_file():
+            continue
+        f = bib.parse(bib_path)
+        # a sandbox-tier check = has a check and its effective tier is sandbox (no tier field / "sandbox")
+        if any(w.get("check") and (w.get("tier") or "sandbox") == "sandbox" for w in f.values()):
+            out.append(proj.group(1))
+    return sorted(out)
 
 
 _FILEGROUP_RE = re.compile(r'filegroup\(\s*name\s*=\s*"files"\s*,\s*srcs\s*=\s*\[(.*?)\]', re.S)
@@ -127,12 +148,16 @@ def build(repo_root: Path, names: list) -> dict:
         F = {}
         for b in cfg["bibs"]:
             F.update(bib.parse(b, cfg["consumer_fields"]))
-        # A BOUNDARY-CROSSING check (resolver.CROSSING — result:, concept:) is an EDGE, not a leaf:
-        # its footprint is never used, and stracing it would rerun a whole sibling gate or library
-        # witness.  Skip by asking the VERB (crosses=True), never by re-listing the verbs here.
+        # Only SANDBOX-tier checks are footprint-audited (bibtex.bzl: only sandbox is swept + audited).
+        # A toolchain/local check runs the host toolchain (veraPDF/lualatex/pandoc, 37s+ each) — stracing
+        # it would RERUN that validator (minutes) AND its reads= is not staged-and-gated the sandbox way,
+        # so it is correctly out of scope.  A BOUNDARY-CROSSING check (resolver.CROSSING — result:/concept:)
+        # is an EDGE, not a leaf: its footprint is never used, and stracing it reruns a sibling gate.  Skip
+        # both by the DATA (the tier field) and the VERB (crosses=True), never by re-listing verbs/tiers.
         # strace is I/O-bound, so trace the rest CONCURRENTLY.
         items = [(k, f["check"]) for k, f in sorted(F.items())
-                 if f.get("check") and not f["check"].startswith(resolver.CROSSING)]
+                 if f.get("check") and not f["check"].startswith(resolver.CROSSING)
+                 and (f.get("tier") or "sandbox") == "sandbox"]
 
         def deps(chk):
             fp = resolver.footprint(chk, pdir, custom, scope=repo_root)
@@ -227,7 +252,7 @@ def main(argv: list) -> int:
               "not passed (Ζ·degrade·roots positive control — never a silent false green).  reads= are "
               "unenforced here; run on a strace-capable host to gate them.", file=sys.stderr)
         return 0
-    names = [a for a in argv[1:] if not a.startswith("-")] or WIRED
+    names = [a for a in argv[1:] if not a.startswith("-")] or _wired(repo_root)
     bad = audit(repo_root, names)
     if bad:
         for proj, k, miss, decl in bad:

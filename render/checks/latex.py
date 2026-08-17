@@ -59,9 +59,12 @@ def _deps_absent() -> str | None:
     for sty in ("unicode-math", "luaotfload"):
         if subprocess.run(["kpsewhich", sty + ".sty"], capture_output=True).returncode != 0:
             return sty + ".sty"
+    if a11y._find_verapdf(None) is None:    # the UA-2 gate needs veraPDF; absent → cannot-run, not a crash
+        return "verapdf"
     return None
 
 
+import a11y          # owns _find_verapdf (portable veraPDF resolution — never a hardcoded absolute path)
 import source        # the render graph's md node — the ONE resolved-source logic every format node shares
 import ruler_inject  # apply ruler-sequence rules to every table by construction (WCAG 1.4.1, the latex route affords it)
 
@@ -169,8 +172,10 @@ def _selftest() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     def _ua2(pdf: Path) -> int:
-        v = subprocess.run(["/home/mikemol/.local/bin/verapdf", "--flavour", "ua2", str(pdf)],
-                           capture_output=True, text=True)
+        vera = a11y._find_verapdf(None)     # portable resolution (a11y.py owns it), never a hardcoded path
+        if vera is None:
+            return -1                       # unreachable — _deps_absent() gates veraPDF above → cannot-run
+        v = subprocess.run([str(vera), "--flavour", "ua2", str(pdf)], capture_output=True, text=True)
         m = re.search(r'failedChecks="(\d+)"', v.stdout)
         return int(m.group(1)) if m else -1
 

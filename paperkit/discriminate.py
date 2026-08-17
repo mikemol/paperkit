@@ -218,8 +218,14 @@ def main(argv: list) -> int:
             # Ζ·calc — emit the CALCULATION (the measurement), separate from the grade INTERPRETATION:
             # the baseline verdict + the sensitivity fingerprint that a reading (grade/emergence/...)
             # consumes.  The expensive sweep runs ONCE here; readings over this record are free.
-            print(json.dumps({"claim": only, "baseline": rec.get("baseline", rec["grade"] != "broken"),
-                              "sens": rec.get("tests", [])}))
+            # Μ·sweep·atom — carry the orthogonal decision-coverage axis (if grade_check measured any
+            # reached-but-unasserted decision) onto the __dcalc record, so the grade/cohere reading and
+            # the compliance disclosure see it without re-sweeping.  Absent ⇒ no such decision (common).
+            calc = {"claim": only, "baseline": rec.get("baseline", rec["grade"] != "broken"),
+                    "sens": rec.get("tests", [])}
+            if rec.get("decisions_unasserted"):
+                calc["decisions_unasserted"] = rec["decisions_unasserted"]
+            print(json.dumps(calc))
         else:
             print(json.dumps({"claim": only, "grade": rec["grade"]}))   # the grade INTERPRETATION
         return 0

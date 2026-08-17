@@ -16,6 +16,17 @@ counterfactual (Ζ·mutant·struct — drop the present, inject the absent):
     flip:<qn>#<n>     INVERT one CONDITION (`if C` → `if not (C)`) — NON-monotone (a wrong-but-non-crashing
                       value flips only if the witness ASSERTS on it), so it is BARRED from the sensitivity
                       sweep and feeds the ORTHOGONAL `decisions_unasserted` axis, never the grade ladder.
+    data-:<qn>#<n>    DROP one KEY/ELEMENT of a module-level dict/list/set/tuple LITERAL (Μ·sweep·atom, the
+                      DATA cell of the Klein four-group: axis code↔data × drop↔perturb).  Present → absent,
+                      MONOTONE like def:/branch: — a witness reading that key flips (membership False, or a
+                      KeyError on bare subscript) — so it feeds the SENSITIVITY sweep.  A key whose dict is
+                      read ONLY via `.get(k, DEFAULT)` / `except KeyError` is REFUSED (the default swallows
+                      the drop → non-monotone, the DATA analog of branch:'s BaseException-enclosure).
+    dflip:<qn>#<n>    PERTURB one VALUE of a dict-value / list-element to a counterfactual (a VALID-ENUM
+                      sibling where the literal has a finite value domain, else a distinct marker) —
+                      NON-monotone (a wrong value flips only if the witness ASSERTS on it), so it is BARRED
+                      from the sweep and feeds `decisions_unasserted`, exactly like flip:.  The (data,perturb)
+                      cell.  Never applies to bare set membership (a set element has no value to perturb).
     import-:<name>    DROP `import <name>` / `from <name> import …` (a present import → absent) — a
                       POSITIVE import-dependence flips.
     import+:<name>    INJECT `import <name>` (an absent import → present) — the NEGATIVE polarity that
@@ -189,6 +200,204 @@ def _flip_condition(text: str, qualname: str, n: int) -> str:
     raise KeyError(f"Ζ·mutant: 'flip:{qualname}#{n}' is not a condition site in the module")
 
 
+def _swallowing_dicts(tree) -> set:
+    """The names of module-level dicts read in a way that would SWALLOW a dropped key: any access
+    `<name>.get(k, DEFAULT)` with a real default, or a `try: <name>[k] except KeyError`.  A data-: DROP
+    of such a dict is NON-monotone (the default hides the drop, the DATA analog of a branch raise
+    swallowed by `except BaseException`), so its sites are REFUSED.  Static + conservative: a dynamic
+    access (`**merge`, `dict(d)` copy, a computed default) is invisible here and must widen if a swept
+    module grows one — the ∅-baseline + the canary catch a live regression loudly."""
+    unsafe: set = set()
+    for n in ast.walk(tree):
+        # <name>.get(key, DEFAULT) — two args ⇒ a default that swallows a missing key
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "get" and isinstance(n.func.value, ast.Name)
+                and len(n.args) >= 2):
+            unsafe.add(n.func.value.id)
+        # try: … except KeyError — a handler that recovers from a dropped key
+        if isinstance(n, ast.Try):
+            for h in n.handlers:
+                names = ([h.type] if isinstance(h.type, ast.Name)
+                         else h.type.elts if isinstance(h.type, ast.Tuple) else [])
+                if any(isinstance(t, ast.Name) and t.id == "KeyError" for t in names):
+                    for stmt in n.body:
+                        for d in ast.walk(stmt):
+                            if (isinstance(d, ast.Subscript) and isinstance(d.value, ast.Name)):
+                                unsafe.add(d.value.id)
+    return unsafe
+
+
+def _data_assigns(tree):
+    """Every module-level `<NAME> = <dict/list/set/tuple literal>` as (name, literal_node).  Only a
+    single Name target (a tuple-unpack / attribute / subscript target has no stable scalar qualname)."""
+    for stmt in tree.body:
+        if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+            name, v = stmt.targets[0].id, stmt.value
+        elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and stmt.value is not None:
+            name, v = stmt.target.id, stmt.value
+        else:
+            continue
+        if isinstance(v, (ast.Dict, ast.List, ast.Set, ast.Tuple)):
+            yield name, v
+
+
+def _data_sites(text: str) -> list:
+    """Every mutable DATA site as (qualname, n, kind, key_node|None, value_node): each top-level
+    key/element of a module-level dict/list/set/tuple literal, numbered #n in stable source order.  A
+    dict whose EVERY read swallows a dropped key (`.get(k, DEFAULT)` / `except KeyError`, see
+    _swallowing_dicts) is REFUSED — the precondition that keeps data-: MONOTONE."""
+    out: list = []
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return out
+    unsafe = _swallowing_dicts(tree)
+    for name, v in _data_assigns(tree):
+        if name in unsafe:
+            continue                                     # REFUSED — a dropped key would be swallowed
+        if isinstance(v, ast.Dict):
+            for i, (k, val) in enumerate(zip(v.keys, v.values)):
+                if k is not None:                        # skip **spread entries (no single key)
+                    out.append((name, i, "dict", k, val))
+        else:                                            # List / Set / Tuple
+            for i, el in enumerate(v.elts):
+                out.append((name, i, type(v).__name__, None, el))
+    return out
+
+
+def _seg(text: str, node) -> str:
+    """The exact source substring of an AST node (its lineno/col span) — used for byte-MINIMAL data
+    edits: unlike ast.unparse (which reformats the WHOLE literal and would spuriously flip a
+    source-grep witness), a segment splice touches only the dropped/perturbed span."""
+    lines = text.splitlines(keepends=True)
+    if node.lineno == node.end_lineno:
+        return lines[node.lineno - 1][node.col_offset:node.end_col_offset]
+    seg = lines[node.lineno - 1][node.col_offset:]
+    seg += "".join(lines[node.lineno:node.end_lineno - 1])
+    seg += lines[node.end_lineno - 1][:node.end_col_offset]
+    return seg
+
+
+def _splice(text: str, start_node, end_node, replacement: str) -> str:
+    """Replace the source span from start_node's start to end_node's end with `replacement`."""
+    lines = text.splitlines(keepends=True)
+    prefix = "".join(lines[:start_node.lineno - 1]) + lines[start_node.lineno - 1][:start_node.col_offset]
+    suffix = lines[end_node.end_lineno - 1][end_node.end_col_offset:] + "".join(lines[end_node.end_lineno:])
+    return prefix + replacement + suffix
+
+
+def _drop_data(text: str, qualname: str, n: int) -> str:
+    """DROP one key/element of a module-level literal — byte-minimally.  For a dict entry the removable
+    span is key…value; for a list/set/tuple, the element.  The trailing (or, for the last item,
+    leading) comma is swallowed so no dangling `,` remains, keeping the module parseable."""
+    for name, i, kind, k, val in _data_sites(text):
+        if name == qualname and i == n:
+            first = k if k is not None else val          # the entry's start node
+            # find the sibling entries to compute comma removal
+            tree = ast.parse(text)
+            lit = next(v for nm, v in _data_assigns(tree) if nm == qualname)
+            entries = (list(zip(lit.keys, lit.values)) if isinstance(lit, ast.Dict)
+                       else [(None, e) for e in lit.elts])
+            starts = [(kk if kk is not None else vv) for kk, vv in entries]
+            # replace the entry span with empty, then clean up the comma via a re-parse-safe splice.
+            dropped = _splice(text, first, val, "")
+            # the splice leaves e.g. `{a: 1, , b: 2}` or `{a: 1, }` — normalise the orphaned comma.
+            import re
+            dropped = re.sub(r",(\s*,)", r",", dropped, count=0)     # `, ,` → `,`
+            dropped = re.sub(r"([\[{(])\s*,", r"\1", dropped)        # `{ ,` / `[ ,` → `{` / `[`
+            dropped = re.sub(r",(\s*[\]})])", r"\1", dropped)        # `, }` / `, ]` → `}` / `]`
+            ast.parse(dropped)                            # Ν·loud: a malformed drop raises, never ships
+            return dropped
+    raise KeyError(f"Ζ·mutant: 'data-:{qualname}#{n}' is not a data site in the module")
+
+
+def _leaf_path(entry_value, leaf) -> tuple | None:
+    """The structural INDEX-PATH from an entry's value node down to `leaf` (e.g. () = the value IS the
+    leaf; (0,) = first element of a tuple/list value; (0, 1) = nested).  None if leaf is not reachable
+    by positional descent (a dict-valued position has no positional index — handled as no-domain)."""
+    if entry_value is leaf:
+        return ()
+    if isinstance(entry_value, (ast.Tuple, ast.List)):
+        for i, el in enumerate(entry_value.elts):
+            sub = _leaf_path(el, leaf)
+            if sub is not None:
+                return (i,) + sub
+    return None
+
+
+def _at_path(entry_value, path):
+    """Follow an index-path into an entry value; None if the shape does not match (a sibling entry with
+    a different structure has no value at this path)."""
+    node = entry_value
+    for i in path:
+        if isinstance(node, (ast.Tuple, ast.List)) and i < len(node.elts):
+            node = node.elts[i]
+        else:
+            return None
+    return node
+
+
+def _domain_of(text: str, qualname: str, value_node, leaf) -> list:
+    """The finite VALUE DOMAIN of a leaf's POSITION — the string values that appear at the SAME
+    structural position across the literal's sibling entries.  Position-aware (not "every string in
+    the literal"): for a dict of `(scope, remark)` tuples the domain of the SCOPE leaf (path (0,)) is
+    the set of first-tuple-elements {full, fragment, …}, never the keys or remarks.  Empty ⇒ no finite
+    same-position domain ⇒ the caller falls back to a distinct marker (grades presence, not correctness)."""
+    if not (isinstance(leaf, ast.Constant) and isinstance(leaf.value, str)):
+        return []
+    path = _leaf_path(value_node, leaf)
+    if path is None:
+        return []
+    tree = ast.parse(text)
+    lit = next((v for nm, v in _data_assigns(tree) if nm == qualname), None)
+    if not isinstance(lit, (ast.Dict, ast.List, ast.Set, ast.Tuple)):
+        return []
+    values = lit.values if isinstance(lit, ast.Dict) else lit.elts
+    vals = set()
+    for ev in values:
+        node = _at_path(ev, path)                        # the same-position leaf of each sibling entry
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            vals.add(node.value)
+    return sorted(vals - {leaf.value})
+
+
+def _counterfactual(text: str, qualname: str, entry_value, leaf) -> str:
+    """A source-literal DIFFERENT from `leaf`: a valid-enum SAME-POSITION sibling (grades correctness)
+    if the leaf's position has a finite domain, else a type-directed distinct marker (grades presence).
+    `entry_value` is the whole entry value (the top of the position path); `leaf` the scalar to swap."""
+    v = leaf.value
+    if isinstance(v, str):
+        dom = _domain_of(text, qualname, entry_value, leaf)
+        return repr(dom[0]) if dom else repr(v + "·PAPERKIT_PERTURB")
+    if isinstance(v, bool):
+        return repr(not v)
+    if isinstance(v, (int, float)):
+        return repr(v + 1)
+    if v is None:
+        return repr("PAPERKIT_PERTURB")
+    return '"PAPERKIT_PERTURB"'                           # bytes / other constant → a distinct marker
+
+
+def _perturb_data(text: str, qualname: str, n: int) -> str:
+    """PERTURB one value to a counterfactual (non-monotone — a value swap, never a drop).  Recurses
+    into a nested value to the FIRST scalar leaf (so a `({route:scope}, remark)` value perturbs the
+    scope), keeping the module parseable via a byte-minimal segment splice."""
+    for name, i, kind, k, val in _data_sites(text):
+        if name == qualname and i == n:
+            # descend to the first scalar leaf of the value (the perturbable decision).
+            leaf = val
+            if not isinstance(val, ast.Constant):
+                leaf = next((node for node in ast.walk(val)
+                             if isinstance(node, ast.Constant)), None)
+                if leaf is None:
+                    return _splice(text, val, val, '"PAPERKIT_PERTURB"')  # no leaf → whole-value marker
+            cf = _counterfactual(text, qualname, val, leaf)
+            out = _splice(text, leaf, leaf, cf)
+            ast.parse(out)                               # Ν·loud on a malformed perturb
+            return out
+    raise KeyError(f"Ζ·mutant: 'dflip:{qualname}#{n}' is not a data site in the module")
+
+
 def _mutate_lines(text: str, nodes: list) -> str:
     """Replace each given def's body line-span with an UNCATCHABLE raise, leaving the rest of the file
     byte-identical (so a source-grep witness flips only when ITS grepped text lived in a mutated body,
@@ -259,6 +468,10 @@ def emit_mutant(text: str, spec: str) -> str:
         return _mutate_branch(text, *_split_qn_n(arg))
     if op == "flip":
         return _flip_condition(text, *_split_qn_n(arg))
+    if op == "data-":
+        return _drop_data(text, *_split_qn_n(arg))
+    if op == "dflip":
+        return _perturb_data(text, *_split_qn_n(arg))
     if op == "import-":
         return _drop_import(text, arg)
     if op == "import+":

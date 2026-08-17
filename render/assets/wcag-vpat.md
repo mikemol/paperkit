@@ -18,12 +18,12 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
+| 1.1.1 Non-text Content | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 1.3.1 Info and Relationships | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a tagged structure tree encoding info and relationships) |
-| 1.3.2 Meaningful Sequence | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a correct reading order in the tag tree (meaningful sequence)) |
+| 1.3.1 Info and Relationships | Partially Supports | rnd-a11y (veraPDF): UA validates the structure tree, but veraPDF cannot confirm EVERY visual relationship was tagged (completeness is a human PDF/UA checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
+| 1.3.2 Meaningful Sequence | Partially Supports | rnd-a11y (veraPDF): UA validates a reading order exists, but not that it matches the visual sequence (correctness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 1.3.3 Sensory Characteristics | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 1.4.1 Use of Color | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 1.4.2 Audio Control | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -34,14 +34,14 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 2.2.2 Pause, Stop, Hide | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.3.1 Three Flashes or Below Threshold | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.1 Bypass Blocks | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.2 Page Titled | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
+| 2.4.2 Page Titled | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.4 Link Purpose (In Context) | Partially Supports | rnd-link-alt proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
+| 2.4.4 Link Purpose (In Context) | Partially Supports | rnd-link-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.5.1 Pointer Gestures | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.2 Pointer Cancellation | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.3 Label in Name | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.4 Motion Actuation | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 3.1.1 Language of Page | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires the document's primary language to be set) |
+| 3.1.1 Language of Page | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) the document's primary language be set (oracle) |
 | 3.2.1 On Focus | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.2.2 On Input | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.2.6 Consistent Help | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -66,7 +66,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 1.4.12 Text Spacing | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.4.13 Content on Hover or Focus | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.5 Multiple Ways | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.6 Headings and Labels | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires headings in the structure tree (headings and labels)) |
+| 2.4.6 Headings and Labels | Partially Supports | rnd-a11y (veraPDF): UA validates tagged headings, but not that EVERY visual heading was tagged as one (completeness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.7 Focus Visible | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.11 Focus Not Obscured (Minimum) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.7 Dragging Movements | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -121,14 +121,14 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content (A) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
+| 1.1.1 Non-text Content (A) | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
 | 1.2.1 Audio-only and Video-only (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.4 Captions (Live) (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.5 Audio Description (Prerecorded) (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 1.3.1 Info and Relationships (A) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a tagged structure tree encoding info and relationships) |
-| 1.3.2 Meaningful Sequence (A) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a correct reading order in the tag tree (meaningful sequence)) |
+| 1.3.1 Info and Relationships (A) | Partially Supports | rnd-a11y (veraPDF): UA validates the structure tree, but veraPDF cannot confirm EVERY visual relationship was tagged (completeness is a human PDF/UA checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
+| 1.3.2 Meaningful Sequence (A) | Partially Supports | rnd-a11y (veraPDF): UA validates a reading order exists, but not that it matches the visual sequence (correctness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 1.3.3 Sensory Characteristics (A) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 1.4.1 Use of Color (A) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 1.4.2 Audio Control (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -141,13 +141,13 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 | 2.2.2 Pause, Stop, Hide (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.3.1 Three Flashes or Below Threshold (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.1 Bypass Blocks (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.2 Page Titled (A) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
+| 2.4.2 Page Titled (A) | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
 | 2.4.3 Focus Order (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.4 Link Purpose (In Context) (A) | Partially Supports | rnd-link-alt proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
+| 2.4.4 Link Purpose (In Context) (A) | Partially Supports | rnd-link-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.5 Multiple Ways (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.6 Headings and Labels (AA) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires headings in the structure tree (headings and labels)) |
+| 2.4.6 Headings and Labels (AA) | Partially Supports | rnd-a11y (veraPDF): UA validates tagged headings, but not that EVERY visual heading was tagged as one (completeness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.7 Focus Visible (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 3.1.1 Language of Page (A) | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires the document's primary language to be set) |
+| 3.1.1 Language of Page (A) | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) the document's primary language be set (oracle) |
 | 3.1.2 Language of Parts (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.2.1 On Focus (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.2.2 On Input (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -165,7 +165,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 
 | EN Clause | Criteria | Status | Remarks and Explanations |
 | --- | --- | --- | --- |
-| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
+| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
 | 10.1.2.1 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.2 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.3 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -175,8 +175,8 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.1.2.7 | 1.2.7 Extended Audio Description (Prerecorded) | Void | not applicable to non-web documents per EN |
 | 10.1.2.8 | 1.2.8 Media Alternative (Prerecorded) | Void | not applicable to non-web documents per EN |
 | 10.1.2.9 | 1.2.9 Audio-only (Live) | Void | not applicable to non-web documents per EN |
-| 10.1.3.1 | 1.3.1 Info and Relationships | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a tagged structure tree encoding info and relationships) |
-| 10.1.3.2 | 1.3.2 Meaningful Sequence | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a correct reading order in the tag tree (meaningful sequence)) |
+| 10.1.3.1 | 1.3.1 Info and Relationships | Partially Supports | rnd-a11y (veraPDF): UA validates the structure tree, but veraPDF cannot confirm EVERY visual relationship was tagged (completeness is a human PDF/UA checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
+| 10.1.3.2 | 1.3.2 Meaningful Sequence | Partially Supports | rnd-a11y (veraPDF): UA validates a reading order exists, but not that it matches the visual sequence (correctness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.1.3.3 | 1.3.3 Sensory Characteristics | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 10.1.3.4 | 1.3.4 Orientation | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.3.5 | 1.3.5 Identify Input Purpose | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -208,11 +208,11 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.2.3.2 | 2.3.2 Three Flashes | Void | not applicable to non-web documents per EN |
 | 10.2.3.3 | 2.3.3 Animation from Interactions | Void | not applicable to non-web documents per EN |
 | 10.2.4.1 | 2.4.1 Bypass Blocks | Void | not applicable to non-web documents per EN |
-| 10.2.4.2 | 2.4.2 Page Titled | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
+| 10.2.4.2 | 2.4.2 Page Titled | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
 | 10.2.4.3 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 10.2.4.4 | 2.4.4 Link Purpose (In Context) | Partially Supports | rnd-link-alt proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
+| 10.2.4.4 | 2.4.4 Link Purpose (In Context) | Partially Supports | rnd-link-alt entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.2.4.5 | 2.4.5 Multiple Ways | Void | not applicable to non-web documents per EN |
-| 10.2.4.6 | 2.4.6 Headings and Labels | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires headings in the structure tree (headings and labels)) |
+| 10.2.4.6 | 2.4.6 Headings and Labels | Partially Supports | rnd-a11y (veraPDF): UA validates tagged headings, but not that EVERY visual heading was tagged as one (completeness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.2.4.7 | 2.4.7 Focus Visible | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.2.4.8 | 2.4.8 Location | Void | not applicable to non-web documents per EN |
 | 10.2.4.9 | 2.4.9 Link Purpose (Link Only) | Void | not applicable to non-web documents per EN |
@@ -228,7 +228,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.2.5.6 | 2.5.6 Concurrent Input Mechanisms | Void | not applicable to non-web documents per EN |
 | — | 2.5.7 Dragging Movements | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
 | — | 2.5.8 Target Size (Minimum) | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
-| 10.3.1.1 | 3.1.1 Language of Page | Supports | rnd-a11y entails this (oracle) (via PDF/UA: UA requires the document's primary language to be set) |
+| 10.3.1.1 | 3.1.1 Language of Page | Supports | rnd-a11y (veraPDF): UA requires (and veraPDF checks) the document's primary language be set (oracle) |
 | 10.3.1.2 | 3.1.2 Language of Parts | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.3.1.3 | 3.1.3 Unusual Words | Void | not applicable to non-web documents per EN |
 | 10.3.1.4 | 3.1.4 Abbreviations | Void | not applicable to non-web documents per EN |
@@ -278,14 +278,14 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
+| 1.1.1 Non-text Content | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 1.3.1 Info and Relationships | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a tagged structure tree encoding info and relationships) |
-| 1.3.2 Meaningful Sequence | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a correct reading order in the tag tree (meaningful sequence)) |
+| 1.3.1 Info and Relationships | Partially Supports | rnd-a11y-latex (veraPDF): UA validates the structure tree, but veraPDF cannot confirm EVERY visual relationship was tagged (completeness is a human PDF/UA checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
+| 1.3.2 Meaningful Sequence | Partially Supports | rnd-a11y-latex (veraPDF): UA validates a reading order exists, but not that it matches the visual sequence (correctness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 1.3.3 Sensory Characteristics | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
-| 1.4.1 Use of Color | Partially Supports | rnd-ruler proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
+| 1.4.1 Use of Color | Partially Supports | rnd-ruler entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 1.4.2 Audio Control | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.1.1 Keyboard | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.1.2 No Keyboard Trap | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -294,14 +294,14 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 2.2.2 Pause, Stop, Hide | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.3.1 Three Flashes or Below Threshold | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.1 Bypass Blocks | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.2 Page Titled | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
+| 2.4.2 Page Titled | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.4 Link Purpose (In Context) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 2.5.1 Pointer Gestures | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.2 Pointer Cancellation | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.3 Label in Name | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.4 Motion Actuation | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 3.1.1 Language of Page | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires the document's primary language to be set) |
+| 3.1.1 Language of Page | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) the document's primary language be set (oracle) |
 | 3.2.1 On Focus | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.2.2 On Input | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.2.6 Consistent Help | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -326,7 +326,7 @@ International Edition (VPAT®-style ACR): WCAG 2.2, Revised Section 508, and EN 
 | 1.4.12 Text Spacing | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.4.13 Content on Hover or Focus | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.5 Multiple Ways | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.6 Headings and Labels | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires headings in the structure tree (headings and labels)) |
+| 2.4.6 Headings and Labels | Partially Supports | rnd-a11y-latex (veraPDF): UA validates tagged headings, but not that EVERY visual heading was tagged as one (completeness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.7 Focus Visible | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.11 Focus Not Obscured (Minimum) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.5.7 Dragging Movements | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -381,16 +381,16 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 
 | Criteria | Conformance Level | Remarks and Explanations |
 | --- | --- | --- |
-| 1.1.1 Non-text Content (A) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
+| 1.1.1 Non-text Content (A) | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
 | 1.2.1 Audio-only and Video-only (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.2 Captions (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.4 Captions (Live) (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.2.5 Audio Description (Prerecorded) (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 1.3.1 Info and Relationships (A) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a tagged structure tree encoding info and relationships) |
-| 1.3.2 Meaningful Sequence (A) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a correct reading order in the tag tree (meaningful sequence)) |
+| 1.3.1 Info and Relationships (A) | Partially Supports | rnd-a11y-latex (veraPDF): UA validates the structure tree, but veraPDF cannot confirm EVERY visual relationship was tagged (completeness is a human PDF/UA checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
+| 1.3.2 Meaningful Sequence (A) | Partially Supports | rnd-a11y-latex (veraPDF): UA validates a reading order exists, but not that it matches the visual sequence (correctness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 1.3.3 Sensory Characteristics (A) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
-| 1.4.1 Use of Color (A) | Partially Supports | rnd-ruler proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
+| 1.4.1 Use of Color (A) | Partially Supports | rnd-ruler entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 1.4.2 Audio Control (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 1.4.3 Contrast (Minimum) (AA) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 1.4.4 Resize Text (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -401,13 +401,13 @@ Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduc
 | 2.2.2 Pause, Stop, Hide (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.3.1 Three Flashes or Below Threshold (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.1 Bypass Blocks (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.2 Page Titled (A) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
+| 2.4.2 Page Titled (A) | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
 | 2.4.3 Focus Order (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 2.4.4 Link Purpose (In Context) (A) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 2.4.5 Multiple Ways (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 2.4.6 Headings and Labels (AA) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires headings in the structure tree (headings and labels)) |
+| 2.4.6 Headings and Labels (AA) | Partially Supports | rnd-a11y-latex (veraPDF): UA validates tagged headings, but not that EVERY visual heading was tagged as one (completeness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 2.4.7 Focus Visible (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
-| 3.1.1 Language of Page (A) | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires the document's primary language to be set) |
+| 3.1.1 Language of Page (A) | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) the document's primary language be set (oracle) |
 | 3.1.2 Language of Parts (AA) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.2.1 On Focus (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 3.2.2 On Input (A) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -425,7 +425,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 
 | EN Clause | Criteria | Status | Remarks and Explanations |
 | --- | --- | --- | --- |
-| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires alternate text / MathML on non-text content (figures, formulas)) |
+| 10.1.1.1 | 1.1.1 Non-text Content | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) alternate text / MathML on non-text content (oracle) |
 | 10.1.2.1 | 1.2.1 Audio-only and Video-only (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.2 | 1.2.2 Captions (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.2.3 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -435,13 +435,13 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.1.2.7 | 1.2.7 Extended Audio Description (Prerecorded) | Void | not applicable to non-web documents per EN |
 | 10.1.2.8 | 1.2.8 Media Alternative (Prerecorded) | Void | not applicable to non-web documents per EN |
 | 10.1.2.9 | 1.2.9 Audio-only (Live) | Void | not applicable to non-web documents per EN |
-| 10.1.3.1 | 1.3.1 Info and Relationships | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a tagged structure tree encoding info and relationships) |
-| 10.1.3.2 | 1.3.2 Meaningful Sequence | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a correct reading order in the tag tree (meaningful sequence)) |
+| 10.1.3.1 | 1.3.1 Info and Relationships | Partially Supports | rnd-a11y-latex (veraPDF): UA validates the structure tree, but veraPDF cannot confirm EVERY visual relationship was tagged (completeness is a human PDF/UA checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
+| 10.1.3.2 | 1.3.2 Meaningful Sequence | Partially Supports | rnd-a11y-latex (veraPDF): UA validates a reading order exists, but not that it matches the visual sequence (correctness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.1.3.3 | 1.3.3 Sensory Characteristics | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 10.1.3.4 | 1.3.4 Orientation | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.3.5 | 1.3.5 Identify Input Purpose | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.3.6 | 1.3.6 Identify Purpose | Void | not applicable to non-web documents per EN |
-| 10.1.4.1 | 1.4.1 Use of Color | Partially Supports | rnd-ruler proves only part of this criterion (a table/formula/annotation sub-part), not the whole — a full claim needs document-wide coverage |
+| 10.1.4.1 | 1.4.1 Use of Color | Partially Supports | rnd-ruler entails this — only part of the criterion is proven (farm), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.1.4.2 | 1.4.2 Audio Control | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.1.4.3 | 1.4.3 Contrast (Minimum) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 10.1.4.4 | 1.4.4 Resize Text | Not Applicable | does not apply to a static, non-interactive print PDF |
@@ -468,11 +468,11 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.2.3.2 | 2.3.2 Three Flashes | Void | not applicable to non-web documents per EN |
 | 10.2.3.3 | 2.3.3 Animation from Interactions | Void | not applicable to non-web documents per EN |
 | 10.2.4.1 | 2.4.1 Bypass Blocks | Void | not applicable to non-web documents per EN |
-| 10.2.4.2 | 2.4.2 Page Titled | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires a document title (and the viewer to display it)) |
+| 10.2.4.2 | 2.4.2 Page Titled | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) a document title and DisplayDocTitle (oracle) |
 | 10.2.4.3 | 2.4.3 Focus Order | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.2.4.4 | 2.4.4 Link Purpose (In Context) | Does Not Support | no warrant entails this criterion for this deliverable (a known gap) |
 | 10.2.4.5 | 2.4.5 Multiple Ways | Void | not applicable to non-web documents per EN |
-| 10.2.4.6 | 2.4.6 Headings and Labels | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires headings in the structure tree (headings and labels)) |
+| 10.2.4.6 | 2.4.6 Headings and Labels | Partially Supports | rnd-a11y-latex (veraPDF): UA validates tagged headings, but not that EVERY visual heading was tagged as one (completeness is a human checkpoint) — only part of the criterion is proven (oracle), not the whole; a full claim needs coverage the tool cannot confirm |
 | 10.2.4.7 | 2.4.7 Focus Visible | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.2.4.8 | 2.4.8 Location | Void | not applicable to non-web documents per EN |
 | 10.2.4.9 | 2.4.9 Link Purpose (Link Only) | Void | not applicable to non-web documents per EN |
@@ -488,7 +488,7 @@ EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to
 | 10.2.5.6 | 2.5.6 Concurrent Input Mechanisms | Void | not applicable to non-web documents per EN |
 | — | 2.5.7 Dragging Movements | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
 | — | 2.5.8 Target Size (Minimum) | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |
-| 10.3.1.1 | 3.1.1 Language of Page | Supports | rnd-a11y-latex entails this (oracle) (via PDF/UA: UA requires the document's primary language to be set) |
+| 10.3.1.1 | 3.1.1 Language of Page | Supports | rnd-a11y-latex (veraPDF): UA requires (and veraPDF checks) the document's primary language be set (oracle) |
 | 10.3.1.2 | 3.1.2 Language of Parts | Not Applicable | does not apply to a static, non-interactive print PDF |
 | 10.3.1.3 | 3.1.3 Unusual Words | Void | not applicable to non-web documents per EN |
 | 10.3.1.4 | 3.1.4 Abbreviations | Void | not applicable to non-web documents per EN |

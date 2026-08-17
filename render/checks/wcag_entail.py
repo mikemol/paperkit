@@ -63,7 +63,10 @@ ENTAILMENT = {
     "rnd-math-alt":  ("farm",   ["python3", "checks/mathalt.py", "--selftest"],    "fragment"),
     # link-alt proves a /Contents STRING exists; 2.4.4 needs the PURPOSE determinable → fragment.
     "rnd-link-alt":  ("farm",   ["python3", "checks/linkalt.py", "--selftest"],    "fragment"),
-    "rnd-widen":     ("farm",   ["python3", "checks/widen_tables.py", "--selftest"], "full"),
+    # widen proves a wide table cell is sized to fit — it entails no WCAG criterion fully, so
+    # "fragment" (defensive: it carries no WCAG tag today, but if it ever did, a column-widening check
+    # must not grant a full Supports).
+    "rnd-widen":     ("farm",   ["python3", "checks/widen_tables.py", "--selftest"], "fragment"),
     # the veraPDF oracle validates the WHOLE deliverable against PDF/UA → full for the SCs UA covers.
     "rnd-a11y":      ("oracle", None,                                              "full"),
     "rnd-a11y-latex":("oracle", None,                                              "full"),
@@ -76,13 +79,26 @@ ENTAILMENT = {
 # and conservative: only correspondences that the tagged-structure requirement directly establishes.
 # A UA-conformant PDF has a tagged structure tree with correct reading order and role mapping, a
 # document title and language, and (UA) alternate text on non-text content.
+# Each entry: (scope, remark).  veraPDF verifies the MACHINE-checkable half of PDF/UA (the Matterhorn
+# Protocol splits into machine-checkable AND human-verifiable checkpoints) — tag well-formedness, the
+# PRESENCE of alt text / title / language, role-mapping validity.  It does NOT verify tag COMPLETENESS
+# against the visual layout: that EVERY visual relationship or heading was actually tagged.  So a clean
+# veraPDF run entails a criterion FULLY only where the criterion is a presence/absence fact veraPDF
+# checks directly; where the criterion needs completeness (all relationships captured, the reading
+# order CORRECT against the visual sequence), UA establishes valid MACHINERY but not the full criterion
+# → "fragment" (→ Partially Supports).  The adversary drove this per-SC distinction.
 PDFUA_TO_WCAG = {
-    "1.1.1": "UA requires alternate text / MathML on non-text content (figures, formulas)",
-    "1.3.1": "UA requires a tagged structure tree encoding info and relationships",
-    "1.3.2": "UA requires a correct reading order in the tag tree (meaningful sequence)",
-    "2.4.2": "UA requires a document title (and the viewer to display it)",
-    "2.4.6": "UA requires headings in the structure tree (headings and labels)",
-    "3.1.1": "UA requires the document's primary language to be set",
+    # presence/absence facts veraPDF checks directly → full
+    "1.1.1": ("full", "UA requires (and veraPDF checks) alternate text / MathML on non-text content"),
+    "2.4.2": ("full", "UA requires (and veraPDF checks) a document title and DisplayDocTitle"),
+    "3.1.1": ("full", "UA requires (and veraPDF checks) the document's primary language be set"),
+    # valid tagging MACHINERY, but completeness-against-layout is a human checkpoint → fragment
+    "1.3.1": ("fragment", "UA validates the structure tree, but veraPDF cannot confirm EVERY visual "
+                          "relationship was tagged (completeness is a human PDF/UA checkpoint)"),
+    "1.3.2": ("fragment", "UA validates a reading order exists, but not that it matches the visual "
+                          "sequence (correctness is a human checkpoint)"),
+    "2.4.6": ("fragment", "UA validates tagged headings, but not that EVERY visual heading was tagged "
+                          "as one (completeness is a human checkpoint)"),
     # 4.1.2 Name, Role, Value is DELIBERATELY OMITTED.  UA tags STATIC structure roles, but 4.1.2
     # normatively covers the name/role/VALUE and change-notification of interactive components; the
     # paper's citation links are interactive annotations, and a tagged role does not establish their
@@ -176,19 +192,28 @@ def entail(sc: str, route: str, run_farm: bool = False) -> dict:
         return {"verdict": "Not Applicable", "warrant": None, "form": None,
                 "remark": "does not apply to a static, non-interactive print PDF"}
     warrants = _warrants_tagging(sc, fmt)
+
+    def _eff_scope(w: str) -> tuple:
+        """The EFFECTIVE scope of warrant w for THIS sc, and the attesting remark.  For the veraPDF
+        oracle on a UA-bridge SC, the scope is the bridge's PER-SC scope (some UA correspondences are
+        full, some fragment); otherwise the warrant's own scope."""
+        if w in ("rnd-a11y", "rnd-a11y-latex") and sc in PDFUA_TO_WCAG:
+            sc_scope, why = PDFUA_TO_WCAG[sc]
+            return sc_scope, f"{w} (veraPDF): {why}"
+        return _scope(w), f"{w} entails this"
+
+    proven = [(w, _proven(w, run_farm)) for w in warrants]
     # a proven, FULL-scope warrant → Supports.  Scan for one before settling for a fragment.
-    full = [(w, _proven(w, run_farm)) for w in warrants]
-    for w, form in full:
-        if form and _scope(w) == "full":
-            via = f" (via PDF/UA: {PDFUA_TO_WCAG[sc]})" if sc in PDFUA_TO_WCAG and w in ("rnd-a11y", "rnd-a11y-latex") else ""
+    for w, form in proven:
+        if form and _eff_scope(w)[0] == "full":
             return {"verdict": "Supports", "warrant": w, "form": form,
-                    "remark": f"{w} entails this ({form}){via}"}
+                    "remark": f"{_eff_scope(w)[1]} ({form})"}
     # a proven FRAGMENT-scope warrant → Partially Supports (it proves a sub-part, not the whole SC).
-    for w, form in full:
-        if form and _scope(w) == "fragment":
+    for w, form in proven:
+        if form and _eff_scope(w)[0] == "fragment":
             return {"verdict": "Partially Supports", "warrant": w, "form": form,
-                    "remark": f"{w} proves only part of this criterion (a table/formula/annotation "
-                              f"sub-part), not the whole — a full claim needs document-wide coverage"}
+                    "remark": f"{_eff_scope(w)[1]} — only part of the criterion is proven ({form}), "
+                              f"not the whole; a full claim needs coverage the tool cannot confirm"}
     # tagged but no proven entailment (a "post"/"excepted" cell present but unproven) → Partially.
     if warrants:
         return {"verdict": "Partially Supports", "warrant": warrants[0], "form": None,

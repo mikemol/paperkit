@@ -31,16 +31,18 @@ def _entries(content):
     sib = ""        # for a result:<sibling> check — the sibling it definitionally reads
     reads = []
     rests = []      # rests-on: the premise claims this one is grounded on (Ζ·compose deps)
+    loc = ""        # Ζ·tier — per-warrant `local = {true}`: this check runs on the host, gated but not swept
     for raw in content.splitlines():
         s = raw.strip()
         if s.startswith("@") and "{" in s:
             if key != None:
-                out.append((key, check, sib, reads, rests))
+                out.append((key, check, sib, reads, rests, loc))
             key = s.split("{", 1)[1].split(",", 1)[0].strip()
             check = ""
             sib = ""
             reads = []
             rests = []
+            loc = ""
         elif key != None and "=" in s:
             name = s.split("=", 1)[0].strip()
             if name == "check":
@@ -53,8 +55,10 @@ def _entries(content):
             elif name == "rests-on" and "{" in s and "}" in s:
                 inner = s.split("{", 1)[1].rsplit("}", 1)[0]
                 rests = [t.strip() for t in inner.split(",") if t.strip()]
+            elif name == "local" and "{" in s and "}" in s:
+                loc = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
     if key != None:
-        out.append((key, check, sib, reads, rests))
+        out.append((key, check, sib, reads, rests, loc))
     return out
 
 def _data(tokens, files, imports = [], engine = True):
@@ -282,7 +286,10 @@ def _bib_repo_impl(repository_ctx):
     bibp = repository_ctx.path(repository_ctx.attr.bib)
     proj = repository_ctx.attr.project
     files = "@@//:files" if proj == "." else "@@//%s:files" % proj
-    local = repository_ctx.attr.local
+    # Ζ·tier — the project `local` attr is now the DEFAULT enforcement tier for a warrant that does not
+    # declare its own `local = {true}`.  A warrant's effective tier `wlocal` is computed per-loop below:
+    # `local` (host-run, gated but not swept) if the warrant declares it, else this project default.
+    proj_local = repository_ctx.attr.local
 
     # Custom check types AND the project's WARRANTS LIST both come from paper.toml (watched, so an
     # edit re-fetches).  Multi-bib composition is the same thing project.py does over `warrants`
@@ -321,6 +328,16 @@ def _bib_repo_impl(repository_ctx):
         repository_ctx.watch(wp)
         parsed = parsed + _entries(repository_ctx.read(wp))
 
+    # Ζ·tier — a project is all-local iff EVERY checked warrant runs on the host (either it declares
+    # `local = {true}` or the project default is local and it does not override to sandbox).  The
+    # footprint audit (which needs the host per host-coupled warrant) is emitted iff SOME warrant is
+    # sandbox — so its symbols load iff `not all_local`.
+    all_local = True
+    for _pk, _pc, _ps, _pr, _prr, _pl in parsed:
+        if _pc and not ((_pl == "true") if _pl else proj_local):
+            all_local = False
+            break
+
     # Τ·mem·learn — the per-project learned reservation manifest (a projection of observed peaks,
     # mem.json beside the bib; regenerated on-demand by //:mem-learn).  Resolved per claim down the
     # (claim > resolution > cold-start) ladder when emitting each pk_calc.  Absent ⇒ {} ⇒ every
@@ -335,7 +352,7 @@ def _bib_repo_impl(repository_ctx):
     syms = []
     if repository_ctx.attr.adequacy:
         syms += ["pk_adequacy", "pk_grade_claim"]
-    if not local:                       # Ζ·foot·act — the footprint audit (skips host-coupled projects)
+    if not all_local:                   # Ζ·foot·act — the footprint audit (emitted iff some warrant is sandbox)
         syms += ["pk_footaudit", "pk_footprint"]
     if syms:
         out.append("load(\"@@//tools:grade.bzl\", " + ", ".join([_lit(s) for s in sorted(syms)]) + ")")
@@ -393,9 +410,14 @@ def _bib_repo_impl(repository_ctx):
     imported_cert = {}   # Λ·witness — k → the owner library's __dcalc cert label (a concept: import edge)
     owns = repository_ctx.attr.owns_concepts
     vis = ', visibility = ["//visibility:public"]'  # the owner EXPORTS per-concept records for views to import
-    for k, check, sib, reads, rests in parsed:
+    for k, check, sib, reads, rests, loc in parsed:
         if not check:
             continue
+        # Ζ·tier — the warrant's effective enforcement tier: `local` (host-run, gated but NOT
+        # mutation-swept — a toolchain-coupled check the hermetic sweep cannot run) if it declares
+        # `local = {true}`, else the project default.  A local warrant takes the `else` verb-rule
+        # branch (so it is gated, in gate_rec) and never the sweep branch below.
+        wlocal = (loc == "true") if loc else proj_local
         if check.startswith("concept:"):
             # Λ·witness — a concept: check IMPORTS a concept authored + GRADED once in the library.  The
             # VERDICT is the library's per-concept verdict record (pk_result, records-as-deps, like
@@ -417,9 +439,12 @@ def _bib_repo_impl(repository_ctx):
             imported_cert[k] = "@paperkit_library//:" + key + "__dcalc"
             recs.append('":%s"' % k)
             continue
-        if calc and _body(check, custom) != None:
+        if calc and not wlocal and _body(check, custom) != None:
             # Ζ·calc·interp — ONE cached sweep (pk_calc) feeds the verdict reading here (and the grade
             # reading below); the redundant verdict run + the adequacy re-sweep collapse into it.
+            # Ζ·tier — a `local` warrant is excluded (the `and not wlocal`): the sweep is hermetic
+            # (calc.bzl has no host-escape), so a host-coupled check cannot be mutation-swept; it falls
+            # to the `else` verb-rule branch and is GATED but not graded.
             dl = ", ".join([_lit(d) for d in _data(reads, files, imports)])
             out.append("pk_calc(name = " + _lit(k + "__calc") + ", claim = " + _lit(k) +
                        ", project = " + _lit(proj) + ", mem = " + str(_membucket(mem, k, "file")) +
@@ -504,7 +529,7 @@ def _bib_repo_impl(repository_ctx):
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
                            str(_membucket(mem, k, "def")) + ", data = [" + dl + "]" + (vis if owns else "") + ")")
         else:
-            out.append(_verb_rule(k, check, proj, files, reads, custom, local, imports))
+            out.append(_verb_rule(k, check, proj, files, reads, custom, wlocal, imports))
         recs.append('":%s"' % k)
 
     if calc_claims:
@@ -533,8 +558,9 @@ def _bib_repo_impl(repository_ctx):
                    'visibility = ["//visibility:public"])')
 
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an irreducibly
-    # GENERAL oracle, kept as a cmd: drop (Ζ·resist).
-    lc = ", local = True" if local else ""
+    # GENERAL oracle, kept as a cmd: drop (Ζ·resist).  It runs local iff the PROJECT default is local
+    # (a whole-bib oracle has no single warrant's tier).
+    lc = ", local = True" if proj_local else ""
     inv = "\"$(command -v python3)\" paperkit/gate.py --invariants --safe --without-K " + proj
     out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + "".join([", " + _lit(i) for i in imports]) + ', "@@//paperkit:engine"])')
     recs.append('":invariants"')
@@ -549,8 +575,15 @@ def _bib_repo_impl(repository_ctx):
         # pk_adequacy; the assert-test puts it in //:hook.  (The old discriminate.py sweep sh_test
         # is retired; discriminate.py stays as the per-claim grade ORACLE behind pk_grade_claim.)
         grades = []
-        for k, check, sib, reads, rests in parsed:
+        for k, check, sib, reads, rests, loc in parsed:
             if not check:
+                continue
+            # Ζ·tier — a `local` warrant is GATED but not GRADED: the adequacy sweep (a hermetic
+            # mutation grade) cannot soundly grade a host-coupled check, so it is excluded from the
+            # adequacy record entirely (it is not in calc_claims, and file-resolution grading its
+            # source under the sandbox would be the same unsoundness).  Its verdict still gates via
+            # gate_rec above; adequacy asserts falsifiability only over the sandbox subset.
+            if ((loc == "true") if loc else proj_local):
                 continue
             if k in imported_cert:
                 # Λ·witness — grade = the IMPORTED library certificate, read via read_grade → behavioral
@@ -584,29 +617,31 @@ def _bib_repo_impl(repository_ctx):
                    'args = ["$(rootpath :adequacy_rec)"], data = [":adequacy_rec"], size = "small", ' +
                    'visibility = ["//visibility:public"])')
 
-    if not local:
-        # Ζ·foot·act — the declare+audit cross-check as a NESTING of per-claim footprint records
-        # (pk_footprint, footdeps --only) aggregated by pk_footaudit, dissolving footdeps' ThreadPool.
-        # Data is GENEROUS (every project) so the strace sees reads BEYOND the declaration.  On-demand
-        # (not in //:hook); host-coupled projects (local) skip it — their footprint needs the host.
-        foots = []
-        for k, check, sib, reads, rests in parsed:
-            if not check or sib or check.startswith("concept:"):  # result:/concept: are import edges — no local footprint
-                continue
-            out.append("pk_footprint(name = " + _lit(k + "__foot") + ", claim = " + _lit(k) +
-                       ", project = " + _lit(proj) + ", data = [" + _ALL_DATA + "])")
-            foots.append('":%s__foot"' % k)
-        if foots:
-            out.append('pk_footaudit(name = "footaudit", foots = [%s], visibility = ["//visibility:public"])' % ", ".join(foots))
+    # Ζ·foot·act — the declare+audit cross-check as a NESTING of per-claim footprint records
+    # (pk_footprint, footdeps --only) aggregated by pk_footaudit, dissolving footdeps' ThreadPool.
+    # Data is GENEROUS (every project) so the strace sees reads BEYOND the declaration.  On-demand
+    # (not in //:hook).  Ζ·tier — a `local` (host-coupled) WARRANT's footprint needs the host, so it
+    # is skipped per-warrant; the audit is still emitted for a project with ANY sandbox warrant.
+    foots = []
+    for k, check, sib, reads, rests, loc in parsed:
+        if not check or sib or check.startswith("concept:"):  # result:/concept: are import edges — no local footprint
+            continue
+        if ((loc == "true") if loc else proj_local):
+            continue
+        out.append("pk_footprint(name = " + _lit(k + "__foot") + ", claim = " + _lit(k) +
+                   ", project = " + _lit(proj) + ", data = [" + _ALL_DATA + "])")
+        foots.append('":%s__foot"' % k)
+    if foots:
+        out.append('pk_footaudit(name = "footaudit", foots = [%s], visibility = ["//visibility:public"])' % ", ".join(foots))
 
     if repository_ctx.attr.compose:
         # Ζ·compose — each claim's WITNESS as a build artifact; rests-on as build DEPS (the grounding
         # DAG IS the build DAG).  `bazel build //<proj>:proof` builds every witness — build-success =
         # proven, and an unproven premise blocks every claim resting on it.  On-demand (not //:hook yet).
-        checked = {k: True for k, check, sib, reads, rests in parsed if check}
+        checked = {k: True for k, check, sib, reads, rests, loc in parsed if check}
         wits = []
         pj = "" if proj == "." else ", project = " + _lit(proj)
-        for k, check, sib, reads, rests in parsed:
+        for k, check, sib, reads, rests, loc in parsed:
             if not check:
                 continue
             prem = ['":%s__witness"' % r for r in rests if r in checked]

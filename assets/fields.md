@@ -17,6 +17,7 @@ A bibliography entry (a warrant, or a `references.bib` citation) may carry these
 | `mem` | engine-inert; projected to a Bazel memory reservation for the check | warrant |
 | `link` | an expound-rung footnote (a technical name, or a ∂² long-edge discharge) | warrant |
 | `depth` | renders the claim as a nested (indented) proof-step list item | warrant |
+| `local` | the check's enforcement tier — local=true runs it on the host (a toolchain-coupled check), gated but not mutation-swept; default is the hermetic sandbox (Ζ·tier) | warrant |
 | `from` | prose-order edge: topological ordering + glue adjacency (general→specific) | warrant |
 | `rests-on` | grounding edge: effective-grade clamping + citation provenance (NOT prose order) | warrant |
 | `reads` | the check's declared cross-package footprint — staging + audit tokens (Ζ·foot) | warrant |

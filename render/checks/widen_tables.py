@@ -292,7 +292,7 @@ def check(src):
     absent = _deps_absent()
     if absent:
         print(f"widen_tables --check: {absent} absent — CANNOT VERIFY (not a pass)", file=sys.stderr)
-        return 2
+        return 3
     doc, cells, ink = _measure(src)
     if not cells:
         print("widen_tables --check: no tables to check")   # nothing to clip is a genuine pass
@@ -300,7 +300,7 @@ def check(src):
     if ink is None or len(ink) != len(cells):
         print(f"widen_tables --check: could not measure ({'render failed' if ink is None else 'band mismatch'})"
               " — CANNOT VERIFY (not a pass)", file=sys.stderr)
-        return 2
+        return 3
     grids = read_grids(doc)
     # only UN-WRAPPABLE cells can clip (math runs + single whitespace-free tokens); prose reflows.
     need = col_widths(cells, ink, _unwrappable)

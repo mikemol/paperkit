@@ -148,18 +148,20 @@ def emit() -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
-def check() -> tuple[bool, list[str]]:
+def check() -> tuple[bool, list[str], list[str]]:
     """The emitted VPAT is the FRESH projection (project-don't-author, so it cannot drift), and the
-    entailment gate underneath it holds (so no Supports is unproven)."""
+    entailment gate underneath it holds (so no Supports is unproven).  Ζ·tier·exit — a farm F-arm that
+    CANNOT RUN here (toolchain absent) is surfaced separately: the VPAT freshness + registry soundness
+    still gate (they are pure), but the un-runnable F-arms yield cannot-run (exit 3), not a failure."""
     problems = []
-    ok_e, probs_e = we.check()
+    ok_e, probs_e, cannot_e = we.check()
     if not ok_e:
         problems += [f"entailment: {p}" for p in probs_e]
     if not _OUT.exists():
         problems.append(f"{_OUT.name} not emitted — run: python3 checks/wcag.py --emit")
     elif _OUT.read_text() != emit():
         problems.append(f"{_OUT.name} drifted from the projection — regenerate: python3 checks/wcag.py --emit")
-    return (not problems), problems
+    return (not problems), problems, [f"entailment: {c}" for c in cannot_e]
 
 
 def main(argv: list[str]) -> int:
@@ -169,11 +171,18 @@ def main(argv: list[str]) -> int:
         print(f"wcag: wrote {_OUT.relative_to(_OUT.parent.parent)} (VPAT INT, both routes)")
         return 0
     if "--check" in argv:
-        ok, problems = check()
+        ok, problems, cannot_run = check()
         if not ok:
             for p in problems:
                 print(f"wcag --check: {p}", file=sys.stderr)
             return 1
+        if cannot_run:                                  # Ζ·tier·exit — freshness+registry sound, but a farm could not run
+            for c in cannot_run:
+                print(f"wcag --check: {c}", file=sys.stderr)
+            print("wcag --check: the VPAT projection is fresh and the registry is sound, but some F-arms "
+                  "CANNOT RUN here (toolchain absent) — those SCs disclose Not Evaluated (conservative).",
+                  file=sys.stderr)
+            return 3                                    # cannot-run, not a failure
         print("wcag --check: the VPAT INT conformance report is the fresh projection of the standards "
               "model and the proven entailment verdicts — every Supports is warrant-attested, gated fresh")
         return 0

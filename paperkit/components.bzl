@@ -73,6 +73,7 @@ COMPONENTS = {
         "tests/boundaries_surface.py",
         "tests/boundaries_target.py",
         "tests/boundaries_toplevel.py",
+        "tests/boundaries_verdict.py",
         "tests/boundaries_without_k.py",
     ],
 }

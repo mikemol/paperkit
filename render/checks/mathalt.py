@@ -23,7 +23,10 @@ import re
 import sys
 from pathlib import Path
 
-import pikepdf
+try:
+    import pikepdf
+except ImportError:                          # Ζ·tier·exit — pikepdf absent is CANNOT-RUN (exit 3, guarded
+    pikepdf = None                           # in main), not an uncaught ImportError read as a failure
 
 _MATH_SPAN = re.compile(r"(?<!\\)\$(?!\$)([^$]+?)\$|\$\$(.+?)\$\$", re.S)
 
@@ -153,11 +156,14 @@ def _make_fixture(pdf: Path) -> None:
 
 
 def main(argv: list[str]) -> int:
+    if pikepdf is None:                      # Ζ·tier·exit — the toolchain (pikepdf) is absent here
+        print("mathalt: pikepdf absent — CANNOT VERIFY the /Formula alt text (not a pass)", file=sys.stderr)
+        return 3
     if argv and argv[0] == "--selftest":
         return _selftest()
     if len(argv) < 1:
         print("usage: mathalt.py DELIVERABLE.pdf EQ1 EQ2 … | --selftest", file=sys.stderr)
-        return 2
+        return 3
     pdf, alts = Path(argv[0]), argv[1:]
     if not pdf.exists():
         print(f"mathalt: PDF not found at {pdf}", file=sys.stderr)

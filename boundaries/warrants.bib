@@ -69,6 +69,12 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_agree.py},
   reads   = {.}
 }
+@misc{bnd-verdict,
+  section = {engine}, from = {bnd-agree}, join = {. },
+  claim   = {the verdict TRISTATE boundary (Ζ·tier·exit) --- a check's verdict is pass, fail, or cannot-run, and the three are distinct at the record: a check that CANNOT RUN (its host toolchain is absent, exit 3 _REFUSE) records cannot-run, which the pk_gate aggregator's fail-only bad-set does NOT red (so a toolchain-less box is not falsely blocked) yet cannot-run stays distinct from pass (so an unverified check is not falsely green), and a real fail still reds beside it --- the exit code 3-vs-1 is the one bit separating I-could-not-verify from the-property-is-false, the ask-typed-gate-exit shape at the check-verdict layer},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_verdict.py},
+  reads   = {.}
+}
 @misc{bnd-corroboration,
   section = {delta}, from = {bnd-coherence}, join = {. },
   claim   = {the corroboration axis (Ε·agree·grade) --- a grade is the pair (falsifiability, corroboration), not one scalar: an agree: verdict from independent producers is marked independently corroborated while a lone witness or identical producers stay single, so a behavioral cmd: and a behavioral agree: share a grade yet differ on this orthogonal axis},

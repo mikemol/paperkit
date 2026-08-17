@@ -35,9 +35,17 @@ import subprocess
 import sys
 
 
-def _write(out, verb, ok):
+# Ζ·tier·exit — the verdict is a TRISTATE, not a boolean: pass / fail / cannot-run.  `cannot-run`
+# (a toolchain-tier check whose host toolchain is absent — the render checks' explicit `_REFUSE`
+# exit, mirrored here) is NOT a failure: the aggregator's bad-set is {fail} alone, so a cannot-run
+# does NOT red the gate (no false-red on a toolchain-less box) yet stays distinguishable from pass
+# (no false-green — it is honestly "not verified here", the ask-result-tristate shape at the record
+# layer).  A bool `ok` still maps pass/fail (the common path); a str verdict passes through verbatim.
+def _write(out, verb, verdict):
+    if verdict is True or verdict is False:
+        verdict = "pass" if verdict else "fail"
     pathlib.Path(out).write_text(
-        json.dumps({"verb": verb, "verdict": "pass" if ok else "fail"}, separators=(",", ":")) + "\n")
+        json.dumps({"verb": verb, "verdict": verdict}, separators=(",", ":")) + "\n")
 
 
 def main(argv):
@@ -71,7 +79,9 @@ def main(argv):
     a = ap.parse_args(argv)
 
     if a.cmd == "emit":
-        _write(a.out, a.verb, a.ok == "pass")
+        # Ζ·tier·exit — pk_cmd passes pass|fail|cannot-run; anything else is a caller bug → fail closed.
+        v = a.ok if a.ok in ("pass", "fail", "cannot-run") else "fail"
+        _write(a.out, a.verb, v)
     elif a.cmd == "exists":
         _write(a.out, a.verb, pathlib.Path(a.path).exists())
     elif a.cmd == "agg":

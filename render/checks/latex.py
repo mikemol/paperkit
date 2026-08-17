@@ -129,7 +129,7 @@ def main(argv: list[str]) -> int:
     absent = _deps_absent()
     if absent:
         print(f"latex: {absent} absent — CANNOT BUILD (not a pass)", file=sys.stderr)
-        return 2                                            # cannot-run, not a green
+        return 3                                            # cannot-run, not a green
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         pdf = build(Path("../paper/paper.md"), d / "paper.pdf", d)

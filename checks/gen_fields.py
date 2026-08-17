@@ -39,6 +39,9 @@ _FIELD_DOC = {
     "from":     ("prose-order edge: topological ordering + glue adjacency (general→specific)", "warrant"),
     "rests-on": ("grounding edge: effective-grade clamping + citation provenance (NOT prose order)", "warrant"),
     "reads":    ("the check's declared cross-package footprint — staging + audit tokens (Ζ·foot)", "warrant"),
+    "consumes": ("sibling warrant keys whose verdict RECORD this check reads (records-as-deps: the "
+                 "sibling runs once and is memoized; its verdict.json is a declared bazel input, "
+                 "exported in PAPERKIT_CONSUMED_RECORDS as key=path — Ρ·wcag·oracle-edge)", "warrant"),
 }
 
 # What each [paper] key controls.  The KEY SET is derived below from load_config's own source.

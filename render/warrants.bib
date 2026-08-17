@@ -164,11 +164,17 @@
   claim   = {and the accessibility STANDARDS themselves are modeled as sourced, versioned data --- the 86 WCAG 2.2 success criteria (completeness proven by checkable arithmetic, not a trusted number: WCAG 2.1's 78 plus the 9 added in 2.2 less the one removed), the Revised Section 508 incorporation of WCAG 2.0 A and AA, and the EN 301 549 non-web clauses, each tracing to its primary source, with the version skew modeled explicitly because a criterion new in 2.2 is out of 508 scope and out of EN's 2.1 scope BY VERSION, not by choice --- a conformance claim rests on a verified model of the law, not a hand-guessed one},
   check   = {cmd:python3 checks/wcag_model.py --check}
 }
-@misc{rnd-wcag-entail,
+@misc{rnd-wcag-entail-core,
   section = {compliance}, from = {rnd-wcag-model}, join = {. },
-  claim   = {and a criterion is claimed conformant only where a warrant PROVES it, never merely NAMES it --- a Supports verdict is admissible only when a warrant's own falsification arm reds on that criterion's violation, or when the deliverable passes the standard's own validator (veraPDF for PDF/UA), so the falsifiability that grades every paperkit claim becomes the entailment evidence a regulatory claim needs; the check RUNS those falsification arms, so a broken one cannot back a Supports, and a criterion whose entailment is unproven is disclosed conservatively rather than claimed --- the warrant-adequacy gap closed at the regulatory tier, under-claiming by construction because a false Supports is a false legal claim},
+  claim   = {and the entailment LOGIC that decides admissibility is itself falsifiability-graded, not merely trusted --- the pure regulatory core (a Supports is admissible only when its backing proof reads pass; a red proof drops it; an unverifiable one is disclosed conservatively) runs HERMETICALLY with the veraPDF verdicts stubbed, so paperkit's own mutation sweep grades it: corrupt the rule that a failed proof cannot back a Supports and the ⟨P,F,δ⟩ selftest reds, which is what makes the regulatory soundness architecturally enforced rather than self-certified},
+  check   = {cmd:python3 checks/wcag_entail.py --selftest},
+}
+@misc{rnd-wcag-entail,
+  section = {compliance}, from = {rnd-wcag-entail-core}, join = {. },
+  claim   = {and the entailment is then discharged against the REAL deliverable --- a Supports verdict is admissible only when a warrant's own falsification arm reds on that criterion's violation, or when the deliverable passes the standard's own validator (veraPDF for PDF/UA, whose verdict this check CONSUMES from the render warrant that runs it once rather than re-running it), so the falsifiability that grades every paperkit claim becomes the entailment evidence a regulatory claim needs; a broken proof cannot back a Supports, and a criterion whose entailment is unproven is disclosed conservatively rather than claimed --- the warrant-adequacy gap closed at the regulatory tier, under-claiming by construction because a false Supports is a false legal claim},
   check   = {cmd:python3 checks/wcag_entail.py --check},
   tier = {toolchain},
+  consumes = {rnd-a11y, rnd-a11y-latex},
 }
 @misc{rnd-wcag,
   section = {compliance}, from = {rnd-wcag-entail}, join = {. },

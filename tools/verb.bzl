@@ -26,6 +26,10 @@ def _sq(s):
 def _v(ctx):
     return ctx.actions.declare_file(ctx.label.name + ".verdict.json")
 
+def _basekey(f):
+    # a consumed record file is "<key>.verdict.json" → recover <key> (the sibling warrant's name)
+    return f.basename[:-len(".verdict.json")] if f.basename.endswith(".verdict.json") else f.basename
+
 def _pypath(py):
     # prepend the hermetic interpreter's dir so `command -v python3` resolves to it (absolute path ⇒
     # sys.executable is populated for any subprocess the tool spawns — see tools/eval.py).
@@ -59,6 +63,16 @@ def _cmd_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     v = _v(ctx)
     inner = "sh -c " + _sq(ctx.attr.cmd)
+    # Ρ·wcag·oracle-edge — records-as-deps: `consumes` names sibling warrants' verdict records.  Bazel
+    # runs each sibling ONCE (memoized) and stages its verdict.json as an input here; the check reads the
+    # cached verdict instead of re-running the sibling's expensive validator (veraPDF 37s).  The records
+    # are staged at execroot-relative paths, but the check runs with cwd=project (after the cd below), so
+    # export their ABSOLUTE paths — anchored to $PWD captured BEFORE the cd (the pk_agree idiom) — in
+    # PAPERKIT_CONSUMED_RECORDS as `key=abspath` pairs, so the check finds each record regardless of cwd.
+    consume_prefix = ""
+    if ctx.files.consumes:
+        pairs = " ".join([_basekey(f) + "=$PWD/" + f.path for f in ctx.files.consumes])
+        consume_prefix = 'export PAPERKIT_CONSUMED_RECORDS="' + pairs + '"; '
     if ctx.attr.project and ctx.attr.project != ".":
         inner = "cd " + _sq(ctx.attr.project) + " && " + inner  # cwd = the project dir (relative paths)
     # Ζ·tier — the check's enforcement tier decides how it runs and whether it is cached/swept:
@@ -76,13 +90,19 @@ def _cmd_impl(ctx):
     # record itself is emitted by verdict.py (no JSON built in shell).
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.data + stamp_inputs, transitive = [py.files]),
+        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.data + ctx.files.consumes + stamp_inputs, transitive = [py.files]),
         use_default_shell_env = host_env,
         # Ζ·sched-batch·phase2 — the check `inner` is an arbitrary compound shell command, not a
         # single exec, so we tune the ACTION SHELL ($$, single-threaded) and inner + the emit inherit
         # (SCHED_BATCH + nice 19 + 100ms slice), matching the per-cell tuning of the grid rules.
-        command = pyprefix + '"' + ctx.file._sched.path + '" --pid $$ 2>/dev/null; ' +
-                  "if ( " + inner + " ) >/dev/null 2>&1; then V=pass; else V=fail; fi; " +
+        # Ζ·tier·exit — TYPE the exit, engine-aligned with gate.py/discriminate (_REFUSE = 3): a check
+        # that CANNOT RUN (its host toolchain is absent — the render checks return 3) is `cannot-run`,
+        # NOT `fail`.  rc 0 → pass · rc 3 → cannot-run (not verified here, but not a failure — the gate's
+        # bad-set is {fail}, so it does not red the commit) · any other nonzero → fail (ran-and-failed).
+        # Closes the false-red: on a toolchain-less box an honest "cannot verify" no longer blocks commits.
+        command = pyprefix + consume_prefix + '"' + ctx.file._sched.path + '" --pid $$ 2>/dev/null; ' +
+                  "( " + inner + " ) >/dev/null 2>&1; rc=$?; " +
+                  'if [ "$rc" = 0 ]; then V=pass; elif [ "$rc" = 3 ]; then V=cannot-run; else V=fail; fi; ' +
                   '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path,
         mnemonic = "PkCmd",
         execution_requirements = er,
@@ -99,6 +119,10 @@ pk_cmd = rule(
         "cmd": attr.string(mandatory = True),
         "project": attr.string(default = "."),
         "data": attr.label_list(allow_files = True),
+        # Ρ·wcag·oracle-edge — sibling warrants whose verdict records this check consumes (records-as-deps:
+        # they run once, memoized; their verdict.json is staged + their paths exported in
+        # PAPERKIT_CONSUMED_RECORDS as key=abspath, so the check reads the cached verdict, never re-runs it).
+        "consumes": attr.label_list(allow_files = True),
         "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),
         "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),

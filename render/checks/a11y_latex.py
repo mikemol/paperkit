@@ -16,7 +16,7 @@ a paper that used a prose character the fonts do not cover would fail UA-2 here 
 analog of the docx route's fidelity gate, folded into the one conformance verdict.  (Missing-character
 detail, when it fails, is named from the lualatex log so the fix — extend the fallback — is actionable.)
 
-veraPDF absent ⇒ FAIL LOUD (refuse to skip-green); the LaTeX stack absent ⇒ CANNOT-RUN (exit 2), not a
+veraPDF absent ⇒ FAIL LOUD (refuse to skip-green); the LaTeX stack absent ⇒ CANNOT-RUN (exit 3), not a
 false pass.
 
     python3 checks/a11y_latex.py       # build the LaTeX deliverable, gate it PDF/UA-2 == 0
@@ -47,7 +47,7 @@ def main() -> int:
     if latex._deps_absent():
         print(f"a11y-latex: {latex._deps_absent()} absent — CANNOT VERIFY the LaTeX format here "
               "(not a pass)", file=sys.stderr)
-        return 2
+        return 3
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         pdf = latex.build(Path("../paper/paper.md"), d / "paper.pdf", d)

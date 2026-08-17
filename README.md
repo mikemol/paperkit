@@ -44,6 +44,7 @@ A bibliography entry (a warrant, or a `references.bib` citation) may carry these
 | `from` | prose-order edge: topological ordering + glue adjacency (general→specific) | warrant |
 | `rests-on` | grounding edge: effective-grade clamping + citation provenance (NOT prose order) | warrant |
 | `reads` | the check's declared cross-package footprint — staging + audit tokens (Ζ·foot) | warrant |
+| `consumes` | sibling warrant keys whose verdict RECORD this check reads (records-as-deps: the sibling runs once and is memoized; its verdict.json is a declared bazel input, exported in PAPERKIT_CONSUMED_RECORDS as key=path — Ρ·wcag·oracle-edge) | warrant |
 
 A project's `paper.toml` `[paper]` table may set these keys. Generated from the keys `load_config` reads.
 

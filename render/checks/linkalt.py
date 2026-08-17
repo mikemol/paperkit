@@ -31,7 +31,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pikepdf
+try:
+    import pikepdf
+except ImportError:                          # Ζ·tier·exit — pikepdf absent is CANNOT-RUN (exit 3, guarded
+    pikepdf = None                           # in main), not an uncaught ImportError read as a failure
 
 
 def _words_by_page(pdf: Path) -> dict[int, list[tuple[float, float, float, float, str]]]:
@@ -180,11 +183,14 @@ def _describe_by_centre(pdf: Path) -> int:
 
 
 def main(argv: list[str]) -> int:
+    if pikepdf is None:                      # Ζ·tier·exit — the toolchain (pikepdf) is absent here
+        print("linkalt: pikepdf absent — CANNOT VERIFY link descriptions (not a pass)", file=sys.stderr)
+        return 3
     if argv and argv[0] == "--selftest":
         return _selftest()
     if not argv:
         print("usage: linkalt.py DELIVERABLE.pdf | --selftest", file=sys.stderr)
-        return 2
+        return 3
     pdf = Path(argv[0])
     if not pdf.exists():
         print(f"linkalt: PDF not found at {pdf} — build the deliverable first", file=sys.stderr)

@@ -32,8 +32,9 @@ _SCALAR = ("title", "author", "year", "note", "section", "claim",
 # list-valued fields.  `from` = prose-order edge (dep_order + glue); `rests-on` =
 # grounding/entailment edge (adequacy clamping, NOT prose) — the two are often
 # reversed (prose runs general→specific, grounding specific→general); `reads` =
-# the declared cross-package footprint (the declare+audit source, Ζ·foot).
-_LIST = ("from", "rests-on", "reads")
+# the declared cross-package footprint (the declare+audit source, Ζ·foot);
+# `consumes` = sibling warrant keys whose verdict RECORD this check reads (records-as-deps).
+_LIST = ("from", "rests-on", "reads", "consumes")
 # Standard BibTeX reference metadata paperkit TOLERATES on a references.bib citation but does
 # not consume (the projector reads only title/author/year).  Kept so the unknown-field warning
 # below fires on a MEANINGFUL dropped field (a downstream author's `points`, a mistyped `check`)

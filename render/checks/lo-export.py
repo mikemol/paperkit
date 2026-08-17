@@ -208,7 +208,7 @@ def main(argv: list[str]) -> int:
         return _selftest()
     if len(argv) < 2:
         print("usage: lo-export.py SRC.docx OUT.pdf [--timeout N] | --selftest", file=sys.stderr)
-        return 2
+        return 3
     src, out = Path(argv[0]), Path(argv[1])
     timeout = int(argv[argv.index("--timeout") + 1]) if "--timeout" in argv else 900
     if not src.exists():

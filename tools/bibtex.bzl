@@ -32,17 +32,21 @@ def _entries(content):
     reads = []
     rests = []      # rests-on: the premise claims this one is grounded on (Ζ·compose deps)
     tier = ""       # Ζ·tier — per-warrant `tier = {sandbox|local|toolchain}` ("" = inherit the project default)
+    consumes = []   # Ρ·wcag·oracle-edge — sibling warrant KEYS whose verdict RECORD this check reads
+                    # (records-as-deps within a project: the sibling runs ONCE, memoized, and its
+                    # verdict.json is a declared bazel input here — freshness by the action graph)
     for raw in content.splitlines():
         s = raw.strip()
         if s.startswith("@") and "{" in s:
             if key != None:
-                out.append((key, check, sib, reads, rests, tier))
+                out.append((key, check, sib, reads, rests, tier, consumes))
             key = s.split("{", 1)[1].split(",", 1)[0].strip()
             check = ""
             sib = ""
             reads = []
             rests = []
             tier = ""
+            consumes = []
         elif key != None and "=" in s:
             name = s.split("=", 1)[0].strip()
             if name == "check":
@@ -57,8 +61,11 @@ def _entries(content):
                 rests = [t.strip() for t in inner.split(",") if t.strip()]
             elif name == "tier" and "{" in s and "}" in s:
                 tier = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
+            elif name == "consumes" and "{" in s and "}" in s:
+                inner = s.split("{", 1)[1].rsplit("}", 1)[0]
+                consumes = [t.strip() for t in inner.split(",") if t.strip()]
     if key != None:
-        out.append((key, check, sib, reads, rests, tier))
+        out.append((key, check, sib, reads, rests, tier, consumes))
     return out
 
 def _data(tokens, files, imports = [], engine = True):
@@ -135,21 +142,25 @@ def _body(check, custom):
         return custom[typ].replace("{target}", target)
     return None
 
-def _verb_rule(name, check, proj, files, reads, custom, tier, imports = []):
+def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = []):
     """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
     script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd (the exit-code
     oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `tier` is the
     warrant's enforcement tier (Ζ·tier): sandbox (hermetic, swept) | local (host-coupled, uncached) |
     toolchain (host toolchain, cached + stamped with the toolchain fingerprint).  Only pk_cmd carries
-    a tier (the others are always hermetic-sandbox records)."""
+    a tier (the others are always hermetic-sandbox records).  `consumes` (Ρ·wcag·oracle-edge) names
+    sibling warrant keys whose verdict records this pk_cmd depends on (records-as-deps, memoized)."""
     i = check.find(":")
     typ = check[:i]
     target = check[i + 1:]
     dl = ", ".join([_lit(d) for d in _data(reads, files, imports)])
     pj = "" if proj == "." else ", project = " + _lit(proj)
     tc = "" if tier == "sandbox" else ", tier = " + _lit(tier)
+    # Ρ·wcag·oracle-edge — each consumed sibling key → its verdict-record target label ":<key>" in the
+    # same generated package (all warrants of a project are pk_* siblings here — no visibility barrier).
+    cs = "" if not consumes else ", consumes = [" + ", ".join([_lit(":" + c) for c in consumes]) + "]"
     if typ == "cmd":
-        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + tc + ", data = [" + dl + "])"
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + tc + cs + ", data = [" + dl + "])"
     elif typ == "file":
         return "pk_file(name = " + _lit(name) + ", path = " + _lit(target) + ", data = [" + dl + "])"
     elif typ == "result":   # records-as-deps: depend on the sibling's aggregate verdict record
@@ -335,7 +346,7 @@ def _bib_repo_impl(repository_ctx):
     # local or toolchain, never sandbox).  The footprint audit (a per-sandbox-warrant declare-vs-strace
     # cross-check) is emitted iff SOME warrant is sandbox — so its symbols load iff `not all_host`.
     all_host = True
-    for _pk, _pc, _ps, _pr, _prr, _pt in parsed:
+    for _pk, _pc, _ps, _pr, _prr, _pt, _pcons in parsed:
         if _pc and ((_pt if _pt else proj_tier) == "sandbox"):
             all_host = False
             break
@@ -412,7 +423,7 @@ def _bib_repo_impl(repository_ctx):
     imported_cert = {}   # Λ·witness — k → the owner library's __dcalc cert label (a concept: import edge)
     owns = repository_ctx.attr.owns_concepts
     vis = ', visibility = ["//visibility:public"]'  # the owner EXPORTS per-concept records for views to import
-    for k, check, sib, reads, rests, tier in parsed:
+    for k, check, sib, reads, rests, tier, consumes in parsed:
         if not check:
             continue
         # Ζ·tier — the warrant's effective tier: its own `tier = {…}`, else the project default.  A
@@ -531,7 +542,7 @@ def _bib_repo_impl(repository_ctx):
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
                            str(_membucket(mem, k, "def")) + ", data = [" + dl + "]" + (vis if owns else "") + ")")
         else:
-            out.append(_verb_rule(k, check, proj, files, reads, custom, wt, imports))
+            out.append(_verb_rule(k, check, proj, files, reads, custom, wt, consumes, imports))
         recs.append('":%s"' % k)
 
     if calc_claims:
@@ -577,7 +588,7 @@ def _bib_repo_impl(repository_ctx):
         # pk_adequacy; the assert-test puts it in //:hook.  (The old discriminate.py sweep sh_test
         # is retired; discriminate.py stays as the per-claim grade ORACLE behind pk_grade_claim.)
         grades = []
-        for k, check, sib, reads, rests, tier in parsed:
+        for k, check, sib, reads, rests, tier, _consumes in parsed:
             if not check:
                 continue
             # Ζ·tier — a NON-sandbox warrant (local or toolchain) is GATED but not GRADED: the adequacy
@@ -625,7 +636,7 @@ def _bib_repo_impl(repository_ctx):
     # (not in //:hook).  Ζ·tier — a `local` (host-coupled) WARRANT's footprint needs the host, so it
     # is skipped per-warrant; the audit is still emitted for a project with ANY sandbox warrant.
     foots = []
-    for k, check, sib, reads, rests, tier in parsed:
+    for k, check, sib, reads, rests, tier, _consumes in parsed:
         if not check or sib or check.startswith("concept:"):  # result:/concept: are import edges — no local footprint
             continue
         if (tier if tier else proj_tier) != "sandbox":   # a host-run warrant's footprint needs the host
@@ -640,10 +651,10 @@ def _bib_repo_impl(repository_ctx):
         # Ζ·compose — each claim's WITNESS as a build artifact; rests-on as build DEPS (the grounding
         # DAG IS the build DAG).  `bazel build //<proj>:proof` builds every witness — build-success =
         # proven, and an unproven premise blocks every claim resting on it.  On-demand (not //:hook yet).
-        checked = {k: True for k, check, sib, reads, rests, tier in parsed if check}
+        checked = {k: True for k, check, sib, reads, rests, tier, _consumes in parsed if check}
         wits = []
         pj = "" if proj == "." else ", project = " + _lit(proj)
-        for k, check, sib, reads, rests, tier in parsed:
+        for k, check, sib, reads, rests, tier, _consumes in parsed:
             if not check:
                 continue
             prem = ['":%s__witness"' % r for r in rests if r in checked]

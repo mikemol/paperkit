@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "q5TWHY/Mcg3Pv/5hCgB+VWAatuelNnsZc3jq44dNZns=",
+        "bzlTransitiveDigest": "FVzr9TWuDxqb7PUGYvOBy0PYFIvYRnHxq3t4dTmM4qA=",
         "usagesDigest": "KMwiLRDvrKj0s3AUWfGJNRZcYz8YU0maYSXujuyYWaE=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "a733904df72610994a09f23276fd4e3f11e80d12acf22e0642458e08e3f70dad",
@@ -152,10 +152,10 @@
           "@@//paper.toml": "5f9ad08942219d85ba68074f848bddd43096ee9321b93333b698ca3c02e6e0c4",
           "@@//paper/checks/claims.py": "d095f80852784d4c1636f455a9aad5ec1175522d951156b4ecc4d9b18157d684",
           "@@//paper/paper.toml": "d4a36ac3e13d52468701d7b4ae0370c0072d84588c59221f27383593a2aea192",
-          "@@//paperkit/bib.py": "577b216874b3135b9ca580a12a5b68ce3a7860ddd1175b13d1b2f7201724aed2",
+          "@@//paperkit/bib.py": "8754cdf64f01dd843cecf902f35d6b20a6a6e37f9c4064f02b6d94f0be84b6ce",
           "@@//paperkit/cache.py": "c285a4dd121e2cbece9f145ca3725eab10b48e9cbb1d01b87d626f5d40c2d894",
           "@@//paperkit/coherence.py": "d51d682f1d157d1b41cde9ca0393ee620c58981e98a0cd4794991aa4449b7c8a",
-          "@@//paperkit/components.bzl": "f2cecc66d49e86d17b742644b40b54dfc476f13b3b5d1722b38f083d7f2fe38b",
+          "@@//paperkit/components.bzl": "093e61aaf9369fce5bc71e3fa3586b58df1d7bc2f7707a533c51807b6f3eb9f1",
           "@@//paperkit/config.py": "2e4b8eb4c21405042c47e96f2e6662bb0aa62e725dcd6b0310bddf9d7c337868",
           "@@//paperkit/discriminate.py": "e45ff6d1565c9c8109e6c0f3bdb489f707c9aa6519c0b2157531c280dd06e69e",
           "@@//paperkit/driver.py": "f102c6efb796e846d68b55a78a12a869d27157b84472efa35183b77537da136e",

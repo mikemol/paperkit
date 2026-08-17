@@ -82,13 +82,13 @@ def main(argv: list[str]) -> int:
     via = argv[argv.index("--via") + 1] if "--via" in argv else "docx"
     if via not in graph.ROUTES:
         print(f"pdf: unknown route --via {via} (expected {'|'.join(graph.ROUTES)})", file=sys.stderr)
-        return 2
+        return 3
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         pdf = render(Path("../paper/paper.md"), d / "p.pdf", via, d)
         if pdf is None:
             print(f"pdf: CANNOT BUILD via {via} — the route's toolchain is unavailable", file=sys.stderr)
-            return 2                                            # cannot-run, not a false pass
+            return 3                                            # cannot-run, not a false pass
         info = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout
         pages = int((re.search(r"Pages:\s*(\d+)", info) or [0, 0])[1])
         txt = subprocess.run(["pdftotext", str(pdf), "-"], capture_output=True, text=True).stdout

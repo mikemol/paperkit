@@ -33,6 +33,8 @@ Does Not Support — never inferred from UA alone.
 """
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -40,6 +42,30 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import matrix
 import wcag_model as wm
+
+
+# Ρ·wcag·oracle-edge — the oracle warrants' verdict records, consumed as records-as-deps (memoized):
+# PAPERKIT_CONSUMED_RECORDS is set by the pk_cmd rule to space-separated `key=abspath` pairs (the
+# sibling warrant ran ONCE under bazel; its verdict.json is a declared input here).  So the oracle
+# entailment READS veraPDF's cached verdict rather than re-running a11y_own.py (37s) — closing the data
+# edge the adversary found (a red rnd-a11y record now drops the Supports) with no redundant re-run.
+_CONSUMED = {}
+for _pair in os.environ.get("PAPERKIT_CONSUMED_RECORDS", "").split():
+    if "=" in _pair:
+        _k, _p = _pair.split("=", 1)
+        _CONSUMED[_k] = _p
+
+
+def _consumed_verdict(warrant: str) -> str | None:
+    """The pass/fail/cannot-run verdict of a consumed sibling record, or None if not staged here (the
+    check was run standalone, outside bazel — the record dep is only present in the //:hook action)."""
+    path = _CONSUMED.get(warrant)
+    if not path or not Path(path).exists():
+        return None
+    try:
+        return json.loads(Path(path).read_text()).get("verdict")
+    except (OSError, ValueError):
+        return None
 
 # The route → its final delivered format (matrix format names) + PDF/UA version.
 ROUTE_FINAL = {"docx": ("pdf-office", "UA-1"), "latex": ("pdf-latex", "UA-2")}
@@ -164,21 +190,40 @@ def _scope(warrant: str) -> str:
 
 
 def _proven(warrant: str, run_farm: bool) -> str | None:
-    """The entailment form of a warrant if PROVEN, else None.  For a "farm" warrant, optionally RUN
-    its selftest (run_farm) so the entailment is verified not asserted; "oracle" is proven by being
-    the standard's own validator."""
+    """The entailment form of a warrant if PROVEN, else None (unproven) or "cannot-run" (the entailment
+    could not be verified HERE — a THIRD state distinct from a failed proof).
+
+    Ζ·tier·exit + Ρ·wcag·oracle-edge — farm and oracle both VERIFY by consuming a validator's result,
+    never by asserting the warrant is named here:
+      FARM   — run the ⟨P,F,δ⟩ selftest, read its TYPED exit: 0 → proven, 3 (_REFUSE) → cannot-run
+               (its toolchain is absent), other nonzero → None (the F-arm FAILED, a real defect).
+      ORACLE — read the sibling veraPDF warrant's CONSUMED verdict record (records-as-deps, memoized —
+               veraPDF ran once in rnd-a11y): "pass" → proven, "fail" → None (a red veraPDF cannot back
+               a Supports — the false-green the adversary found, closed), "cannot-run"/absent →
+               cannot-run (the record was not staged — standalone run, or the oracle's toolchain absent).
+    run_farm=False (report projection) returns the form unverified — the report SHOWS the verdict; check()
+    is what VERIFIES it (run_farm=True), exactly as the farm SCs work."""
     form = ENTAILMENT.get(warrant)
     if form is None:
         return None
     kind, cmd, _scope_ = form
-    if kind == "oracle":
-        return "oracle"
+    if not run_farm:
+        return kind
     if kind == "farm":
-        if run_farm:
-            rc = subprocess.run(cmd, capture_output=True,
-                                cwd=Path(__file__).resolve().parent.parent).returncode
-            return "farm" if rc == 0 else None    # a farm whose selftest fails does NOT entail
-        return "farm"
+        rc = subprocess.run(cmd, capture_output=True,
+                            cwd=Path(__file__).resolve().parent.parent).returncode
+        if rc == 0:
+            return "farm"           # F-arm proven → entails
+        if rc == 3:
+            return "cannot-run"     # toolchain absent → not verifiable here (not a fail)
+        return None                 # a farm whose selftest FAILED does NOT entail (a real defect)
+    if kind == "oracle":
+        v = _consumed_verdict(warrant)
+        if v == "pass":
+            return "oracle"         # veraPDF passed (consumed record) → entails
+        if v == "fail":
+            return None             # veraPDF FAILED → does NOT entail (false-green closed)
+        return "cannot-run"         # record not staged (standalone) or cannot-run → not verifiable here
     return None
 
 
@@ -203,14 +248,20 @@ def entail(sc: str, route: str, run_farm: bool = False) -> dict:
         return _scope(w), f"{w} entails this"
 
     proven = [(w, _proven(w, run_farm)) for w in warrants]
+    # Ζ·tier·exit — "cannot-run" is a proof STATE, not a proof: it must not read as truthy `form`
+    # (which would grant Supports on an unverified proof), and it must not fall through to "Does Not
+    # Support" (asserting a gap we did NOT verify absent is the OPPOSITE overclaim).  A criterion whose
+    # only would-be proof could not run is Not Evaluated.
+    def _is_proof(form: str | None) -> bool:
+        return form in ("farm", "oracle")
     # a proven, FULL-scope warrant → Supports.  Scan for one before settling for a fragment.
     for w, form in proven:
-        if form and _eff_scope(w)[0] == "full":
+        if _is_proof(form) and _eff_scope(w)[0] == "full":
             return {"verdict": "Supports", "warrant": w, "form": form,
                     "remark": f"{_eff_scope(w)[1]} ({form})"}
     # a proven FRAGMENT-scope warrant → Partially Supports (it proves a sub-part, not the whole SC).
     for w, form in proven:
-        if form and _eff_scope(w)[0] == "fragment":
+        if _is_proof(form) and _eff_scope(w)[0] == "fragment":
             return {"verdict": "Partially Supports", "warrant": w, "form": form,
                     "remark": f"{_eff_scope(w)[1]} — only part of the criterion is proven ({form}), "
                               f"not the whole; a full claim needs coverage the tool cannot confirm"}
@@ -218,40 +269,117 @@ def entail(sc: str, route: str, run_farm: bool = False) -> dict:
     if warrants:
         return {"verdict": "Partially Supports", "warrant": warrants[0], "form": None,
                 "remark": f"{warrants[0]} addresses this but its entailment is not proven for a full claim"}
+    # the only would-be entailment could not RUN here (toolchain absent / record not staged) → Not
+    # Evaluated, conservatively: neither claim Supports (unverified) nor a gap (not verified absent).
+    if any(form == "cannot-run" for _w, form in proven):
+        w = next(w for w, form in proven if form == "cannot-run")
+        return {"verdict": "Not Evaluated", "warrant": w, "form": "cannot-run",
+                "remark": f"{w}'s entailment could not be verified here — not claimed either way "
+                          f"(conservative under a missing validator or an unstaged consumed record)"}
     # claimable for this content but no entailing warrant → Does Not Support (honest gap)
     return {"verdict": "Does Not Support", "warrant": None, "form": None,
             "remark": "no warrant entails this criterion for this deliverable (a known gap)"}
 
 
-def check() -> tuple[bool, list[str]]:
-    """Every "Supports" a route yields must resolve to a warrant with PROVEN entailment — the farm
-    warrants' selftests are RUN (so a broken F-arm cannot back a Supports), the oracle warrants are
-    the standard's validator.  This is the regulatory soundness gate: no Supports without proof."""
-    problems = []
+def check() -> tuple[bool, list[str], list[str]]:
+    """Every "Supports" a route yields must resolve to a warrant with PROVEN entailment.  The farm
+    warrants' selftests are RUN; the oracle warrants' CONSUMED veraPDF records are read (Ρ·wcag·oracle-
+    edge — a Supports backed by the oracle is admissible only when veraPDF actually PASSED, read from
+    rnd-a11y's memoized verdict record, not asserted by registry membership).  The regulatory soundness
+    gate: no Supports without proof.  Returns (ok, problems, cannot_run): Ζ·tier·exit — a validator that
+    could not run here (a farm selftest exiting 3, or an oracle record that is fail-absent/cannot-run) is
+    NOT a problem — it is recorded separately so the gate reports CANNOT-RUN (exit 3), not a false
+    failure, on a toolchain-less box or a standalone (out-of-bazel) run."""
+    problems, cannot_run = [], []
     # the entailment registry must name real warrants (in warrants.bib) and real check commands.
+    # (this half is PURE — no toolchain — the sandbox-gradeable core; see Ρ·wcag·entail-sweep.)
     bib = (Path(__file__).resolve().parent.parent / "warrants.bib").read_text()
     for w, (kind, cmd, _sc) in ENTAILMENT.items():
         if f"@misc{{{w}," not in bib and f"@misc{{{w} ," not in bib:
             problems.append(f"entailment names warrant {w!r} absent from warrants.bib")
         if kind not in ("farm", "oracle"):
             problems.append(f"{w}: entailment form {kind!r} is not farm/oracle")
-    # every farm warrant's selftest must PASS (a Supports backed by a red F-arm is a false claim).
+    # every farm selftest / oracle record must not FAIL (a Supports backed by a red F-arm or a red
+    # veraPDF is a false claim) — UNLESS it could not run here (rc=3 / cannot-run), recorded separately.
     for w, (kind, cmd, _sc) in ENTAILMENT.items():
-        if kind == "farm":
-            rc = subprocess.run(cmd, capture_output=True,
-                                cwd=Path(__file__).resolve().parent.parent).returncode
-            if rc != 0:
-                problems.append(f"{w}: its ⟨P,F,δ⟩ selftest FAILS (rc={rc}) — cannot back a Supports")
-    # every SC a route marks Supports must, on re-derivation with farm-running, still be Supports
-    # (the verdict is stable and proof-backed, not an artifact of skipping the selftest).
+        form = _proven(w, run_farm=True)
+        what = "⟨P,F,δ⟩ selftest" if kind == "farm" else "veraPDF validator (consumed record)"
+        if form == "cannot-run":
+            cannot_run.append(f"{w}: its {what} CANNOT RUN here (toolchain absent / record not staged)")
+        elif form is None:                              # ran-and-failed (a red validator)
+            problems.append(f"{w}: its {what} FAILS — cannot back a Supports")
+    # every SC a route marks Supports must, on re-derivation with proofs RUN, still be Supports — UNLESS
+    # its would-be full-scope proof CANNOT RUN (toolchain absent / consumed record not staged), which
+    # legitimately downgrades it (to Not Evaluated, or Partially if a fragment warrant remains).  A
+    # downgrade is a PROBLEM only when the backing proof genuinely FAILED (_proven → None), not when it
+    # could not run (_proven → cannot-run).  Ζ·tier·exit: cannot-run is not a false Supports.
     for route in ROUTE_FINAL:
         for sc in wm.SC:
             v = entail(sc, route, run_farm=False)
             if v["verdict"] == "Supports":
+                backer = v["warrant"]
                 vr = entail(sc, route, run_farm=True)
-                if vr["verdict"] != "Supports":
-                    problems.append(f"{sc} × {route}: Supports without a passing entailment proof")
-    return (not problems), problems
+                if vr["verdict"] == "Supports":
+                    continue
+                if _proven(backer, run_farm=True) == "cannot-run":
+                    continue                            # its proof could not run — an honest downgrade
+                problems.append(f"{sc} × {route}: Supports without a passing entailment proof")
+    return (not problems), problems, cannot_run
+
+
+def _selftest() -> int:
+    """⟨P, F, δ⟩ for Ρ·wcag·oracle-edge — the oracle Supports is admissible ONLY when the CONSUMED
+    veraPDF record reads pass; a fail record drops it (the false-green the adversary found, closed).
+    Stubs _CONSUMED in-memory (no bazel, no 37s veraPDF), so it gates the record-consumption logic
+    cheaply.  δ = the consumed record's verdict (pass vs fail) flips 1.1.1 between Supports and not."""
+    import tempfile
+    fails = []
+
+    def _with_record(verdict: str, sc: str = "1.1.1", route: str = "docx") -> str:
+        with tempfile.TemporaryDirectory() as d:
+            for w in ("rnd-a11y", "rnd-a11y-latex"):
+                p = Path(d) / f"{w}.verdict.json"
+                p.write_text(f'{{"verb":"cmd","verdict":"{verdict}"}}')
+                _CONSUMED[w] = str(p)
+            try:
+                return entail(sc, route, run_farm=True)["verdict"]
+            finally:
+                for w in ("rnd-a11y", "rnd-a11y-latex"):
+                    _CONSUMED.pop(w, None)
+
+    def check(desc, cond):
+        print(f"  {'ok ' if cond else 'XX '}{desc}")
+        if not cond:
+            fails.append(desc)
+
+    print("Ρ·wcag·oracle-edge — the oracle Supports is proof-backed by the consumed record\n")
+    # P: a consumed record that reads PASS backs the full Supports (1.1.1 is a full UA-bridge SC).
+    check("consumed record = pass → 1.1.1 Supports (reads the cached veraPDF, no re-run)",
+          _with_record("pass") == "Supports")
+    # F: a consumed record that reads FAIL drops the Supports — the adversary's counterexample, closed.
+    check("consumed record = fail → 1.1.1 NOT Supports (a red veraPDF cannot back a Supports)",
+          _with_record("fail") != "Supports")
+    # cannot-run: an absent/cannot-run record is Not-Evaluated-conservative, never a false Supports.
+    check("consumed record = cannot-run → 1.1.1 NOT Supports (unverified, conservative)",
+          _with_record("cannot-run") != "Supports")
+    # standalone (no record staged) → the oracle is cannot-run, never a false-asserted Supports.
+    check("no consumed record staged → 1.1.1 NOT Supports (standalone cannot assert the oracle)",
+          entail("1.1.1", "docx", run_farm=True)["verdict"] != "Supports")
+
+    print("\n⟨P, F, δ⟩ minimum-delta pair\n")
+    P, F = _with_record("pass"), _with_record("fail")
+    ok = P == "Supports" and F != "Supports"
+    fails.append("record-verdict-delta") if not ok else None
+    print(f"  {'ok ' if ok else 'XX '}the consumed record's verdict flips 1.1.1 Supports on/off")
+    print("      P (pass side): consumed rnd-a11y record reads pass — 1.1.1 Supports (veraPDF passed)")
+    print("      F (flag side): consumed rnd-a11y record reads fail — 1.1.1 not Supports (veraPDF failed)")
+    print("      δ (min delta): the single verdict field pass→fail in the consumed record\n")
+
+    if fails:
+        print(f"SELFTEST: FAIL ({len(fails)} drifted)")
+        return 1
+    print("SELFTEST: PASS")
+    return 0
 
 
 def summary(route: str, run_farm: bool = False) -> dict:
@@ -263,12 +391,21 @@ def summary(route: str, run_farm: bool = False) -> dict:
 
 
 def main(argv: list[str]) -> int:
+    if "--selftest" in argv:
+        return _selftest()
     if "--check" in argv:
-        ok, problems = check()
+        ok, problems, cannot_run = check()
         if not ok:
             for p in problems:
                 print(f"wcag-entail --check: {p}", file=sys.stderr)
-            return 1
+            return 1                                    # a real defect (a red validator) — RAN-AND-FAILED
+        if cannot_run:                                  # Ζ·tier·exit — no defect, but a validator could not run
+            for c in cannot_run:
+                print(f"wcag-entail --check: {c}", file=sys.stderr)
+            print("wcag-entail --check: registry is sound; some validators CANNOT RUN here (toolchain "
+                  "absent / consumed record not staged — a standalone run) — those SCs disclose Not "
+                  "Evaluated, not Supports (conservative).", file=sys.stderr)
+            return 3                                    # cannot-run, not a failure
         parts = []
         for route in ROUTE_FINAL:
             t = summary(route, run_farm=False)
@@ -277,7 +414,7 @@ def main(argv: list[str]) -> int:
                                    ("Supports", "Partially Supports", "Does Not Support",
                                     "Not Applicable", "Not Evaluated") if t.get(v)))
         print("wcag-entail --check: every Supports has proven entailment (farm selftests pass, "
-              "oracle = veraPDF); conservative — no Supports without proof.")
+              "oracle = consumed veraPDF record); conservative — no Supports without proof.")
         for p in parts:
             print("  " + p)
         return 0

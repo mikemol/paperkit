@@ -8,6 +8,14 @@ test --test_output=errors --test_summary=terse
 # keys are the fingerprint a consumer needs to trust which environment proved a claim (the VPAT tier
 # disclosure).  Cheap: the status command runs once per build; stable keys invalidate only on change.
 build --stamp --workspace_status_command=tools/toolchain_status.sh
+# Ζ·tier·toolchain — a toolchain-tier check runs under the HOST toolchain unsandboxed (verb.bzl:
+# use_default_shell_env), and part of that toolchain lives under $HOME: lualatex resolves its
+# TEXMFHOME tree (~/texmf — luaotfload.sty et al.) via HOME, veraPDF/pandoc read ~/.local caches.
+# use_default_shell_env does NOT reliably carry HOME (bazel sanitizes it), so pass it explicitly.
+# This reaches only NON-sandboxed actions (local/toolchain tiers); the hermetic sandbox (the pure
+# swept compliance checks, --config=mutant) gets a fixed sandbox env and ignores action_env, so its
+# reproducibility is untouched — measured: the sandbox compliance checks stay green + graded.
+build --action_env=HOME
 # Memory bounding is Τ·mem: each pk_calc declares a resource_set (the learned mem.json bucket via
 # the bib generator's ladder), and Bazel's local scheduler bounds concurrent sweeps against
 # --local_ram_resources (default HOST_RAM*.67) — no rc pool needed.  The old --local_extra_resources

@@ -39,6 +39,31 @@ def main() -> int:
     check("a lone producer (no independence) flags", not ag("printf 42").passed)
     check("a producer that FAILS cannot concur", not ag("printf 42 ||| false").passed)
     check("agreement is on OUTPUT, not exit code alone", not ag("printf A ||| printf B").passed)
+    # Ζ·tier·agree — a producer output is a whole DOCUMENT, not one line: two byte-identical MULTI-LINE
+    # producers must concur (the render `agree:` producers are 19k-byte rendered documents).  This pins
+    # BOTH agree implementations — the resolver CLI (here) and the bazel pk_agree/verdict.py path (below)
+    # — on full-TEXT equality, not the line-collapse that reds identical multi-line documents.
+    check("two identical MULTI-LINE producers concur", ag("printf 'a\\nb\\nc' ||| printf 'a\\nb\\nc'").passed)
+    check("multi-line producers differing on one line flag", not ag("printf 'a\\nb\\nc' ||| printf 'a\\nX\\nc'").passed)
+
+    # The bazel path is a SECOND implementation (tools/verdict.py agree) — gate it directly on the same
+    # multi-line property, so the two agree oracles cannot diverge (they did: the CLI compared full text
+    # while verdict.py collapsed to distinct LINES and red two identical multi-line documents).
+    import subprocess, tempfile, json
+    VER = str(ENG.parent / "tools" / "verdict.py")
+    def vagree(*texts):
+        with tempfile.TemporaryDirectory() as d:
+            ps = []
+            for i, t in enumerate(texts):
+                p = f"{d}/p{i}"
+                open(p, "w").write(t)
+                ps.append(p)
+            out = f"{d}/v.json"
+            subprocess.run(["python3", VER, "agree", "agree", out, *ps], check=True)
+            return json.load(open(out))["verdict"] == "pass"
+    check("verdict.py agree: identical multi-line texts concur", vagree("a\nb\nc\n", "a\nb\nc\n"))
+    check("verdict.py agree: differing multi-line texts flag", not vagree("a\nb\nc\n", "a\nX\nc\n"))
+    check("verdict.py agree: a __FAIL__ producer flags", not vagree("__FAIL__\n", "__FAIL__\n"))
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     P, F = ag("printf 42 ||| printf 42"), ag("printf 42 ||| printf 43")

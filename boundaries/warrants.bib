@@ -65,8 +65,9 @@
 }
 @misc{bnd-agree,
   section = {engine}, from = {bnd-footprint}, join = {. },
-  claim   = {the agree verb's boundary (Δ·agree) --- independent producers that concur pass, a single byte of disagreement flags, and neither a lone producer nor one that fails can concur, so the verb corroborates a fact across implementations rather than trusting one},
-  check   = {cmd:python3 ../paperkit/tests/boundaries_agree.py}
+  claim   = {the agree verb's boundary (Δ·agree) --- independent producers that concur pass, a single byte of disagreement flags, and neither a lone producer nor one that fails can concur, so the verb corroborates a fact across implementations rather than trusting one; and concurrence is full-TEXT equality on BOTH the resolver-CLI and the bazel pk_agree paths, so two byte-identical MULTI-LINE documents concur (the two agree oracles cannot diverge)},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_agree.py},
+  reads   = {.}
 }
 @misc{bnd-corroboration,
   section = {delta}, from = {bnd-coherence}, join = {. },

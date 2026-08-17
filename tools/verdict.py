@@ -94,9 +94,12 @@ def main(argv):
 
         _write(a.out, a.verb, all(field_val(r) not in bad for r in a.records))
     elif a.cmd == "agree":
+        # CONCURS — the producers' full outputs are all byte-equal (one distinct TEXT), none failed.
+        # (Not one distinct LINE: a producer output is a whole document; collapsing to lines would
+        # demand every producer be a single line — which reds two byte-identical multi-line documents.)
         texts = [pathlib.Path(p).read_text() for p in a.produced]
-        lines = {ln for t in texts for ln in t.splitlines()}
-        _write(a.out, a.verb, len(texts) >= 2 and len(lines) == 1 and "__FAIL__" not in lines)
+        distinct = set(texts)
+        _write(a.out, a.verb, len(texts) >= 2 and len(distinct) == 1 and "__FAIL__" not in next(iter(distinct)))
     elif a.cmd == "calc":
         _write(a.out, a.verb, bool(json.loads(pathlib.Path(a.calc).read_text()).get("baseline")))
     elif a.cmd == "cohere":

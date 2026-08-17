@@ -3,17 +3,20 @@
 @misc{rnd-graph,
   section = {graph},
   claim   = {the render pipeline is a COALGEBRA tracked as data --- format OBJECTS (md, docx, odt, latex, pdf) and conversion MORPHISMS (pandoc from markdown, the office suite between docx/odt/pdf, lualatex from latex) live as an explicit many-to-many adjacency matrix with ONE owner, and the format-node producers and the pdf router DERIVE their edges from it rather than each hardcoding a tool --- so every declared morphism's tool is present (the graph cannot claim an edge the toolchain cannot perform) and every route to the terminal PDF composes real edges, and a new node or edge (a slide-deck target) is added in ONE place},
-  check   = {cmd:python3 checks/graph.py --check}
+  check   = {cmd:python3 checks/graph.py --check},
+  tier = {toolchain},
 }
 @misc{rnd-docx,
   section = {graph}, from = {rnd-graph}, join = {. },
   claim   = {and the docx format is a first-class NODE --- md becomes a Word document by the pandoc morphism the graph declares (asserted against the matrix, not hardcoded), from the ONE resolved source every node shares (each internal warrant inlined as its verification marker, the title carried from paper.toml through pandoc's core metadata), a well-formed OOXML package that pandoc reads back --- terminal-capable (a consumer may want the .docx itself) or the intermediate the docx-to-pdf route reads},
-  check   = {cmd:python3 checks/docx.py}
+  check   = {cmd:python3 checks/docx.py},
+  tier = {toolchain},
 }
 @misc{rnd-odf,
   section = {graph}, from = {rnd-docx}, join = {. },
   claim   = {and the OpenDocument format is a first-class NODE too --- md becomes a valid .odt (a package carrying content.xml and the OpenDocument-text mimetype) by the same pandoc morphism from the same resolved source; ODF is LibreOffice's NATIVE format, the object the office edges already pass through, so surfacing it as its own node makes the hidden intermediate a terminal-capable deliverable a consumer may render or route on to a PDF},
-  check   = {cmd:python3 checks/odf.py}
+  check   = {cmd:python3 checks/odf.py},
+  tier = {toolchain},
 }
 @misc{rnd-matrix,
   section = {graph}, from = {rnd-odf}, join = {. },
@@ -28,107 +31,128 @@
 @misc{rnd-emit,
   section = {emit},
   claim   = {the paper renders to a Word document --- pandoc turns paper.md into a valid .docx (a well-formed OOXML package that pandoc can read back), the first presentation beyond markdown},
-  check   = {cmd:sh checks/emit.sh}
+  check   = {cmd:sh checks/emit.sh},
+  tier = {toolchain},
 }
 @misc{rnd-agree,
   section = {agree},
   claim   = {the rendered document PRESENTS the verified paper: the plain text a reader sees in the .docx is byte-for-byte the plain text of paper.md, so the render preserves the content --- presentation agreement extends prose≡projection down the render stack, from the gated source to the delivered document},
-  check   = {agree:sh checks/agree_md.sh|||sh checks/agree_docx.sh}
+  check   = {agree:sh checks/agree_md.sh|||sh checks/agree_docx.sh},
+  tier = {toolchain},
 }
 @misc{rnd-wf,
   section = {integrity},
   claim   = {the rendered document is structurally sound: word/document.xml is well-formed OOXML, and every section of the paper is presented as a real Word heading whose text matches --- the structure survives the render, never flattened into body text},
-  check   = {cmd:python3 checks/structure.py}
+  check   = {cmd:python3 checks/structure.py},
+  tier = {toolchain},
 }
 @misc{rnd-fidelity,
   section = {integrity}, from = {rnd-wf}, join = {. },
   claim   = {and the reader's view is faithful: rendered all the way to a PDF, every non-ASCII glyph the paper uses survives into the text layer with no missing-glyph tofu, and every heading is present there --- what the consumer copies, searches, or hears through a screen reader is the paper, not a broken rendering},
-  check   = {cmd:python3 checks/fidelity.py}
+  check   = {cmd:python3 checks/fidelity.py},
+  tier = {toolchain},
 }
 @misc{rnd-omml,
   section = {integrity}, from = {rnd-fidelity}, join = {. },
   claim   = {and the paper's EQUATIONS transport as native Office Math (OMML), not pixels --- the effective-grade clamp, the emergence increment and the coherence disjointness render from the claim prose's inline math into editable, well-formed $<$m:oMath$>$ elements that scale and stay in the text layer, with no equation leaked to a rasterized image and no math delimiter surviving as literal text; and the presentation-agreement check DELEGATES the equations to this OMML owner rather than compare their plain-text flattenings (which differ across the two render paths), so the cross-path difference is REGISTERED against a bounded set of glyph variants and witnessed to stay within it, not erased --- the hardest document-fidelity case demonstrated on the paper's own content (mat260's OMML doctrine)},
-  check   = {cmd:python3 checks/omml.py}
+  check   = {cmd:python3 checks/omml.py},
+  tier = {toolchain},
 }
 @misc{rnd-widen,
   section = {integrity}, from = {rnd-omml}, join = {. },
   claim   = {and a wide equation in a TABLE cell is sized to fit rather than clipped --- an OMML run cannot wrap (LibreOffice never breaks inside it, and renders it at a fixed base size that ignores the run's own size hints, so column WIDTH is the only lever), and a formula wider than its fixed column paints past the margin and is truncated, so before the export each table's columns are sized to their MEASURED rendered ink and a cell that still would not fit under that sizing is named rather than silently clipped --- the ink measured with the same rasterizer the reader sees, not estimated from a character count (mat260's measured-column-width, whose CLIPS verdict is first-pass under column sizing, a wider page or a broken equation left untried)},
-  check   = {cmd:python3 checks/widen_tables.py --selftest}
+  check   = {cmd:python3 checks/widen_tables.py --selftest},
+  tier = {toolchain},
 }
 @misc{rnd-ocr,
   section = {visual},
   claim   = {the reader's EYE sees the paper, not just a screen reader: rendered to a PDF and rasterized to images, OCR recovers the paper's text from the pixels themselves --- a font or render regression that turned the body to tofu would crater that recovery, so the visual layer is gated, not only the text layer},
-  check   = {cmd:python3 checks/ocr.py}
+  check   = {cmd:python3 checks/ocr.py},
+  tier = {toolchain},
 }
 @misc{rnd-fonts,
   section = {visual}, from = {rnd-ocr}, join = {. },
   claim   = {and every font in the rendered PDF is EMBEDDED, so it draws identically on a machine that lacks the font --- no silent substitution to a glyph the author never saw},
-  check   = {cmd:python3 checks/fonts.py}
+  check   = {cmd:python3 checks/fonts.py},
+  tier = {toolchain},
 }
 @misc{rnd-bib,
   section = {cite},
   claim   = {the paper's two kinds of citation RESOLVE in the render: an internal warrant becomes an inline machine-checked marker (cite_split, before pandoc), an external source renders author-date with a References list (--citeproc over references.bib), and no bracketed citation marker is left as bare text --- a render-time projection that leaves the gated paper.md untouched},
-  check   = {cmd:python3 checks/bib.py}
+  check   = {cmd:python3 checks/bib.py},
+  tier = {toolchain},
 }
 @misc{rnd-plain,
   section = {cite}, from = {rnd-bib}, join = {. },
   claim   = {which of these a citation MATERIALIZES as is the projector's render TARGET --- pandoc emits an inline citeproc marker, web an intra-page anchor, footnote a document-end provenance note, and plain surfaces NO citation marker at all: a clean SUBMISSION view that presents the same verified prose with the machinery removed, while the claim-DAG stays the author-side gate},
-  check   = {cmd:python3 checks/plain.py}
+  check   = {cmd:python3 checks/plain.py},
+  tier = {toolchain},
 }
 @misc{rnd-pdf,
   section = {deliver},
   claim   = {the paper renders END-TO-END to a PDF deliverable --- cite_split, then citeproc, then docx, then PDF: the human-readable artifact a reader actually receives --- gated to be complete and polished: no citation is left as a bare marker, the References list renders, and the paper's content is present in the PDF},
-  check   = {cmd:python3 checks/pdf.py}
+  check   = {cmd:python3 checks/pdf.py},
+  tier = {toolchain},
 }
 @misc{rnd-fig-vector,
   section = {figure},
   claim   = {a generated figure renders into the document as a Word-native VECTOR --- SVG converted to EMF (libreoffice), embedded by pandoc, and carried through to the PDF without ever being rasterized --- so it stays crisp at any zoom, with no pixelation for a reader who magnifies the page},
-  check   = {cmd:python3 checks/fig_vector.py}
+  check   = {cmd:python3 checks/fig_vector.py},
+  tier = {toolchain},
 }
 @misc{rnd-fig-legible,
   section = {figure},
   claim   = {the figure's legend SURVIVES into the rendered PDF text layer --- every label selectable, searchable, and screen-readable rather than locked inside the pixels --- the accessibility of the report's Okabe-Ito claim-DAG figure, preserved through the render},
-  check   = {cmd:python3 checks/fig_legible.py}
+  check   = {cmd:python3 checks/fig_legible.py},
+  tier = {toolchain},
 }
 @misc{rnd-link-alt,
   section = {a11y},
   claim   = {every link annotation in the deliverable carries a text description --- a pass over the finished PDF reads the words whose boxes OVERLAP each undescribed link's rectangle and writes them back as that link's description, on the reasoning that the words a sighted reader sees are what a screen reader should hear, so a citation link announces its destination rather than a bare "link" (PDF/UA 7.18.1 and 7.18.5) --- adopted from sre-troubleshooting, carrying its half-description fix forward: selection is by BOX OVERLAP not word centre, so two adjacent citations that extract as one word are both described},
-  check   = {cmd:python3 checks/linkalt.py --selftest}
+  check   = {cmd:python3 checks/linkalt.py --selftest},
+  tier = {toolchain},
 }
 @misc{rnd-math-alt,
   section = {a11y}, from = {rnd-link-alt}, join = {. },
   claim   = {and every equation carries a text alternative so the math is accessible --- the office export tags each formula as a Formula structure element but sets no alternate text, which a screen reader announces as nothing (PDF/UA 7.7), so a post-export pass writes each equation's own LaTeX source, the recoverable structure, as the Formula's alt text in document order, refusing loudly if the formula and equation counts disagree rather than describing a partial set (mat230's per-formula math-alternative doctrine, on the office route)},
-  check   = {cmd:python3 checks/mathalt.py --selftest}
+  check   = {cmd:python3 checks/mathalt.py --selftest},
+  tier = {toolchain},
 }
 @misc{rnd-a11y,
   section = {a11y}, from = {rnd-math-alt}, join = {. },
   claim   = {so paperkit's OWN paper is PDF/UA-1 conformant BY CONSTRUCTION --- the deliverable is built as the pdf check builds it (the title carried from paper.toml through pandoc metadata, the export driven in PDF/UA mode so LibreOffice sets the pdfuaid schema, DisplayDocTitle and dc:title AT THE LAYER THAT OWNS THEM, then link and equation descriptions restored), and veraPDF validates it at UA-1 with zero failed checks over a Tagged PDF including its equations, gating on the flavour the producer targets (LibreOffice emits UA-1 and declares pdfuaid part 1) --- what was an opt-in measurement a downstream deliverable pointed at is now a live warrant of the render project's own output, earned rather than asserted},
-  check   = {cmd:python3 checks/a11y_own.py}
+  check   = {cmd:python3 checks/a11y_own.py},
+  tier = {toolchain},
 }
 @misc{rnd-index,
   section = {deliver}, from = {rnd-pdf}, join = {. },
   claim   = {and the deliverable is exported as a tagged PDF/UA over the office suite's UNO scripting bridge rather than its command-line conversion --- the bridge sets the PDF/UA export flags and refreshes each document index, since the command-line path exports a plain PDF and never populates a table-of-contents field, and it owns the office process explicitly (a private pipe, a deadline, and a kill if it will not exit) so that sre-troubleshooting's first attempt, a document macro that hung the build with no output, becomes a LOUD bounded failure instead of a silent stall --- the export path falls back to the plain conversion where no scripting-bridge interpreter is present, so the deliverable still renders},
-  check   = {cmd:python3 checks/lo-export.py --selftest}
+  check   = {cmd:python3 checks/lo-export.py --selftest},
+  tier = {toolchain},
 }
 @misc{rnd-latex,
   section = {latex},
   claim   = {and the SAME verified paper renders through a SECOND format --- a LaTeX pipeline beside the docx one, for a reader who wants latex and PDF where another wants docx and PDF --- pandoc turns the projected prose into a LaTeX body, the engine assembles it under a tagged-PDF preamble with a per-codepoint font fallback so a prose glyph the main font lacks is covered rather than dropped, and lualatex compiles it to a tagged PDF, so one claim-DAG reaches two delivered formats and neither degrades the other},
-  check   = {cmd:python3 checks/latex.py --selftest}
+  check   = {cmd:python3 checks/latex.py --selftest},
+  tier = {toolchain},
 }
 @misc{rnd-a11y-latex,
   section = {latex}, from = {rnd-latex}, join = {. },
   claim   = {and the LaTeX format is held to AT LEAST the docx format's accessibility, and better --- paperkit's own paper renders through it to a PDF that veraPDF validates at PDF/UA-2 with zero failed checks, a LATER standard than the docx route's UA-1, reached BY CONSTRUCTION (native document tagging, not post-export surgery) with every equation carrying an ASSOCIATED MathML file rather than a stamped alt string, so the math is recoverable structure a screen reader reads; and because a zero-failure UA-2 verdict forbids a .notdef glyph, the conformance gate SUBSUMES the missing-glyph tofu check the arbitrary-prose format needs --- the recipe vendored from mat230 (its minimal tagged preamble, pinned to its validated TeX Live), the arbitrary-prose font fallback authored for paperkit's own route},
-  check   = {cmd:python3 checks/a11y_latex.py}
+  check   = {cmd:python3 checks/a11y_latex.py},
+  tier = {toolchain},
 }
 @misc{rnd-format,
   section = {latex}, from = {rnd-a11y-latex}, join = {. },
   claim   = {and WHICH route a consumer builds their PDF through is one selector, resolved the paperkit way (Ω·config) --- an environment knob picks a graph ROUTE (docx, odf, or latex), each terminating at the PDF node through its own intermediate, defaulting to docx and REFUSING an unknown value rather than silently falling back, and it lives in the render project rather than the engine registry because the engine projects the paper format-agnostically and never branches on the format, so a knob there would be one the engine does not own --- the routes stay independently gated regardless, so the selector chooses what to BUILD, never what to VERIFY},
-  check   = {cmd:sh checks/render.sh --selftest}
+  check   = {cmd:sh checks/render.sh --selftest},
+  tier = {local},
 }
 @misc{rnd-ruler,
   section = {colour}, from = {rnd-format}, join = {. },
   claim   = {and every table in the LaTeX deliverable carries its binary row structure in the RULE PATTERN, a redundant non-colour cue --- the rule between two rows is chosen by the cycle order of that boundary (the 2-adic valuation of the row index, which bit rolls over there) and drawn as a self-similar dot-dash motif, so a reader who cannot perceive colour still recovers the counting structure (WCAG 2.2 use-of-colour, the producing side); the rules are applied BY CONSTRUCTION to every rendered table, and a table is exempt only through a NAMED marker that the deliverable records rather than a silent absence, so the paper's own formula table is ruled with no author effort and the exception stays legible --- the capability vendored from mat230 as the target-independent generator it should have been (uncapped, encoding any unsigned row count, with tex, html and markdown readings), not its order-capped reified form},
-  check   = {cmd:python3 checks/ruler.py}
+  check   = {cmd:python3 checks/ruler.py},
+  tier = {toolchain},
 }
 @misc{rnd-colour,
   section = {colour}, from = {rnd-ruler}, join = {. },
@@ -143,12 +167,14 @@
 @misc{rnd-wcag-entail,
   section = {compliance}, from = {rnd-wcag-model}, join = {. },
   claim   = {and a criterion is claimed conformant only where a warrant PROVES it, never merely NAMES it --- a Supports verdict is admissible only when a warrant's own falsification arm reds on that criterion's violation, or when the deliverable passes the standard's own validator (veraPDF for PDF/UA), so the falsifiability that grades every paperkit claim becomes the entailment evidence a regulatory claim needs; the check RUNS those falsification arms, so a broken one cannot back a Supports, and a criterion whose entailment is unproven is disclosed conservatively rather than claimed --- the warrant-adequacy gap closed at the regulatory tier, under-claiming by construction because a false Supports is a false legal claim},
-  check   = {cmd:python3 checks/wcag_entail.py --check}
+  check   = {cmd:python3 checks/wcag_entail.py --check},
+  tier = {toolchain},
 }
 @misc{rnd-wcag,
   section = {compliance}, from = {rnd-wcag-entail}, join = {. },
   emit    = {assets/wcag-vpat.md},
   as      = {raw},
   claim   = {and paperkit's own accessibility conformance is DISCLOSED as a self-attesting report --- a VPAT International conformance statement (WCAG 2.2 by level, Section 508, and EN 301 549), generated as a projection of the standards model and the proven entailment verdicts, per render route, so the two deliverables disclose their genuine difference (the office route reaches PDF/UA-1, the LaTeX route the later PDF/UA-2) and every Supports carries in its remarks the warrant that entails it --- the engine's own thesis, that a document is a projection of a verified claim-DAG, applied to the highest-stakes claim a document makes about itself, so the conformance statement and its machine-checked proof are one object gated fresh},
-  check   = {cmd:python3 checks/wcag.py --check}
+  check   = {cmd:python3 checks/wcag.py --check},
+  tier = {toolchain},
 }

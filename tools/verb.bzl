@@ -34,6 +34,27 @@ def _pypath(py):
 def _verdict_tool(py, tool):
     return _pypath(py) + '"$(command -v python3)" ' + tool.path + " "
 
+def _tier_exec(ctx, py, tier):
+    """Ζ·tier — resolve a warrant's enforcement tier to the action's (execution_requirements,
+    use_default_shell_env, python-PATH-prefix, stamp inputs).  A `toolchain` check must run under the
+    HOST toolchain IN FULL — host binaries (pandoc/veraPDF/soffice/lualatex) AND the host python + its
+    site-packages (pikepdf, …) — so it inherits the client env (use_default_shell_env) and drops the
+    hermetic `_pypath` prepend so `python3` resolves to the host interpreter.  Sound: the check is
+    deterministic given a PINNED toolchain, and ctx.info_file (STABLE_TOOLCHAIN_*) keys the cache on
+    the toolchain identity — the same argument covers host binaries and host python packages alike."""
+    er = {}
+    stamp_inputs = []
+    host_env = False
+    pyprefix = _pypath(py)
+    if tier == "local":
+        er = {"local": "1", "no-sandbox": "1", "no-cache": "1", "no-remote": "1"}
+    elif tier == "toolchain":
+        er = {"local": "1", "no-sandbox": "1", "no-remote": "1"}   # cacheable (no no-cache)
+        stamp_inputs = [ctx.info_file]   # depend on the stable toolchain fingerprint → precise invalidation
+        host_env = True
+        pyprefix = ""
+    return er, host_env, pyprefix, stamp_inputs
+
 def _cmd_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     v = _v(ctx)
@@ -50,23 +71,17 @@ def _cmd_impl(ctx):
     #     PINNED toolchain, so it is CACHED and STAMPED with the toolchain fingerprint (ctx.info_file,
     #     the STABLE_TOOLCHAIN_* keys): a toolchain change invalidates it precisely, an unchanged
     #     toolchain is a cache hit — enforceable every commit AND fast.  Cacheable = omit no-cache.
-    tier = ctx.attr.tier
-    er = {}
-    stamp_inputs = []
-    if tier == "local":
-        er = {"local": "1", "no-sandbox": "1", "no-cache": "1", "no-remote": "1"}
-    elif tier == "toolchain":
-        er = {"local": "1", "no-sandbox": "1", "no-remote": "1"}   # cacheable (no no-cache)
-        stamp_inputs = [ctx.info_file]   # depend on the stable toolchain fingerprint → precise invalidation
+    er, host_env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
     # The ONE irreducibly-shell oracle: run the arbitrary `cmd` and read its exit code → $V; the
     # record itself is emitted by verdict.py (no JSON built in shell).
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.data + stamp_inputs, transitive = [py.files]),
+        use_default_shell_env = host_env,
         # Ζ·sched-batch·phase2 — the check `inner` is an arbitrary compound shell command, not a
         # single exec, so we tune the ACTION SHELL ($$, single-threaded) and inner + the emit inherit
         # (SCHED_BATCH + nice 19 + 100ms slice), matching the per-cell tuning of the grid rules.
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" --pid $$ 2>/dev/null; ' +
+        command = pyprefix + '"' + ctx.file._sched.path + '" --pid $$ 2>/dev/null; ' +
                   "if ( " + inner + " ) >/dev/null 2>&1; then V=pass; else V=fail; fi; " +
                   '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path,
         mnemonic = "PkCmd",
@@ -139,6 +154,9 @@ def _agree_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     v = _v(ctx)
     tool = ctx.file._tool
+    # Ζ·tier — the PRODUCERS are the toolchain-coupled work (render's pandoc twice, etc.), so they carry
+    # the tier's exec regime exactly like a pk_cmd; the final equality action is a pure verdict.py parse.
+    er, host_env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
     if len(ctx.attr.producers) < 2:
         ctx.actions.run_shell(  # agreement needs >=2 independent producers
             outputs = [v],
@@ -147,16 +165,24 @@ def _agree_impl(ctx):
             mnemonic = "PkAgree",
         )
         return [DefaultInfo(files = depset([v]))]
+    # A producer's `cmd` uses paths relative to the PROJECT dir (cwd), exactly like pk_cmd — so `cd`
+    # into it before running.  The output must be written to an ABSOLUTE path (o.path is execroot-
+    # relative), so anchor it to $PWD captured before the cd.
+    prefix = ""
+    if ctx.attr.project and ctx.attr.project != ".":
+        prefix = "cd " + _sq(ctx.attr.project) + " && "
     inters = []
     for i in range(len(ctx.attr.producers)):
         prod = ctx.attr.producers[i]
         o = ctx.actions.declare_file(ctx.label.name + ".prod" + str(i) + ".out")
         ctx.actions.run_shell(  # each producer's output is an agglomerated INTERMEDIATE artifact
             outputs = [o],
-            inputs = depset(transitive = [py.files]),
-            command = _pypath(py) + "if sh -c " + _sq(prod) + " > " + o.path +
-                      " 2>/dev/null; then :; else echo __FAIL__ > " + o.path + "; fi",
+            inputs = depset(stamp_inputs, transitive = [py.files]),
+            use_default_shell_env = host_env,
+            command = pyprefix + 'O="$PWD/' + o.path + '"; if ( ' + prefix + "sh -c " + _sq(prod) +
+                      ' ) > "$O" 2>/dev/null; then :; else echo __FAIL__ > "$O"; fi',
             mnemonic = "PkProducer",
+            execution_requirements = er,
         )
         inters.append(o)
     # PARSES the producer outputs (verdict.py agree) — pass iff all byte-equal and none failed.
@@ -174,6 +200,8 @@ pk_agree = rule(
     toolchains = [_PY],
     attrs = {
         "producers": attr.string_list(mandatory = True),
+        "project": attr.string(default = "."),
+        "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),
     },
 )

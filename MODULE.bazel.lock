@@ -144,8 +144,8 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "qayVk4Vz6A4oVtfTC7Fq+YZ3fqSyJ1vDbKPlxmGPX3s=",
-        "usagesDigest": "2Jpso3wbDC+uk0ABLux1i0bWp/bK0XGYpF6etOiAOJw=",
+        "bzlTransitiveDigest": "q5TWHY/Mcg3Pv/5hCgB+VWAatuelNnsZc3jq44dNZns=",
+        "usagesDigest": "KMwiLRDvrKj0s3AUWfGJNRZcYz8YU0maYSXujuyYWaE=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "a733904df72610994a09f23276fd4e3f11e80d12acf22e0642458e08e3f70dad",
           "@@//library/paper.toml": "abe305540f0d6df80ebcd536f2b097d7c665399b844678ee9ce3179bd6ba8b95",
@@ -2136,6 +2136,21 @@
               "tier": "local",
               "compose": false,
               "calc": false,
+              "emerge": false,
+              "owns_concepts": false,
+              "sites": [],
+              "closures": []
+            }
+          },
+          "paperkit_render": {
+            "repoRuleId": "@@//tools:bibtex.bzl%bib_repo",
+            "attributes": {
+              "bib": "@@//render:warrants.bib",
+              "project": "render",
+              "adequacy": true,
+              "tier": "sandbox",
+              "compose": false,
+              "calc": true,
               "emerge": false,
               "owns_concepts": false,
               "sites": [],

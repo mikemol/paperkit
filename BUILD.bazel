@@ -79,6 +79,15 @@ test_suite(name = "hook", tests = [
     # self-verifying starter (its check runs the gate on the starter).  Zero witness code.
     "@paperkit_guide//:gate",
     "@paperkit_guide//:adequacy",
+    # Ζ·tier — the RENDER project, mixed-tier: its gate runs every warrant — the pure compliance checks
+    # hermetically, the render/oracle checks under the host toolchain (tier=toolchain, CACHED + stamped
+    # with the toolchain fingerprint, so the gate is fast: a toolchain check re-runs only when the
+    # toolchain or its input changes).  Its adequacy mutation-sweeps ONLY the sandbox subset — so the
+    # WCAG standards model, the capability coalgebra, and the use-of-colour predicate are
+    # architecturally enforced AND falsifiability-graded every commit (closing the self-certification
+    # the enforcement adversary found).  No cohere (adequacy+calc, no emerge).
+    "@paperkit_render//:gate",
+    "@paperkit_render//:adequacy",
     # Ζ·emerge·gate — the ∂² coherence reading over each emerge project's def-sweep GRID (the
     # Ξ·dag·eval closure cells).  Pulls the grid into //:hook, so the hook runs under --config=mutant
     # (the hermetic sandbox the mutation cells require; .githooks/pre-commit passes it).

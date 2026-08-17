@@ -156,7 +156,7 @@ def _verb_rule(name, check, proj, files, reads, custom, tier, imports = []):
         return "pk_result(name = " + _lit(name) + ', sibling_verdict = "@paperkit_' + target + '//:gate_rec")'
     elif typ == "agree":
         prods = ", ".join([_lit(p.strip()) for p in target.split("|||") if p.strip()])
-        return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "])"
+        return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "]" + pj + tc + ")"
     elif typ in custom:     # a config-declared cmd template — {target} substituted, run as a cmd oracle
         cmd = custom[typ].replace("{target}", target)
         return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + tc + ", data = [" + dl + "])"

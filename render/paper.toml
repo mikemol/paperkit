@@ -6,3 +6,8 @@ rubric = "rubric.tsv"
 out = "RENDER.md"
 numbered = false
 references = false
+# Ζ·tier — render's PURE compliance warrants (wcag_model/matrix/cube/use-of-colour/format)
+# are sandbox-gated and MUTATION-SWEPT (the standards model + capability coalgebra enforced every
+# commit); its toolchain warrants are cached+stamped, gated but not swept.  adequacy grades the
+# sandbox subset.
+adequacy = true

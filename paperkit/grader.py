@@ -25,12 +25,14 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 import config
 
 import resolver
 from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _copy_sandbox, _nested_roots, _mutable
-from mutate import _def_sites, _mutate_lines  # Ζ·mutant — the pure AST mutation primitives (their own leaf)
+from mutate import (  # Ζ·mutant / Μ·sweep·atom — the pure AST mutation primitives (their own leaf)
+    _def_sites, _mutate_lines, _branch_sites, _flip_sites, _flip_condition)
 from grade import _grade_from_sens  # Μ·grade — the pure ladder/interpretation (the rungs + clamp
 # orders STRENGTH/ORDER/RANK_C/GRADE_C/CORRO_C live in grade.py now; the SWEEP below is the
 # calculation, that module the interpretation — Ζ·calc·interp in code).
@@ -177,19 +179,41 @@ def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None,
 # capability fingerprint) stays here.
 
 
+class _BranchNode:
+    """Μ·sweep·atom — a branch ARM presented to _mutate_lines with the same interface a def node
+    has (`.body[0].lineno`, `.end_lineno`, `.body[0].col_offset`), so the arm's body line-span is
+    replaced by the SAME uncatchable raise as a def body — zero change to _mutate_lines, and a
+    branch: site is a raise-kind site indistinguishable from def: at the mutation atom.  It IS
+    monotone (the same primitive) and ADDITIVE (a NEW label, appended beside its def: site)."""
+    __slots__ = ("body", "end_lineno")
+
+    def __init__(self, first, last):
+        self.body = [first]
+        self.end_lineno = last.end_lineno
+
+
 def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = None,
            root_copy: Path | None = None) -> list:
     """Every def-resolution mutation SITE as (file, node | None, label): a .py file's
     DEFINITIONS (label `path::qualname`, body→uncatchable-raise) and any other file as one
     whole-file site (label `path`, corrupted).  The unit set the group-testing sweep bisects
     AND the single-site probe (flip_one) selects from — shared so both label sites identically
-    (a per-site Bazel action and the in-process sweep agree by construction)."""
+    (a per-site Bazel action and the in-process sweep agree by construction).
+
+    Μ·sweep·atom — ADDITIVELY appends per-branch-arm sites (label `path::branch:<qn>#<n>`, the
+    arm body → the same raise): a finer, still-monotone reach probe that never REPLACES the def:
+    site, so the coarse behavioral grade and the def: cache cell both survive beside it.  flip:
+    is NOT here — it is a distinct, non-monotone site type (a FlipSite) the sensitivity sweep is
+    structurally unable to consume; see _flip_sites_of."""
     sites = []
     for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
         label = _rel(f, sandbox_project, engine_dir, root_copy)
         if f.suffix == ".py":
-            for qn, node in _def_sites(f.read_text()):
+            text = f.read_text()
+            for qn, node in _def_sites(text):
                 sites.append((f, node, f"{label}::{qn}"))
+            for qn, n, (b0, blast) in _branch_sites(text):
+                sites.append((f, _BranchNode(b0, blast), f"{label}::branch:{qn}#{n}"))
         else:
             sites.append((f, None, label))
     return sites
@@ -397,6 +421,15 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
         producers = [p.strip() for p in target.split("|||") if p.strip()]
         rec["corroboration"] = "independent" if len(set(producers)) >= 2 else "single"
         rec["producers"] = len(producers)
+    # Μ·sweep·atom — the decision-coverage AXIS (orthogonal, never a rung): of the branch decisions the
+    # check REACHES, which does it never ASSERT on?  Only meaningful at def resolution (branch:/flip:
+    # sites live in the engine surface) and only when the sweep found reached arms; the flip: probe is
+    # a SEPARATE, non-monotone measurement barred from `sens` by construction (FlipSite).  Never fed to
+    # _grade_from_sens: an unasserted decision names a gap, it does not lower the grade.
+    if engine_dir is not None and rec.get("grade") == "behavioral":
+        unasserted = decisions_unasserted(chk, sandbox_project, custom, engine_dir, sens)
+        if unasserted:
+            rec["decisions_unasserted"] = unasserted
     return rec
 
 
@@ -430,6 +463,93 @@ def _vacuity_source(rec: dict, chk: str, sandbox_project: Path,
                    "on project content in concert, not on any one file",
             "not_higher": "to rise: a Π counter-fixture isolating the responsible inputs proves it behavioral",
             "not_lower": "not external: corrupting all inputs DOES flip it, so it reads project content"}
+
+
+class FlipSite(NamedTuple):
+    """Μ·sweep·atom — a NON-monotone condition site (flip:<qn>#<n>), a DISTINCT TYPE from the raise-
+    kind (file, node, label) tuples the sensitivity sweep consumes.  This is the STRUCTURAL bar (not a
+    string-prefix filter that could drift): a FlipSite handed to _apply/sensitivity fails when their
+    `f, node, _ = …` unpacking meets a 4-field NamedTuple whose fields are not (file, node, label) —
+    a value inversion can never enter a falsifiability sweep, because the sweep's signature cannot
+    receive one.  Consumed ONLY by decisions_unasserted, which feeds the orthogonal decision-coverage
+    axis, never the grade."""
+    file: Path
+    qualname: str
+    n: int
+    label: str
+
+
+def _flip_sites_of(sandbox_project: Path, engine_dir: Path | None,
+                   files: list | None = None, root_copy: Path | None = None) -> list:
+    """Every flip: condition site as a FlipSite — a SEPARATE generator from _sites, so a flip: site
+    is never in the list the sensitivity sweep group-tests (revision c, the structural bar)."""
+    out = []
+    for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
+        if f.suffix != ".py":
+            continue
+        label = _rel(f, sandbox_project, engine_dir, root_copy)
+        for qn, n, _test in _flip_sites(f.read_text()):
+            out.append(FlipSite(f, qn, n, f"{label}::flip:{qn}#{n}"))
+    return out
+
+
+def decisions_unasserted(chk: str, sandbox_project: Path, custom: dict,
+                         engine_dir: Path | None, sens: list) -> list:
+    """Μ·sweep·atom — of the decisions a check REACHES, which does it never ASSERT on?  For each flip:
+    condition, invert it (a NON-monotone value swap) and read it against the SECOND, independent
+    probe that keeps this instrument sound (revision d — the analog of _vacuity_source's disambiguation
+    of a single non-flip):
+
+      BOTH SIBLING ARMS must be GENUINELY REACHED — proven per-arm by flip_one (a SINGLE-site probe),
+      never by `sens` membership.  Group-testing correlates sibling arms: dropping one arm can flip the
+      check via a sibling's raise, so an arm can appear in `sens` a fixture never takes (the
+      correlated-flip finding).  flip_one isolates each arm; requiring BOTH arms individually reached
+      rules out the "coincidentally invariant because the fixture only takes one path" false positive
+      that a single non-flip cannot distinguish.
+
+    Then, with both outcomes provably exercised:
+      - inversion FLIPS       → the decision IS asserted (the witness observes which outcome selects).
+      - inversion does NOT    → UNASSERTED: the check runs both arms but its verdict is indifferent to
+                                which condition selected them — coverage the coarse behavioral grade
+                                cannot see (no fixture coincidence survives, since both arms are reached).
+
+    Returns the labels of unasserted decisions.  An orthogonal AXIS, never a rung, never fed to
+    _grade_from_sens — an unasserted decision names a coverage gap, it does not lower the grade."""
+    out = []
+    branch_arms = _branch_arms_by_qn(sandbox_project, engine_dir)
+    for fs in _flip_sites_of(sandbox_project, engine_dir):
+        arms = branch_arms.get((fs.file, fs.qualname), [])
+        # BOTH sibling arms genuinely reached (per-arm flip_one, not the correlated `sens`).
+        if len(arms) < 2 or not all(
+                flip_one(chk, sandbox_project, custom, engine_dir, lbl) for lbl in arms):
+            continue
+        if not _flip_flips(chk, sandbox_project, custom, engine_dir, fs):
+            out.append(fs.label)
+    return sorted(out)
+
+
+def _branch_arms_by_qn(sandbox_project: Path, engine_dir: Path | None) -> dict:
+    """(file, qualname) → the branch: arm labels of that def — the siblings whose per-arm reach gates a
+    flip: as an assertable decision."""
+    by_qn: dict = {}
+    for f, node, lbl in _sites(sandbox_project, engine_dir):
+        if isinstance(node, _BranchNode):
+            qn = lbl.split("::branch:", 1)[1].split("#", 1)[0]
+            by_qn.setdefault((f, qn), []).append(lbl)
+    return by_qn
+
+
+def _flip_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None,
+                fs: FlipSite) -> bool:
+    """Invert fs's condition in-place, run the check, restore.  True iff the inversion flips chk red —
+    the witness asserts on the decision.  A NON-monotone probe (a value swap, not a raise), which is
+    exactly why fs is a FlipSite the sensitivity sweep cannot receive."""
+    saved = fs.file.read_bytes()
+    try:
+        fs.file.write_text(_flip_condition(saved.decode(), fs.qualname, fs.n))
+        return not resolver.resolves(chk, sandbox_project, custom).passed
+    finally:
+        fs.file.write_bytes(saved)
 
 
 def _sandbox_setup(project_dir, resolution="def"):

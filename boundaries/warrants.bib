@@ -175,8 +175,13 @@
   claim   = {the mutation ATOM decomposes without losing its monotonicity --- the def-sweep drops a whole def body to an UNCATCHABLE raise, so no witness's own except-Exception swallows it, and a finer per-branch-arm atom keeps that guarantee by using the same raise, but an arm a bare or BaseException handler would CATCH is REFUSED because a raise planted there is swallowed and the arm reads reached-but-covered when it is neither --- the finer cell is ADDITIVE, the coarse def cell is byte-identical and survives beside it so no committed grade re-keys, and a condition-inversion is a separate NON-monotone op that a value assertion alone can catch, kept out of the sensitivity sweep by construction},
   check   = {cmd:python3 ../paperkit/tests/boundaries_mutate_atom.py}
 }
-@misc{bnd-mutable,
+@misc{bnd-decisions,
   section = {engine}, from = {bnd-mutate-atom}, join = {. },
+  claim   = {the atom's non-monotone half is barred from the sweep by TYPE, and the coverage it reads is sound --- a condition inversion is a value swap, not a raise, so it flips a check only if the witness ASSERTS on the outcome, which would let a wrong-but-non-crashing value pass a monotone sweep; the fix makes a flip site a DISTINCT type the sweep's atom structurally cannot unpack, failing on the first call rather than by a hand-copied filter that drifts, and reads a decision as unasserted only when BOTH its arms are genuinely reached (proven per arm by the single-site probe, since group testing correlates siblings) and inverting the condition still does not flip --- both outcomes provably exercised leaves no fixture coincidence, and the result is an orthogonal coverage axis that names a gap without ever lowering a grade},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_decisions.py}
+}
+@misc{bnd-mutable,
+  section = {engine}, from = {bnd-decisions}, join = {. },
   claim   = {the surface admits a file by the FILE, not just its suffix --- an extensionless versioned command a witness reads (scripts/summit, bin/pk, a .githooks hook, a Containerfile) was a file the sweep could not corrupt, so any claim reading one carried an unfalsifiable component, and the fix generalizes the one-off .githooks exception to the CLASS it named: a suffixless file that decodes as text is mutable, keyed on CONTENT because the sandbox is a copy without .git and mode is not reliable there --- a single NUL byte, the minimum delta, flips such a command out of the surface as binary, while the suffix path (MUTABLE_SUFFIXES) and derived-name exclusion are untouched},
   check   = {cmd:python3 ../paperkit/tests/boundaries_mutable.py},
   reads   = {.}

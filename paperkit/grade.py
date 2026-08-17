@@ -34,6 +34,18 @@ GRADE_C = {v: k for k, v in RANK_C.items()}
 # witness — or identical producers concurring trivially — is `single`.  single < independent.
 CORRO_C = {"single": 0, "independent": 1}
 
+# Decision-coverage — a THIRD, ORTHOGONAL axis (Μ·sweep·atom), again NOT a rung on RANK_C.  The
+# grade asks "does a mutation flip this check" (FALSIFIABILITY, over the raise-monotone branch:/def:
+# atom); this asks "of the decisions a check REACHES, how many does it ASSERT on".  A finer,
+# NON-monotone flip: cell inverts one condition — and is read soundly only when BOTH sibling arms are
+# GENUINELY reached (proven per-arm by flip_one, not by the group-correlated sens set): with both
+# outcomes provably exercised, an inversion that does NOT flip the check is an UNASSERTED decision (the
+# check runs both arms but is indifferent to which selected them), with no fixture-coincidence left to
+# confuse it.  `unasserted` < `asserted`; it NEVER lowers a grade (incompleteness is not a weaker rung,
+# the same discipline as corroboration and content_sensitive), only names the gap.  Absent field ⇒ the
+# check has no reached-both-arms decision it fails to assert (the common case).
+DECISIONS_C = {"unasserted": 0, "asserted": 1}
+
 
 # Ζ·ladder — the two DERIVATIONS every consumer needs, so none re-declares the rungs.  A ladder
 # re-listed downstream drifts silently and in the WORST direction: a display order that omits a

@@ -59,12 +59,14 @@ CAPABILITIES = {
     "presentation-agreement": {
         "what": "the rendered document presents byte-for-byte the verified paper's prose",
         "wcag": "",
-        "cells": {"docx": ("native", "rnd-agree")},
+        # the prose survives into the PDF text layer (rnd-pdf gates the content is present, no bare marker).
+        "cells": {"docx": ("native", "rnd-agree"), "pdf-office": ("post", "rnd-pdf")},
     },
     "structural-headings": {
         "what": "every section renders as a real document heading whose text matches",
         "wcag": "1.3.1",
-        "cells": {"docx": ("native", "rnd-wf")},
+        # a docx heading becomes a tagged heading in the tagged PDF (rnd-fidelity checks headings present).
+        "cells": {"docx": ("native", "rnd-wf"), "pdf-office": ("post", "rnd-fidelity")},
     },
     "glyph-fidelity": {
         "what": "every non-ASCII glyph survives to the PDF text layer, no missing-glyph tofu",
@@ -74,7 +76,11 @@ CAPABILITIES = {
     "native-math": {
         "what": "equations transport as native editable math, never rasterized",
         "wcag": "",
-        "cells": {"docx": ("native", "rnd-omml"), "pdf-latex": ("native", "rnd-a11y-latex")},
+        # docx affords EDITABLE OMML; the office pdf edge does NOT preserve editability — it TWISTS
+        # native-math into math-alt (a tagged /Formula with /Alt).  So there is no pdf-office cell here;
+        # the twist is recorded in TRANSFORMS below.  The latex PDF carries math natively (MathML /AF).
+        "cells": {"docx": ("native", "rnd-omml"),
+                  "pdf-latex": ("native", "rnd-a11y-latex")},
     },
     "measured-column-width": {
         "what": "a wide equation in a table cell is sized to measured ink, clip named not silent",
@@ -96,12 +102,16 @@ CAPABILITIES = {
     "citations-resolve": {
         "what": "internal warrants inline as markers, external sources render author-date, no bare marker",
         "wcag": "",
-        "cells": {f: ("native", "rnd-bib") for f in ("docx", "odt", "latex")},
+        # citations resolve at the source formats AND survive into the delivered PDF (rnd-pdf gates
+        # no bare marker in the PDF); the latex PDF carries them too.
+        "cells": {**{f: ("native", "rnd-bib") for f in ("docx", "odt", "latex")},
+                  "pdf-office": ("post", "rnd-pdf"), "pdf-latex": ("native", "rnd-a11y-latex")},
     },
     "vector-figures": {
         "what": "a generated figure embeds as a native vector, never rasterized, crisp at any zoom",
         "wcag": "1.4.10",
-        "cells": {"docx": ("post", "rnd-fig-vector")},
+        # the vector is carried through to the PDF without rasterizing (rnd-fig-vector gates end-to-end).
+        "cells": {"docx": ("post", "rnd-fig-vector"), "pdf-office": ("post", "rnd-fig-vector")},
     },
     "legible-figure-text": {
         "what": "a figure's legend survives into the PDF text layer, selectable and screen-readable",

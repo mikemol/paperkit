@@ -94,15 +94,25 @@ def _top_fields(body: str) -> list:
     return names
 
 
-def parse(path: Path) -> dict:
-    """{key: {field: value, _src}} for one .bib (a missing file → {})."""
+def parse(path: Path, consumer_fields: tuple = ()) -> dict:
+    """{key: {field: value, _src}} for one .bib (a missing file → {}).
+
+    `consumer_fields` are extra scalar fields a PROJECT has DECLARED it tolerates (via its
+    paper.toml `consumer_fields`, resolved in load_config) — carried verbatim like _SCALAR but
+    consumed by NO paperkit invariant (the projector and gate ignore them); a downstream consumer
+    reads them.  This is the mechanism/policy split: paperkit owns the mechanism (parse-and-carry a
+    declared field), the vocabulary is the consumer's (declared per project, not baked into the
+    engine — a domain-and-location-free engine must not learn one consumer's field names).  A
+    DECLARED field is quiet in the loud-drop below; an UNdeclared unknown field is still named loud,
+    so the declaration is what distinguishes a consumer's field from a typo."""
     out = {}
     path = Path(path)
+    scalars = tuple(_SCALAR) + tuple(consumer_fields)
     if path.exists():
         for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", path.read_text(), re.S):
             key, body = m.group(1), m.group(2)
             f = {"_src": path.name}
-            for name in _SCALAR:
+            for name in scalars:
                 v = _scalar_value(body, name)            # true brace-counting, escaped-brace-safe
                 if v is not None:
                     f[name] = v
@@ -113,18 +123,21 @@ def parse(path: Path) -> dict:
             # and a silent drop is a silent failure: a downstream author's `points` (a real grounding
             # relation) vanished on 14 entries with no signal.  Name it LOUD rather than drop it in
             # silence — but stay quiet on standard BibTeX metadata (_BIBTEX), which references carry
-            # and paperkit is expected to ignore.  A warning, not a refusal: the field may be
-            # deliberate human documentation, and breaking a downstream's build is not the point —
-            # being SEEN is.  Deduped, since a build parses each bib many times.
+            # and paperkit is expected to ignore, and on this project's DECLARED consumer fields.  A
+            # warning, not a refusal: the field may be deliberate human documentation, and breaking a
+            # downstream's build is not the point — being SEEN is.  Deduped, since a build parses each
+            # bib many times.
             unknown = [n for n in _top_fields(body)
-                       if n not in _SCALAR and n not in _LIST and n not in _BIBTEX]
+                       if n not in scalars and n not in _LIST and n not in _BIBTEX]
             for n in unknown:
                 if (path.name, key, n) not in _WARNED:
                     _WARNED.add((path.name, key, n))
                     print(f"paperkit-bib: {path.name} @{key}: field '{n}' is not a paperkit field "
                           f"and was DROPPED (not silently) — paperkit reads "
-                          f"{', '.join(list(_SCALAR) + list(_LIST))}; use one, or remove it",
-                          file=sys.stderr)
+                          f"{', '.join(list(_SCALAR) + list(_LIST))}"
+                          + (f" plus this project's declared {', '.join(consumer_fields)}"
+                             if consumer_fields else "")
+                          + "; use one, or remove it", file=sys.stderr)
             out[key] = f
     return out
 
@@ -163,7 +176,24 @@ def load_config(project: Path) -> dict:
         "paragraph": p.get("paragraph", "woven"),
         "references": p.get("references", True),
         "adequacy": p.get("adequacy", False),   # Ζ·project: emit a Δ-adequacy Bazel test for this project
+        # Extra scalar fields THIS project declares it tolerates — a downstream consumer's vocabulary
+        # (e.g. a summit report's reporter/genre/target), carried by the parser but consumed by no
+        # paperkit invariant.  The policy (which fields) is the consumer's, declared here per project;
+        # the mechanism is the engine's.  An UNdeclared unknown field is still named loud by parse.
+        "consumer_fields": tuple(p.get("consumer_fields", [])),
     }
+
+
+def parse_project(project_dir: Path) -> dict:
+    """Every entry across a project's warrant bibs, parsed with the project's DECLARED consumer
+    fields resolved from its paper.toml — the ONE place that binds "which extra fields this project
+    tolerates" to the parse, so no caller re-implements the load-config-then-parse-all loop (and
+    none can forget to pass consumer_fields, silently strict-rejecting a declared field)."""
+    cfg = load_config(project_dir)
+    F = {}
+    for b in cfg["bibs"]:
+        F.update(parse(b, cfg["consumer_fields"]))
+    return F
 
 
 def rubric(path: Path) -> list:

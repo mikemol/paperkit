@@ -165,7 +165,7 @@ def main(argv: list) -> int:
 
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
-        F.update(bib.parse(b))
+        F.update(bib.parse(b, cfg["consumer_fields"]))
 
     # Ζ·starlark — the LEAF of the recursive check target: resolve ONE claim's check and exit.
     # A project's gate (the node) is this over every claim ∧ the project invariants; a Bazel

@@ -171,7 +171,7 @@ def main(argv: list) -> int:
 
     F = {}
     for b in cfg["bibs"]:
-        F.update(bib.parse(b))
+        F.update(bib.parse(b, cfg["consumer_fields"]))
 
     out = cfg["out"]
     cited = G.cited_keys(out.read_text()) if out.exists() else set()

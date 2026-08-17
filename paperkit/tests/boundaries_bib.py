@@ -21,14 +21,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import bib  # noqa: E402
 
 
-def _warns(body: str) -> str:
-    """Parse a one-entry bib with this body; return the parser's stderr."""
+def _warns(body: str, consumer_fields: tuple = ()) -> str:
+    """Parse a one-entry bib with this body (and optional declared consumer fields); return the
+    parser's stderr and the parsed record."""
     bib._WARNED.clear()                          # the dedup is per build, not per probe
     p = Path(tempfile.mkdtemp()) / "t.bib"
     p.write_text("@misc{k,\n" + body + "\n}\n")
     err = io.StringIO()
     with redirect_stderr(err):
-        parsed = bib.parse(p)
+        parsed = bib.parse(p, consumer_fields)
     return err.getvalue(), parsed["k"]
 
 
@@ -70,6 +71,23 @@ def main() -> int:
           bib._scalar_value(r"claim = {a \min\{\mathrm{x}\} b}", "claim") == r"a \min\{\mathrm{x}\} b")
     check("_top_fields ignores escaped braces in math (they are not structural depth)",
           bib._top_fields(r"claim = {$\{x\}$ text}, check = {cmd:true}") == ["claim", "check"])
+    # A project DECLARES the extra scalar fields it tolerates (its downstream consumer's vocabulary);
+    # paperkit carries them but consumes them in no invariant.  A DECLARED field is carried AND quiet;
+    # an UNdeclared unknown is still named loud — the declaration is what tells a consumer's field
+    # from a typo, which a hardcoded whitelist could not (one consumer's words must not be baked into
+    # a domain-and-location-free engine).
+    cf = ("kind", "by", "of")
+    decl_err, decl = _warns("  claim = {c},\n  kind = {friction},\n  by = {paperkit}", cf)
+    check("a DECLARED consumer field is carried verbatim (kind, by parsed)",
+          decl.get("kind") == "friction" and decl.get("by") == "paperkit")
+    check("a declared consumer field warns about nothing (quiet)", decl_err == "")
+    mixed_err, mixed = _warns("  claim = {c},\n  kind = {friction},\n  bogus = {x}", cf)
+    check("an UNdeclared unknown field is still NAMED loud even when others are declared",
+          "'bogus'" in mixed_err and "DROPPED" in mixed_err        # bogus reported dropped
+          and "'kind'" not in mixed_err and mixed.get("kind") == "friction")  # kind carried, not dropped
+    undecl_err, undecl = _warns("  claim = {c},\n  kind = {friction}")
+    check("WITHOUT the declaration the same field is a loud-drop, not carried",
+          "kind" in undecl_err and "kind" not in undecl)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -88,6 +106,11 @@ def main() -> int:
          bib._scalar_value(r"claim = {a {b} c}", "claim") == "a {b} c",
          "escaped \\} does NOT close it early",
          bib._scalar_value(r"claim = {a \} b}", "claim") == r"a \} b"),
+        ("a consumer field is carried-and-quiet iff the project DECLARED it",
+         "whether the field name is in this project's declared consumer_fields",
+         "declared → carried + quiet",
+         _warns("  kind = {x}", ("kind",))[1].get("kind") == "x" and _warns("  kind = {x}", ("kind",))[0] == "",
+         "undeclared → dropped + named", "kind" in _warns("  kind = {x}")[0]),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -100,7 +123,7 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (10 behaviors, 3 deltas)")
+    print("BOUNDARIES: PASS (14 behaviors, 4 deltas)")
     return 0
 
 

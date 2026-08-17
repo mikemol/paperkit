@@ -126,7 +126,7 @@ def build(repo_root: Path, names: list) -> dict:
         cfg = bib.load_config(pdir)
         F = {}
         for b in cfg["bibs"]:
-            F.update(bib.parse(b))
+            F.update(bib.parse(b, cfg["consumer_fields"]))
         # A BOUNDARY-CROSSING check (resolver.CROSSING — result:, concept:) is an EDGE, not a leaf:
         # its footprint is never used, and stracing it would rerun a whole sibling gate or library
         # witness.  Skip by asking the VERB (crosses=True), never by re-listing the verbs here.
@@ -148,9 +148,7 @@ def _declared(pdir: Path) -> dict:
     """{claim: set(declared read tokens)} from each claim's `reads` field (the declare+audit
     source).  Routed through the canonical parser (paperkit.bib, via bib.parse) — `reads` is now
     a first-class field there, so no separate line scanner / no disagreement with the build."""
-    F = {}
-    for b in bib.load_config(pdir)["bibs"]:
-        F.update(bib.parse(b))
+    F = bib.parse_project(pdir)
     return {k: set(f.get("reads", [])) for k, f in F.items()}
 
 
@@ -187,9 +185,7 @@ def audit_one(proj: str, claim: str) -> dict:
     raw = tomllib.loads((project_dir / "paper.toml").read_text())
     custom = raw.get("checks", {})
     declared = _declared(project_dir).get(claim, set())
-    F = {}
-    for b in bib.load_config(project_dir)["bibs"]:
-        F.update(bib.parse(b))
+    F = bib.parse_project(project_dir)
     f = F.get(claim)
     if not f or not f.get("check") or f["check"].startswith(resolver.CROSSING):
         return {"claim": claim, "ok": True, "skip": True}     # a crossing verb is an edge — no footprint

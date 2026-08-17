@@ -359,9 +359,7 @@ def _records_from_calcs(project_dir: Path, calc_files: list) -> list:
     sens) + the bib STRUCTURE (rests-on/section/from), instead of re-running the def-resolution sweep.
     This is what makes the ∂² faces a CHEAP READING over the cached calculation.  The structure comes
     from the canonical parser (paperkit.bib, via bib.parse) — entries already carries rests-on."""
-    F = {}
-    for b in bib.load_config(project_dir)["bibs"]:
-        F.update(bib.parse(b))
+    F = bib.parse_project(project_dir)
     recs = []
     for f in calc_files:
         c = json.loads(Path(f).read_text())
@@ -412,9 +410,7 @@ def _records_from_cache(project_dir: Path) -> list:
               "sensitivity, grounding and emergence faces would read a measurement that cannot "
               "discriminate.  Re-grade with --resolution def.", file=sys.stderr)
         raise SystemExit(_REFUSE)
-    F = {}
-    for b in bib.load_config(project_dir)["bibs"]:
-        F.update(bib.parse(b))
+    F = bib.parse_project(project_dir)
     # a check may serve SEVERAL claims (binding dilution) — the cache keys by check, the faces
     # key by claim, so one cached grade fans out to every claim citing it.
     by_check: dict = {}
@@ -436,19 +432,14 @@ def _records_from_cache(project_dir: Path) -> list:
 def _all_keys(project_dir: Path) -> frozenset:
     """Every key the bib DECLARES — the set against which an ungraded target is `pending`
     (a claim awaiting measurement) rather than `dangling` (an edge to nothing at all)."""
-    F = {}
-    for b in bib.load_config(project_dir)["bibs"]:
-        F.update(bib.parse(b))
+    F = bib.parse_project(project_dir)
     return frozenset(F)
 
 
 def _discharged(project_dir: Path) -> set:
     """Claims carrying a `link` footnote — the author has acknowledged that this claim's
     prose and grounding edges diverge, and why; that discharges the advisory."""
-    cfg = bib.load_config(project_dir)
-    F = {}
-    for b in cfg["bibs"]:
-        F.update(bib.parse(b))
+    F = bib.parse_project(project_dir)
     return {k for k, f in F.items() if f.get("link")}
 
 

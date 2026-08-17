@@ -111,7 +111,7 @@ def analyze(project_dir: Path) -> list:
     cfg = bib.load_config(project_dir)
     F = {}
     for b in cfg["bibs"]:
-        F.update(bib.parse(b))
+        F.update(bib.parse(b, cfg["consumer_fields"]))
     by_sec = {}
     for k, f in F.items():
         if f.get("section"):

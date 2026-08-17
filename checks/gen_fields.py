@@ -49,6 +49,9 @@ _PAPER_KEY_DOC = {
     "paragraph":  "`claim` = one paragraph per claim; `woven` (default) = join a section into prose",
     "references": "emit the trailing References section",
     "adequacy":   "engine-inert; emits a Bazel Δ-adequacy test for the project",
+    "consumer_fields": "extra bib scalar fields this project's downstream consumer owns — carried "
+                       "verbatim, consumed by no engine invariant (a declared field is quiet in the "
+                       "unknown-field warning; an undeclared one is still named)",
 }
 
 

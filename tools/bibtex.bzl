@@ -519,7 +519,10 @@ def _bib_repo_impl(repository_ctx):
                     sn = _sitename(m, q)
                     out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, module = %s, mutated_py = ":mut_%s", mutated_pyc = ":pyc_%s", %s)' % (
                         k, sn, _lit(k), _lit(m + "::" + q), _lit(m), sn, sn, ev))
-                    (flipcells if q.startswith("flip:") else cellnames).append(sn)
+                    # Μ·sweep·atom — the NON-monotone cells (flip: condition inversion, dflip: data-value
+                    # perturb) route to pk_decisions; the raise-kind cells (def:/branch:/data-:/import+:)
+                    # feed the sensitivity sweep.  A dflip: is the DATA analog of flip: — same partition.
+                    (flipcells if (q.startswith("flip:") or q.startswith("dflip:")) else cellnames).append(sn)
                 # Ζ·mutant·struct·node-kinds — the claim's FILE toggle cells (file+ inject / file- drop),
                 # per its witness's .exists() edges.  A file cell mutates no module: it passes no
                 # module/mutant (eval.py branches on the file+/file- site prefix), only the site + the

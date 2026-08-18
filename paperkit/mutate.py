@@ -421,21 +421,49 @@ def _counterfactual(text: str, qualname: str, entry_value, leaf) -> str:
 def _perturb_data(text: str, qualname: str, n: int) -> str:
     """PERTURB one value to a counterfactual (non-monotone — a value swap, never a drop).  Recurses
     into a nested value to the FIRST scalar leaf (so a `({route:scope}, remark)` value perturbs the
-    scope), keeping the module parseable via a byte-minimal segment splice."""
+    scope), keeping the module parseable.  The swap is located via ast.get_source_segment — NOT raw
+    col_offset slicing: an entry on a line with escaped/raw strings (e.g. a regex `(r"\\\\'E", "É")`)
+    desyncs naive column arithmetic from the true span, so the segment API (which Python guarantees
+    correct) locates the leaf's source, and the replacement is scoped to the ENTRY's segment so a
+    same-text leaf elsewhere in the module is untouched (byte-minimal, like _drop_data's rebuild)."""
+    assign = _assign_of(ast.parse(text), qualname)      # the whole `<qualname> = <literal>` statement
     for name, i, kind, k, val in _data_sites(text):
         if name == qualname and i == n:
             # descend to the first scalar leaf of the value (the perturbable decision).
-            leaf = val
-            if not isinstance(val, ast.Constant):
-                leaf = next((node for node in ast.walk(val)
-                             if isinstance(node, ast.Constant)), None)
-                if leaf is None:
-                    return _splice(text, val, val, '"PAPERKIT_PERTURB"')  # no leaf → whole-value marker
-            cf = _counterfactual(text, qualname, val, leaf)
-            out = _splice(text, leaf, leaf, cf)
+            leaf = val if isinstance(val, ast.Constant) else next(
+                (node for node in ast.walk(val) if isinstance(node, ast.Constant)), None)
+            asrc = ast.get_source_segment(text, assign) if assign is not None else None
+            entry_src = ast.get_source_segment(text, val)
+            leaf_src = None if leaf is None else ast.get_source_segment(text, leaf)
+            # OFFSET-FREE: locate + rewrite via ast.get_source_segment (Python-correct on escaped/raw-
+            # string lines where col_offset slicing desyncs), scoped ENTRY→ASSIGNMENT→module so a
+            # same-text leaf/entry elsewhere is untouched (byte-minimal, like _drop_data's rebuild).
+            if asrc is None or entry_src is None:
+                return _splice(text, val, val, '"PAPERKIT_PERTURB"')  # unlocatable → col_offset marker
+            if leaf is None or leaf_src is None:
+                # a value with NO scalar leaf (e.g. a Param(...) call) — no value to swap; mark its
+                # PRESENCE (a distinct whole-value marker), offset-free via the entry segment.
+                new_asrc = asrc.replace(entry_src, '"PAPERKIT_PERTURB"', 1)
+            else:
+                cf = _counterfactual(text, qualname, val, leaf)
+                new_entry = entry_src.replace(leaf_src, cf, 1)
+                new_asrc = asrc.replace(entry_src, new_entry, 1)
+            out = text.replace(asrc, new_asrc, 1)
             ast.parse(out)                               # Ν·loud on a malformed perturb
             return out
     raise KeyError(f"Ζ·mutant: 'dflip:{qualname}#{n}' is not a data site in the module")
+
+
+def _assign_of(tree, qualname):
+    """The module-level `Assign` node whose target is `qualname` (the statement a data literal lives in)."""
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == qualname for t in node.targets):
+            return node
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) \
+                and node.target.id == qualname:
+            return node
+    return None
 
 
 def _mutate_lines(text: str, nodes: list) -> str:

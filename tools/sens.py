@@ -29,14 +29,16 @@ def main(argv):
     # the sens is not to be trusted — the reading layer grades it broken, exactly as for a file-calc.
     baseline = not base.get("flipped")
     records = [json.load(open(f)) for f in a.evals]
-    # Μ·sweep·atom — the grid-level structural bar: a NON-monotone flip: cell must NEVER enter the
-    # sensitivity set (a value inversion flips only if the witness asserts, so it is not a
-    # falsifiability signal).  The generator partitions flip: cells to pk_decisions; this FAILS LOUD if
-    # one reached pk_sens anyway (a partition regression), since Starlark cannot make a type error the
-    # way the in-process FlipSite does.  A positive control, like the ∅-baseline guard above.
-    flips = [r["site"] for r in records if "::flip:" in r.get("site", "")]
+    # Μ·sweep·atom — the grid-level structural bar: a NON-monotone cell (flip: condition inversion,
+    # dflip: data-value perturb) must NEVER enter the sensitivity set (it flips only if the witness
+    # asserts, so it is not a falsifiability signal).  The generator partitions them to pk_decisions;
+    # this FAILS LOUD if one reached pk_sens anyway (a partition regression), since Starlark cannot make
+    # a type error the way the in-process FlipSite/DflipSite do.  A positive control, like the ∅-baseline
+    # guard above.  Matches "::flip:" and "::dflip:" (the dflip: spec is `<file>::dflip:<QN>#<n>`).
+    flips = [r["site"] for r in records
+             if "::flip:" in r.get("site", "") or "::dflip:" in r.get("site", "")]
     if flips:
-        sys.stderr.write("Μ·sweep·atom: NON-monotone flip: cell(s) reached pk_sens — the partition "
+        sys.stderr.write("Μ·sweep·atom: NON-monotone cell(s) reached pk_sens — the partition "
                          "leaked: %s\n" % flips)
         return 1
     sens = [r["site"] for r in records if r["flipped"]]

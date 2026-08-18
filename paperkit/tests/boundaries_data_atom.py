@@ -80,18 +80,30 @@ def main() -> int:
 
     # ── data-: monotone drop, parseable, byte-minimal ────────────────────────────────────────────
     d = mutate.emit_mutant(SRC, "data-:SCOPE#1")            # drop "2.4.2"
-    check("data-: drops one key ('2.4.2' gone, '1.1.1' kept)",
-          '"2.4.2"' not in d and '"1.1.1"' in d)
+    # value-level, quote-agnostic (ast.unparse may normalise " → '): the KEY is gone, siblings kept.
+    check("data-: drops one key (2.4.2 gone, 1.1.1 kept)",
+          "2.4.2" not in d and "1.1.1" in d)
     check("the data-: drop still parses (module importable)", _parses(d))
-    # (b) byte-minimal: only the SCOPE line changed.
-    orig, dl = SRC.splitlines(), d.splitlines()
-    changed = [i for i in range(len(orig)) if i >= len(dl) or orig[i] != dl[i]]
-    check("(b) the drop changes ONLY the dropped key's line (byte-minimal, no literal reflow)",
-          changed == [0])
+    # (b) INTER-LITERAL byte-minimality: mutating one literal leaves every UNRELATED literal (and the
+    # rest of the module) byte-identical — so a source-grep witness over an unrelated table never
+    # flips.  (The mutated literal itself is rebuilt to stay parseable + type-correct — a 1-tuple
+    # keeps its `(x,)`, which a byte-minimal comma-splice would silently lose.)
+    check("(b) mutating SCOPE leaves the UNRELATED COLORS literal byte-identical (inter-literal "
+          "minimal)", 'COLORS = ["red", "green", "blue"]' in d)
+    check("(b) mutating SCOPE leaves SWALLOWED byte-identical", '"a": 1, "b": 2' in d)
     # drop the LAST element — no dangling comma.
     dlast = mutate.emit_mutant(SRC, "data-:COLORS#2")       # drop "blue"
     check("data-: dropping the last element leaves no dangling comma (parseable)",
-          _parses(dlast) and '"blue"' not in dlast and '"red"' in dlast)
+          _parses(dlast) and "blue" not in dlast and "red" in dlast)
+    # a 2-tuple dropped to 1 element MUST stay a tuple (the `(x,)` case a comma-splice loses — this
+    # broke the sweep on resolver._ENV_KEEP_PREFIX).
+    TUP = 'P = ("LC_", "PAPERKIT_")\n'
+    tdrop = mutate.emit_mutant(TUP, "data-:P#1")            # drop "PAPERKIT_"
+    check("data-: a 2-tuple dropped to 1 element STAYS a tuple (keeps its trailing comma)",
+          _parses(tdrop) and isinstance(ast.parse(tdrop).body[0].value, ast.Tuple))
+    # empty containers stay their own type (set() not {}).
+    check("data-: an emptied set becomes set() (not {} which is a dict)",
+          "set()" in mutate.emit_mutant('S = {"only"}\n', "data-:S#0"))
 
     # ── (c) dflip: position-aware valid-enum perturb ─────────────────────────────────────────────
     p = mutate.emit_mutant(SRC, "dflip:SCOPE#0")            # perturb 1.1.1's "full"

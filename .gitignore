@@ -27,3 +27,4 @@ tools/sched-batch
 # (the five already-tracked ones kept working, which is what hid it). Removed by summit
 # 2026-08-14 — floor/reports.bib `friction-provisioner-clobbers-a-carve-out`, reported by
 # cassian-observability after the same clobber hit its A119 archive.
+.githooks/local.env

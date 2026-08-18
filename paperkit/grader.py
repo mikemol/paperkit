@@ -32,7 +32,8 @@ import config
 import resolver
 from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _copy_sandbox, _nested_roots, _mutable
 from mutate import (  # Ζ·mutant / Μ·sweep·atom — the pure AST mutation primitives (their own leaf)
-    _def_sites, _mutate_lines, _branch_sites, _flip_sites, _flip_condition)
+    _def_sites, _mutate_lines, _branch_sites, _flip_sites, _flip_condition,
+    _data_sites, emit_mutant, _drop_data_multi)
 from grade import _grade_from_sens  # Μ·grade — the pure ladder/interpretation (the rungs + clamp
 # orders STRENGTH/ORDER/RANK_C/GRADE_C/CORRO_C live in grade.py now; the SWEEP below is the
 # calculation, that module the interpretation — Ζ·calc·interp in code).
@@ -192,6 +193,20 @@ class _BranchNode:
         self.end_lineno = last.end_lineno
 
 
+class _DataNode:
+    """Μ·sweep·atom — a module-level DATA DROP (data-:<qn>#<n>) presented to the sweep.  Unlike a def/
+    branch node it is NOT a body line-span _mutate_lines can replace — it rewrites a dict/list literal
+    in place — so it carries its mutate.py SPEC and renders via emit_mutant.  data-: IS monotone (a
+    reader flips when the key is gone), so it belongs in _sites beside def:/branch: and the sweep
+    consumes it uniformly; _apply renders a data node by applying its spec to the (possibly already
+    def/branch-mutated) file text.  dflip: is NOT here — it is the non-monotone DflipSite the sweep
+    cannot receive (the structural bar), like flip:."""
+    __slots__ = ("spec",)
+
+    def __init__(self, qualname, n):
+        self.spec = f"data-:{qualname}#{n}"
+
+
 def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = None,
            root_copy: Path | None = None) -> list:
     """Every def-resolution mutation SITE as (file, node | None, label): a .py file's
@@ -214,6 +229,8 @@ def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = 
                 sites.append((f, node, f"{label}::{qn}"))
             for qn, n, (b0, blast) in _branch_sites(text):
                 sites.append((f, _BranchNode(b0, blast), f"{label}::branch:{qn}#{n}"))
+            for qn, n, _kind, _k, _v in _data_sites(text):
+                sites.append((f, _DataNode(qn, n), f"{label}::data-:{qn}#{n}"))
         else:
             sites.append((f, None, label))
     return sites
@@ -224,14 +241,26 @@ def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
     run the check, restore.  True iff the mutation flips chk red.  The atom shared by the
     group-testing sweep (sensitivity) and the single-site probe (flip_one)."""
     saved: dict = {}
-    pyfiles: dict = {}
+    linenodes: dict = {}   # def/branch nodes → _mutate_lines (body-span → raise)
+    dataspecs: dict = {}   # Μ·sweep·atom — _DataNode specs → emit_mutant (literal rewrite)
     try:
         for f, node, _ in group:
             saved.setdefault(f, f.read_bytes())
-            if node is not None:
-                pyfiles.setdefault(f, []).append(node)
-        for f, nodes in pyfiles.items():
-            f.write_text(_mutate_lines(saved[f].decode(), nodes))
+            if isinstance(node, _DataNode):
+                dataspecs.setdefault(f, []).append(node.spec)
+            elif node is not None:
+                linenodes.setdefault(f, []).append(node)
+        for f in set(list(linenodes) + list(dataspecs)):
+            text = saved[f].decode()
+            if f in linenodes:
+                text = _mutate_lines(text, linenodes[f])   # def/branch body-drops (line-span)
+            if f in dataspecs:
+                # Μ·sweep·atom — resolve every data-: DROP's (qualname, index) against the CURRENT
+                # text ONCE and remove them per-literal in a single index-stable rebuild.  A sequential
+                # spec-by-spec drop renumbers a literal as it goes, so a later index of the same literal
+                # can vanish; drop_data_multi removes a whole index-SET at once, composition-safe.
+                text = _drop_data_multi(text, dataspecs[f])
+            f.write_text(text)
         for f, node, _ in group:
             if node is None:
                 f.write_bytes(CORRUPT)
@@ -525,6 +554,17 @@ def decisions_unasserted(chk: str, sandbox_project: Path, custom: dict,
             continue
         if not _flip_flips(chk, sandbox_project, custom, engine_dir, fs):
             out.append(fs.label)
+    # Μ·sweep·atom — the DATA analog: a dflip: value is UNASSERTED iff its sibling data-: DROP flips
+    # (the key is genuinely READ — a single, unambiguous sibling via flip_one, no correlated-flip
+    # confound to disambiguate, so ONE probe suffices where branch needed both arms) AND perturbing the
+    # value to a valid same-position counterfactual does NOT flip: the check reads the entry but is
+    # indifferent to WHICH valid value it holds — a wrong table value would ride through.
+    for ds in _dflip_sites_of(sandbox_project, engine_dir):
+        drop_label = f"{_rel(ds.file, sandbox_project, engine_dir)}::data-:{ds.qualname}#{ds.n}"
+        if not flip_one(chk, sandbox_project, custom, engine_dir, drop_label):
+            continue                                     # key not read → not a gap, just unreached
+        if not _perturb_flips(chk, sandbox_project, custom, engine_dir, ds):
+            out.append(ds.label)
     return sorted(out)
 
 
@@ -550,6 +590,49 @@ def _flip_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Path 
         return not resolver.resolves(chk, sandbox_project, custom).passed
     finally:
         fs.file.write_bytes(saved)
+
+
+class DflipSite(NamedTuple):
+    """Μ·sweep·atom — a NON-monotone DATA-VALUE perturb site (dflip:<qn>#<n>), the (data,perturb) cell
+    of the Klein group and the DATA analog of FlipSite.  A DISTINCT 5-field type the raise-kind (file,
+    node, label) sweep cannot unpack — the STRUCTURAL bar: a value swap can never enter the
+    falsifiability sweep.  Consumed only by decisions_unasserted, feeding the orthogonal
+    decision-coverage axis, never the grade."""
+    file: Path
+    qualname: str
+    n: int
+    kind: str
+    label: str
+
+
+def _dflip_sites_of(sandbox_project: Path, engine_dir: Path | None,
+                    files: list | None = None, root_copy: Path | None = None) -> list:
+    """Every dflip: data-value site as a DflipSite — a SEPARATE generator from _sites (the structural
+    bar), scoped to DICT VALUES and non-set elements (a bare set element has no value to perturb; only
+    presence, which data-: already covers).  A set literal contributes NO dflip: sites."""
+    out = []
+    for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
+        if f.suffix != ".py":
+            continue
+        label = _rel(f, sandbox_project, engine_dir, root_copy)
+        for qn, n, kind, _k, _v in _data_sites(f.read_text()):
+            if kind == "Set":
+                continue                                 # a set element has no perturbable value
+            out.append(DflipSite(f, qn, n, kind, f"{label}::dflip:{qn}#{n}"))
+    return out
+
+
+def _perturb_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None,
+                   ds: DflipSite) -> bool:
+    """Perturb ds's value to a valid same-position counterfactual in-place, run the check, restore.
+    True iff the perturb flips chk red — the witness ASSERTS on the value.  A NON-monotone probe (a
+    value swap, not a drop), which is why ds is a DflipSite the sensitivity sweep cannot receive."""
+    saved = ds.file.read_bytes()
+    try:
+        ds.file.write_text(emit_mutant(saved.decode(), f"dflip:{ds.qualname}#{ds.n}"))
+        return not resolver.resolves(chk, sandbox_project, custom).passed
+    finally:
+        ds.file.write_bytes(saved)
 
 
 def _sandbox_setup(project_dir, resolution="def"):

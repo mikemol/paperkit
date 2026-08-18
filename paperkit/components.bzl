@@ -51,6 +51,7 @@ COMPONENTS = {
         "tests/boundaries_config.py",
         "tests/boundaries_corroboration.py",
         "tests/boundaries_data_atom.py",
+        "tests/boundaries_data_grade.py",
         "tests/boundaries_decisions.py",
         "tests/boundaries_degrade.py",
         "tests/boundaries_discriminate.py",

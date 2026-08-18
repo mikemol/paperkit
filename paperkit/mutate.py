@@ -287,28 +287,68 @@ def _splice(text: str, start_node, end_node, replacement: str) -> str:
 
 
 def _drop_data(text: str, qualname: str, n: int) -> str:
-    """DROP one key/element of a module-level literal — byte-minimally.  For a dict entry the removable
-    span is key…value; for a list/set/tuple, the element.  The trailing (or, for the last item,
-    leading) comma is swallowed so no dangling `,` remains, keeping the module parseable."""
+    """DROP one key/element of a module-level literal, keeping it PARSEABLE and its TYPE intact.  The
+    edit is the SMALLEST that stays syntactically valid: it rebuilds ONLY the affected literal (not
+    the whole module) from the surviving entries — so a source-grep witness over an UNRELATED literal
+    never flips, while the guaranteed-parseable rebuild handles every comma / trailing-comma / tuple
+    case (a 1-element tuple keeps its `(x,)`, an empty container is `{}`/`[]`/`set()`/`()`).  A byte-
+    minimal comma-splice cannot: dropping a 2-tuple to `("x")` silently loses tuple-ness (Python reads
+    a parenthesised value), which broke the sweep on resolver._ENV_KEEP_PREFIX."""
     for name, i, kind, k, val in _data_sites(text):
         if name == qualname and i == n:
-            first = k if k is not None else val          # the entry's start node
-            # find the sibling entries to compute comma removal
             tree = ast.parse(text)
             lit = next(v for nm, v in _data_assigns(tree) if nm == qualname)
-            entries = (list(zip(lit.keys, lit.values)) if isinstance(lit, ast.Dict)
-                       else [(None, e) for e in lit.elts])
-            starts = [(kk if kk is not None else vv) for kk, vv in entries]
-            # replace the entry span with empty, then clean up the comma via a re-parse-safe splice.
-            dropped = _splice(text, first, val, "")
-            # the splice leaves e.g. `{a: 1, , b: 2}` or `{a: 1, }` — normalise the orphaned comma.
-            import re
-            dropped = re.sub(r",(\s*,)", r",", dropped, count=0)     # `, ,` → `,`
-            dropped = re.sub(r"([\[{(])\s*,", r"\1", dropped)        # `{ ,` / `[ ,` → `{` / `[`
-            dropped = re.sub(r",(\s*[\]})])", r"\1", dropped)        # `, }` / `, ]` → `}` / `]`
-            ast.parse(dropped)                            # Ν·loud: a malformed drop raises, never ships
+            if isinstance(lit, ast.Dict):
+                keep = ast.Dict(keys=[kk for j, kk in enumerate(lit.keys) if j != i],
+                                values=[vv for j, vv in enumerate(lit.values) if j != i])
+            else:
+                keep = type(lit)(elts=[e for j, e in enumerate(lit.elts) if j != i])
+                if isinstance(lit, ast.Set) and not keep.elts:
+                    return _splice(text, lit, lit, "set()")   # ast.unparse gives {} (a dict) — fix
+            shortened = ast.unparse(ast.fix_missing_locations(keep))
+            dropped = _splice(text, lit, lit, shortened)      # rebuild ONLY this literal's span
+            ast.parse(dropped)                                # Ν·loud: a malformed drop raises
             return dropped
     raise KeyError(f"Ζ·mutant: 'data-:{qualname}#{n}' is not a data site in the module")
+
+
+def _drop_data_multi(text: str, specs: list) -> str:
+    """DROP several keys/elements at once — COMPOSITION-SAFE.  A sequential spec-by-spec drop renumbers
+    a literal as it goes (dropping #2 makes #3 become #2), so a group-testing group that lists several
+    indices of ONE literal would lose the later ones.  This resolves every (qualname, index) against
+    the ORIGINAL text once and rebuilds each affected literal from the surviving entries in a single
+    pass — the data analog of _mutate_lines taking a LIST of nodes.  A spec naming no current site is
+    Ν·loud (a genuine miss), but a spec whose index is valid in the original text always applies."""
+    by_qn: dict = {}
+    for spec in specs:
+        arg = spec[len("data-:"):] if spec.startswith("data-:") else spec
+        qn, _, n = arg.rpartition("#")
+        by_qn.setdefault(qn, set()).add(int(n))
+    tree = ast.parse(text)
+    assigns = {nm: v for nm, v in _data_assigns(tree)}
+    # rebuild in REVERSE source order so earlier splices don't invalidate later nodes' spans.
+    edits = []
+    for qn, drop_idx in by_qn.items():
+        lit = assigns.get(qn)
+        if lit is None:
+            raise KeyError(f"Ζ·mutant: 'data-:{qn}' is not a data literal in the module")
+        count = len(lit.keys) if isinstance(lit, ast.Dict) else len(lit.elts)
+        if any(i >= count for i in drop_idx):
+            raise KeyError(f"Ζ·mutant: 'data-:{qn}#{max(drop_idx)}' index out of range")
+        if isinstance(lit, ast.Dict):
+            keep = ast.Dict(keys=[k for j, k in enumerate(lit.keys) if j not in drop_idx],
+                            values=[v for j, v in enumerate(lit.values) if j not in drop_idx])
+        else:
+            keep = type(lit)(elts=[e for j, e in enumerate(lit.elts) if j not in drop_idx])
+        if isinstance(lit, ast.Set) and not keep.elts:
+            rendered = "set()"
+        else:
+            rendered = ast.unparse(ast.fix_missing_locations(keep))
+        edits.append((lit, rendered))
+    for lit, rendered in sorted(edits, key=lambda e: e[0].lineno, reverse=True):
+        text = _splice(text, lit, lit, rendered)
+    ast.parse(text)                                       # Ν·loud on a malformed rebuild
+    return text
 
 
 def _leaf_path(entry_value, leaf) -> tuple | None:
@@ -403,10 +443,19 @@ def _mutate_lines(text: str, nodes: list) -> str:
     byte-identical (so a source-grep witness flips only when ITS grepped text lived in a mutated body,
     not because the file was reformatted).  BaseException — not Exception — so a witness's own
     `except Exception` cannot swallow the mutation (MONOTONE BY CONSTRUCTION).  Takes a LIST of nodes:
-    grader.py's in-process group-testing mutates several def-sites at once."""
+    grader.py's in-process group-testing mutates several def-sites at once.
+
+    NESTED nodes are collapsed: when an OUTER def/arm span CONTAINS an inner one (a def and its own
+    closure/branch, both in the group), replacing the outer body already removes the inner, and
+    replacing BOTH would slice a line list a prior replacement already shortened — corrupting content
+    below (the data atom exposed this: it silently overwrote a module-level literal far downstream).
+    So drop any node whose span is contained in another's, then replace the survivors bottom-up."""
+    spans = [(n.body[0].lineno, n.end_lineno, n.body[0].col_offset) for n in nodes]
+    outer = [(s, e, c) for i, (s, e, c) in enumerate(spans)
+             if not any(j != i and os <= s and e <= oe and (os, oe) != (s, e)
+                        for j, (os, oe, _oc) in enumerate(spans))]
     lines = text.splitlines(keepends=True)
-    for node in sorted(nodes, key=lambda n: n.body[0].lineno, reverse=True):
-        s, e, col = node.body[0].lineno, node.end_lineno, node.body[0].col_offset
+    for s, e, col in sorted(outer, key=lambda x: x[0], reverse=True):
         lines[s - 1:e] = [" " * col + "raise BaseException('PAPERKIT_MUT')\n"]
     return "".join(lines)
 

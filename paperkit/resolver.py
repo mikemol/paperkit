@@ -202,14 +202,64 @@ def clean_env(env: dict | None = None) -> dict:
     return out
 
 
+# A check must TERMINATE to pass.  A mutation can make a witness non-terminating — a flip: inverting a
+# `while` condition (bib._unescaped_braces' escaped-backslash loop is the live example), a branch: that
+# removes a loop's exit — and without a bound the sweep spins forever on that one cell instead of
+# recording the flip.  So a check that does not finish reads FAIL (the mutation changed behaviour — the
+# pristine check terminates, the mutant does not, which IS the sensitivity the sweep measures).
+#
+# The bound is CPU TIME, not wall clock — this is the honest measure under paperkit's own scheduling.
+# A mutation-induced hang is a BUSY loop at 100% CPU, so it trips a CPU limit almost immediately; a
+# check that is merely SLOW because it is lease-QUEUED (the membudget semaphore) or descheduled under
+# load burns little CPU and is NOT false-failed, which a wall-clock timeout would do (it was descheduled,
+# not looping).  RLIMIT_CPU is kernel-enforced (SIGXCPU at the soft limit, SIGKILL at the hard) and
+# INHERITED by the child tree, set in a preexec_fn before exec.  A generous WALL BACKSTOP still catches
+# the rare stuck-WAITING process that burns no CPU (a deadlocked I/O wait a CPU limit would never trip).
+# Ample for any single real check (a def-sweep's minutes are MANY checks, not one CPU-heavy one);
+# PAPERKIT_CHECK_CPU / PAPERKIT_CHECK_TIMEOUT override.
+CHECK_CPU = 60          # seconds of CPU time — a busy hang trips this; a lease-queued check does not
+CHECK_TIMEOUT = 600     # wall-clock BACKSTOP for a stuck-waiting (zero-CPU) process
+
+
+def _cpu_rlimit(seconds: int):
+    """A preexec_fn that caps the child's (and its tree's) CPU time — SIGXCPU at `seconds`, SIGKILL a
+    few seconds later.  Runs in the forked child before exec, so the whole check subprocess is bounded
+    by WORK DONE, not wall time."""
+    def _set():
+        import resource
+        resource.setrlimit(resource.RLIMIT_CPU, (seconds, seconds + 3))
+    return _set
+
+
 def run_ok(cmd: str, cwd: Path) -> Verdict:
-    """Run a shell command: it RAN and exited 0 → PASS, ran and exited non-zero → FAIL, could not
-    be SPAWNED at all → UNAVAILABLE.  The last arm is the same could-not-evaluate seam as the
-    crossing verbs, one verb down: an un-spawnable cmd is not a refuted claim, it is an unchecked
-    one, and folding it into FAIL would be the exact bug this change removes for the most-used verb."""
+    """Run a shell command: it RAN and exited 0 → PASS, ran and exited non-zero (or exceeded its CPU
+    budget / the wall backstop) → FAIL, could not be SPAWNED at all → UNAVAILABLE.  The last arm is the
+    same could-not-evaluate seam as the crossing verbs, one verb down: an un-spawnable cmd is not a
+    refuted claim, it is an unchecked one, and folding it into FAIL would be the exact bug this change
+    removes for the most-used verb.  A cmd that BURNS its CPU budget (a mutation-induced busy loop), by
+    contrast, IS a fail — a check that never answers has not passed, and the hang is a real behavioural
+    flip the sweep must see; measuring CPU not wall keeps a lease-queued check from a false FAIL."""
+    import os
+    import signal
+    cpu = int(os.environ.get("PAPERKIT_CHECK_CPU", CHECK_CPU))
+    wall = int(os.environ.get("PAPERKIT_CHECK_TIMEOUT", CHECK_TIMEOUT))
+    # start_new_session so a hang kills the WHOLE process group — a `shell=True` timeout otherwise
+    # reaps only the shell and orphans the real child (the hanging witness), which then spins on.
     try:
-        return _pf(subprocess.run(cmd, shell=True, cwd=cwd, env=clean_env(),
-                                  capture_output=True).returncode == 0)
+        p = subprocess.Popen(cmd, shell=True, cwd=cwd, env=clean_env(),
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True, preexec_fn=_cpu_rlimit(cpu))
+        try:
+            rc = p.wait(timeout=wall)
+            # SIGXCPU (‑signal 24) / SIGKILL from the CPU rlimit ⇒ negative returncode ⇒ FAIL, not PASS.
+            return _pf(rc == 0)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(p.pid), signal.SIGKILL)   # kill the whole tree, no orphans
+            except ProcessLookupError:
+                pass
+            p.wait()
+            return _pf(False)                            # did not terminate → FAIL (the mutation flipped it)
     except Exception:
         return UNAVAILABLE
 

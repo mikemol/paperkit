@@ -22,6 +22,7 @@ IMPORTS = {
     "tests/boundaries_config.py": ["config"],
     "tests/boundaries_corroboration.py": ["_fixture_delta", "_fixture_model"],
     "tests/boundaries_data_atom.py": ["mutate"],
+    "tests/boundaries_data_grade.py": ["grader"],
     "tests/boundaries_decisions.py": ["grade", "grader"],
     "tests/boundaries_degrade.py": ["cache", "resolver"],
     "tests/boundaries_discriminate.py": ["_fixture_delta", "_fixture_model", "_fixture_project"],

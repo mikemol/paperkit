@@ -93,4 +93,10 @@ test_suite(name = "hook", tests = [
     # (the hermetic sandbox the mutation cells require; .githooks/pre-commit passes it).
     "@paperkit_paper//:cohere",
     "@paperkit_root//:cohere",
+    # Μ·sweep·atom — the DECISION-COVERAGE summary over each emerge project's flip:/dflip: grid cells
+    # (the non-monotone half of the Klein-four atom).  Built every commit so the grid twin is CONSUMED,
+    # not emitted-but-inert (the enforcement adversary's finding); an orthogonal axis, so it reds only
+    # on a malformed record (a partition/aggregation regression), never on an unasserted-decision count.
+    "@paperkit_paper//:decisions",
+    "@paperkit_root//:decisions",
 ])

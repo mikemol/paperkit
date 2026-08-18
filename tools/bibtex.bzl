@@ -409,7 +409,7 @@ def _bib_repo_impl(repository_ctx):
     if calc:
         csyms = ["pk_calc", "pk_grade", "pk_mem_learn", "pk_verdict"]
         if emerge:
-            csyms += ["pk_cohere", "pk_mutate", "pk_pyc", "pk_eval", "pk_sens", "pk_decisions"]
+            csyms += ["pk_cohere", "pk_mutate", "pk_pyc", "pk_eval", "pk_sens", "pk_decisions", "pk_decisions_summary"]
         out.append('load("@@//tools:calc.bzl", ' + ", ".join([_lit(s) for s in csyms]) + ")")
     out.append("")
     if emerge:
@@ -423,6 +423,7 @@ def _bib_repo_impl(repository_ctx):
         out.append('pk_mutate(name = "mut_0", module = "paperkit/bib.py", site = "", data = ["@@//paperkit:engine"])')
         out.append('pk_pyc(name = "pyc_0", src = ":mut_0")')
     recs = []
+    dcns = []            # Μ·sweep·atom — the per-claim __decisions targets, folded into one summary (else inert)
     calc_claims = {}
     imported_cert = {}   # Λ·witness — k → the owner library's __dcalc cert label (a concept: import edge)
     owns = repository_ctx.attr.owns_concepts
@@ -557,6 +558,7 @@ def _bib_repo_impl(repository_ctx):
                         k,
                         ", ".join(['":%s__%s"' % (k, c) for c in flipcells]),
                         ", ".join(['":%s__%s"' % (k, c) for c in cellnames])))
+                    dcns.append('":%s__decisions"' % k)     # collect for the project summary (else inert)
             elif emerge:
                 # A calc claim with NO engine witness (a cmd:/result: check — e.g. a grep over a static
                 # asset).  It has no closure (closure.py enumerates only the witness module's CLAIMS), so
@@ -594,6 +596,19 @@ def _bib_repo_impl(repository_ctx):
                    '], data = ["@@//paperkit:engine", ' + _lit(files) + "".join([", " + _lit(i) for i in imports]) + "])")
         out.append('sh_test(name = "cohere", srcs = ["@@//tools:assert_pass.sh"], ' +
                    'args = ["$(rootpath :cohere_rec)"], data = [":cohere_rec"], size = "small", ' +
+                   'visibility = ["//visibility:public"])')
+
+    # Μ·sweep·atom — fold the per-claim __decisions records into ONE project summary, so the
+    # decision-coverage grid twin is CONSUMED (the enforcement adversary's emitted-but-inert finding).
+    # A PUBLIC target //<proj>:decisions built every commit (added to //:hook by the owner), reachable +
+    # non-inert; the summary reads each __decisions record (a malformed one reds — a partition/
+    # aggregation regression), reporting the reached-but-unasserted decisions.  It does NOT gate a floor:
+    # decision-coverage is an orthogonal axis, so a high unasserted count is surfaced, never failed.
+    if emerge and dcns:
+        out.append('pk_decisions_summary(name = "decisions_rec", decisions = [%s], visibility = ["//visibility:public"])'
+                   % ", ".join(dcns))
+        out.append('sh_test(name = "decisions", srcs = ["@@//tools:assert_pass.sh"], ' +
+                   'args = ["$(rootpath :decisions_rec)"], data = [":decisions_rec"], size = "small", ' +
                    'visibility = ["//visibility:public"])')
 
     # invariants — a structural meta-check over the WHOLE bib (coverage, no-axiom-K); an irreducibly

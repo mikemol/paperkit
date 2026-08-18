@@ -349,6 +349,37 @@ pk_decisions = rule(
     },
 )
 
+# Μ·sweep·atom — the PROJECT decision-coverage SUMMARY: fold every claim's __decisions record into one
+# artifact, so the grid twin is CONSUMED (not emitted-but-inert — the enforcement adversary's finding).
+# decision-coverage is an ORTHOGONAL axis, never a grade rung, so this does NOT gate a floor; it makes
+# the aggregate REACHABLE + built every commit (a //:hook member), surfacing which reached decisions no
+# witness asserts.  A red only on a MALFORMED record (a partition/aggregation regression), never on a
+# high unasserted count — the axis reports coverage, it does not fail a build for having a gap.
+def _decisions_summary_impl(ctx):
+    py = ctx.toolchains[_PY].py3_runtime
+    o = ctx.actions.declare_file(ctx.label.name + ".decisions_summary.json")
+    recs = " ".join([e.path for e in ctx.files.decisions])
+    ctx.actions.run_shell(
+        outputs = [o],
+        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.decisions, transitive = [py.files]),
+        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
+                  " --summary " + recs + " > " + o.path,
+        mnemonic = "PkDecisionsSummary",
+        progress_message = "Μ·decisions·summary " + ctx.label.name,
+    )
+    return [DefaultInfo(files = depset([o]))]
+
+pk_decisions_summary = rule(
+    implementation = _decisions_summary_impl,
+    doc = "Μ·sweep·atom — fold a project's per-claim __decisions records into one reachable coverage summary.",
+    toolchains = [_PY],
+    attrs = {
+        "decisions": attr.label_list(allow_files = True, mandatory = True, doc = "the per-claim __decisions records"),
+        "_tool": attr.label(default = "//tools:decisions.py", allow_single_file = True),
+        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
+    },
+)
+
 # Ζ·mutant — ONE (claim, def-site) probe as a Bazel action: mutate exactly `site` and report
 # whether it flips the check.  This LIFTS the def-sweep's in-process group-testing fanout into
 # Bazel's graph (parallel + per-site cached); pk_sens aggregates the {flipped} records into the

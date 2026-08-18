@@ -442,6 +442,26 @@ def _selftest() -> int:
     # A (scope==full)==(Supports) invariant would be VACUOUS (both sides read the same dict) — verified.
     print("\nΡ·wcag·scope-fixture — every disclosed verdict pinned; a scope-label mutation flips one\n")
     scope_fails = []
+    # COMPLETENESS (Ζ·bnd·toplevel / guard-must-not-copy): the CONTENT loop below iterates SCOPE_EMIT
+    # itself, so a data-: DROP of a golden entry would just SHRINK the loop — the dropped verdict would
+    # vanish silently rather than mismatch (the enforcement adversary's finding).  Pin the DOMAIN first,
+    # against an INDEPENDENT source (wm.SC minus NOT_APPLICABLE, both routes — NOT SCOPE_EMIT), so a drop
+    # breaks domain-equality here even though the content loop can't see it.  This is the completeness
+    # arithmetic wcag_model uses, applied to the golden table's key set: the guard must not derive its
+    # own domain from the thing it guards.
+    expected_domain = {(sc, route) for sc in (set(wm.SC) - NOT_APPLICABLE) for route in ("docx", "latex")}
+    got_domain = set(SCOPE_EMIT)
+    missing = sorted(expected_domain - got_domain)
+    extra = sorted(got_domain - expected_domain)
+    if missing:
+        scope_fails.append(f"SCOPE_EMIT is MISSING {len(missing)} disclosed (SC×route) entries: {missing[:6]}")
+        print(f"  XX SCOPE_EMIT domain incomplete — {len(missing)} non-NA (SC×route) unpinned: {missing[:6]}")
+    if extra:
+        scope_fails.append(f"SCOPE_EMIT pins {len(extra)} (SC×route) that are Not Applicable: {extra[:6]}")
+        print(f"  XX SCOPE_EMIT pins {len(extra)} NA (SC×route): {extra[:6]}")
+    if not missing and not extra:
+        print(f"  ok SCOPE_EMIT domain == the {len(expected_domain)} non-NA (SC×route) — independently derived "
+              f"from wm.SC − NOT_APPLICABLE (a drop cannot hide)")
     for (sc, route), expected in sorted(SCOPE_EMIT.items()):
         got = entail(sc, route, run_farm=False)["verdict"]
         ok = got == expected

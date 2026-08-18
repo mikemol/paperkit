@@ -77,8 +77,10 @@ def main() -> int:
     check("//:hook is a SINGLE test_suite", BUILD.count('name = "hook"') == 1)
     # Λ·cardinality — the non-project residual is the OWNED set {//canary:canary}, asserted by
     # set-EQUALITY (a bare "project-shaped or not" filter would silently admit any stray member).
-    check("the hook's members are uniform @proj//:{gate,adequacy,cohere} targets plus exactly the harness canary",
-          bool(hook) and {t for t in hook if not re.match(r"@\w+//:(gate|adequacy|cohere)$", t)} == {"//canary:canary"})
+    # `decisions` (Μ·sweep·atom) is a fourth per-project member KIND, emerge-only like cohere: the
+    # decision-coverage grid summary, built every commit so the grid twin is not emitted-but-inert.
+    check("the hook's members are uniform @proj//:{gate,adequacy,cohere,decisions} targets plus exactly the harness canary",
+          bool(hook) and {t for t in hook if not re.match(r"@\w+//:(gate|adequacy|cohere|decisions)$", t)} == {"//canary:canary"})
 
     print("\n⟨harness sound⟩\n")
     check("//:hook carries the harness canary (Ζ·canary — a degraded sandbox fails LOUD, not silently green)",

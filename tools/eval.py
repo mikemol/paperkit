@@ -27,8 +27,10 @@ Idempotency: invoke this tool by an ABSOLUTE interpreter path so sys.executable 
 check re-spawns the projector as [sys.executable, …] (see the history of the '' spurious-flip bug)."""
 import argparse
 import json
+import os
 import pathlib
 import shutil
+import signal
 import subprocess
 import sys
 
@@ -89,8 +91,33 @@ def main(argv):
         shutil.copyfile(a.mutant_py, mod)   # non-sensitive cell) → not staged; deliver the mutant anyway
         shutil.copyfile(a.mutant_pyc, slot(mod))
 
-    flipped = subprocess.run([sys.executable, a.check, a.claim],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+    # Μ·sweep·atom — a flip:/branch: mutant can make the check NON-TERMINATING (e.g. inverting
+    # bib._unescaped_braces's `while` loop spins forever).  The GRID path bounds the check by CPU time
+    # exactly as the in-process resolver.run_ok does (RLIMIT_CPU via preexec, a wall backstop, kill the
+    # whole session so no orphan spins on): a mutant that never answers HAS flipped the check (a real
+    # behavioural change the sweep must see), and measuring CPU not wall keeps a lease-queued cell from a
+    # false flip.  Without this the grid hangs the moment a flip:/dflip: non-terminating mutant is swept
+    # ([[witness-the-live-path]] — the in-process path was bounded, the grid path was not).
+    cpu = int(os.environ.get("PAPERKIT_CHECK_CPU", 60))
+    wall = int(os.environ.get("PAPERKIT_CHECK_TIMEOUT", 600))
+
+    def _cpu_rlimit():
+        import resource
+        resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 3))
+
+    p = subprocess.Popen([sys.executable, a.check, a.claim],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True, preexec_fn=_cpu_rlimit)
+    try:
+        rc = p.wait(timeout=wall)
+        flipped = rc != 0                                # SIGXCPU/SIGKILL ⇒ negative rc ⇒ flipped (the hang IS a flip)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)  # kill the whole tree, no orphan spinning on
+        except ProcessLookupError:
+            pass
+        p.wait()
+        flipped = True                                   # did not terminate → the mutation flipped it
     pathlib.Path(a.out).write_text(
         json.dumps({"claim": a.claim, "site": a.site, "flipped": flipped}) + "\n")
     return 0

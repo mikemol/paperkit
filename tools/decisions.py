@@ -72,11 +72,35 @@ def decisions_unasserted(flips, reach):
     return sorted(out)
 
 
+def summarize(records):
+    """Fold per-claim __decisions records into one project coverage summary.  Each record is
+    `{"decisions_unasserted": [labels]}` (a claim's reached-but-unasserted decisions).  Returns the
+    union of unasserted labels + the per-claim count — an ORTHOGONAL coverage axis, never a grade."""
+    allu = []
+    for r in records:
+        u = r.get("decisions_unasserted", [])
+        allu.extend(u)
+    # verdict=pass means the AGGREGATION succeeded (every record well-formed) — NOT that the count is
+    # zero: decision-coverage is an orthogonal axis, so a nonzero count is REPORTED, never failed.  A
+    # malformed record raises in _load before we get here (the only red — a partition/aggregation bug).
+    return {"verdict": "pass", "decisions_unasserted": sorted(set(allu)), "count": len(set(allu))}
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--flips", nargs="*", default=[])
     ap.add_argument("--reach", nargs="*", default=[])
+    ap.add_argument("--summary", nargs="*", default=None,
+                    help="fold per-claim __decisions records into one project coverage summary")
     a = ap.parse_args(argv)
+    if a.summary is not None:
+        # a MALFORMED record raises here (loud) — the only failure mode; a high unasserted count is
+        # reported, never a build failure (the axis names a gap, it does not lower a grade).
+        # separators no-space: assert_pass.sh greps '"verdict":"pass"' (no space) — the same convention
+        # verdict.py's records use (a space here would silently never match — verdict.py:8-10 records
+        # that exact past bug).
+        print(json.dumps(summarize(_load(a.summary)), separators=(",", ":")))
+        return 0
     out = decisions_unasserted(_load(a.flips), _load(a.reach))
     print(json.dumps({"decisions_unasserted": out}))
     return 0

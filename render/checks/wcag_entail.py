@@ -177,6 +177,40 @@ NOT_APPLICABLE = {
 CLAUSE_TO_WCAG = {"7.7": "1.1.1", "7.18": "2.4.4"}
 
 
+# Ρ·wcag·scope-fixture — the DECLARED emit-path disclosure: every non-NA (SC, route) → the verdict the
+# VPAT emits (entail(run_farm=False)).  This is the golden claim _selftest pins the DERIVED value against,
+# so a data-:/dflip: mutation of a scope leaf (PDFUA_TO_WCAG / ENTAILMENT) makes derived ≠ declared and reds
+# the gate — turning an atomic authored scope label into a mutation-graded def-site (the enforcement
+# adversary's un-swept-scope-data finding, closed).  Authored INDEPENDENTLY of PDFUA_TO_WCAG (a wrong label
+# moves only the derived side) so the check is non-vacuous.  A scope correction updates this table in the
+# SAME commit (the corrected label + its pinned verdict together — no drift).
+SCOPE_EMIT = {
+    ("1.1.1", "docx"):  "Partially Supports",  ("1.1.1", "latex"): "Supports",
+    ("1.3.1", "docx"):  "Partially Supports",  ("1.3.1", "latex"): "Partially Supports",
+    ("1.3.2", "docx"):  "Partially Supports",  ("1.3.2", "latex"): "Partially Supports",
+    ("1.3.3", "docx"):  "Does Not Support",    ("1.3.3", "latex"): "Does Not Support",
+    ("1.3.6", "docx"):  "Does Not Support",    ("1.3.6", "latex"): "Does Not Support",
+    ("1.4.1", "docx"):  "Does Not Support",    ("1.4.1", "latex"): "Partially Supports",
+    ("1.4.3", "docx"):  "Does Not Support",    ("1.4.3", "latex"): "Does Not Support",
+    ("1.4.5", "docx"):  "Partially Supports",  ("1.4.5", "latex"): "Does Not Support",
+    ("1.4.6", "docx"):  "Does Not Support",    ("1.4.6", "latex"): "Does Not Support",
+    ("1.4.8", "docx"):  "Does Not Support",    ("1.4.8", "latex"): "Does Not Support",
+    ("1.4.9", "docx"):  "Does Not Support",    ("1.4.9", "latex"): "Does Not Support",
+    ("1.4.11", "docx"): "Does Not Support",    ("1.4.11", "latex"): "Does Not Support",
+    ("2.4.2", "docx"):  "Partially Supports",  ("2.4.2", "latex"): "Partially Supports",
+    ("2.4.4", "docx"):  "Partially Supports",  ("2.4.4", "latex"): "Does Not Support",
+    ("2.4.6", "docx"):  "Partially Supports",  ("2.4.6", "latex"): "Partially Supports",
+    ("2.4.9", "docx"):  "Does Not Support",    ("2.4.9", "latex"): "Does Not Support",
+    ("2.4.10", "docx"): "Does Not Support",    ("2.4.10", "latex"): "Does Not Support",
+    ("3.1.1", "docx"):  "Supports",            ("3.1.1", "latex"): "Supports",
+    ("3.1.3", "docx"):  "Does Not Support",    ("3.1.3", "latex"): "Does Not Support",
+    ("3.1.4", "docx"):  "Does Not Support",    ("3.1.4", "latex"): "Does Not Support",
+    ("3.1.5", "docx"):  "Does Not Support",    ("3.1.5", "latex"): "Does Not Support",
+    ("3.1.6", "docx"):  "Does Not Support",    ("3.1.6", "latex"): "Does Not Support",
+    ("4.1.2", "docx"):  "Does Not Support",    ("4.1.2", "latex"): "Does Not Support",
+}
+
+
 def _warrants_tagging(sc: str, fmt: str) -> list:
     """Warrants whose matrix cell (afforded native/post on `fmt`) tags this SC — directly via the
     capability's wcag clause, via a PDF/UA clause (CLAUSE_TO_WCAG), or via the UA oracle
@@ -389,6 +423,36 @@ def _selftest() -> int:
     print("      P (pass side): consumed rnd-a11y record reads pass — 3.1.1 Supports (veraPDF passed)")
     print("      F (flag side): consumed rnd-a11y record reads fail — 3.1.1 not Supports (veraPDF failed)")
     print("      δ (min delta): the single verdict field pass→fail in the consumed record\n")
+
+    # ── Ρ·wcag·scope-fixture ──────────────────────────────────────────────────────────────────────
+    # The oracle-edge fixture above drives ONE SC (3.1.1 docx), so it reaches only the record-consumption
+    # DISPATCH — never the SCOPE DATA (PDFUA_TO_WCAG / ENTAILMENT scope labels) that decides WHICH SC gets
+    # Supports.  A wrong scope label (the reproduced 1.1.1 docx fragment→full overclaim) slips straight
+    # through it (the enforcement adversary's finding).  A scope label is ATOMIC AUTHORED INPUT — a reading
+    # of WCAG normative text, not derivable — so this fixture does NOT verify a label is RIGHT.  It gives the
+    # two guarantees that ARE achievable, and that the data atom (data-:/dflip:) makes gradable:
+    #   (1) BEHAVIORAL — the label is not inert: SCOPE_EMIT is the DECLARED emit-path disclosure (authored
+    #       from the normative reading); entail(run_farm=False) is the DERIVED value read THROUGH the mutable
+    #       PDFUA_TO_WCAG.  A data-: drop or dflip: perturb of a scope leaf makes derived ≠ declared → this
+    #       reds → the label is a mutation-graded def-site, not un-swept data (fix-#3's gap, closed).
+    #   (2) NO SILENT DISCONNECT — the verdict a regulator READS (emit path, run_farm=False) is pinned, so a
+    #       future refactor cannot decouple the emitted VPAT from the entailment logic without reddening here.
+    # NON-VACUOUS by construction: SCOPE_EMIT is authored independently of PDFUA_TO_WCAG (a golden-file test,
+    # like wcag_model's completeness arithmetic), so a wrong label moves the DERIVED side only → mismatch.
+    # A (scope==full)==(Supports) invariant would be VACUOUS (both sides read the same dict) — verified.
+    print("\nΡ·wcag·scope-fixture — every disclosed verdict pinned; a scope-label mutation flips one\n")
+    scope_fails = []
+    for (sc, route), expected in sorted(SCOPE_EMIT.items()):
+        got = entail(sc, route, run_farm=False)["verdict"]
+        ok = got == expected
+        if not ok:
+            scope_fails.append(f"{sc}×{route}: emit={got} ≠ declared={expected}")
+        # print only mismatches + a per-route roll-up (full enumeration is the committed SCOPE_EMIT)
+        if not ok:
+            print(f"  XX {sc:8} {route:6} emit={got!r} declared={expected!r}")
+    print(f"  {'ok ' if not scope_fails else 'XX '}{len(SCOPE_EMIT)} disclosed (SC×route) verdicts match "
+          f"the declared emit table ({len(scope_fails)} drifted)")
+    fails.extend(scope_fails)
 
     if fails:
         print(f"SELFTEST: FAIL ({len(fails)} drifted)")

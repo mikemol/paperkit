@@ -28,7 +28,18 @@ def main(argv):
     # (broken harness or broken claim); every site then reads sensitive, but baseline=false signals
     # the sens is not to be trusted — the reading layer grades it broken, exactly as for a file-calc.
     baseline = not base.get("flipped")
-    sens = [r["site"] for r in (json.load(open(f)) for f in a.evals) if r["flipped"]]
+    records = [json.load(open(f)) for f in a.evals]
+    # Μ·sweep·atom — the grid-level structural bar: a NON-monotone flip: cell must NEVER enter the
+    # sensitivity set (a value inversion flips only if the witness asserts, so it is not a
+    # falsifiability signal).  The generator partitions flip: cells to pk_decisions; this FAILS LOUD if
+    # one reached pk_sens anyway (a partition regression), since Starlark cannot make a type error the
+    # way the in-process FlipSite does.  A positive control, like the ∅-baseline guard above.
+    flips = [r["site"] for r in records if "::flip:" in r.get("site", "")]
+    if flips:
+        sys.stderr.write("Μ·sweep·atom: NON-monotone flip: cell(s) reached pk_sens — the partition "
+                         "leaked: %s\n" % flips)
+        return 1
+    sens = [r["site"] for r in records if r["flipped"]]
     print(json.dumps({"claim": base["claim"], "baseline": baseline, "sens": sorted(sens)}))
     return 0
 

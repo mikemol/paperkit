@@ -6,6 +6,11 @@ enumerating present elements to DROP and absent ones to INJECT:
 
     <qualname>       DROP a def's behaviour (def_sites.py — the original surface; a bare qualname is a
                      def-drop to mutate.py, backward-compatible).
+    branch:<qn>#<n>  DROP one BRANCH ARM's behaviour (Μ·sweep·atom — a finer, still-monotone reach probe
+                     ADDITIVE to the def-drop; the same raise, the same grid path).
+    flip:<qn>#<n>    INVERT one CONDITION (Μ·sweep·atom — NON-monotone; routed to the decision-coverage
+                     grid, NOT the sensitivity sweep; the grid partition + sens.py's fail-loud assert are
+                     the grid-level structural bar, mirroring the in-process FlipSite type).
     import+:<name>   INJECT an ABSENT engine import — the NEGATIVE polarity, over which a "module does
                      NOT import X" assertion (module-split) becomes falsifiable.  X ranges over the
                      engine modules the target does not already import (a bounded candidate set, not
@@ -14,20 +19,28 @@ enumerating present elements to DROP and absent ones to INJECT:
 Emits `module<TAB>spec`; the grid runs `mutate.py <module> <spec>` per site.  import-DROP is OMITTED:
 dropping an import breaks the module, which the def-drop of any function it uses already covers — a
 redundant coarse cell.  (bib-edge / file nodes need eval.py to swap a non-.py artifact — a later rung;
-this surface is the .py toggles mutate.py already emits.)  Usage: sites.py <module.py>…"""
+this surface is the .py toggles mutate.py already emits.)  branch:/flip: come from mutate.py itself (the
+ONE source the in-process sweep also imports — no separate twin to drift).  Usage: sites.py <module.py>…"""
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "paperkit"))
+
 from def_sites import def_sites
 from imports import imports
+from mutate import _branch_sites, _flip_sites  # Μ·sweep·atom — the ONE atom source (grader imports it too)
 
 
 def sites(path, names):
-    """The perturbation SPECS for one module: its def-drops (present behaviours) and its import+
-    injects (absent engine imports — every engine module it does not already import, itself aside)."""
+    """The perturbation SPECS for one module: its def-drops (present behaviours), its branch-arm and
+    condition sites (Μ·sweep·atom — additive), and its import+ injects (absent engine imports)."""
     text = Path(path).read_text()
     for qn in def_sites(text):
         yield qn                                        # def-drop — a bare qualname
+    for qn, n, _arm in _branch_sites(text):
+        yield "branch:%s#%d" % (qn, n)                  # Μ·sweep·atom — a branch-arm reach probe (raise-kind)
+    for qn, n, _test in _flip_sites(text):
+        yield "flip:%s#%d" % (qn, n)                    # Μ·sweep·atom — a condition inversion (non-monotone)
     absent = names - imports(text, names) - {Path(path).stem}
     for name in sorted(absent):
         yield "import+:" + name                         # inject an absent engine import (negative polarity)

@@ -184,7 +184,7 @@ def _sitename(m, q):
     """A unique, valid target-name fragment for a perturbation site (module, spec): stem__spec with
     the mutate.py spec flattened to an identifier — a def-drop qualname's dots, and an import op's
     `+`/`-`/`:` (import+:gate → import_add__gate) — so every op has a distinct, valid target name."""
-    spec = q.replace(".", "_").replace("+", "_add_").replace("-", "_drop_").replace(":", "_")
+    spec = q.replace(".", "_").replace("+", "_add_").replace("-", "_drop_").replace(":", "_").replace("#", "_arm_")
     return m[len("paperkit/"):-len(".py")].replace("/", "_") + "__" + spec
 
 def _filesitename(spec):
@@ -236,6 +236,10 @@ def _surface(module_ctx, core):
     # extension serves a STALE result — the tool is an INPUT like the core modules, [[bazel-action-idempotency]]).
     for t in ("sites.py", "def_sites.py", "imports.py"):
         module_ctx.watch(module_ctx.path(Label("@@//tools:" + t)))
+    # Μ·sweep·atom — sites.py imports the branch:/flip: enumerators from paperkit/mutate.py (the ONE
+    # atom source), so an edit to it must regenerate the surface too, else the extension serves a stale
+    # set ([[bazel-action-idempotency]]: the tool is an input like the core modules).
+    module_ctx.watch(module_ctx.path(Label("@@//paperkit:mutate.py")))
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
     res = module_ctx.execute([str(py), str(ds)] + core, working_directory = root)
     if res.return_code != 0:
@@ -405,7 +409,7 @@ def _bib_repo_impl(repository_ctx):
     if calc:
         csyms = ["pk_calc", "pk_grade", "pk_mem_learn", "pk_verdict"]
         if emerge:
-            csyms += ["pk_cohere", "pk_mutate", "pk_pyc", "pk_eval", "pk_sens"]
+            csyms += ["pk_cohere", "pk_mutate", "pk_pyc", "pk_eval", "pk_sens", "pk_decisions"]
         out.append('load("@@//tools:calc.bzl", ' + ", ".join([_lit(s) for s in csyms]) + ")")
     out.append("")
     if emerge:
@@ -502,12 +506,20 @@ def _bib_repo_impl(repository_ctx):
                 edl = ", ".join([_lit(d) for d in _data(reads, files, imports, engine = False)] + rdl)
                 ev = ("check = " + _lit(wscript) + ", closure = [" + cl + "], project = [" +
                       (dl if check.startswith("result:") else edl) + "]")
+                # Μ·sweep·atom — PARTITION the closure sites by kind.  Raise-kind (def:/branch:/import+:)
+                # cells are MONOTONE (an uncatchable raise / a presence toggle) → they feed the
+                # sensitivity sweep (pk_sens).  flip: cells are NON-monotone (a condition inversion) →
+                # they are BARRED from pk_sens and routed to pk_decisions (the orthogonal coverage axis)
+                # — the grid-level bar mirroring the in-process FlipSite type; sens.py additionally
+                # FAILS LOUD if a flip: record ever reaches it (belt-and-suspenders, since Starlark
+                # cannot make a type error).
                 cellnames = []
+                flipcells = []
                 for m, q in csites:
                     sn = _sitename(m, q)
                     out.append('pk_eval(name = "%s__%s", claim = %s, site = %s, module = %s, mutated_py = ":mut_%s", mutated_pyc = ":pyc_%s", %s)' % (
                         k, sn, _lit(k), _lit(m + "::" + q), _lit(m), sn, sn, ev))
-                    cellnames.append(sn)
+                    (flipcells if q.startswith("flip:") else cellnames).append(sn)
                 # Ζ·mutant·struct·node-kinds — the claim's FILE toggle cells (file+ inject / file- drop),
                 # per its witness's .exists() edges.  A file cell mutates no module: it passes no
                 # module/mutant (eval.py branches on the file+/file- site prefix), only the site + the
@@ -531,6 +543,17 @@ def _bib_repo_impl(repository_ctx):
                     cellnames.append(cn)
                 out.append('pk_eval(name = "%s__0", claim = %s, site = "0", module = "paperkit/bib.py", mutated_py = ":mut_0", mutated_pyc = ":pyc_0", %s)' % (k, _lit(k), ev))
                 out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0")' % (k, ", ".join(['":%s__%s"' % (k, c) for c in cellnames]), k))
+                # Μ·sweep·atom — the DECISION-COVERAGE grid twin: pk_decisions reads the flip: cells
+                # (did inverting each condition flip the check) AND the raise-kind cells (which branch:
+                # arms are reached — each cell is single-site, so its flipped bit IS a per-arm reach
+                # probe, sibling-independent by construction, exactly the in-process flip_one gate).  A
+                # decision is unasserted iff BOTH its sibling branch: arms are reached and its inversion
+                # does NOT flip.  Emitted only when the row has flip: cells (a condition to cover).
+                if flipcells:
+                    out.append('pk_decisions(name = "%s__decisions", flips = [%s], reach = [%s])' % (
+                        k,
+                        ", ".join(['":%s__%s"' % (k, c) for c in flipcells]),
+                        ", ".join(['":%s__%s"' % (k, c) for c in cellnames])))
             elif emerge:
                 # A calc claim with NO engine witness (a cmd:/result: check — e.g. a grep over a static
                 # asset).  It has no closure (closure.py enumerates only the witness module's CLAIMS), so

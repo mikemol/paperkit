@@ -59,7 +59,7 @@ PK_T0=$(date +%s)
 # here and passed to Bazel (invoke-don't-embed: tools/sweep_budget.py, not inline arithmetic).
 PK_SWEEP_RAM=$(python3 tools/sweep_budget.py)
 run "bazel test //:hook"   mise exec -- bazel test //:hook --config=mutant \
-    --local_ram_resources="$PK_SWEEP_RAM" --execution_log_json_file="$PK_EXECLOG"
+    --local_resources=memory="$PK_SWEEP_RAM" --execution_log_json_file="$PK_EXECLOG"
 if [ -n "${PAPERKIT_OTLP_METRICS:-}" ]; then
   uv run --with opentelemetry-proto python3 tools/otlp_push.py "$PK_EXECLOG" \
       --build-seconds "$(( $(date +%s) - PK_T0 ))" || true

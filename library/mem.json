@@ -1,0 +1,7 @@
+{
+  "claims": {
+    "gate-dispatches": 128
+  },
+  "def": 64,
+  "file": 256
+}

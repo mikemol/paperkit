@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+#
+# ── VENDORED INTO PAPERKIT ────────────────────────────────────────────────────────────────────
+# Origin: substrate scripts/cgroup-scope (repaired 2026-08-24 after paperkit reported that the
+# original targeted the v2 ROOT, which is root-owned, and that nothing reaped a scope a SIGKILL
+# left behind).  Vendored rather than referenced: paperkit's sweep cells run on arbitrary
+# machines, and depending on a sibling repo by absolute path would trade the PORTABLE
+# memory-bounding that Τ·mem exists to provide (tools/calc.bzl) for a build that only works
+# beside substrate.  A copy is the honest form of a cross-repo dependency here — 251 lines, no
+# substrate-internal references, verified by grep before copying.
+#
+# ⚑ memory.swap.max=0 IS LOAD-BEARING, not hygiene.  Measured on this box: a 64MB allocation
+# under an 8MB memory.max gave `max 678, oom_kill 0` and SUCCEEDED — the kernel compressed into
+# zram instead of killing.  memory.max ALONE is a reclaim threshold; only zeroing swap makes it a
+# boundary.  substrate made that write a hard refusal on the strength of this measurement.
+#
+# Upstream fixes flow substrate → here by re-copying; this file is not edited in place.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# cgroup-scope — run a command under a hard memory cap WITHOUT systemd.
+#
+# WHY THIS EXISTS
+#   scripts/membudget launches top-level leases with
+#       systemd-run --user --scope -p MemoryMax=<MB>M -p MemorySwapMax=0 -- <cmd>
+#   which needs a systemd USER SESSION (a DBus bus). In a container whose PID 1 is
+#   not systemd, `systemd-run` fails with "Failed to connect to bus: No medium found"
+#   and exits 1 — silently, from membudget's point of view.
+#
+#   But systemd-run is only a CLIENT of the kernel's memory controller. Where the
+#   controller is DELEGATED to a directory we may write, the same cap is one mkdir
+#   and two writes.
+#
+# WHERE THE CGROUP GOES — three candidate parents, and only the third works.
+#   This tool got it wrong for an unknown period by picking (1).
+#
+#   1. the v2 ROOT (/sys/fs/cgroup)   — root-owned. `mkdir: Permission denied`
+#      for any unprivileged caller. THIS IS WHAT THIS FILE USED TO DO.
+#   2. the CALLER'S OWN cgroup        — writable, and `cgroup.controllers` reads
+#      "cpu memory pids", so it LOOKS delegable. It is not: `cgroup.subtree_control`
+#      is empty and writing "+memory" returns EBUSY, because cgroup v2's
+#      NO-INTERNAL-PROCESS rule forbids a cgroup that HOLDS PROCESSES from enabling
+#      controllers for its children. A child created here has only *.pressure —
+#      no memory.max at all. ⚑ `cgroup.controllers` is what is AVAILABLE TO a
+#      cgroup; `cgroup.subtree_control` is what it DELEGATES TO CHILDREN. Only the
+#      second predicts whether a child gets memory.max, and reading the first is
+#      the trap.
+#   3. an ANCESTOR whose cgroup.subtree_control ALREADY LISTS memory — on a
+#      systemd user session that is the caller's parent slice (app.slice), but this
+#      tool must NOT hardcode that: the delegating ancestor differs by context
+#      (a Bazel sandbox, a system service, a login shell, a container). We WALK UP
+#      and take the nearest ancestor that actually delegates, PROBING rather than
+#      assuming — the discipline this header always claimed and did not practise.
+#
+#   This also explains, rather than merely records, why a nested `systemd-run`
+#   scope lands as a SIBLING under the slice instead of a child: that is the only
+#   place a delegated controller set exists. systemd-run and a hand-rolled mkdir
+#   necessarily agree.
+#
+# THE v1 ARM IS GONE. The header used to record a dated probe — "cgroup2 at
+#   /sys/fs/cgroup/unified -> cpuset hugetlb (NO memory); cgroup v1 memory at
+#   /sys/fs/cgroup/memory (rw) -> usable". BOTH HALVES ARE NOW FALSE on this host:
+#   it is unified v2 with per-scope delegation and has NO v1 memory tree at all.
+#   The v1 arm was dead code guarded by a `[ -d ]` that cannot succeed here, it was
+#   never exercised, and keeping an untested fallback makes a v2 delegation failure
+#   fall THROUGH to something that would also fail — turning a diagnosable refusal
+#   into a silent one. If a v1-only host reappears it is work to re-add against a
+#   real machine, not a branch to carry unverified. Exit 3 (with a REASON on stderr)
+#   is the honest answer.
+#
+# CONTRACT (exactly what membudget's call site depends on)
+#   * hard cap on the whole subprocess tree
+#   * swap disabled, so the cap is on RSS
+#   * the cgroup OOM-killer's SIGKILL surfaces as exit 137, propagated verbatim
+#     (membudget's MEMBUDGET_RETRY_OOM logic keys on 137)
+#   * env vars pass through (membudget uses --setenv=MEMBUDGET_PARENT)
+#
+# REAPING — the trap is right for the clean path and insufficient for the kill path.
+#   A SIGKILLed holder skips `trap cleanup EXIT`, and membudget's gc() is
+#   LEDGER-ONLY: it drops LEASE lines for dead pids and never opens /sys/fs/cgroup.
+#   On the systemd arm this leak is invisible because systemd reaps its own
+#   transient scopes; on THIS arm nothing did — and this is the arm a sandboxed
+#   consumer is forced onto. So every launch first sweeps (see `reap` below).
+#
+# USAGE
+#   cgroup-scope <MB> [--setenv K=V]... [--cpu-weight N] -- <cmd> [args...]
+#   cgroup-scope probe        # which parent was chosen, and why — no side effects
+#   cgroup-scope reap         # sweep abandoned scopes we own; prints what it took
+#   cgroup-scope selftest     # constructs the real 137 and the real hard-kill leak
+#
+# Exits 3 if no delegating ancestor is usable, so the caller can degrade rather
+# than hang.
+set -euo pipefail
+
+# --- our namespace -------------------------------------------------------------
+# Scope directories are named  mb-<launcher-pid>-<birth-epoch>-<rand>.scope
+# ⚑ The pid and birth are IN THE NAME on purpose. A sidecar registry file was the
+#   obvious alternative and is strictly worse: it can be lost, cleaned, or point at
+#   a directory that no longer exists, so the reaper would then need to reconcile
+#   two sources of truth. cgroupfs will not accept an arbitrary marker file inside
+#   the cgroup, so the NAME is the only place metadata can live that cannot drift
+#   from the thing it describes.
+NS_PREFIX="mb-"
+NS_SUFFIX=".scope"
+REAP_GRACE_SEC="${MEMBUDGET_REAP_GRACE:-30}"
+
+_die() { echo "cgroup-scope: $*" >&2; exit 3; }
+
+# --- parent selection: walk up, take the nearest ancestor that DELEGATES memory --
+# Returns the absolute path of the parent under which our scope must be created,
+# and (on fd 2 when VERBOSE) the reasoning. Empty output => nothing usable.
+_delegating_ancestor() {
+  local mnt=/sys/fs/cgroup rel node
+  [ -f "$mnt/cgroup.controllers" ] || return 0        # not unified v2 → no arm here
+
+  # /proc/self/cgroup on v2 is a single "0::<path>" line.
+  rel=$(awk -F: '$1=="0"{print $3}' /proc/self/cgroup 2>/dev/null || true)
+  [ -n "$rel" ] || return 0
+
+  node="$mnt$rel"
+  # Start at the PARENT: our own cgroup holds processes, so by the
+  # no-internal-process rule it can never delegate (swarm-F9).
+  node="${node%/*}"
+  while [ -n "$node" ] && [ "${#node}" -ge "${#mnt}" ]; do
+    if [ -d "$node" ] && [ -w "$node" ] \
+       && grep -qw memory "$node/cgroup.subtree_control" 2>/dev/null; then
+      printf '%s' "$node"; return 0
+    fi
+    [ "$node" = "$mnt" ] && break
+    node="${node%/*}"
+  done
+  return 0
+}
+
+# --- reaper --------------------------------------------------------------------
+# WHAT IS SAFELY REAPABLE — an empty cgroup.procs is NOT sufficient. A scope
+# created a millisecond ago is also empty, and reaping it would rmdir a cgroup the
+# launcher is about to move its payload into. Three conjuncts, each closing a
+# distinct hole:
+#
+#   (a) NAME is ours: matches mb-<pid>-<birth>-<rand>.scope exactly, parsed by
+#       field, not by substring. ⚑ A substring test is the gate-F8 shape — it
+#       would match any directory merely CONTAINING "mb-". Scoping by convention
+#       is only sound when the convention is something we INVOKE (gate-F5): we
+#       both CREATE and PARSE this name, and no other producer writes it, so the
+#       namespace is ours by construction rather than by hope.
+#   (b) LAUNCHER IS DEAD: kill -0 <pid> fails. This is the conjunct that
+#       distinguishes "finished" from "not started yet" — a live launcher owns its
+#       scope whether or not the payload has been moved in yet. It is also why
+#       the pid must be in the name.
+#   (c) AGE > grace: guards pid REUSE (a recycled pid could be alive and unrelated,
+#       which would make (b) wrongly protective — harmless) and, more importantly,
+#       the window where a launcher has forked but not yet execed.
+#   plus cgroup.procs EMPTY, which rmdir enforces for us anyway (a non-empty
+#   cgroup cannot be removed), but is checked first so the sweep is quiet.
+#
+# ⚑ NOT AN ARGUMENT THAT THE SWEEP IS COMPLETE. It reaps only OUR namespace. A
+#   scope leaked by a different producer is invisible to it, and reporting the
+#   sweep as "no leaks" would be a fact about the census, not the tree.
+_reap() {
+  local parent="$1" verbose="${2:-}" d base pid birth now taken=0 skipped=0
+  now=$(date +%s)
+  [ -d "$parent" ] || return 0
+  for d in "$parent"/"$NS_PREFIX"*"$NS_SUFFIX"; do
+    [ -d "$d" ] || continue
+    base=${d##*/}; base=${base#"$NS_PREFIX"}; base=${base%"$NS_SUFFIX"}
+    pid=${base%%-*}
+    birth=${base#*-}; birth=${birth%%-*}
+    case "$pid$birth" in ''|*[!0-9]*) skipped=$((skipped+1)); continue;; esac
+    if [ -s "$d/cgroup.procs" ]; then skipped=$((skipped+1)); continue; fi
+    if kill -0 "$pid" 2>/dev/null;  then skipped=$((skipped+1)); continue; fi
+    if [ $(( now - birth )) -lt "$REAP_GRACE_SEC" ]; then skipped=$((skipped+1)); continue; fi
+    if rmdir "$d" 2>/dev/null; then
+      taken=$((taken+1)); [ -n "$verbose" ] && echo "reaped ${d##*/} (launcher $pid dead, empty, age $((now-birth))s)"
+    else
+      skipped=$((skipped+1))
+    fi
+  done
+  [ -n "$verbose" ] && echo "reap: took $taken, left $skipped"
+  return 0
+}
+
+# --- subcommands ---------------------------------------------------------------
+case "${1:-}" in
+  probe)
+    p=$(_delegating_ancestor)
+    own=$(awk -F: '$1=="0"{print $3}' /proc/self/cgroup 2>/dev/null || echo '<none>')
+    echo "own cgroup        : $own"
+    if [ -z "$p" ]; then
+      echo "delegating parent : <none>  (no v2 ancestor whose cgroup.subtree_control lists memory)"
+      echo "verdict           : UNUSABLE (exit 3) — caller must degrade"
+      exit 3
+    fi
+    echo "delegating parent : ${p#/sys/fs/cgroup}"
+    echo "subtree_control   : $(cat "$p/cgroup.subtree_control")"
+    echo "writable          : yes"
+    echo "verdict           : usable"
+    exit 0;;
+  reap)
+    p=$(_delegating_ancestor); [ -n "$p" ] || _die "no delegating ancestor; nothing to sweep"
+    _reap "$p" verbose; exit 0;;
+  selftest)
+    exec "${BASH_SOURCE[0]%/*}/cgroup-scope-selftest";;
+esac
+
+MB=""; ENVS=(); CPUW=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --setenv)     ENVS+=("$2"); shift 2;;
+    --cpu-weight) CPUW="$2"; shift 2;;
+    --)           shift; break;;
+    *)            [ -z "$MB" ] && { MB="$1"; shift; } || break;;
+  esac
+done
+[ -n "$MB" ] && [ $# -gt 0 ] || { echo "usage: cgroup-scope <MB> [--setenv K=V]... [--cpu-weight N] -- <cmd...>
+       cgroup-scope probe | reap | selftest" >&2; exit 2; }
+
+BYTES=$(( MB * 1024 * 1024 ))
+
+PARENT=$(_delegating_ancestor)
+[ -n "$PARENT" ] || _die "no usable memory controller: no v2 ancestor of $(awk -F: '$1=="0"{print $3}' /proc/self/cgroup 2>/dev/null) has 'memory' in cgroup.subtree_control (the v2 root is root-owned; our own cgroup holds processes so cannot delegate)"
+
+# Sweep BEFORE creating. ⚑ THE SWEEP LIVES HERE, NOT IN membudget's gc().
+#   gc() is the natural home by NAME and the wrong one by LOAD: it sits on the hot
+#   path of every blocked waiter, and its own comment records a "self-feeding churn
+#   storm that saturated the GLOBAL lock and starved other repos". Adding a
+#   readdir + N stats there would put filesystem work under the global mutex on
+#   every wakeup. Here it runs ONCE PER LAUNCH, outside any lock, over one
+#   directory — the same cadence at which leaks are created, which is the cadence
+#   at which they need collecting. It is also confined to the cgroup arm, which is
+#   the only arm that leaks (systemd reaps its own).
+_reap "$PARENT" || true
+
+# ⚑ COLLISION RETRY (paperkit, 2026-08-25).  `$$-$(date +%s)-$RANDOM` is not unique under real
+# concurrency: bash seeds $RANDOM from pid+time, so two cells launched in the same second with the
+# same pid draw the SAME name.  Measured: a //:hook run of 24,376 sandboxed actions hit
+# `mkdir mb-4-1787636759-15268.scope: File exists`, the cell produced no output, and the build
+# failed — one collision in ~24k is enough when every cell needs its own scope.
+# A unique name is cheap, so take the mkdir itself as the uniqueness test rather than trusting the
+# name: whoever creates the directory owns it, and a loser retries.  Bounded, and the bound FAILS
+# LOUD — an unbounded retry would spin forever if the parent were unwritable, which is a different
+# fault and must not be disguised as contention.
+# A UUID, because uniqueness is exactly what this needs and exactly what a UUID is.
+# `$$-$(date +%s)-$RANDOM` was NOT unique under real concurrency: bash seeds $RANDOM from
+# pid+time, so two cells launched in the same second with the same pid draw the SAME name.
+# Measured: a //:hook run of 24,376 sandboxed actions hit `mkdir mb-...scope: File exists`,
+# that cell produced no output, and the whole build failed on it.
+#
+# /proc/sys/kernel/random/uuid over `uuidgen`: kernel-provided, no fork, and no dependency on
+# util-linux being installed in whatever sandbox this runs in.  Falls back to uuidgen, then to
+# the old composite, so a machine lacking both still runs (degraded, not dead).
+if [ -r /proc/sys/kernel/random/uuid ]; then
+  _uuid=$(cat /proc/sys/kernel/random/uuid)
+elif command -v uuidgen >/dev/null 2>&1; then
+  _uuid=$(uuidgen)
+else
+  _uuid="$$-$(date +%s%N)-${RANDOM}"
+fi
+# KEEP the <pid>-<birth> fields: the reaper parses them BY FIELD and needs both — the pid for
+# `kill -0` (is the launcher still alive?) and the birth epoch for the grace window.  A bare UUID
+# would have made every scope unparseable, so the reaper would skip all of them forever and the
+# leak this tool exists to prevent would come back silently.  The UUID replaces only the field
+# that was supposed to supply UNIQUENESS and did not.
+CG="$PARENT/${NS_PREFIX}$$-$(date +%s)-${_uuid}${NS_SUFFIX}"
+
+cleanup() { [ -n "${CG:-}" ] && [ -d "$CG" ] && rmdir "$CG" 2>/dev/null || true; }
+trap cleanup EXIT
+
+mkdir "$CG" || _die "mkdir $CG failed"
+[ -f "$CG/memory.max" ] || _die "created $CG but it has no memory.max — the parent advertised delegation it did not provide"
+echo "$BYTES" > "$CG/memory.max"
+# ⚑⚑⚑ memory.swap.max=0 IS THE MECHANISM, NOT HYGIENE — AND IT WAS BEST-EFFORT.
+#   This line used to end `2>/dev/null || true`. On a box with swap available
+#   memory.max is a RECLAIM THRESHOLD, NOT A KILL BOUNDARY: the kernel compresses
+#   into zram instead of killing, so a capped runaway just gets slower. MEASURED
+#   here as a decisive pair (scripts/cgroup-scope-swapprobe), 8 MiB cap, 64 MiB
+#   touched, one variable:
+#       memory.swap.max = max (default) -> rc=0    memory.events max=261 oom_kill=0
+#       memory.swap.max = 0             -> rc=137  memory.events max=35  oom_kill=1
+#   THE LIMIT WAS HIT 261 TIMES AND NOTHING DIED. This host has /dev/zram0 at
+#   priority 100 (9.2G) plus a 32G swapfile, so reclaim always succeeds.
+#   ⚑ THE FAILURE READS AS SUCCESS: memory.max reads back correctly, the cgroup
+#   exists, cgroup.procs is populated — and it contains nothing. "Is the cap set"
+#   answers yes; only "does the cap BITE" answers no. So a swap write we cannot
+#   make is a REFUSAL, not a warning: returning a scope that cannot kill would
+#   hand membudget an uncapped agda, which is the OOM this whole mechanism exists
+#   to prevent, while looking capped.
+#   ⚑⚑ THE TWO WRITES ARE ONE CONTROL IN TWO FILES. Neither is meaningful alone
+#   (this is also why systemd-run's MemoryMax + MemorySwapMax=0 are a pair, not a
+#   cap plus a nicety) — so never expose one without the other.
+echo 0 > "$CG/memory.swap.max" 2>/dev/null \
+  || _die "cannot write memory.swap.max in $CG — refusing: with swap reachable, memory.max only throttles (reclaim into zram) and never kills, so the returned scope would look capped and contain nothing"
+[ -n "$CPUW" ] && { echo "$CPUW" > "$CG/cpu.weight" 2>/dev/null || true; }
+
+# --- run the command inside it -------------------------------------------------
+# The subshell joins the cgroup, then execs; every descendant inherits membership.
+# ⚑ CLIMB ON OOM (paperkit, 2026-08-25).  Start TINY and double until it fits, rather than
+# reserving high enough that nothing can ever fail.
+#
+# WHY: an over-reservation is SILENT — it never errors, it just idles cores.  Measured: paperkit's
+# def-sweep floor was 2048MB while a cell actually peaks at 2.8MB, a ~700x guess that nothing
+# could falsify, and the box ran 3 concurrent cells where the budget allowed ~48.  An
+# UNDER-reservation is LOUD: the kernel kills the cgroup, memory.events records oom_kill, and the
+# next attempt knows exactly which cell needs more and by how much.
+#
+# So the failure IS the measurement.  A caller may start at the ladder's bottom and let the climb
+# find the true cost, instead of a human picking a number that is wrong in the safe direction.
+#
+# Only an OOM climbs.  A payload that exits non-zero for its own reasons must NOT be retried —
+# re-running a failing check would turn one honest red into N, and a check with side effects
+# would repeat them.  memory.events' oom_kill counter is what distinguishes the two: rc=137 alone
+# is ambiguous (any SIGKILL), the counter is not.
+_oom_count() { awk '/^oom_kill /{print $2}' "$1/memory.events" 2>/dev/null || echo 0; }
+
+rc=0
+_climb_mb=$MB
+for _attempt in 1 2 3 4 5 6 7 8 9 10; do
+  rc=0
+  _oom_before=$(_oom_count "$CG")
+  ( echo "$BASHPID" > "$CG/cgroup.procs"; exec env "${ENVS[@]+"${ENVS[@]}"}" "$@" ) || rc=$?
+  [ "$rc" = 0 ] && break
+  _oom_after=$(_oom_count "$CG")
+  # ⚑ INCREMENT, never a delta SIZE: oom_kill counts PROCESSES, oom_group_kill counts EVENTS,
+  # so a group OOM (kubelet sets memory.oom.group=1) raises oom_kill by the whole tree size.
+  # "did it increment" is right under both; assuming +1 would not be.
+  [ "${_oom_after:-0}" -gt "${_oom_before:-0}" ] || break     # not an OOM: the payload's own failure
+  _climb_mb=$(( _climb_mb * 2 ))
+  if [ "$_climb_mb" -gt "${CLIMB_MAX_MB:-4096}" ]; then
+    echo "cgroup-scope: [${CG##*/}] OOM at ${CLIMB_MAX_MB:-4096}MB ceiling — refusing to climb further" >&2
+    break
+  fi
+  echo "cgroup-scope: [${CG##*/}] OOM at $(( _climb_mb / 2 ))MB — retrying at ${_climb_mb}MB" >&2
+  echo "$(( _climb_mb * 1024 * 1024 ))" > "$CG/memory.max" 2>/dev/null || break
+done
+exit "$rc"

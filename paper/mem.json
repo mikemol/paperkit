@@ -1,5 +1,9 @@
 {
-  "claims": {},
-  "def": 256,
+  "claims": {
+    "edge-chiral": 128,
+    "edge-move-types": 128,
+    "joined-by-glue": 128
+  },
+  "def": 64,
   "file": 256
 }

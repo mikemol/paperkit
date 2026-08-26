@@ -20,7 +20,7 @@ IMPORTS = {
     "tests/_fixture_project.py": ["_fixture_model", "project"],
     "tests/boundaries_agree.py": ["resolver"],
     "tests/boundaries_bib.py": ["bib"],
-    "tests/boundaries_clamp.py": ["grade"],
+    "tests/boundaries_clamp.py": ["grade", "grader"],
     "tests/boundaries_coherence.py": ["coherence"],
     "tests/boundaries_concept_route.py": ["resolver"],
     "tests/boundaries_config.py": ["config"],

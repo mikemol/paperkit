@@ -63,6 +63,21 @@ DECISIONS_C = {"unasserted": 0, "asserted": 1}
 # be evaluated returns 2, never 0 and never 1); the unfold needed the same third state.
 RESOLUTION_C = {"truncated": 0, "resolved": 1}
 
+# Ζ·broken·offaxis — the FOURTH instance of the same distinction, and the one the engine was
+# still losing.  `broken` is not a weak rung: `_grade_from_sens` emits it on `not baseline`,
+# i.e. the check never ESTABLISHED anything.  But a baseline can fail for two categorically
+# different reasons, and the resolver already separates them — a FAIL ("the claim is false")
+# from an UNAVAILABLE ("I could not REACH the thing", exit 3, the tristate routes.py's protocol
+# calls not-mine).  `grader.sensitivity` read `.passed`, a bool, and both arrived as False.  So
+# a check killed by its memory cap graded `broken` with "repo is not green" — about a green
+# repo.  Measured: that exact false statement, twice, on 2026-08-26.
+#
+# The fix is NOT a rung below `broken` (the ladder is a positive cone: `vacuous` is the unit and
+# nothing sits under a real verdict) and NOT a rank for a non-verdict.  It is this axis, on the
+# same discipline as the three above: it NEVER lowers a grade, it names WHY no grade was
+# established.  `unreachable` is not worse than `refuted` — it is a different kind of statement.
+BASELINE_C = {"unreachable": 0, "refuted": 1, "established": 2}
+
 
 # Ζ·ladder — the two DERIVATIONS every consumer needs, so none re-declares the rungs.  A ladder
 # re-listed downstream drifts silently and in the WORST direction: a display order that omits a
@@ -85,15 +100,26 @@ def below(floor: str) -> list:
     return [g for g in rungs(descending=False) if RANK_C[g] < RANK_C[floor]]
 
 
-def _grade_from_sens(baseline: bool, sens: list) -> dict:
+def _grade_from_sens(baseline: bool, sens: list, reachable: bool = True) -> dict:
     """The cmd/custom verdict as a pure function of (baseline-passes, flip-set) — shared
-    by the per-check path (grade_check → sensitivity) and the flat work-queue grader."""
+    by the per-check path (grade_check → sensitivity) and the flat work-queue grader.
+
+    Ζ·broken·offaxis — `reachable` carries the resolver's tristate the last hop.  A caller that
+    reads `.passed` collapses UNAVAILABLE onto FAIL and both arrive here as `baseline=False`;
+    passing `reachable=False` says WHICH, so the record stops asserting "repo is not green"
+    about a repo whose check merely could not run.  The GRADE is unchanged either way — the
+    axis names the gap, it does not move the rung (see BASELINE_C)."""
     if not baseline:
         return {"grade": "broken", "tests": [],
-                "why": "check does not pass in a pristine sandbox — repo is not green",
+                "baseline": "unreachable" if not reachable else "refuted",
+                "why": ("check could not be REACHED in a pristine sandbox — its toolchain or a "
+                        "resource it needs was unavailable, so nothing was established about "
+                        "the claim (this is NOT a statement that the repo is red)")
+                       if not reachable else
+                       "check does not pass in a pristine sandbox — repo is not green",
                 "not_higher": "—", "not_lower": "—"}
     if sens:
-        return {"grade": "behavioral", "tests": sens,
+        return {"grade": "behavioral", "tests": sens, "baseline": "established",
                 "why": f"falsifiable — corrupting {len(sens)} input(s) flips it red",
                 "not_higher": "behavioral is the top tier; a proof-grade (total, postulate-free witness) tier is not yet defined",
                 "not_lower": f"not indeterminate/vacuous: a mutation DOES flip it (sensitive to {len(sens)} input(s))"}

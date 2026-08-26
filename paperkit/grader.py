@@ -34,7 +34,19 @@ from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _copy_sandbox, _nested_roo
 from mutate import (  # Ζ·mutant / Μ·sweep·atom — the pure AST mutation primitives (their own leaf)
     _def_sites, _mutate_lines, _branch_sites, _flip_sites, _flip_condition,
     _data_sites, emit_mutant, _drop_data_multi)
-from grade import _grade_from_sens  # Μ·grade — the pure ladder/interpretation (the rungs + clamp
+from grade import _grade_from_sens
+
+
+class _Unreachable(int):
+    """Falsy like False — every `if not baseline` still holds — but distinguishable, so the
+    ONE caller that builds a grade record can say WHY nothing was established."""
+    def __new__(cls):
+        return super().__new__(cls, 0)
+    def __repr__(self):
+        return "UNREACHABLE"
+
+
+UNREACHABLE = _Unreachable()  # Μ·grade — the pure ladder/interpretation (the rungs + clamp
 # orders STRENGTH/ORDER/RANK_C/GRADE_C/CORRO_C live in grade.py now; the SWEEP below is the
 # calculation, that module the interpretation — Ζ·calc·interp in code).
 
@@ -284,9 +296,14 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     `path`, corrupted).  Monotonicity (a cleared group truly holds no flipper) is by
     construction — the uncatchable raise in _mutate_lines.  engine_dir is None ⇒ file
     resolution (the whole-file scan); a path ⇒ def resolution over project + engine."""
-    baseline = resolver.resolves(chk, sandbox_project, custom).passed
-    if not baseline:
-        return False, []
+    # Ζ·broken·offaxis — read the VERDICT, not `.passed`.  `.passed` is a bool and the resolver
+    # is tristate: an UNAVAILABLE ("I could not REACH the thing") and a FAIL ("the claim is
+    # false") both collapse to False here, and the grade record downstream then said "repo is
+    # not green" about a check that merely could not run.  Measured: exactly that, twice, on a
+    # green repo whose cells were being killed by their memory cap.
+    _v = resolver.resolves(chk, sandbox_project, custom)
+    if not _v.passed:
+        return (UNREACHABLE if _v.is_unavailable() else False), []
     if engine_dir is None:
         # file resolution — corrupt each whole file, label by path.  Ξ·depth·explain: scope
         # the scan to the check's READ footprint (Φ — the files it actually opens) when one
@@ -455,7 +472,9 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
                 "not_higher": "to rise: make the check a pure function of project content, then Δ can grade it",
                 "not_lower": "—"}
     baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir, footprint, root_copy)
-    rec = _grade_from_sens(baseline, sens)
+    # Ζ·broken·offaxis — hand the ladder the third state.  `baseline` is UNREACHABLE (falsy,
+    # but not plain False) when the check could not be reached at all.
+    rec = _grade_from_sens(baseline, sens, reachable=(baseline is not UNREACHABLE))
     rec["baseline"] = baseline   # Ζ·calc — the measured baseline (the verdict), part of the CALCULATION
     if rec["grade"] == "indeterminate":
         rec = _vacuity_source(rec, chk, sandbox_project, custom, engine_dir)

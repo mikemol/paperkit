@@ -215,6 +215,28 @@ def main() -> int:
                         "delegates_to": {"owner": "library", "claim": "w", "verb": "concept"}},
                        {}, {("library", "w"): "vacuous"})[0])
 
+    # ---- Ζ·broken·offaxis: a cannot-run is not a refutation ----
+    # `_grade_from_sens` emits `broken` on `not baseline`, and a baseline fails for two
+    # categorically different reasons: the claim is FALSE, or the check could not be REACHED.
+    # The resolver separates them (tristate); `grader.sensitivity` used to read `.passed` and
+    # collapse both to False, so a check killed by its memory cap graded "repo is not green"
+    # about a green repo.  Measured, twice, 2026-08-26.
+    import grader as GR
+    ref = G._grade_from_sens(False, [], reachable=True)
+    unr = G._grade_from_sens(False, [], reachable=False)
+    check("a REFUTED baseline says the repo is not green",
+          ref["baseline"] == "refuted" and "not green" in ref["why"])
+    check("an UNREACHABLE baseline says nothing was ESTABLISHED, and says so out loud",
+          unr["baseline"] == "unreachable" and "not a statement that the repo is red"
+          in unr["why"].lower())
+    # δ: the ONE differing input, and the grade is deliberately UNCHANGED — the axis names the
+    # gap, it never moves the rung (the discipline CORRO_C/DECISIONS_C/RESOLUTION_C state thrice)
+    check("δ: reachable is the only difference, and the GRADE does not move",
+          ref["grade"] == unr["grade"] == "broken" and ref["baseline"] != unr["baseline"])
+    # and the sentinel stays FALSY, so every existing `if not baseline` in the tree still holds
+    check("UNREACHABLE is falsy — every existing `if not baseline` is unaffected",
+          not GR.UNREACHABLE and GR.UNREACHABLE is not False)
+
     print(f"CLAMP BOUNDARIES: {'PASS' if not _fails else 'FAIL'}")
     return 1 if _fails else 0
 

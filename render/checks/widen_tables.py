@@ -411,6 +411,44 @@ def _selftest():
     return 0
 
 
+def fits(docx_path, text_w=9360):
+    """Ρ·render·widen·live — does every math cell in THIS docx fit its column?
+
+    The warrant's only check was this module's own --selftest: the producer grading its method on
+    a fixture while the shipped deliverable's columns went ungraded.  This is the deliverable-side
+    predicate — measure the real document's ink and compare against the widths it actually carries.
+
+    Returns (verdict, detail).  The verdict is a STRING, not a bool, because "cannot measure" is
+    not "fits": with the render deps absent widen() copies through unchanged by design (loud-
+    absence), and a caller must be able to tell an unmeasurable document from a sound one rather
+    than read a skip as a pass.
+    """
+    if _deps_absent():
+        return ("unmeasurable", "render deps absent — widen copies through; nothing to grade")
+    doc, cells, ink = _measure(docx_path)
+    if not cells:
+        return ("n/a", "no table cells in the document")
+    if ink is None:
+        return ("unmeasurable", "probe render failed")
+    if len(ink) != len(cells):
+        return ("unmeasurable", f"band/cell count mismatch ({len(ink)} vs {len(cells)})")
+    # the HARD minimum per (table,column): an un-wrappable run cannot be narrowed, so its measured
+    # ink plus cell margins is the width the column must carry or the cell is clipped.
+    hard = col_widths(cells, ink, _unwrappable)
+    grids = read_grids(doc)
+    over = []
+    for (ti, ci), need in hard.items():
+        grid = grids.get(ti) or []
+        have = grid[ci] if ci < len(grid) else None
+        if have is not None and need > have:
+            over.append((ti, ci, need, have))
+    if over:
+        worst = max(over, key=lambda x: x[2] - x[3])
+        return ("clipped", f"{len(over)} un-wrappable cell(s) exceed their column; worst "
+                           f"table {worst[0]} col {worst[1]} needs {worst[2]} twips, has {worst[3]}")
+    return ("fits", f"{len(hard)} un-wrappable column(s) measured, none clipped")
+
+
 def widen(src_docx, dst_docx, text_w=9360):
     """Library entry for the render pipeline: size `src_docx`'s table columns to measured ink
     and write to `dst_docx` (the main() body minus argv).  Copies through unchanged if deps are
@@ -433,9 +471,35 @@ def widen(src_docx, dst_docx, text_w=9360):
     return dst_docx
 
 
+def _deliverable(paper_md="../paper/paper.md"):
+    """Ρ·render·widen·live — build the real docx, widen it, and assert every un-wrappable math
+    cell FITS.  The selftest proves the METHOD on a fixture; this proves the DELIVERABLE, which is
+    what the warrant claims.  An unmeasurable verdict is reported and REFUSED as a pass: with the
+    render deps absent widen copies through by design, and reading that skip as a fit would be the
+    silent-degradation this module's own loud-absence doctrine forbids."""
+    import tempfile
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import docx as _d
+    with tempfile.TemporaryDirectory() as t:
+        w = Path(t)
+        src = _d.docx(Path(paper_md), w / "p.docx")
+        before = fits(src)
+        dst = widen(src, w / "w.docx")
+        after = fits(dst)
+    print(f"widen_tables: before={before[0]} ({before[1]}) -> after={after[0]} ({after[1]})")
+    if after[0] == "fits":
+        return 0
+    if after[0] in ("n/a",):
+        return 0
+    print(f"widen_tables: DELIVERABLE {after[0]} — {after[1]}", file=sys.stderr)
+    return 1
+
+
 def main():
     if "--selftest" in sys.argv:
         return _selftest()
+    if "--deliverable" in sys.argv:
+        return _deliverable()
     if "--check" in sys.argv:
         src = next(a for a in sys.argv[1:] if not a.startswith("--"))
         return check(src)

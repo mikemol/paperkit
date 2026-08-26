@@ -6,6 +6,10 @@
 # cached + stamped with the toolchain fingerprint, enforceable every commit AND fast).
 filegroup(name = "files", srcs = [
         "RENDER.md",
+        "assets/paper-units.tsv",
+        "assets/root-units.tsv",
+        "assets/setup-units.tsv",
+        "assets/talk-units.tsv",
         "assets/wcag-vpat.md",
         "paper.toml",
         "rubric.tsv",
@@ -17,6 +21,7 @@ filegroup(name = "files", srcs = [
         "checks/agree_md.sh",
         "checks/bib.py",
         "checks/cube.py",
+        "checks/deck_bound.py",
         "checks/docx.py",
         "checks/emit.sh",
         "checks/fidelity.py",
@@ -40,7 +45,9 @@ filegroup(name = "files", srcs = [
         "checks/ruler.py",
         "checks/ruler_inject.py",
         "checks/rulerseq.py",
+        "checks/slides.py",
         "checks/source.py",
+        "checks/units.py",
         "checks/structure.py",
         "checks/use_of_colour.py",
         "checks/wcag.py",

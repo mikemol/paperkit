@@ -28,7 +28,10 @@ import subprocess
 import sys
 
 # The format OBJECTS (nodes).  `md` is the source; the rest are producible, terminal-capable formats.
-OBJECTS = ("md", "docx", "odt", "latex", "pdf")
+# pptx/odp are the SLIDE objects (Ρ·deck·node) — see the DECK BOUND note below.
+# `units` is the OBSERVATION object (Ρ·deck·route): project.observe()'s segmentation of the
+# claim-DAG, a SIBLING source to `md` (project()'s linearization), not downstream of it.
+OBJECTS = ("md", "units", "docx", "odt", "latex", "pdf", "pptx", "odp")
 
 # The conversion MORPHISMS (edges): (src, dst) -> {tool, a11y}.  a11y: "native" (the edge tags for
 # PDF/UA by construction), "post" (reaches PDF/UA only after post-processing), or None (not a
@@ -42,7 +45,34 @@ MORPHISMS = {
     ("latex", "pdf"): {"tool": "lualatex", "a11y": "native"},  # \DocumentMetadata tagging → PDF/UA-2
     ("docx", "odt"): {"tool": "soffice",  "a11y": None},      # the office hub converts between them
     ("odt", "docx"): {"tool": "soffice",  "a11y": None},
+    # The SLIDE objects (Ρ·deck·node).  pandoc emits pptx from markdown; the office hub converts
+    # pptx↔odp exactly as it does docx↔odt.  See DECK BOUND: these are TRANSFORM edges of the
+    # pandoc observation, not a new observation of the claim-DAG.
+    ("md", "pptx"):  {"tool": "pandoc",   "a11y": None},
+    # Ρ·deck·route — the UNIT-carrying edge.  Its source is `units` (the observation), not `md`
+    # (the linearization), which is what makes the route's deliverable a PROJECTION of the DAG
+    # rather than a reflow of finished prose.  Same tool; different source object, and the object
+    # is the whole difference.
+    ("units", "pptx"): {"tool": "pandoc",   "a11y": None},
+    ("pptx", "odp"): {"tool": "soffice",  "a11y": None},
+    ("odp", "pptx"): {"tool": "soffice",  "a11y": None},
 }
+
+# ── DECK BOUND (Ρ·deck·node) ──────────────────────────────────────────────────────────────────
+# The slide nodes above make the slide FORMATS first-class and tool-gated.  They do NOT make a deck
+# a paperkit PROJECTION.  Every edge here is a downstream TRANSFORM of the pandoc observation of an
+# ALREADY-LINEARIZED document: project() is S -> String (one flat stream seeded by rubric-order ×
+# dep-order), and these edges reflow that stream onto slides.
+#
+# A deck as a genuine OBSERVATION of the claim-DAG is S -> RoseTree(S) indexed by (target, genre) —
+# a SEGMENTATION into bounded observation-windows, not a linearization.  That is Ρ·deck·observe, and
+# it is NOT what this matrix delivers; prototypes/slides.bib holds its design DAG, whose
+# `docx-pdf-are-transforms-not-observations` names exactly the trap of shipping an
+# exporter-of-finished-prose and calling it a deck target.
+#
+# So: `.odp`/`.pptx` OUT of paperkit — yes, gated, from the resolved source.  A deck PROJECTED from
+# the DAG — not yet.  Any warrant citing these nodes must carry that bound.
+# ──────────────────────────────────────────────────────────────────────────────────────────────
 
 # The composed ROUTES from the source to the terminal PDF (each is a list of intermediate objects the
 # md passes through).  The router (pdf.py) selects one by its intermediate; the a11y of the route is
@@ -51,6 +81,21 @@ ROUTES = {
     "docx":  ["md", "docx", "pdf"],
     "odf":   ["md", "odt", "pdf"],
     "latex": ["md", "latex", "pdf"],
+}
+
+# The composed routes to a terminal SLIDE deliverable (Ρ·deck·node).  Kept SEPARATE from ROUTES
+# because ROUTES is the fan-in to the terminal PDF and route_a11y() reads its final edge's a11y
+# field; a slide route terminates at a slide object, so folding it into ROUTES would make
+# route_a11y raise on a None-a11y edge.  Same composition rule: consecutive pairs must be
+# declared morphisms (deck --check asserts it, exactly as ROUTES does).
+SLIDE_ROUTES = {
+    "pptx": ["md", "pptx"],
+    "odp":  ["md", "pptx", "odp"],
+    # the OBSERVED routes (Ρ·deck·route): same terminal formats, sourced from the segmentation.
+    # A consumer asking for a deck picks between them by which SOURCE it wants, and the graph
+    # names the difference instead of leaving two things that look alike indistinguishable.
+    "pptx-observed": ["units", "pptx"],
+    "odp-observed":  ["units", "pptx", "odp"],
 }
 
 
@@ -85,19 +130,33 @@ def main(argv: list[str]) -> int:
                   "an edge the toolchain cannot perform", file=sys.stderr)
             return 1
         # every route composes real edges (each consecutive pair is a declared morphism)
-        for name, path in ROUTES.items():
-            for a, b in zip(path, path[1:]):
-                if (a, b) not in MORPHISMS:
-                    print(f"graph --check: route {name} uses undeclared edge {a}->{b}", file=sys.stderr)
-                    return 1
+        for label, table in (("route", ROUTES), ("slide route", SLIDE_ROUTES)):
+            for name, path in table.items():
+                for a, b in zip(path, path[1:]):
+                    if (a, b) not in MORPHISMS:
+                        print(f"graph --check: {label} {name} uses undeclared edge {a}->{b}",
+                              file=sys.stderr)
+                        return 1
+        # every declared object is REACHED by some morphism (an object no edge produces or consumes
+        # is a node the graph claims but cannot deliver — the OBJECTS/MORPHISMS drift guard)
+        touched = {o for pair in MORPHISMS for o in pair}
+        orphans = sorted(set(OBJECTS) - touched)
+        if orphans:
+            print(f"graph --check: object(s) {orphans} appear in no morphism — the graph declares a "
+                  "node it cannot reach", file=sys.stderr)
+            return 1
         print(f"graph --check: {len(MORPHISMS)} morphisms over {len(OBJECTS)} objects, "
-              f"{len(ROUTES)} routes — every edge's tool is present and every route composes")
+              f"{len(ROUTES)} pdf routes + {len(SLIDE_ROUTES)} slide routes — every edge's tool is "
+              "present, every object is reachable, and every route composes")
         return 0
     print("render coalgebra — conversion morphisms (row = from, col = to):\n")
     print(_matrix())
     print("\nroutes to the terminal PDF:")
     for name, path in ROUTES.items():
         print(f"  {name:<6} {' → '.join(path)}   (a11y: {route_a11y(name)})")
+    print("\nroutes to a terminal SLIDE deliverable (transforms, not observations — see DECK BOUND):")
+    for name, path in SLIDE_ROUTES.items():
+        print(f"  {name:<6} {' → '.join(path)}")
     return 0
 
 

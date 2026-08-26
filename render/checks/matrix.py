@@ -45,12 +45,34 @@ import graph
 # receives (a subset/renaming of graph.OBJECTS: the office route delivers docx/odt/pdf, the latex
 # route delivers latex/pdf; "pdf-office" and "pdf-latex" distinguish the two PDF deliverables since
 # a capability can differ between them — UA-1 vs UA-2).
-FORMATS = ("docx", "odt", "latex", "pdf-office", "pdf-latex")
+FORMATS = ("docx", "odt", "latex", "pdf-office", "pdf-latex", "pptx", "odp")
+
+# Ρ·render·matrix·cover — the graph OBJECTS this grid deliberately does NOT state capabilities over,
+# each with the reason.  Declared rather than left implicit: `FORMATS` was described in prose as "a
+# subset of graph.OBJECTS" and nothing checked it, so adding pptx/odp to the coalgebra left them
+# silently ungraded here — the grid kept passing because it only ever compared itself to itself.
+# An object must now be in FORMATS or in this map, so a new node cannot be quietly uncovered.
+NOT_STATED = {
+    "md":    "the SOURCE, not a deliverable — capabilities are properties of what a consumer receives",
+    "units": "the OBSERVATION (project.observe's segmentation), a carrier of claims rather than a "
+             "rendered format; its capabilities are those of whatever format it is rendered into",
+    "pdf":   "split into pdf-office and pdf-latex, since a capability can differ between the two "
+             "producers (UA-1 vs UA-2)",
+}
 
 # The CAPABILITIES — each an a11y or fidelity property, keyed to the warrant(s) that demonstrate it.
 # CAPABILITIES[cap] = {"what": one phrase, "wcag": clause or "", "cells": {format: (state, warrant)}}.
 # A capability names its demonstrating warrant per cell; matrix --check asserts the warrant exists.
 CAPABILITIES = {
+    "slide-alt-text": {
+        "what": "a non-text element on a slide carries a text alternative",
+        "wcag": "1.1.1",
+        # MEASURED: the produced .odp contains ZERO svg:desc — pandoc's pptx writer emits no
+        # alt-text and the office edge invents none.  EXCEPTED, not silently absent: the deck's
+        # current content is text and lists, so nothing NEEDS an alternative today, but a figure
+        # placed on a slide would ship without one and the grid says so.
+        "cells": {"pptx": ("excepted", "rnd-slides"), "odp": ("excepted", "rnd-slides")},
+    },
     "coalgebra": {
         "what": "the render pipeline is an explicit owned coalgebra (formats × conversions as data)",
         "wcag": "",
@@ -61,6 +83,15 @@ CAPABILITIES = {
         "wcag": "",
         # the prose survives into the PDF text layer (rnd-pdf gates the content is present, no bare marker).
         "cells": {"docx": ("native", "rnd-agree"), "pdf-office": ("post", "rnd-pdf")},
+    },
+    "slide-structure": {
+        "what": "each slide carries a real title placeholder and its content as list structure, "
+                "so a screen reader announces the slide and walks its points",
+        "wcag": "1.3.1",
+        # MEASURED on the observed deck: 59 title placeholders, 50 outline placeholders, 286 lists.
+        # `post` rather than `native`: pandoc's pptx writer places them and the office edge carries
+        # them through — neither format guarantees it by construction.
+        "cells": {"pptx": ("post", "rnd-slides"), "odp": ("post", "rnd-slides")},
     },
     "structural-headings": {
         "what": "every section renders as a real document heading whose text matches",
@@ -197,6 +228,20 @@ def check(warrants_bib: Path) -> tuple[bool, list[str]]:
                 problems.append(f"{cap} × {fmt}: names warrant {warrant!r} absent from warrants.bib")
     # the pdf-ua row is graph.MORPHISMS[edge].a11y — office pdf edges are "post", the latex edge "native"
     ua = CAPABILITIES["pdf-ua"]["cells"]
+    # COVERAGE — every graph object is either stated over here or declared not-stated, with a
+    # reason.  Without this the two faces of "one owned coalgebra" drift silently: a node added to
+    # the graph simply never appears in the capability grid, and each face keeps passing because
+    # each checks itself against its own list.
+    uncovered = [o for o in graph.OBJECTS if o not in FORMATS and o not in NOT_STATED]
+    if uncovered:
+        problems.append(f"graph object(s) {uncovered} are neither stated over nor declared NOT_STATED — "
+                   f"the capability grid and the conversion graph have diverged, and each face "
+                   f"would keep passing against its own object list")
+    stale = [o for o in NOT_STATED if o not in graph.OBJECTS]
+    if stale:
+        problems.append(f"NOT_STATED names {stale}, absent from the graph — the exemption outlived "
+                   f"its object")
+
     if ua["pdf-office"][0] != graph.MORPHISMS[("docx", "pdf")]["a11y"]:
         problems.append("pdf-ua × pdf-office disagrees with graph.MORPHISMS[(docx,pdf)].a11y")
     if ua["pdf-latex"][0] != graph.MORPHISMS[("latex", "pdf")]["a11y"]:

@@ -41,6 +41,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 _LO = "/usr/lib/libreoffice/program"
@@ -181,7 +182,9 @@ def _selftest() -> int:
         subprocess.run(["pandoc", str(md), "--toc", "-o", str(docx)], check=True)
 
         p_out = dd / "p.pdf"
+        t0 = time.monotonic()
         got = export_pdfua(docx, p_out, timeout=180)
+        p_secs = time.monotonic() - t0
         tagged = False
         if got is not None and p_out.exists():
             info = subprocess.run(["pdfinfo", str(p_out)], capture_output=True, text=True).stdout
@@ -189,11 +192,22 @@ def _selftest() -> int:
         check("P: the bridge exports a Tagged PDF from a docx (UA export path)",
               got is not None and tagged)
 
+        # Ζ·lo·deadline — the F arm's deadline is DERIVED from the P arm's measured export, not
+        # hardcoded.  It was `timeout=1` with the comment "shorter than LO startup", and that
+        # premise DECAYED: this host now exports in 0.96s, so a 1s deadline no longer kills
+        # anything and the arm went red while the mechanism it tests was working perfectly.  A
+        # wall-clock constant in a fixture is a claim about the machine, and machines get faster.
+        #
+        # The deadline reaches the bridge as a FLOAT (the worker reads `float(sys.argv[3])`), so a
+        # sub-second fraction is expressible however fast the host is — the `int` annotation on
+        # export_pdfua is cosmetic.  A tenth of the measured time cannot outlive an export that
+        # actually took that time, on any machine, which is what makes the arm portable.
         f_out = dd / "f.pdf"
-        killed = export_pdfua(docx, f_out, timeout=1)          # deadline shorter than LO startup
-        check("F: an impossibly short deadline is killed → None (loud, never a silent hang)",
+        f_deadline = round(p_secs / 10, 3)
+        killed = export_pdfua(docx, f_out, timeout=f_deadline)
+        check(f"F: a deadline of {f_deadline}s (a tenth of the measured {p_secs:.2f}s) is killed → None",
               killed is None)
-        check("δ: the deadline decides — generous exports a Tagged PDF, 1s is killed",
+        check("δ: the deadline decides — the measured time exports a Tagged PDF, a tenth of it is killed",
               got is not None and killed is None)
 
     if fails:

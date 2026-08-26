@@ -78,6 +78,44 @@ def render(paper_md: Path, out_pdf: Path, via: str, work: Path) -> Path | None:
     return _office_pdf(intermediate, out_pdf, work)
 
 
+def _formula_alts(pdf: Path) -> tuple[int, int]:
+    """(formula count, how many carry an EMPTY /Alt) in the deliverable's structure tree — the
+    office route's math alternative, read from the shipped artifact rather than trusted from the
+    step that wrote it."""
+    try:
+        import pikepdf
+    except ImportError:
+        return (0, 0)
+    alts: list = []
+
+    def walk(n, d=0):
+        if d > 20 or not hasattr(n, "get"):
+            return
+        if str(n.get("/S") or "") == "/Formula":
+            alts.append(str(n.get("/Alt") or ""))
+        for k in (n.get("/K") or []):
+            if hasattr(k, "get"):
+                walk(k, d + 1)
+
+    with pikepdf.open(str(pdf)) as doc:
+        root = doc.Root.get("/StructTreeRoot")
+        if root is not None:
+            walk(root)
+    return (len(alts), sum(1 for a in alts if not a.strip()))
+
+
+def _link_count(pdf: Path) -> int:
+    """Every /Link annotation in the deliverable — the denominator the informative-description
+    ratio is stated over, read from the PDF rather than assumed from the source."""
+    try:
+        import pikepdf
+    except ImportError:
+        return 0
+    with pikepdf.open(str(pdf)) as doc:
+        return sum(1 for pg in doc.pages for a in (pg.get("/Annots") or [])
+                   if a.get("/Subtype") == "/Link")
+
+
 def main(argv: list[str]) -> int:
     via = argv[argv.index("--via") + 1] if "--via" in argv else "docx"
     if via not in graph.ROUTES:
@@ -96,10 +134,46 @@ def main(argv: list[str]) -> int:
         words = sorted(set(re.findall(r"[a-z]{4,}", source.cite_split(Path("../paper/paper.md")).lower())))
         seen = set(re.findall(r"[a-z]{4,}", txt.lower()))
         rate = sum(w in seen for w in words) / len(words)
-        ok = pages >= 1 and not bare and rate >= 0.85
+        # Ρ·render·alt·live — the SHIPPED deliverable's link descriptions must actually say
+        # something.  linkalt describes every link (PDF/UA 7.18) and reports how many descriptions
+        # are uninformative, but reporting alone let a real defect ship: measured on this very
+        # deliverable, 18 of 19 links carried a bare footnote digit, so a screen reader announced
+        # "link, one" while the check said 0 undescribed remain.  The report is now a GATE.
+        #
+        # The threshold is not zero.  A link over a figure has no words beneath it and honestly
+        # falls back to "link"; failing the build for that would be measuring the wrong thing —
+        # the same trap as counting the office suite's table-preview thumbnail as an undescribed
+        # image.  What must not recur is the BULK case, where the marker-expansion has regressed
+        # and most links say nothing.  So: a minority may sit on the honest floor; a majority may
+        # not.
+        # Ρ·render·alt·selfbar — SWEPT: seven render warrants are graded ONLY by their producer's
+        # own --selftest.  That is legitimate for a METHOD (a ⟨P,F,δ⟩ proof of the technique), and
+        # veraPDF at UA-1 does cover link and formula descriptions on the deliverable — but only
+        # for PRESENCE, which is exactly the bar that passed 18 bare digits.  The gap is QUALITY on
+        # the shipped artifact, and these two lines close it for the two producers whose output is
+        # a description.  widen_tables remains selftest-only for its measured column widths.
+        #
+        # mathalt WRITES /Alt on every /Formula and nothing verified it on
+        # the deliverable: its own selftest was the only witness, while the LaTeX route asserts its
+        # formulas carry a real alternative in the SHIPPED artifact.  A producer whose output no
+        # verifier grades is the same shape as a description that is present but useless — the
+        # check and the thing checked were the same party.  Measured here: 21 formulas, 0 empty.
+        formulas, empty_alt = _formula_alts(pdf)
+        math_ok = not empty_alt
+
+        thin = linkalt.uninformative(pdf)
+        nlinks = _link_count(pdf)
+        thin_ok = (not nlinks) or (len(thin) * 2 <= nlinks)
+
+        ok = pages >= 1 and not bare and rate >= 0.85 and thin_ok and math_ok
         print(f"pdf: {'ok' if ok else 'FAIL'} via {via} — {pages}-page deliverable "
               f"({'no bare markers, ' if not bare else f'{len(bare)} bare markers, '}"
-              f"{rate:.0%} of body content present)")
+              f"{rate:.0%} of body content present, "
+              f"{nlinks - len(thin)}/{nlinks} links informatively described, "
+              f"{formulas - empty_alt}/{formulas} formulas with a math alternative"
+              f"{'' if math_ok else f' — {empty_alt} EMPTY /Alt'}"
+              f"{'' if thin_ok else ' — MOST LINKS SAY NOTHING: ' + str(sorted({c for _, c in thin})[:6])}"
+              f")")
         return 0 if ok else 1
 
 

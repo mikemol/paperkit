@@ -61,6 +61,75 @@ def _words_by_page(pdf: Path) -> dict[int, list[tuple[float, float, float, float
     return out
 
 
+def uninformative(pdf: Path) -> list:
+    """Ρ·render·alt·audit — links whose description is PRESENT but says nothing.
+
+    The defect class, found on the slide route and audited back here: a presence test passes a
+    useless description.  `describe_links` writes the literal "link" when no visible text falls
+    under the annotation — PDF/UA requires *a* description, so that is the honest floor — but the
+    exit condition counted such a link as DESCRIBED, so a deliverable could satisfy "0 undescribed
+    remain" while announcing "link, link, link" to a screen reader.
+
+    This names them instead of hiding them: the count is reported beside the described count, so a
+    deliverable states how much of its link description is real.  It is deliberately a REPORT and
+    not a hard failure — a link over a figure genuinely has no words under it, and failing the
+    build for an honest floor would be measuring the wrong thing.  What was wrong was the silence.
+    """
+    out = []
+    with pikepdf.open(str(pdf)) as doc:
+        for i, page in enumerate(doc.pages, 1):
+            for a in (page.get("/Annots") or []):
+                if a.get("/Subtype") == "/Link":
+                    c = str(a.get("/Contents") or "").strip()
+                    # ONE owner for "is this description thin": _is_marker.  This branch used to
+                    # carry its own copy (link-literal or under two tokens), which disagreed with
+                    # it — a URI counted as thin here and as a real description there, so the two
+                    # sides of the same question gave different answers.
+                    if c and (c.lower() == "link" or _is_marker(c)):
+                        out.append((i, c))
+    return out
+
+
+def _is_marker(text: str) -> bool:
+    """A description that is a bare reference MARKER — a digit, a bracketed number, a single
+    token — rather than words.  These are what a footnote or citation link covers, and they carry
+    no information out of context."""
+    t = text.strip().strip("[]()")
+    # A URI is a DESCRIPTION, not a marker: "https://doi.org/10.1145/3236774" is one token and
+    # says exactly where the link goes, which is what a description is for.  Measured on the latex
+    # route, whose external links are bare DOIs — flagging them would have called a perfectly good
+    # description thin, the same measure-the-wrong-thing error as counting a table thumbnail.
+    if re.match(r"^(https?|mailto|doi):", t, re.I) or t.startswith("www."):
+        return False
+    if t.isdigit() or len(t.split()) < 2:
+        return True
+    # A trailing bare number with at most one leading word is still a marker: the overlap rule
+    # catches the word ADJACENT to a footnote reference, so "and 5" or "build 2" arrives looking
+    # like prose while carrying no more information than "5" did.  Measured: 8 of 19 links on the
+    # real deliverable took this shape once the digit-only case was fixed.
+    parts = t.split()
+    return len(parts) <= 2 and parts[-1].strip("[]().,").isdigit()
+
+
+def _destination_hint(annot) -> str:
+    """What KIND of thing a link points at, from its own destination — so a marker-only link can
+    say "footnote 1" rather than "1".  Read from the annotation, never guessed: an internal
+    destination is a note or section within the document, an external URI names its host."""
+    try:
+        act = annot.get("/A")
+        if act is not None and act.get("/URI") is not None:
+            uri = str(act.get("/URI"))
+            host = uri.split("//")[-1].split("/")[0]
+            return f"link to {host}" if host else "external link"
+    except Exception:
+        pass
+    # "note" plus a digit is two tokens, which _is_marker rejects — correctly, and the
+    # disagreement was mine: an expansion must clear the SAME bar it applies.  The LaTeX route,
+    # whose links lualatex describes natively, sets the standard to match ("Go to destination
+    # footnote*.1"): say what the target IS and where it goes, in words.
+    return "go to footnote"
+
+
 def describe_links(pdf: Path) -> int:
     """Give EVERY undescribed `/Link` a `/Contents`: the words whose box OVERLAPS its rect by at
     least half a word's width (so a text extractor that merges two adjacent links into one word,
@@ -75,7 +144,15 @@ def describe_links(pdf: Path) -> int:
     filled = 0
     for pno, page in enumerate(doc.pages, 1):
         for a in page.get("/Annots", []):
-            if a.get("/Subtype") != "/Link" or a.get("/Contents") is not None:
+            if a.get("/Subtype") != "/Link":
+                continue
+            # An EXISTING description is left alone — overwriting real prose would be worse than
+            # the gap.  But a description that is a bare MARKER is not left alone: the office
+            # export sets /Contents to the reference glyph itself ("1", "2"), so skipping every
+            # already-described link meant the marker expansion never ran on the real deliverable
+            # at all.  Measured: 18 of 19 links kept their bare digit until this exception existed.
+            existing = a.get("/Contents")
+            if existing is not None and not _is_marker(str(existing)):
                 continue
             r = [float(v) for v in a["/Rect"]]
             x0, y0, x1, y1 = min(r[0], r[2]), min(r[1], r[3]), max(r[0], r[2]), max(r[1], r[3])
@@ -86,6 +163,15 @@ def describe_links(pdf: Path) -> int:
                 if ox > 0 and oy > 0 and ox >= 0.5 * min(x1 - x0, wx1 - wx0):   # ≥ half a word wide
                     hit.append(w)
             text = " ".join(hit).strip()
+            # Ρ·render·alt·measure — a link whose own text is a bare MARKER describes nothing.
+            # Measured on the real deliverable: 18 of 19 links carried a single digit ("1", "2", …)
+            # because a footnote reference covers only its marker glyph, so a screen reader
+            # announced "link, one".  The check said "0 undescribed remain" and was correct — the
+            # description was present and useless, the same presence-for-meaning failure found on
+            # the slide route.  So a marker-only description is EXPANDED with what it points at:
+            # the link's own words stay, prefixed by the kind of destination they lead to.
+            if text and _is_marker(text):
+                text = f"{_destination_hint(a)} {text}".strip()
             if text:
                 a["/Contents"] = pikepdf.String(text)
                 filled += 1
@@ -130,6 +216,37 @@ def _selftest() -> int:
         check("F: the centre rule leaves at least one bare (sre's half-description bug)",
               centre_desc < n)
         check("δ: overlap describes strictly more than centre", n > centre_desc)
+
+        # ── the MARKER-DESCRIBED arm (Ρ·render·alt·fixture) ──────────────────────────────────
+        # The arms above build links with NO /Contents — a state the real pipeline never presents.
+        # LibreOffice's PDF/UA export always sets /Contents, to the reference GLYPH itself, so a
+        # fixture of bare links let describe_links' already-described skip pass the selftest while
+        # 18 of 19 links on the actual deliverable kept a bare digit.  The verification method, not
+        # only the code, produced the false result: a fixture that cannot exhibit the shipping
+        # condition cannot witness the shipping bug.
+        mk = dd / "marker.pdf"
+        _make_fixture(mk)
+        with pikepdf.open(str(mk), allow_overwriting_input=True) as doc:
+            for a in doc.pages[0].get("/Annots", []):
+                a["/Contents"] = pikepdf.String("1")          # what the office export writes
+            doc.save(str(mk))
+        pre_thin = len(uninformative(mk))
+        describe_links(mk)
+        post_thin = len(uninformative(mk))
+        check("P(marker): a link already described by its own GLYPH is expanded, not skipped",
+              pre_thin >= 1 and post_thin == 0)
+        # and the guard that keeps it honest: REAL prose is never overwritten.
+        pr = dd / "prose.pdf"
+        _make_fixture(pr)
+        with pikepdf.open(str(pr), allow_overwriting_input=True) as doc:
+            for a in doc.pages[0].get("/Annots", []):
+                a["/Contents"] = pikepdf.String("see the adequacy section for the full ladder")
+            doc.save(str(pr))
+        describe_links(pr)
+        with pikepdf.open(str(pr)) as doc:
+            kept = all("adequacy" in str(a.get("/Contents") or "")
+                       for a in doc.pages[0].get("/Annots", []))
+        check("F(marker): an existing PROSE description is left alone, never overwritten", kept)
 
     if fails:
         print(f"LINKALT SELFTEST: FAIL ({len(fails)})")
@@ -197,7 +314,10 @@ def main(argv: list[str]) -> int:
         return 1
     n = describe_links(pdf)
     left = _undescribed(pdf)
-    print(f"linkalt: described {n} link(s); {left} undescribed remain")
+    thin = uninformative(pdf)
+    print(f"linkalt: described {n} link(s); {left} undescribed remain; "
+          f"{len(thin)} carry an UNINFORMATIVE description (the \"link\" floor or a single "
+          f"token) — present, but announcing little to a screen reader")
     if left:
         print("linkalt: FAIL — a link covering visible text is still undescribed", file=sys.stderr)
         return 1

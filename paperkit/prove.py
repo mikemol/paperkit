@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""library/prove.py — Λ·witness: a witness PROVES ITSELF.
+"""paperkit/prove.py — Λ·witness: a witness PROVES ITSELF.
 
 A concept witness is not merely an executable that passes or fails; it is a PROOF-CARRYING object.
 Run in prove mode it emits its own CERTIFICATE — ⟨verdict, sensitivity fingerprint⟩ — so the proof can

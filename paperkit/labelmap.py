@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""library/labelmap.py — Λ·label·carrier: the concept/label/route index, and the contrast instrument.
+"""paperkit/labelmap.py — Λ·label·carrier: the concept/label/route index, and the contrast instrument.
 
 A LABEL is a point in an orbit: it names a concept FROM THE CARRIER one was standing in.  "Current
 divider", "bridge null", "pareto crossover" and "argmin" are four labels for one structure, coined

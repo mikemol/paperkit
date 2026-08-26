@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Ζ·prove-gate — the --prove face and the build's cached __dcalc run the SAME oracle.
 
-A concept witness's --prove face (library/prove.py certificate()) emits ⟨verdict, baseline, sens,
+A concept witness's --prove face (paperkit/prove.py certificate()) emits ⟨verdict, baseline, sens,
 grade, …⟩; the build caches the identical measurement as @paperkit_library//:<key>__dcalc.  Their
 byte-equivalence was HAND-verified once (Λ·prove @ab386b4, 63 sites).  This gates the structural
 ground of that equivalence in //:hook, WITHOUT re-running any sweep (the ~40s×N nesting the
@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PROVE = ROOT / "library" / "prove.py"
+PROVE = ROOT / "paperkit" / "prove.py"
 CALC = ROOT / "tools" / "calc.bzl"
 BIBTEX = ROOT / "tools" / "bibtex.bzl"
 

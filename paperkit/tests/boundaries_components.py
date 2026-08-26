@@ -118,6 +118,12 @@ def main() -> int:
     check(f"dag.bzl IMPORTS is FRESH against tools/imports.py ({len(live)} edges)", committed == live)
     if committed != live:
         print(f"      committed-only={sorted(committed - live)} live-only={sorted(live - committed)}")
+        # Ζ·dag·regen — name the REPAIR, not just the breach.  dag.bzl says "REGENERATE (never
+        # hand-edit)" and for a long time nothing could: the generator emitted edges to stdout and
+        # had no writer, so the only way past this red was to hand-edit the file its own header
+        # forbids hand-editing.  `--write` closes that, and saying so here is the difference
+        # between a check that reports a fact and one a reader can act on.
+        print("      repair: python3 tools/imports.py --write")
     bad = violations(components, deps, committed)
     check("every import edge respects the component DAG", not bad)
     for mod, stem, a, b in bad[:6]:

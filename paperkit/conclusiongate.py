@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""library/conclusiongate.py — Λ·conclusion·backed: gate PRINTED conclusions on ASSERTIONS.
+"""paperkit/conclusiongate.py — Λ·conclusion·backed: gate PRINTED conclusions on ASSERTIONS.
 
 The check apparatus covers LANDED CLAIMS: every one carries a command that must pass.  Printed
 reasoning carries nothing.  An analysis script prints a conclusion beside output from the same run

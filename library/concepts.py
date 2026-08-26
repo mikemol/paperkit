@@ -24,7 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or ROOT / "paperkit")
-sys.path.insert(0, str(Path(__file__).resolve().parent))   # this library — for routes (the graded walk)
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # this library — for its own domain walk)
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
 from _fixture_model import entry  # noqa: E402  (the validated fixture kernel; capability helpers
@@ -138,7 +138,7 @@ def resolver_dispatches():
     for typ in resolver.VERBS:
         assert not gate.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}).passed, \
             f"{typ}: is declared in VERBS but does not dispatch to a real branch"
-    assert gate.resolves("nosuchverb:x", ENGINE, {}) is resolver.UNAVAILABLE, \
+    assert gate.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(), \
         "an unregistered type resolved — the built-in set is not closed"
     assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}).passed, \
         "a custom [checks.X] type did not dispatch through the registry"
@@ -331,6 +331,106 @@ def label_records_carrier():
         "the index did not grow, or the collision went undetected"
 
 
+def boundary_is_a_triple():
+    """<P, F, delta>: a pass arm, a flag arm, and the minimum delta between them.
+
+    Interned as the SHAPE, proven on a constructed check — not by counting the boundary suites in
+    this repository.  Two reasons.  The library stages only its own files, so reaching into a
+    sibling project would pass in-process and fail in the sandbox (the trap concept_carries_several
+    _views already documents).  And a COUNT is the wrong referent anyway: "more than twenty suites
+    exist" is a fact about this corpus at one moment, while the claim is about what a boundary IS.
+
+    The property that makes the triple a measurement: the delta must be MINIMAL and SUFFICIENT --
+    changing it flips the verdict, and changing nothing does not.  A pair of arms without that is
+    two anecdotes, and a check that cannot fail is indistinguishable from one that discriminates.
+    """
+    def check(text):                      # a toy tool: passes iff its input carries the token
+        return "TOKEN" in text
+
+    P, F = "a TOKEN here", "a  here"      # the minimal pass / minimal flag pair
+    assert check(P), "the P arm does not pass — it is not a pass arm"
+    assert not check(F), "the F arm does not flag — a check that cannot fail proves nothing"
+
+    # delta: the ONE difference between the arms, and it is what flips the verdict.
+    assert P.replace("TOKEN", "") == F.replace("TOKEN", ""), \
+        "P and F differ in more than the delta — the pair does not isolate a cause"
+    assert check(F.replace(" ", "TOKEN", 1)) is not check(F), \
+        "applying the delta to F does not flip it — the delta is not sufficient"
+
+    # a happy-path-only tool has an UNDEFINED boundary: no F arm distinguishes these two.
+    def always(text):
+        return True
+    assert always(P) and always(F), "the degenerate tool should accept both"
+    assert check(P) != check(F), "the real tool discriminates where the degenerate one cannot"
+
+
+def capability_owned_as_data():
+    """A capability matrix is DATA with a named exception, not prose with silent gaps.
+
+    Proven against a CONSTRUCTED matrix, never by importing a project's own grid: the library
+    stages only its own files (the hermetic sandbox honours that), and a witness that reached into
+    a sibling would pass in-process and fail in the sandbox — the exact failure the talk's
+    hand-rolled version had.  What is interned here is the SHAPE: cells are declared, an
+    unaffordable cell is EXCEPTED rather than absent, and absence is therefore detectable.
+    """
+    grid = {"alt-text": {"docx": "native", "latex": "post", "pdf": "excepted"},
+            "math":     {"docx": "native", "latex": "native", "pdf": "post"}}
+    fmts = {f for cells in grid.values() for f in cells}
+    for cap, cells in grid.items():
+        assert set(cells) == fmts, f"{cap} leaves a format undeclared — a silent gap"
+    assert "excepted" in {st for c in grid.values() for st in c.values()}, \
+        "no cell is EXCEPTED — an honest matrix names what it cannot afford"
+    # the property that makes it data: DELETING a cell is detectable, which prose cannot offer.
+    holed = {c: dict(v) for c, v in grid.items()}
+    holed["math"].pop("pdf")
+    assert any(set(v) != fmts for v in holed.values()), \
+        "a removed cell is undetectable — the matrix is not owned as data"
+
+
+def pipeline_is_a_coalgebra():
+    """Targets are OBJECTS, conversions are MORPHISMS, a route is a WALK over declared edges.
+
+    Constructed, for the same staging reason as capability_owned_as_data.  The interned property is
+    that a route is CHECKED against the adjacency: an edge the graph does not declare is refused,
+    which is what separates a tracked pipeline from a shell script that happens to work today.
+    """
+    objects = {"md", "docx", "pdf"}
+    morphisms = {("md", "docx"), ("docx", "pdf")}
+
+    def walks(route):
+        return all(e in morphisms for e in zip(route, route[1:])) and set(route) <= objects
+
+    assert walks(["md", "docx", "pdf"]), "a route over declared edges does not compose"
+    assert not walks(["md", "pdf"]), "an UNDECLARED edge composes — the adjacency is decorative"
+    assert not walks(["md", "epub"]), "a route reaches an object the graph does not declare"
+
+
+def derived_is_regenerated_not_trusted():
+    """Every derived artifact is regenerated and compared — the drift face, generalised.
+
+    project_then_gate interns this for PROSE (project -> gate on a document).  This node is the
+    same discipline over any derivative a project commits: a table, a manifest, a figure.  It is a
+    DISTINCT concept rather than a second key on that witness, because the property is about the
+    committed derivative's relation to its generator, not about the projector.
+    """
+    d = Path(tempfile.mkdtemp())
+    try:
+        def generate(src):
+            return "\n".join(f"| {k} | {v} |" for k, v in sorted(src.items()))
+
+        src = {"a": 1, "b": 2}
+        committed = d / "table.md"
+        committed.write_text(generate(src))
+        assert committed.read_text() == generate(src), "a fresh derivative does not match"
+        src["c"] = 3                                   # the source moves, the derivative does not
+        assert committed.read_text() != generate(src), \
+            "the committed derivative still matches a CHANGED source — nothing is being compared"
+        committed.write_text(generate(src))            # regenerate closes it
+        assert committed.read_text() == generate(src), "regeneration does not restore agreement"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def project_then_gate():
     from _fixture_gate import gate
     from _fixture_project import project_text
@@ -462,7 +562,113 @@ def rests_on_clamps():
         f"rests-on did not clamp the thesis (self={th['grade']}, eff={th['effective_grade']})"
 
 
+def concept_imports_a_certificate():
+    # `concept:` IMPORTS rather than runs: the verb resolves a key against a library and yields
+    # its certificate.  Δ therefore grades it `imported` — outside the falsifiability ladder,
+    # delegated to the owner that graded it — exactly as a verdict-import is.
+    import grader
+    import resolver
+    assert resolver.VERBS["concept"]["verb"] == "imports", \
+        "the concept verb no longer IMPORTS — the engine's own registry disagrees with the claim"
+    assert resolver.VERBS["concept"]["crosses"], \
+        "concept: must be a BOUNDARY-CROSSING verb — its proof lives in another project"
+    rec = grader.grade_check("concept:adequacy-pitch", ROOT / "paper", set(), {}, ROOT / "paper")
+    assert rec["grade"] == "imported", \
+        f"a concept citation should grade imported (delegated to its library), got {rec['grade']}"
+
+
+def concept_interns_to_one_node():
+    # A library is a HASH-CONS table: two keys naming the same concept resolve to the SAME
+    # canonical witness object, not to two copies that could drift.  The engine's own library
+    # exhibits it — adequacy-pitch and grade-ladder are one node under two citations.
+    assert CONCEPTS["adequacy-pitch"] is CONCEPTS["grade-ladder"], \
+        ("two keys for one concept resolve to DIFFERENT witnesses — the library is a cache of "
+         "repeats, not a hash-cons table, and the two can drift apart")
+    # and interning is not deduplication-after-the-fact: a key present ONCE is still canonical.
+    assert CONCEPTS["crash-sensitive-limit"] is CONCEPTS["crash-sensitive-limit"], \
+        "a singly-cited concept must still be one canonical node"
+
+
+def concept_carries_several_views():
+    # ONE truth, SEVERAL prose faces: distinct views cite the same concept and get the IDENTICAL
+    # certificate, so their sentences cannot drift apart.
+    #
+    # Asserted against CONSTRUCTED views, not by scanning the repository: a witness that globbed
+    # the tree passed in-process and failed in the hermetic sandbox, which stages only declared
+    # inputs — and it was measuring "does this corpus happen to share a key" rather than "does one
+    # concept serve several views", which is the property the claim actually makes.
+    import resolver
+    d = Path(tempfile.mkdtemp())
+    try:
+        def view(name, key):
+            p = d / name
+            p.mkdir()
+            (p / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
+                                          'rubric = "r.tsv"\nout = "out.md"\n')
+            (p / "r.tsv").write_text("s\tSec\n")
+            (p / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {a face},\n"
+                                     "  check = {concept:%s}\n}\n" % key)
+            return p
+        a, b = view("pitch", "adequacy-pitch"), view("deep", "adequacy-pitch")
+        ra = resolver.resolves("concept:adequacy-pitch", a, {})
+        rb = resolver.resolves("concept:adequacy-pitch", b, {})
+        assert ra.passed and rb.passed, \
+            "two distinct views citing one concept did not both resolve against the library"
+        # and the SAME key under a different citation is one node: adequacy-pitch and grade-ladder
+        # are two keys the library maps to one witness, so a view may cite either face and import
+        # the identical proof.
+        assert CONCEPTS["adequacy-pitch"] is CONCEPTS["grade-ladder"], \
+            "two keys for one concept are not one node — the faces can drift apart"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def concept_resolves_consumer_first():
+    # Λ·library·seam — a project's OWN library answers first; the engine's is the FALLBACK, and
+    # the fallthrough is decided PER KEY so a downstream library cannot eclipse engine concepts.
+    #
+    # Ρ·concept·shareable·cost — the seam is witnessed with the CHEAPEST key that exercises it.
+    # An earlier version probed the fallthrough with `adequacy-pitch`, whose own witness runs the
+    # real Δ grader over a fixture: correct, and 20x the cost of every sibling concept (measured
+    # ~1.6s of nested-spawn overhead against a 0.10s baseline), repeated per engine def-site under
+    # a def-sweep.  What the fallthrough claim needs is that a key the consumer DISCLAIMS reaches
+    # the engine's library and gets ITS verdict — the identity of that key is irrelevant, so it
+    # should be the cheapest concept in the library, not the most expensive.
+    import resolver
+    d = Path(tempfile.mkdtemp())
+    try:
+        # a consumer with its own library, owning one key and disclaiming the rest (exit 2).
+        (d / "library").mkdir()
+        (d / "library" / "concepts.py").write_text(
+            "import sys\n"
+            "sys.exit(0 if sys.argv[1:2] == ['mine'] else 2)\n")
+        # SELECTION is pure — no spawn needed to witness that the consumer's library is chosen.
+        assert resolver._library_for(d) == (d / "library"), \
+            "a project with its own library did not resolve to it — the seam is engine-relative"
+        assert resolver._library_for(ROOT / "paper") == resolver._LIBRARY, \
+            "a project WITHOUT its own library did not fall back to the engine's"
+        # its own key resolves against ITS library (one spawn, of a two-line stub)...
+        assert resolver.resolves("concept:mine", d, {}).passed, \
+            "a consumer's own concept key did not resolve against its own library"
+        # ...and a key it disclaims FALLS THROUGH to the engine's, rather than being eclipsed.
+        # `label-carrier` is the cheapest engine concept (measured 0.07s); any engine key proves
+        # the fallthrough, so the probe pays the minimum.
+        assert resolver.resolves("concept:label-carrier", d, {}).passed, \
+            ("a key the consumer's library disclaims did not fall through to the engine's — "
+             "directory-level selection alone makes every engine concept unreachable")
+        # and an UNOWNED key is UNAVAILABLE from both, never a silent pass.
+        assert not resolver.resolves("concept:no-such-concept-anywhere", d, {}).passed, \
+            "a key no library owns resolved as passing — an absent concept must not certify"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 CONCEPTS = {
+    # resolver component — the concept verb and the library seam (Ρ·paper·concept).
+    "concept-builtin": concept_imports_a_certificate,
+    "concept-interned": concept_interns_to_one_node,
+    "concept-views": concept_carries_several_views,
+    "concept-shareable": concept_resolves_consumer_first,
     # delta component (Μ·kernel·certs·delta) — canonical Δ-grader/coherence nodes.
     "crash-sensitive-limit": content_marks_relevance,
     "imported-grade": delegated_grade,
@@ -519,6 +725,10 @@ CONCEPTS = {
     # project then gate: README (rm-cmds), paper (gate-rejects-drift).
     "rm-cmds": project_then_gate,
     "gate-rejects-drift": project_then_gate,
+    "boundary-is-a-triple": boundary_is_a_triple,
+    "capability-owned-as-data": capability_owned_as_data,
+    "pipeline-is-a-coalgebra": pipeline_is_a_coalgebra,
+    "derived-is-regenerated-not-trusted": derived_is_regenerated_not_trusted,
 }
 
 # Λ·key·graded — this library is a GRADE-0 route table, the degenerate case of the graded walk in

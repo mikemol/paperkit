@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""library/routes.py — Λ·key·graded: the GRADED concept-route walk, and the exit-code protocol.
+"""paperkit/routes.py — Λ·key·graded: the GRADED concept-route walk, and the exit-code protocol.
 
 A concept library maps a KEY to a witness.  The flat form — `key -> nullary function` — forces a
 distinct Python function per claim, because `--without-K` requires every cited claim to carry a
@@ -21,7 +21,7 @@ non-dict, so it serves every grade with one loop:
     grade n   ...                           no bound; the walk is depth-agnostic
 
 This matters concretely: paperkit's own library is a GRADE-0 table, so adopting this file is a no-op
-for its ~20 existing keys and bib records, not a migration.  (mdt's dispatch hard-codes
+for its ~20 existing keys and bib records, not a migration.  (A dispatch that hard-codes
 `if "/" not in key: return 2`, which would reject grade 0; that line is the one thing here that is
 deliberately NOT lifted.)
 
@@ -40,7 +40,7 @@ answering 2 falls through to the engine's).
 The INVERSE rule belongs beside it, because the two are a pair and only make sense together:
 a MISSING TOOL must exit 1 (FAILED), never 2.  A check that cannot run has not been shown to
 apply-and-pass; reading it as "not mine" lets a gate skip it silently, which is the one failure a
-gate exists to prevent.  Resolvers for external toolchains (mdt's `agda:`) state this explicitly.
+gate exists to prevent.  Resolvers for external toolchains (an `agda:` verb, say) state this explicitly.
 """
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def leaves(routes: dict):
     """Every `(path, (fn, arg))` leaf in ROUTES, path as a tuple of segments.
 
     THE one recursive leaf-walk.  The resolver, the `meta` family, and the check cache all need to
-    enumerate a table, and mdt had two implementations of this contract — the dispatch walk was
+    enumerate a table, and a prototype of this had two implementations of the contract — the walk was
     depth-agnostic while the cache's was hard-coded to two levels, so a grade-3 family would be
     served by one and silently DROPPED by the other (dropped from the cache's driver loop, hence
     never run at all).  One function, one contract."""
@@ -128,7 +128,7 @@ def meta_family(routes: dict):
                          rather than of the cited claims
 
     ROUTES is INJECTED, not read from a module global: that is what makes this reusable across
-    libraries (mdt's version closed over its own `ROUTES` at module scope)."""
+    libraries (an earlier version closed over its own `ROUTES` at module scope)."""
 
     def meta(which_and_target):
         if "/" not in which_and_target:
@@ -173,7 +173,7 @@ def meta_family(routes: dict):
 def register_meta(routes: dict, ops=("total", "occupancy", "distinct")) -> dict:
     """Install the `meta` family into ROUTES, over the families present AT THIS MOMENT.
 
-    An explicit FINALISER, which mdt's module-level `ROUTES["meta"] = {...}` comprehension was not:
+    An explicit FINALISER, which a module-level `ROUTES["meta"] = {...}` comprehension is not:
     that construction reads `for fam in ROUTES` and so silently snapshots whatever the table held at
     whatever line it happened to sit on, making "the table is now closed" a line-number accident.
     Naming it makes the moment explicit — and makes it an error to add a family afterwards and

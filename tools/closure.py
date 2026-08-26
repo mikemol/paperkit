@@ -197,9 +197,22 @@ def main(argv):
         return ri, rr
 
     # CLAIMS = {key: fn} — the registry; emit per (claim key, root module).
+    # Ζ·library·grid — the DISPATCH TABLE's name is a per-project convention, not one string.
+    # This hardcoded "CLAIMS", and library's table is called CONCEPTS — so its closure came back
+    # EMPTY, the `emerge` grid gate (bibtex.bzl: `closures.get(k) or rroots.get(k)`) never fired,
+    # and library ran 42 MONOLITHIC def-sweeps instead of a cell grid.  Cost of that one-name
+    # mismatch, measured: ~10 minutes per claim with a 10-minute critical path nothing could
+    # parallelise, all-or-nothing cache invalidation, failures reported per-claim instead of
+    # per-site, and no `def` memory measurement at all (mem_learn reads pk_eval peaks, and there
+    # were no pk_eval cells).
+    #
+    # Named as a SET the tool owns rather than a string it guesses: a project that adds a third
+    # spelling is a one-line edit HERE, where the parse lives, and silently getting an empty
+    # closure is exactly the failure this cost us.
+    _DISPATCH = ("CLAIMS", "CONCEPTS", "WITNESSES")
     claims = {}
     for n in tree.body:
-        if (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "CLAIMS" for t in n.targets)
+        if (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id in _DISPATCH for t in n.targets)
                 and isinstance(n.value, ast.Dict)):
             for k, v in zip(n.value.keys, n.value.values):
                 if isinstance(k, ast.Constant) and isinstance(v, ast.Name):
@@ -214,10 +227,43 @@ def main(argv):
     parts = relpath.split("/")
     mod_pref = _dir_consts(relpath, tree.body)           # the module-level dir constants (shared)
 
+    # Ξ·dag·concept — the SUBPROCESS edge.  A witness that resolves `concept:KEY` does not IMPORT
+    # that key's witness: resolver.resolves() SHELLS OUT to the owning library's concepts.py, which
+    # runs KEY's witness in a fresh interpreter.  An AST import-walk cannot see across that boundary,
+    # so the caller staged a cone sized for its OWN imports and the callee's first import died —
+    # concept-views resolved `concept:adequacy-pitch` and got ModuleNotFoundError(_fixture_delta),
+    # nine modules short.  Flat staging masked this: every claim got the whole engine, so no cone was
+    # ever too small.  The per-claim grid is what made cone size load-bearing.
+    # The edge is followed TRANSITIVELY (a resolved key may itself resolve another) via the same
+    # `seen` discipline as the intra-file call walk.
+    def _concept_keys(fn):
+        out = set()
+        for c in ast.walk(fn):
+            if isinstance(c, ast.Constant) and isinstance(c.value, str) and c.value.startswith("concept:"):
+                k = c.value[len("concept:"):]
+                if k in claims:
+                    out.add(k)
+        return out
+
+    def _resolved_roots(key, seen):
+        if key in seen or key not in claims:
+            return set(), set()
+        seen.add(key)
+        ri, rr = roots(claims[key], set())
+        for nxt in _concept_keys(funcs[claims[key]]):
+            ni, nr = _resolved_roots(nxt, seen)
+            ri |= ni
+            rr |= nr
+        return ri, rr
+
     for key in sorted(claims):
         fn = funcs[claims[key]]
         pref = _dir_consts(relpath, fn.body, mod_pref)   # extend with the witness's function-local ones
         wi, wr = roots(claims[key], set())
+        for ck in _concept_keys(fn):                     # follow each resolved key's witness cone
+            ci, cr = _resolved_roots(ck, {key})
+            wi |= ci
+            wr |= cr
         cone = _cone(base_i | wi)
         for stem in sorted(cone):
             print("{}\t{}".format(key, names[stem]))

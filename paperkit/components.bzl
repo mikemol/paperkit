@@ -12,20 +12,41 @@
 
 COMPONENTS = {
     "kernel": [
+        "__init__.py",
         "config.py",
     ],
     "model": [
         "bib.py",
+        "durable.py",
         "rhetoric.py",
     ],
     "resolver": [
         "resolver.py",
     ],
     "project": [
+        "genre.py",
         "project.py",
     ],
     "gate": [
         "gate.py",
+    ],
+    # Ζ·library·kernel — the CONCEPT-LIBRARY machinery, lifted out of library/ where it was private
+    # to paperkit's own concepts.  Mechanism, not content: the graded route walk and its exit-code
+    # protocol, a witness that proves itself, the concept/label index, a check cache keyed on what
+    # each check reaches, the printed-conclusion gate.  Zero domain coupling.
+    #
+    # Two things forced the lift.  Inside library/ they were invisible to closure.py (which
+    # enumerates ENGINE modules), so the per-claim grid staged a closure without them and
+    # concept-views' ∅-baseline flipped — the harness refusing to trust a measurement whose
+    # witness could not run.  And a downstream consumer building four concept libraries wrote
+    # their own harness for this protocol, because paperkit shipped `concept:` as a verb while
+    # keeping the library-side machinery private to one project.
+    "library_kernel": [
+        "checkcache.py",
+        "conclusiongate.py",
+        "labelmap.py",
+        "prove.py",
+        "routes.py",
     ],
     "delta": [
         "cache.py",
@@ -46,10 +67,14 @@ COMPONENTS = {
         "tests/boundaries_agree.py",
         "tests/boundaries_bib.py",
         "tests/boundaries_check.py",
+        "tests/boundaries_clamp.py",
         "tests/boundaries_coherence.py",
         "tests/boundaries_components.py",
+        "tests/boundaries_concept_route.py",
         "tests/boundaries_config.py",
+        "tests/boundaries_cpuweight.py",
         "tests/boundaries_corroboration.py",
+        "tests/boundaries_dag_regen.py",
         "tests/boundaries_data_atom.py",
         "tests/boundaries_data_grade.py",
         "tests/boundaries_decisions.py",
@@ -65,6 +90,8 @@ COMPONENTS = {
         "tests/boundaries_hook_index.py",
         "tests/boundaries_jobs.py",
         "tests/boundaries_ladder.py",
+        "tests/boundaries_logs_push.py",
+        "tests/boundaries_mem_db.py",
         "tests/boundaries_memoize.py",
         "tests/boundaries_mutate_atom.py",
         "tests/boundaries_mutable.py",
@@ -73,11 +100,13 @@ COMPONENTS = {
         "tests/boundaries_prove.py",
         "tests/boundaries_prove_envelope.py",
         "tests/boundaries_references.py",
+        "tests/boundaries_result_addr.py",
         "tests/boundaries_sandbox.py",
         "tests/boundaries_surface.py",
         "tests/boundaries_target.py",
         "tests/boundaries_toplevel.py",
         "tests/boundaries_verdict.py",
+        "tests/boundaries_write_atomic.py",
         "tests/boundaries_without_k.py",
     ],
 }
@@ -88,6 +117,7 @@ DEPS = {
     "resolver": ["kernel"],
     "project": ["model", "kernel"],
     "gate": ["project", "model", "resolver", "kernel"],
+    "library_kernel": ["delta", "gate", "project", "model", "resolver", "kernel"],
     "delta": ["gate", "project", "model", "resolver", "kernel"],
     "tests": ["delta", "gate", "project", "model", "resolver", "kernel"],
 }

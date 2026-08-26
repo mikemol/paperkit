@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""library/checkcache.py — Λ·cache·slice: a persistent check cache keyed on WHAT EACH CHECK REACHES.
+"""paperkit/checkcache.py — Λ·cache·slice: a persistent check cache keyed on WHAT EACH CHECK REACHES.
 
 A gate re-runs every witness on every invocation, so its cost grows with the library while the edit
 per round stays constant.  Keying a cache on the whole module would invalidate everything on every
@@ -47,6 +47,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -322,7 +323,11 @@ def main(argv, src_path: Path = DEFAULT_SRC, cache_path: Path = DEFAULT_CACHE) -
             cache[keys[route]] = True                      # only a PASS is ever recorded
         if not ok:
             failed.append(route)
-    cache_path.write_text(json.dumps(cache))
+    # Ζ·write·atomic — replace the PATH, not the inode's contents: a hardlinked twin (a dedup
+    # pass, an editor snapshot) must not see this write, and a crash must not leave a torn cache.
+    _tmp = cache_path.with_name(f".{cache_path.name}.tmp")
+    _tmp.write_text(json.dumps(cache))
+    os.replace(_tmp, cache_path)
     print(f"ran {len(misses)} check(s) in {time.time() - t0:.1f}s "
           f"({'all pass' if not failed else f'{len(failed)} FAILED'}"
           f"{f', {len(skipped)} not-mine' if skipped else ''})")

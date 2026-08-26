@@ -75,6 +75,30 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_verdict.py},
   reads   = {.}
 }
+@misc{bnd-write-atomic,
+  section = {engine}, from = {bnd-verdict}, join = {. },
+  claim   = {a durable WRITE replaces the path, never the inode's contents (Ζ·write·atomic) --- write_text opens O_TRUNC and writes THROUGH the inode, which is invisible while a path is the sole link to it and becomes a silent cross-object write the moment it is not, the state a content-addressed dedup pass creates legitimately because byte-identity is its PRECONDITION rather than its risk; so the cache, the projector, the check-cache and the verdict record all write a sibling temp and rename over the target, which is atomic for a concurrent reader AND breaks the alias so a hardlinked twin keeps the bytes it had, while the MUTATION writers keep writing in place because handing a check a different inode than the one it opened would defeat the mutation itself},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_write_atomic.py},
+  reads   = {.}
+}
+@misc{bnd-concept-route,
+  section = {engine}, from = {bnd-write-atomic}, join = {. },
+  claim   = {ONE citation must not name two owners (Λ·library·seam) --- a concept: is resolved by two different mechanisms, the CLI deciding ownership AT RUNTIME per key by the exit-2 not-mine sentinel (the consuming project's library first, the engine's on fallthrough) and the build deciding it AT ANALYSIS TIME by a label built from the key alone, which cannot probe because a dependency exists in the graph before anything runs or it does not; those are two rules rather than two implementations of one, they agree in this repository only because a single project declares ownership so the fallthrough never fires, and the divergence is therefore invisible in-repo and waits for the downstream consumer the seam exists to serve --- measured here on a constructed consumer that owns an engine key and gets a DIFFERENT witness by route},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_concept_route.py},
+  reads   = {., library}
+}
+@misc{bnd-dag-regen,
+  section = {engine}, from = {bnd-write-atomic}, join = {. },
+  claim   = {a GENERATED file's generator can write it (Ζ·dag·regen) --- dag.bzl carries "REGENERATE (never hand-edit)" and the component boundary gates it FRESH against tools/imports.py, yet for a long time the only way past a stale-dag red was to hand-edit the file whose own header forbids it, because the generator emitted edges to stdout and had no writer; --write closes the loop and --check is the same computation asserting instead of writing, so the two cannot drift, and the property pinned is the ROUND TRIP --- add an import edge and the check reds naming its repair without mutating anything, --write repairs it, and removing the edge regenerates BYTE-IDENTICAL, which is what makes a regenerator a repair rather than a rewriter},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_dag_regen.py},
+  reads   = {.}
+}
+@misc{bnd-result-addr,
+  section = {engine}, from = {bnd-write-atomic}, join = {. },
+  claim   = {a result: import addresses a PROJECT or ONE of its warrants (Λ·reduce) --- a claim naming a specific sibling guarantee cannot honestly check the sibling's whole gate, which would be green only when every unrelated warrant holds and red for a failure the importing claim never depended on, so `result:<project>#<claim>` delegates to the sibling's own per-claim leaf; the tristate survives the finer address, since a claim key naming no check is a CALLER bug (cannot-run) rather than a refutation of the importing claim, and the bare form keeps whole-project semantics unchanged},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_result_addr.py},
+  reads   = {.}
+}
 @misc{bnd-corroboration,
   section = {delta}, from = {bnd-coherence}, join = {. },
   claim   = {the corroboration axis (Ε·agree·grade) --- a grade is the pair (falsifiability, corroboration), not one scalar: an agree: verdict from independent producers is marked independently corroborated while a lone witness or identical producers stay single, so a behavioral cmd: and a behavioral agree: share a grade yet differ on this orthogonal axis},
@@ -82,7 +106,7 @@
 }
 @misc{bnd-sandbox,
   section = {runtime}, from = {bnd-cache}, join = {. },
-  claim   = {the Δ sandbox's boundary --- the mutation copy takes the bounded root WHOLE (the bound lives on the root, not a lossy per-dir skip) save for SKIP_DIRS, which prune .git and the bazel-* cache links from both the copy and the deep nested-project walk so an artifact never explodes the sandbox, and that root is DECLARABLE (the PAPERKIT_ROOT environment variable, which a --root flag overrides, or paper.toml) and otherwise inferred as the parent --- but inferring a home directory or above is REFUSED with guidance, so a downstream project living in a home that also holds a clone or cache does not explode the disk},
+  claim   = {the Δ sandbox's boundary --- the mutation copy takes the bounded root WHOLE (the bound lives on the root, not a lossy per-dir skip) save for SKIP_DIRS, which prune .git and the bazel-* cache links from both the copy and the deep nested-project walk so an artifact never explodes the sandbox, and that root is DECLARABLE (the PAPERKIT_ROOT environment variable, which a --root flag overrides, or paper.toml) and otherwise inferred as the parent --- but inferring a home directory or above is REFUSED with guidance, so a downstream project living in a home that also holds a clone or cache does not explode the disk; and the copy allocates a FRESH INODE per file, which is what makes Δ's in-place mutation safe at all --- write_text writes THROUGH an inode, so a link-preserving copy would send every mutant into the original tree and into any hardlinked twin outside it, and on a machine where deduplication has run those twins reach other repositories entirely},
   check   = {cmd:python3 ../paperkit/tests/boundaries_sandbox.py}
 }
 @misc{bnd-config,

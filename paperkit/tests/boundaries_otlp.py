@@ -68,7 +68,7 @@ def main() -> int:
     check("project_of strips the @@+bib+paperkit_ repo prefix",
           project_of("@@+bib+paperkit_paper//:gate") == "paper")
     check("project_of on a local //pkg:target label",
-          project_of("//canary:canary") == "canary" and project_of("//tools:sched-batch-bin") == "tools")
+          project_of("//canary:canary") == "canary" and project_of("//tools:pyinfo") == "tools")
     check("target_of is the post-colon target name",
           target_of("@@+bib+paperkit_paper//:c__eval") == "c__eval" and target_of("//canary:canary") == "canary")
     check("duration_seconds: '6.904s'/'500ms'/None",

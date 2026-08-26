@@ -90,7 +90,12 @@ def main() -> int:
     # [checks.claim] extends this set — the guard fails LOUD until it does (fail-closed).
     check(f"witness modules derived from MODULE.bazel's emerge projects {emerge_dirs()}: "
           f"{', '.join(sorted(mods)) or 'none'}",
-          set(mods) == {"checks/readme.py", "paper/checks/claims.py"})
+          # Ζ·library·grid — library joined this set when it declared [checks.claim].  It had 42
+          # bare `cmd:` checks running one script with the key as its argument, which is the same
+          # shape paper and root declare; the undeclared spelling cost it the def-sweep GRID (42
+          # monolithic ~10-minute sweeps instead of 48,011 parallel cells).  Its top level was
+          # already read-free, so the membership pin is the only thing that had to move.
+          set(mods) == {"checks/readme.py", "library/concepts.py", "paper/checks/claims.py"})
     for rel, p in sorted(mods.items()):
         r = toplevel_reads(p.read_text(), names)
         check(f"{rel}: top-level engine-source reads == ∅"

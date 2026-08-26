@@ -61,7 +61,7 @@ def main() -> int:
         not resolver.resolves(f"{v}:no-such-target-{v}", ENGINE, {}).passed for v in resolver.VERBS)
     check("resolver.resolves dispatches every declared verb (no fallthrough, no raise)", dispatched)
     check("the built-in set is CLOSED — an undeclared type is UNAVAILABLE (cannot check ≠ refuted)",
-          resolver.resolves("nosuchverb:x", ENGINE, {}) is resolver.UNAVAILABLE)
+          resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable())
 
     # 2. the FOOTPRINT command — file: opens only its target (None); every other verb runs something.
     cmds = {v: resolver._check_cmd(f"{v}:t", {}) for v in resolver.VERBS}
@@ -130,7 +130,7 @@ def main() -> int:
         check("a key it answers 'not mine' (exit 2) FALLS THROUGH to the engine's library",
               resolver.resolves("concept:claim-is-record", far / "doc", {}).passed)
         check("a key owned NOWHERE is UNAVAILABLE (exit 2 everywhere = cannot witness, not refuted)",
-              resolver.resolves("concept:no-such-concept", far / "doc", {}) is resolver.UNAVAILABLE)
+              resolver.resolves("concept:no-such-concept", far / "doc", {}).is_unavailable())
     check("in-repo resolution is UNCHANGED by the seam (every project here shares the root library)",
           resolver._library_for(ROOT / "paper") == ROOT / "library")
 
@@ -156,7 +156,7 @@ def main() -> int:
     cmd_ran_failed = resolver.resolves("cmd:false", ENGINE, {})
     cmd_ran_passed = resolver.resolves("cmd:true", ENGINE, {})
     no_bool = not hasattr(resolver.Verdict, "__bool__")
-    arm_ok = (absent is resolver.UNAVAILABLE and unknown is resolver.UNAVAILABLE
+    arm_ok = (absent.is_unavailable() and unknown.is_unavailable()
               and cmd_ran_failed is resolver.FAIL and cmd_ran_passed is resolver.PASS
               and not resolver.UNAVAILABLE.passed and no_bool
               # the determinism set needs three DISTINGUISHABLE outcomes, identity-hashable

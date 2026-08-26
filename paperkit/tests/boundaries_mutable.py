@@ -46,7 +46,7 @@ def main() -> int:
         cmd = root / "summit"
         cmd.write_text("#!/usr/bin/env bash\necho hi\n")
         # A suffixless BINARY (a compiled command) — content decides: a NUL byte excludes it.
-        binary = root / "sched-batch"
+        binary = root / "pk-compiled"
         binary.write_bytes(b"\x7fELF\x00\x00\x00compiled\n")
         # A suffixed text source — unaffected, still mutable via MUTABLE_SUFFIXES.
         suffixed = root / "warrants.bib"

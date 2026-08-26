@@ -13,6 +13,8 @@ grounding edge.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
 from pathlib import Path
 
@@ -66,7 +68,15 @@ MEASURED_TGT = [rec("y"), rec("x", rests=["y"])]     # y graded → the edge is 
 def main() -> int:
     fails = []
 
+    ran = []
+
     def check(desc, cond):
+        # Λ·guard-must-not-copy — `ran` COUNTS the arms.  The summary line used to restate a
+        # number authored beside the set it describes, and every one of the 26 suites carrying
+        # such a line UNDERSTATED it (24 mismatched, none overstated): arms were added and the
+        # literal never moved, so it tracked the suite's authoring history rather than its
+        # content — and would have read a SHRINKING suite as an unchanged one.
+        ran.append(desc)
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
@@ -94,6 +104,26 @@ def main() -> int:
           C.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0)
     check("grounding: shared scaffolding is not engine grounding (no edge counted)",
           C.grounding_residual(SCAFFOLD)["grounding_edges"] == 0)
+
+    # Ζ·cohere·mute — the EXIT, not the computation.  Every check above proves the residual is
+    # computed right; none proved anyone ever SEES it.  `--from-calcs` (the arm //:cohere runs)
+    # returned 1 in silence, so a red gate said `fail` and discarded the named misses one field
+    # away.  δ = the same fixtures, one edge apart: silence+0 vs the edge named on stderr.
+    def _exit(recs, discharged=frozenset()):
+        rep = C.report(recs, set(discharged), frozenset(r["key"] for r in recs))
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = C._grounding_exit(rep)
+        return rc, err.getvalue()
+
+    p_rc, p_err = _exit(GROUNDED)
+    check("exit (P): a reflected edge → 0, and SILENT (no residual to report)",
+          p_rc == 0 and p_err == "")
+    f_rc, f_err = _exit(GENUINE)
+    check("exit (F): an undischarged edge → 1, and the edge is NAMED on stderr",
+          f_rc == 1 and "[@b]" in f_err and "[@a]" in f_err)
+    check("exit (δ): a `link` on the same fixture flips it back to silent+0",
+          _exit(GENUINE, {"b"}) == (0, ""))
     check("vacuity (Ν·vac): no claim tests engine capability → report flags vacuous (refuse a verdict)",
           C.report(VAC)["vacuous"] is True)
     check("vacuity (Ν·vac): one engine site → NOT vacuous (a real verdict is possible)",
@@ -160,7 +190,11 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (20 behaviors, 7 deltas)")
+    bad = len([b for b in ran if not b])
+    if bad:
+        print(f"BOUNDARIES: FAIL ({bad} of {len(ran)} behaviors drifted)")
+        return 1
+    print(f"BOUNDARIES: PASS ({len(ran)} behaviors, 7 deltas)")
     return 0
 
 

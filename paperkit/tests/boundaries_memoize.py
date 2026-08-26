@@ -41,7 +41,15 @@ def _grades(out):
 def main() -> int:
     fails = []
 
+    ran = []
+
     def check(desc, cond):
+        # Λ·guard-must-not-copy — `ran` COUNTS the arms.  The summary line used to restate a
+        # number authored beside the set it describes, and every one of the 26 suites carrying
+        # such a line UNDERSTATED it (24 mismatched, none overstated): arms were added and the
+        # literal never moved, so it tracked the suite's authoring history rather than its
+        # content — and would have read a SHRINKING suite as an unchanged one.
+        ran.append(desc)
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
@@ -142,7 +150,11 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    print("BOUNDARIES: PASS (12 behaviors, 4 deltas)")
+    bad = len([b for b in ran if not b])
+    if bad:
+        print(f"BOUNDARIES: FAIL ({bad} of {len(ran)} behaviors drifted)")
+        return 1
+    print(f"BOUNDARIES: PASS ({len(ran)} behaviors, 4 deltas)")
     return 0
 
 

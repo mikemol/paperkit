@@ -1,0 +1,62 @@
+intro	paper-is-projection	node-is-claim	claim-bears-check	fail-omits	claim-is-record	record-is-bibentry	prose-projected	ordered-by-deps	joined-by-glue
+model	deterministic	projector-emits	prose-is-artifact	gate-rejects-drift	edit-cant-survive	coverage-both-sides	every-section-appears	every-claim-cited
+engine	module-split	paper-is-paperkit	claims-are-warrants	prose-is-projection	gate-is-subject
+selfhost	paperkit-on-paperkit	one-green-check	closes-gap	unverified-cant-ship	not-project
+edges	edge-from-orders	edge-rests-grounds
+edges	edge-chiral	edge-move-types
+edges	edge-formulas
+resolver	verifier-named	gate-dispatches	new-domain-adds	two-builtins	file-builtin	cmd-builtin	result-builtin
+resolver	agree-builtin	cmd-escape	dataset-backed
+resolver	dataset-fresh	concept-builtin
+resolver	concept-interned
+resolver	concept-views
+resolver	concept-shareable
+resolver	key-graded
+resolver	label-orbit
+resolver	cache-slice
+resolver	conclusion-gated	conclusion-direction
+projection	weave-sentence	connector-resolution
+projection	emit-placement	config-flags
+projection	latex-clean
+gate	resolve-passes	safe-rejects-postulates
+gate	without-k-distinct	jobs-parallel
+adequacy	grade-ladder	mutation-probes
+adequacy	content-cache
+adequacy	sandbox-grade	min-strength
+adequacy	footprint-scopes
+adequacy	imported-grade
+liveness	pump-parse-witness
+liveness	resumable	roundtrip-obligation
+rhetoric	prosody	scheme-count
+rhetoric	scheme-opt-in	form-gate
+projects	multi-project	project-dag
+projects	local-ci
+projects	boundaries-project	report-live
+projects	compose-two-imports
+projects	compose-delegates
+projects	compose-refuses-regrid
+projects	compose-chains
+implications	fresh-by-construction	adequacy-gap
+implications	crash-sensitive-limit	trust-boundary
+implications	env-sanitized
+implications	path-surface
+implications	grounding-reflected
+implications	emergence-collapse
+implications	collapse-safe
+implications	grouping-residual
+implications	grouping-tail-falls-back
+implications	grouping-discharge
+implications	grouping-not-pagination
+implications	genre-registry
+implications	genre-gates-the-seam
+implications	genre-budget
+implications	genre-collection
+implications	observe-second-shape
+implications	observe-regroups-on-grounding
+implications	partition-merges
+implications	gamma-is-reachable
+implications	genre-declared-runs
+implications	observe-bounded-by-adoption
+implications	forward-direction
+related	knuth-lit	buckheit-donoho	mokhov-build
+related	cassian-fresh

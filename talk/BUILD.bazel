@@ -1,0 +1,17 @@
+# Hand-maintained file manifest (Ζ·sunset) — a data dep of the Ζ·starlark-generated
+# @paperkit_talk check graph; the bib is the source, this just lists the files.
+#
+# The rendered decks (talk.odp, talk.pptx) are DERIVED and deliberately absent: they are
+# projections of this bib, and listing a deliverable as a source input would make the artifact
+# an input to its own gate.  No sibling project lists one either.
+filegroup(name = "files", srcs = [
+        "TALK.md",
+        "paper.toml",
+        "rubric.tsv",
+        "warrants.bib",
+        "checks/talk.py",
+        "assets/five-verbs.svg",
+        "assets/one-concept-many-views.svg",
+        "assets/two-edges.svg",
+        "assets/two-routes.svg",
+    ], visibility = ["//visibility:public"])

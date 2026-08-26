@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 250" width="460" height="250"
+     role="img" aria-label="The five built-in check verbs and which cross a project boundary">
+ <g font-family="sans-serif" font-size="12" fill="#111">
+  <text x="10" y="18" font-size="13" font-weight="bold">check type</text>
+  <text x="140" y="18" font-size="13" font-weight="bold">verb</text>
+  <text x="230" y="18" font-size="13" font-weight="bold">crosses a boundary?</text>
+  <line x1="8" y1="26" x2="450" y2="26" stroke="#111"/>
+  <g font-family="monospace">
+   <text x="10" y="52">file:</text><text x="10" y="82">cmd:</text>
+   <text x="10" y="112">result:</text><text x="10" y="142">agree:</text>
+   <text x="10" y="172">concept:</text>
+  </g>
+  <text x="140" y="52">exists</text><text x="140" y="82">execs</text>
+  <text x="140" y="112">parses</text><text x="140" y="142">concurs</text>
+  <text x="140" y="172">imports</text>
+  <g font-size="12">
+   <text x="230" y="52">no</text><text x="230" y="82">no</text>
+   <text x="230" y="112" font-weight="bold">YES  ■</text>
+   <text x="230" y="142">no</text>
+   <text x="230" y="172" font-weight="bold">YES  ■</text>
+  </g>
+  <line x1="8" y1="186" x2="450" y2="186" stroke="#111" stroke-dasharray="3 3"/>
+  <text x="10" y="206" font-size="11">cmd: is the universal escape hatch every check reduces to.</text>
+  <text x="10" y="224" font-size="11">Crossing verbs are marked by WORD and SQUARE, never by colour alone.</text>
+ </g>
+</svg>

@@ -1,0 +1,208 @@
+@misc{t-asymmetry,
+  note = {Open by asking for hands: who has followed a README that did not work? Every hand goes up. Then ask whose fault it was --- nobody's. That is the point: there is no mechanism, so care is the only defence, and care does not survive staff turnover.},
+  section = {why},
+  claim = {ship a wrong line of code and the build goes red in ninety seconds; ship a wrong line of prose and it is served to every new hire, integrator and auditor until someone burns an afternoon on it},
+  check = {premise:shared-experience/prose-ships-unchecked}
+}
+@misc{t-time,
+  note = {Say this slowly. Nobody in the room writes a doc intending it to be false. The defect is structural, not moral, and that framing keeps the audience with you rather than defensive.},
+  section = {why}, move = {consequence}, from = {t-asymmetry}, join = {. },
+  claim = {the failure is not carelessness but TIME --- the sentence was true when written, the system moved, the sentence stayed},
+  check = {premise:shared-experience/truth-decays-with-time}
+}
+@misc{t-bill,
+  note = {Pick the ONE of these four that matches your room and tell a real story from it. Compliance lands hardest with management, onboarding with engineers. The list is a menu, not a script.},
+  section = {why}, move = {amplification}, from = {t-time}, rests-on = {t-asymmetry}, join = {, and the bill comes due in four places: },
+  claim = {onboarding wrong at step six, an integrator building on a stale spec, a compliance answer someone will hold you to, and a design record describing a system gone two years},
+  check = {premise:field-observation}
+}
+@misc{t-bars,
+  note = {This is the promise the rest of both talks has to pay off. Bar four is the unusual one --- write it on the board if you have one. Everything in part two is downstream of it.},
+  section = {why}, move = {consequence}, from = {t-bill}, rests-on = {t-time}, join = {. },
+  claim = {a real fix must be MECHANICAL (a machine decides), BLOCKING (a wrong sentence cannot ship), ABOUT ASSERTIONS (not that the samples parse), and SELF-AUDITING (it can tell you when the check itself is worthless)},
+  check = {definition:stipulated/what-a-fix-must-be}
+}
+@misc{t-nobody,
+  note = {Walk down quickly, do not dwell. The point is that this is not a crowded space with a marginal new entrant: every existing option stops before the fourth bar.},
+  section = {why}, move = {antithesis}, from = {t-bars}, rests-on = {t-bars}, join = {; },
+  claim = {doc review, link lint, doctests and generated docs each clear one or two of those bars and none attempts the fourth},
+  check = {premise:survey-of-alternatives}
+}
+@misc{t-claim,
+  note = {The whole talk in one slide. If someone is only half-listening, this is the sentence to land. The bib file is not metadata about the paper --- it IS the paper.},
+  section = {how},
+  claim = {so write CLAIMS, not prose --- one bibliography entry per claim carrying a sentence, its section, what it depends on, and a machine verifier; the document is the DAG's projection, generated and never hand-authored},
+  check = {concept:rm-pitch}
+}
+@misc{t-commands,
+  note = {Note that PROJECT is subtler than regenerate: it proves the COMMITTED, reviewable markdown is the one the claims produce, so you keep normal PR review. Coverage running both ways blocks the cheap dodge of quietly dropping an inconvenient claim.},
+  section = {how}, move = {consequence}, from = {t-claim}, rests-on = {t-claim}, join = {. },
+  claim = {two commands do the work --- project turns the claims into the document, gate verifies it --- and three invariants hold: the committed prose equals its projection, every cited claim's check passes, and every section is covered both ways},
+  check = {concept:rm-cmds-inv}
+}
+@misc{t-verbs,
+  note = {Someone will ask about escape hatches --- get there first. cmd: is deliberately universal, and that is a trust posture, not an oversight: gating a document RUNS it, so a warrant set is trusted code like a makefile.},
+  section = {how}, move = {amplification}, from = {t-commands}, rests-on = {t-commands}, join = {. },
+  claim = {a verifier is named type:target and five verbs ship built in --- file EXISTS, cmd EXECS, result PARSES a sibling project's verdict, agree CONCURS across independent producers, and concept IMPORTS a certificate --- while cmd is the universal escape hatch every check reduces to, so a new domain adds named types in its own config without touching the engine},
+  check = {concept:rm-resolver}
+}
+@misc{t-graphs,
+  note = {The payoff sentence: a paper can be all-green on every individual check and still be honestly reported as weak, because its thesis inherits the grade of the weakest thing it rests on. No human volunteers that about their own paper.},
+  section = {how}, move = {scope-shift}, from = {t-verbs}, rests-on = {t-claim}, join = {. },
+  claim = {two edges, not one: `from` sets prose order and connective glue, `rests-on` sets GROUNDING --- and conflating them lets a well-structured argument hide a weak foundation, since a claim is never stronger than its weakest premise},
+  check = {concept:edge-rests-grounds}
+}
+@misc{t-verbs-fig,
+  section = {how}, move = {apposition}, from = {t-verbs}, rests-on = {t-verbs},
+  emit = {assets/five-verbs.svg}, as = {image},
+  claim = {the five built-in verbs with their resolution words, and the two that CROSS a project boundary marked by the word YES and a filled square rather than by colour --- so a reader who cannot perceive the marking still has the distinction},
+  check = {claim:t-verbs-fig}
+}
+
+@misc{t-graphs-fig,
+  section = {how}, move = {apposition}, from = {t-graphs}, rests-on = {t-graphs},
+  emit = {assets/two-edges.svg}, as = {image},
+  claim = {two edge types over the same claims --- a solid chain giving prose order, and a dashed grounding DAG running the other way, so a claim's reading position and its logical support are drawn apart},
+  check = {claim:t-graphs-fig}
+}
+
+@misc{t-delta,
+  note = {Pause here. This is the intellectual centre of part one, and it is the objection the sharp person in row three is already forming. Getting there before they do is worth more than any feature slide.},
+  section = {how}, move = {concession}, from = {t-graphs}, rests-on = {t-bars}, join = {. },
+  claim = {a passing check proves only that a sentence NAMED a verifier, so the checks themselves are graded by mutation --- drop a function body, corrupt an input, and see whether the check flips red; a check that cannot fail grades vacuous and that is a build error, not a review nitpick},
+  check = {concept:adequacy-pitch}
+}
+@misc{t-library,
+  note = {If you only have time for one deep example in part one, make it this. Prove once, import everywhere.},
+  section = {libraries},
+  claim = {a CONCEPT LIBRARY authors and grades a proof ONCE, and every view imports its certificate --- the verdict plus the engine fingerprint it was measured against --- instead of re-authoring a parallel and usually weaker witness},
+  check = {concept:concept-builtin}
+}
+@misc{t-hashcons,
+  note = {The distinction that matters: this is not de-duplication after you notice a repeat. By the time you notice, the copies already disagree. Interning is the discipline that prevents the divergence rather than cleaning it up.},
+  section = {libraries}, move = {amplification}, from = {t-library}, rests-on = {t-library}, join = {, and },
+  claim = {the library is a HASH-CONS table rather than a cache of repeats --- every concept interns to exactly one canonical node, so the test for lifting something in is whether it IS a concept, never whether it has been written twice},
+  check = {concept:concept-interned}
+}
+@misc{t-views,
+  note = {The concrete result to quote: a full documented view in this repo has nine claims and ZERO lines of proof code. Every sentence certified by a concept the library had already graded.},
+  section = {libraries}, move = {consequence}, from = {t-hashcons}, rests-on = {t-hashcons}, join = {, which lets },
+  claim = {one truth carry SEVERAL prose faces --- a pitch, a deep exposition and a tutorial each speak in their own register while importing the identical proof, so the faces cannot drift and a view may add no witness code at all},
+  check = {concept:concept-views}
+}
+@misc{t-library-fig,
+  section = {libraries}, move = {apposition}, from = {t-views}, rests-on = {t-views},
+  emit = {assets/one-concept-many-views.svg}, as = {image},
+  claim = {one graded witness in a library, drawn as a solid bold box, with three views below it in dashed boxes each importing the certificate --- the owner and the reference are told apart by border weight and dash pattern, never by hue},
+  check = {claim:t-library-fig}
+}
+
+@misc{t-shareable,
+  note = {This is the question people actually care about --- can I reuse someone else's library? Consumer-first with per-key fallthrough is the answer: your library wins for keys you own, and you still reach the shared ones you do not.},
+  section = {libraries}, move = {scope-shift}, from = {t-views}, rests-on = {t-library}, join = {. },
+  claim = {libraries are SHAREABLE across projects because the seam resolves consumer-first with per-key fallthrough --- your own library answers the keys it owns, and a key it disclaims falls through to the engine's, so a downstream repository keeps its own concepts without losing access to the shared ones},
+  check = {concept:concept-shareable}
+}
+@misc{t-compose,
+  note = {Delegation is the load-bearing word. The importing side does NOT re-sweep the proof, because re-deriving it would measure the same thing twice while claiming independence --- and could disagree with the owner.},
+  section = {libraries}, move = {scope-shift}, from = {t-shareable}, rests-on = {t-verbs}, join = {. },
+  claim = {projects CITE EACH OTHER through exactly two boundary-crossing imports --- a verdict import takes a sibling's whole gate result, a certificate import takes one graded concept --- and both DELEGATE adequacy to the owner rather than re-deriving it},
+  check = {concept:imported-grade}
+}
+@misc{t-chain,
+  note = {Demo this live if the room is technical: break the innermost project and watch the outermost go red. It takes fifteen seconds and it makes transitivity concrete.},
+  section = {libraries}, move = {amplification}, from = {t-compose}, rests-on = {t-compose}, join = {, and they },
+  claim = {CHAIN: a project may rest on a sibling that rests on a third, so a verdict carries the whole cone beneath it and a family of projects is one claim-DAG at a coarser grain --- break the innermost and the outermost goes red},
+  check = {claim:t-chain}
+}
+@misc{t-a11y-claim,
+  note = {Anyone who has filled in a VPAT by hand will sit up here. Be precise about the claim though: this does not make conformance easy, it makes a FALSE Supports a red build.},
+  section = {a11y},
+  claim = {accessibility becomes a set of GATED CLAIMS rather than an audit --- each Supports in a conformance statement names a check, so a false one is a red build instead of a paragraph nobody re-reads},
+  check = {result:render#rnd-wcag-entail}
+}
+@misc{t-a11y-construct,
+  note = {By construction is the phrase to stress --- not audited afterwards. The validator runs on the deliverable the pipeline builds, not on a sample someone remembered to check.},
+  section = {a11y}, move = {amplification}, from = {t-a11y-claim}, rests-on = {t-a11y-claim}, join = {, and the deliverable holds it BY CONSTRUCTION: },
+  claim = {the PDF is exported in PDF/UA mode with the title carried from the config through the producer, link and equation descriptions restored, and a validator run over the result at zero failed checks},
+  check = {result:render#rnd-a11y}
+}
+@misc{t-a11y-matrix,
+  note = {Toolchain-excepted is the honest half. Some things the toolchain simply cannot express, and the grid SAYS so per cell rather than leaving a silent gap. That is what makes the rest of the grid believable.},
+  section = {a11y}, move = {addition}, from = {t-a11y-construct}, rests-on = {t-a11y-claim}, join = {. },
+  claim = {which capability each FORMAT affords is owned as data --- native, only-after-post-processing, or TOOLCHAIN-EXCEPTED, a named exception and never a silent gap --- so a capability's reach is stated in one place and every demonstrated cell names the warrant that shows it},
+  check = {concept:capability-owned-as-data}
+}
+@misc{t-a11y-slides,
+  note = {The per-frame detail is worth thirty seconds: a count-based check passes when two images share one description, so one of them ships undescribed. We found that in our own check.},
+  section = {a11y}, move = {addition}, from = {t-a11y-matrix}, rests-on = {t-a11y-matrix}, join = {. },
+  claim = {a slide deck gets the same treatment: each slide carries a real title placeholder and its content as list structure, and every content image is held to a description in ITS OWN FRAME --- per frame, because two images sharing one description would satisfy a count},
+  check = {result:render#rnd-slides}
+}
+@misc{t-fmt-graph,
+  note = {One owner. Every check derives its tool from the matrix instead of hardcoding pandoc or libreoffice, so a declared edge whose tool is missing is a graph that lies about its reach.},
+  section = {formats},
+  claim = {the render pipeline is a COALGEBRA tracked as data --- format objects and conversion morphisms as an explicit adjacency matrix with one owner --- so every declared edge's tool must be present, every route must compose real edges, and a new format is added in ONE place},
+  check = {concept:pipeline-is-a-coalgebra}
+}
+@misc{t-fmt-many,
+  note = {Hold up the artifact if you can --- this deck is one of those nodes. Same verified source, different rendering.},
+  section = {formats}, move = {amplification}, from = {t-fmt-graph}, rests-on = {t-fmt-graph}, join = {: },
+  claim = {one verified source reaches Word, OpenDocument, LaTeX, PDF and a slide deck, each a first-class node rather than a script someone runs by hand},
+  check = {result:render#rnd-graph}
+}
+@misc{t-fmt-agree,
+  note = {Presentation agreement is the invariant most people never think to want until you name it: the render can silently misrepresent a verified source, and nothing downstream would notice.},
+  section = {formats}, move = {addition}, from = {t-fmt-many}, rests-on = {t-fmt-graph}, join = {. },
+  claim = {and presentation AGREEMENT extends the invariant down the stack --- the plain text a reader sees in the rendered document is the plain text of the verified source, so the render cannot quietly misrepresent what was checked},
+  check = {result:render#rnd-agree}
+}
+@misc{t-fmt-deck,
+  note = {This is the conceptual heart of part two. A deck is not an export of finished prose --- prose has already lost the DAG structure. It is a different OBSERVATION of the same claims.},
+  section = {formats}, move = {addition}, from = {t-fmt-agree}, rests-on = {t-fmt-many}, join = {. },
+  claim = {a deck is the interesting case, because it is NOT a linearization --- a document is one flat stream, a deck is a SEGMENTATION into bounded windows, so it is a different observation of the same claim-DAG rather than another export of finished prose},
+  check = {claim:t-fmt-deck}
+}
+@misc{t-routes-fig,
+  section = {formats}, move = {apposition}, from = {t-fmt-deck}, rests-on = {t-fmt-deck},
+  emit = {assets/two-routes.svg}, as = {image},
+  claim = {one carrier reaching the same deck two ways --- a solid path through linearized prose, a dashed path through the segmentation --- so the two deliverables that share a tool and an extension are told apart by the OBJECT they came from},
+  check = {claim:t-routes-fig}
+}
+
+@misc{t-fmt-genre,
+  note = {Two axes: what coheres is structural, where the break falls is rhetoric. Same cluster renders as one dense slide, or a slide per claim, or one summary line --- and that choice is a registered objective, not a hardcoded mode.},
+  section = {formats}, move = {consequence}, from = {t-fmt-deck}, rests-on = {t-fmt-deck}, join = {, which means },
+  claim = {what coheres and where a slide BREAKS are two independent axes --- the grouping comes from the grounding graph, the pagination from a named objective (a talk cut, a teaching cut, a self-contained-document cut) registered like a check type, so a consumer adds its own without touching the engine},
+  check = {claim:t-fmt-genre}
+}
+@misc{t-test-boundaries,
+  note = {Engineers steal this one. It needs no tooling at all --- you can adopt it in a plain markdown file tomorrow.},
+  section = {testing},
+  claim = {every tool ships its behavioral boundaries as a triple --- a minimal input that PASSES, a minimal input that FLAGS, and the minimum delta between them --- because a tool documented only by its happy path has an undefined edge},
+  check = {concept:boundary-is-a-triple}
+}
+@misc{t-test-spec,
+  note = {Land this as a soundbite and pause. It is the most portable sentence in either talk.},
+  section = {testing}, move = {apposition}, from = {t-test-boundaries}, rests-on = {t-test-boundaries}, join = {; },
+  claim = {here is a passing example is DOCUMENTATION, here is the exact input that flips it is a SPECIFICATION},
+  check = {definition:stipulated/example-vs-specification}
+}
+@misc{t-test-mutation,
+  note = {Tie back to bar four explicitly. This is how the fourth bar is discharged mechanically rather than by a careful reader.},
+  section = {testing}, move = {scope-shift}, from = {t-test-spec}, rests-on = {t-delta}, join = {. },
+  claim = {and the same discipline turns on the checks themselves --- mutation testing pointed at documentation, so a claim backed by a verifier that cannot fail is caught by the machine rather than by a careful reader},
+  check = {concept:adequacy-gap}
+}
+@misc{t-test-drift,
+  note = {This deck's own segmentation is gated this way: re-section a single claim and the build fails. Mention that the slides they are looking at are subject to it.},
+  section = {testing}, move = {addition}, from = {t-test-mutation}, rests-on = {t-commands}, join = {. },
+  claim = {every derived artifact is regenerated and compared, never trusted --- the prose, the figures, the knob tables, and the deck's own segmentation, so re-sectioning a single claim fails the build},
+  check = {concept:derived-is-regenerated-not-trusted}
+}
+@misc{t-test-limits,
+  note = {Volunteering the limits buys credibility for everything before them. The kicker: these limits are themselves gated claims, so the document cannot quietly drop its own caveats. Close here and open the floor.},
+  section = {testing}, move = {concession}, from = {t-test-drift}, rests-on = {t-delta}, join = {. },
+  claim = {and the honest limits are themselves gated claims: a check can be falsifiable yet sensitive to the wrong inputs, the gate proves a sentence NAMED a passing check rather than that the check ENTAILS it, and gating executes code --- so the warrant set is trusted code, like a makefile},
+  check = {concept:crash-sensitive-limit}
+}

@@ -1,0 +1,38 @@
+[paper]
+title = "CI/CD Applied to Writing, Reasoning and Publishing"
+subtitle = "Mike Mol — parts 1 and 2"
+rubric = "rubric.tsv"
+warrants = ["warrants.bib"]
+out = "TALK.md"
+numbered = false
+references = false
+
+# Ρ·talk·adequacy — a talk makes two KINDS of claim, and conflating them is the dishonesty this
+# tool exists to prevent.  A MECHANISM claim ("five verbs ship built in") is checkable, and every
+# one here imports a certificate the library already graded.  A RHETORIC claim ("everyone here has
+# shipped a doc that lies") is about the audience's world: no machine can verify it, and dressing
+# it in cmd:true would make it LOOK verified while proving nothing — exactly the failure Part 1
+# slide 10 warns about.  So it carries `premise:`, which the projector renders as "Classical
+# premise (not machine-checked)".  It PASSES (the speaker asserts it) but says so out loud.
+[checks.premise]
+cmd = "true"
+# Ζ·talk·tier — NOT machine-checked, and declared so rather than inferred: this claim is gated
+# (it passes, the speaker asserts it) but is not a candidate for the falsifiability sweep.
+mechanical = false
+
+# Ρ·talk·premise·recheck — a third provenance kind, separated from `premise:` after re-auditing
+# the survivors of the first pass.  A PREMISE asserts something about the world that no machine
+# here can adjudicate ("everyone has shipped a doc that lies").  A DEFINITION stipulates what a
+# word will mean for the rest of the talk ("a passing example is DOCUMENTATION; the input that
+# flips it is a SPECIFICATION") — it cannot be false, because it is not a claim about anything;
+# it is a naming the audience is invited to accept.  Calling a definition a premise overstates
+# what is being asserted, which is the same error, one level down, that the first audit removed.
+[checks.definition]
+cmd = "true"
+# a stipulation cannot be false — it is not a claim about anything, so there is nothing to flip.
+mechanical = false
+
+# Mechanism claims with no matching library concept yet: a per-claim witness asserting the
+# specific proposition the claim makes about the engine, so it FAILS if the claim is false.
+[checks.claim]
+cmd = "python3 checks/talk.py {target}"

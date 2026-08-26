@@ -1,0 +1,12 @@
+machine	mach-cores	mach-numa	mach-hybrid
+swap	swap-zram	swap-zstd	swap-inram	swap-size	swap-nvme
+swap	swap-tier	swap-swappy	swap-zswap
+swap	swap-zswap-lz4	swap-zswap-bounded	swap-zswap-shrinker	wit-spilled
+witness	wit-ioquiet	wit-compressed
+kernel	kern-overcommit	kern-mglru
+kernel	kern-watermark	kern-thp
+grace	grace-dedup	grace-cheap	grace-cpu
+witness	wit-membound
+witness	wit-oversub	wit-bounded
+provenance	prov-source
+provenance	prov-fresh

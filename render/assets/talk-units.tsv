@@ -1,0 +1,22 @@
+why	t-asymmetry	t-time
+why	t-bill	t-bars
+why	t-nobody
+how	t-claim	t-commands
+how	t-verbs
+how	t-graphs	t-verbs-fig
+how	t-graphs-fig	t-test-drift
+how	t-delta
+testing	t-test-boundaries	t-test-spec
+testing	t-test-mutation
+testing	t-test-limits
+libraries	t-library	t-hashcons
+libraries	t-views	t-library-fig
+libraries	t-shareable
+libraries	t-compose	t-chain
+a11y	t-a11y-claim	t-a11y-construct
+a11y	t-a11y-matrix
+a11y	t-a11y-slides
+formats	t-fmt-graph	t-fmt-many
+formats	t-fmt-agree	t-fmt-deck
+formats	t-routes-fig
+formats	t-fmt-genre

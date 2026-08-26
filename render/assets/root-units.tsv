@@ -1,0 +1,9 @@
+pitch	rm-pitch	rm-verifier	rm-noship	rm-selfhost
+model	rm-model	rm-model-eg	rm-fields
+commands	rm-cmds	rm-cmds-eg	rm-cmds-inv
+resolver	rm-resolver	rm-resolver-tbl	rm-resolver-cmd	rm-resolver-eg
+resolver	rm-resolver-premise
+adequacy	adequacy-pitch	rm-delta-tbl	rm-delta-cmds	rm-boundaries
+layout	rm-layout
+ci	rm-ci	rm-ci-enable
+status	rm-status	rm-next

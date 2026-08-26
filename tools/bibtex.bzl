@@ -114,6 +114,32 @@ def _custom(content):
             out[cur] = val
     return out
 
+def _nonmechanical(content):
+    """Ζ·talk·tier — the check TYPES a project declares NON-MECHANICAL (`[checks.X] mechanical =
+    false`): GATED but never GRADED, the same disposition `tier` gives a host-run warrant.
+
+    A `premise:` or `definition:` resolves by `cmd = "true"`, which is unfalsifiable BY
+    CONSTRUCTION — no mutation of any input can flip it — so the def-sweep correctly measures
+    sens=∅ and the grade lands `indeterminate`, below the adequacy floor.  Failing adequacy there
+    would force a project to delete its honest premises or dress them in a fake mechanism, which
+    is the dishonesty the verb exists to prevent.  Excluding them keeps adequacy ASSERTING over
+    the claims that are actually sweep candidates.
+
+    DECLARED, never inferred: `cmd == "true"` would be a tempting tell and a hole, since any
+    project could then silence adequacy by routing a real claim through a trivial command."""
+    out = []
+    cur = None
+    for raw in content.splitlines():
+        s = raw.strip()
+        if s.startswith("[checks."):
+            cur = s[len("[checks."):].split("]")[0].strip()
+        elif s.startswith("["):
+            cur = None
+        elif cur != None and s.startswith("mechanical") and "=" in s:
+            if s.split("=", 1)[1].strip().lower() == "false":
+                out.append(cur)
+    return out
+
 def _warrants(content):
     """The project's WARRANTS LIST from paper.toml ([paper] warrants = ["a.bib", "b.bib"]).  Starlark
     has no toml parser, so string ops on the single-line array shape (the same discipline as _custom).
@@ -142,7 +168,7 @@ def _body(check, custom):
         return custom[typ].replace("{target}", target)
     return None
 
-def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = []):
+def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = [], vis = ""):
     """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
     script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd (the exit-code
     oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `tier` is the
@@ -160,14 +186,21 @@ def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imp
     # same generated package (all warrants of a project are pk_* siblings here — no visibility barrier).
     cs = "" if not consumes else ", consumes = [" + ", ".join([_lit(":" + c) for c in consumes]) + "]"
     if typ == "cmd":
-        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + tc + cs + ", data = [" + dl + "])"
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + tc + cs + ", data = [" + dl + "]" + vis + ")"
     elif typ == "file":
-        return "pk_file(name = " + _lit(name) + ", path = " + _lit(target) + ", data = [" + dl + "])"
-    elif typ == "result":   # records-as-deps: depend on the sibling's aggregate verdict record
-        return "pk_result(name = " + _lit(name) + ', sibling_verdict = "@paperkit_' + target + '//:gate_rec")'
+        return "pk_file(name = " + _lit(name) + ", path = " + _lit(target) + ", data = [" + dl + "]" + vis + ")"
+    elif typ == "result":   # records-as-deps: depend on the sibling's verdict record
+        # Λ·reduce — `<project>#<claim>` depends on the sibling's PER-CLAIM record instead of its
+        # aggregate.  pk_result already reads "a verdict record from a label" and does not care
+        # which, and the bib's claim-DAG already emits one target per claim (Ζ·starlark), so the
+        # finer address is a LABEL change, not a new rule: the structure was there, only the
+        # aggregate was ever addressed.  Bare `<project>` keeps the gate_rec dep unchanged.
+        sproj, _, sclaim = target.partition("#")
+        rec = sclaim if sclaim else "gate_rec"
+        return "pk_result(name = " + _lit(name) + ', sibling_verdict = "@paperkit_' + sproj + '//:' + rec + '"' + vis + ')'
     elif typ == "agree":
         prods = ", ".join([_lit(p.strip()) for p in target.split("|||") if p.strip()])
-        return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "]" + pj + tc + ")"
+        return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "]" + pj + tc + vis + ")"
     elif typ in custom:     # a config-declared cmd template — {target} substituted, run as a cmd oracle
         cmd = custom[typ].replace("{target}", target)
         return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + tc + ", data = [" + dl + "])"
@@ -317,12 +350,14 @@ def _bib_repo_impl(repository_ctx):
     # references) contribute no target — every parsed loop below skips `if not check`.
     custom = {}
     warrants = []
+    nonmech = []
     tomlp = bibp.dirname.get_child("paper.toml")
     if tomlp.exists:
         repository_ctx.watch(tomlp)
         toml = repository_ctx.read(tomlp)
         custom = _custom(toml)
         warrants = _warrants(toml)
+        nonmech = _nonmechanical(toml)
     if not warrants:
         warrants = [bibp.basename]
     # Ζ·import·stage — the IMPORTED concept-bib packages (label tokens in warrants): their :files must
@@ -360,6 +395,16 @@ def _bib_repo_impl(repository_ctx):
     # (claim > resolution > cold-start) ladder when emitting each pk_calc.  Absent ⇒ {} ⇒ every
     # claim falls through to calc.bzl's cold-start floor (mem = 0).
     mem = {}
+    # Ζ·mem·wire — the build input is the PROJECTION (mem.json), not the observation store
+    # (mem.sqlite).  Measured before choosing: a new cell changes the DB's bytes but NOT the
+    # manifest it projects to — one sweep deposits ~163 observations, so watching the DB would
+    # re-fetch this repo rule 163 times to regenerate a BUILD file whose content never moved
+    # (paper's is 52,584 pk_eval targets).  Watching the projection invalidates exactly when a
+    # RESERVATION changes, which is the only thing this generator reads.
+    #
+    # The store is where provenance lives ("256 rests on 79 cells, 76-216MB, measured when"); the
+    # projection is where the build reads a number.  Regenerate with tools/mem_project.py — the
+    # generate-and-gate discipline (project-dont-author), not a hand-maintained copy.
     memp = repository_ctx.path(repository_ctx.attr.bib).dirname.get_child("mem.json")
     if memp.exists:
         repository_ctx.watch(memp)
@@ -425,8 +470,18 @@ def _bib_repo_impl(repository_ctx):
     recs = []
     dcns = []            # Μ·sweep·atom — the per-claim __decisions targets, folded into one summary (else inert)
     calc_claims = {}
+    # Ζ·mem·def·blind — every pk_eval label emitted, so mem_learn can aggregate the DEF resolution
+    # too.  Without it the expensive resolution was the unmeasured one: the def-sweep is a grid of
+    # pk_eval cells (not a pk_calc), so `def` could only ever be the cold-start floor.
+    eval_cells = []
     imported_cert = {}   # Λ·witness — k → the owner library's __dcalc cert label (a concept: import edge)
     owns = repository_ctx.attr.owns_concepts
+    # Λ·delegate — a project that EXPORTS its warrants lets a sibling `result:<proj>#<claim>`
+    # depend on ONE of its per-claim verdict records.  OPT-IN, exactly like owns_concepts:
+    # making every claim public by default would silently widen every project's boundary to
+    # its entire claim set, so a project declares that its warrants are a public surface it
+    # intends downstream views to cite, and accepts that renaming one is a breaking change.
+    wvis = ', visibility = ["//visibility:public"]' if repository_ctx.attr.owns_warrants else ""
     vis = ', visibility = ["//visibility:public"]'  # the owner EXPORTS per-concept records for views to import
     for k, check, sib, reads, rests, tier, consumes in parsed:
         if not check:
@@ -505,8 +560,16 @@ def _bib_repo_impl(repository_ctx):
                 # the full engine tree, so its row keeps the flat staging.
                 rdl = ['"@@//paperkit:%s"' % m[len("paperkit/"):] for m in rroots.get(k, [])]
                 edl = ", ".join([_lit(d) for d in _data(reads, files, imports, engine = False)] + rdl)
+                # Τ·mem·learn·eval — a GRID cell is sized from the manifest exactly as a calc is.
+                # pk_eval used to take calc.bzl's cold-start floor unconditionally, so the learned
+                # `def` reservation reached the monolithic pk_calc and never the cells that replaced
+                # it: measured, compose-chains needs 61MB and started every run at 4, climbing
+                # 4→8→16→32→64 to re-derive a number already sitting in mem.json.  The ladder in
+                # _membucket (per-claim > per-resolution > floor) is shared, so a claim measured
+                # once is sized everywhere it runs.
                 ev = ("check = " + _lit(wscript) + ", closure = [" + cl + "], project = [" +
-                      (dl if check.startswith("result:") else edl) + "]")
+                      (dl if check.startswith("result:") else edl) + "]" +
+                      ", mem = " + str(_membucket(mem, k, "def")))
                 # Μ·sweep·atom — PARTITION the closure sites by kind.  Raise-kind (def:/branch:/import+:)
                 # cells are MONOTONE (an uncatchable raise / a presence toggle) → they feed the
                 # sensitivity sweep (pk_sens).  flip: cells are NON-monotone (a condition inversion) →
@@ -546,7 +609,15 @@ def _bib_repo_impl(repository_ctx):
                         k, cn, _lit(k), _lit(op + ":" + path + ":" + sub), _lit(path), _lit(sub), ev))
                     cellnames.append(cn)
                 out.append('pk_eval(name = "%s__0", claim = %s, site = "0", module = "paperkit/bib.py", mutated_py = ":mut_0", mutated_pyc = ":pyc_0", %s)' % (k, _lit(k), ev))
-                out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0")' % (k, ", ".join(['":%s__%s"' % (k, c) for c in cellnames]), k))
+                eval_cells += [":%s__%s" % (k, c) for c in cellnames] + [":%s__0" % k]
+                # Ζ·library·grid — the GRID's __dcalc must carry the same visibility the
+                # MONOLITHIC pk_calc below does.  A library with owns_concepts exports each
+                # certificate so an importing view's pk_grade can read it (Λ·witness), and
+                # converting library to a cell grid moved the certificate from pk_calc (which
+                # applied `vis if owns`) to pk_sens (which did not) — so every downstream
+                # `concept:` import failed ANALYSIS with "not visible from", before any action ran.
+                out.append('pk_sens(name = "%s__dcalc", evals = [%s], baseline = ":%s__0"%s)' % (
+                    k, ", ".join(['":%s__%s"' % (k, c) for c in cellnames]), k, vis if owns else ""))
                 # Μ·sweep·atom — the DECISION-COVERAGE grid twin: pk_decisions reads the flip: cells
                 # (did inverting each condition flip the check) AND the raise-kind cells (which branch:
                 # arms are reached — each cell is single-site, so its flipped bit IS a per-arm reach
@@ -570,7 +641,7 @@ def _bib_repo_impl(repository_ctx):
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
                            str(_membucket(mem, k, "def")) + ", data = [" + dl + "]" + (vis if owns else "") + ")")
         else:
-            out.append(_verb_rule(k, check, proj, files, reads, custom, wt, consumes, imports))
+            out.append(_verb_rule(k, check, proj, files, reads, custom, wt, consumes, imports, wvis))
         recs.append('":%s"' % k)
 
     if calc_claims:
@@ -580,6 +651,19 @@ def _bib_repo_impl(repository_ctx):
         # mem.json beside this bib (NOT hook-gated — the observe is too costly and a stale manifest
         # is a benign perf hint).  Aggregates the file-calcs' peaks; the def-sweep is now a grid of
         # pk_eval cells (Ζ·mutant·wire·gen), not a pk_calc with a peak output group, so it is not here.
+        # Ζ·mem·def·blind — file-calcs only as DEPENDENCIES.  The def-sweep's eval cells carry a
+        # peak too (pk_eval's `peak` output group), but making mem_learn DEPEND on them inverts
+        # the economics: paper's grid is 52,584 cells, so the manifest that exists to make the
+        # sweep affordable would first require running the sweep unsized (measured: 41,468 deps
+        # on one action).  The measurement must not cost what it is meant to save.
+        #
+        # The cells write their peaks as a SIDE EFFECT of work that runs anyway, and the manifest
+        # is a READING over whatever peaks exist — mem_learn already tolerates a partial corpus
+        # (it skips what it cannot read and NAMES why, rather than folding it to 0).  So the
+        # measurement warms up: the first sweep runs on the cold-start floor and deposits peaks,
+        # //:mem-observe harvests them, and the next sweep is sized.  A first pass may be
+        # mis-sized; it fails fast and retries fast, which is cheaper than a barrier that can
+        # never be crossed the first time.
         ml = [":" + k + "__calc" for k in calc_claims]
         out.append('pk_mem_learn(name = "mem_learn", calcs = [' +
                    ", ".join([_lit(t) for t in ml]) + '], visibility = ["//visibility:public"])')
@@ -621,8 +705,11 @@ def _bib_repo_impl(repository_ctx):
 
     # pk_gate aggregates the records → the project verdict; the assert-test puts it in the live gate.
     out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
+    # Ζ·gate·detail — stage the PER-CLAIM records beside the aggregate, so a red names the claims
+    # that failed instead of only that something did.  Without them the assert sees one file
+    # saying {"verdict":"fail"} and the diagnosis is a hand reconstruction from sibling artifacts.
     out.append('sh_test(name = "gate", srcs = ["@@//tools:assert_pass.sh"], ' +
-               'args = ["$(rootpath :gate_rec)"], data = [":gate_rec"], size = "small", ' +
+               'args = ["$(rootpath :gate_rec)"], data = [":gate_rec", %s], size = "small", ' % ", ".join(recs) +
                'visibility = ["//visibility:public"])')
     if repository_ctx.attr.adequacy:
         # Ζ·nest — adequacy as a NESTING of per-claim grade records (pk_grade_claim) aggregated by
@@ -638,6 +725,11 @@ def _bib_repo_impl(repository_ctx):
             # its source under the sandbox would be the same unsoundness).  Its verdict still gates via
             # gate_rec above; adequacy asserts falsifiability only over the sandbox subset.
             if (tier if tier else proj_tier) != "sandbox":
+                continue
+            # Ζ·talk·tier — a NON-MECHANICAL check type is gated but not graded, exactly as a
+            # non-sandbox tier is: its cmd is unfalsifiable by construction, so a sweep measures
+            # sens=∅ and adequacy would red on an honest premise.  Declared in paper.toml.
+            if check.split(":")[0] in nonmech:
                 continue
             if k in imported_cert:
                 # Λ·witness — grade = the IMPORTED library certificate, read via read_grade → behavioral
@@ -667,8 +759,10 @@ def _bib_repo_impl(repository_ctx):
                            ", ".join([_lit(d) for d in _data(reads, files, imports)]) + "])")
             grades.append('":%s__grade"' % k)
         out.append('pk_adequacy(name = "adequacy_rec", grades = [%s], visibility = ["//visibility:public"])' % ", ".join(grades))
+        # Ζ·gate·detail — the per-claim GRADE records staged too, so a red adequacy names the
+        # claims that fell below the floor (and their grade) instead of only that some did.
         out.append('sh_test(name = "adequacy", srcs = ["@@//tools:assert_pass.sh"], ' +
-                   'args = ["$(rootpath :adequacy_rec)"], data = [":adequacy_rec"], size = "small", ' +
+                   'args = ["$(rootpath :adequacy_rec)"], data = [":adequacy_rec", %s], size = "small", ' % ", ".join(grades) +
                    'visibility = ["//visibility:public"])')
 
     # Ζ·foot·act — the declare+audit cross-check as a NESTING of per-claim footprint records
@@ -728,6 +822,7 @@ bib_repo = repository_rule(
         "sites": attr.string_list(default = []),  # ·gen·surface: the engine def-sites (enumerated once by the extension)
         "closures": attr.string_list(default = []),  # ·gen·closure: per-claim witness closure roots (Ξ·dag·eval)
         "owns_concepts": attr.bool(default = False),  # Λ·witness: the concept LIBRARY — its per-concept verdict + def-cert are PUBLIC, imported by views' concept: checks
+        "owns_warrants": attr.bool(default = False),  # Λ·delegate: this project EXPORTS its per-claim verdict records, so a sibling result:<proj>#<claim> can import ONE warrant instead of the whole gate
     },
 )
 
@@ -739,7 +834,7 @@ def _bib_ext_impl(module_ctx):
     sites = _surface(module_ctx, core)
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [])
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, owns_warrants = tag.owns_warrants, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [])
 
 bib = module_extension(
     implementation = _bib_ext_impl,
@@ -754,6 +849,7 @@ bib = module_extension(
             "calc": attr.bool(default = False),
             "emerge": attr.bool(default = False),
             "owns_concepts": attr.bool(default = False),
+            "owns_warrants": attr.bool(default = False),
         }),
     },
 )

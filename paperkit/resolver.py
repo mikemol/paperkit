@@ -60,29 +60,100 @@ class Verdict:
     downstream consumer ever measures a need to route on the owner, UNAVAILABLE widens to carry one
     (an `owner` slot + factory) WITHOUT touching PASS/FAIL or `.passed` — a non-breaking widening,
     precisely because `__eq__`/`__hash__` are not overridden here (interning per-owner variants then
-    Just Works on identity)."""
-    __slots__ = ("_name",)
+    Just Works on identity).
 
-    def __init__(self, name: str) -> None:
+    Ζ·unavailable·why — and UNAVAILABLE now CARRIES its reason, which is the widening this
+    docstring anticipated above.  A cannot-run is not a verdict about the claim; it is a report
+    about the WORLD, and the world's shortfalls are usually solvable — a missing veraPDF, an
+    unstaged record, a sibling mid-refactor.  Collapsing every one of them to a single interned
+    sentinel discarded the direction of the fix at the moment it was known: the delegate had
+    computed "its veraPDF validator CANNOT RUN here (toolchain absent)" and the seam printed
+    "could not evaluate (unreachable delegate or unknown verb)" — a disjunction of everything it
+    might have been, naming nothing.  Do not report a sum type; report the incomplete Π and point
+    at what would complete it.
+
+    `.passed` and identity semantics are untouched: PASS/FAIL stay interned singletons, a bare
+    UNAVAILABLE stays the module-level one, and `is UNAVAILABLE` keeps working because
+    `__eq__`/`__hash__` are still not overridden — a REASONED unavailable is a distinct object
+    that compares unequal, so callers testing identity must use `is_unavailable()`."""
+    __slots__ = ("_name", "_why", "_owner")
+
+    def __init__(self, name: str, why: str = "", owner: str = "") -> None:
         object.__setattr__(self, "_name", name)
+        object.__setattr__(self, "_why", why)
+        object.__setattr__(self, "_owner", owner)
 
     @property
     def passed(self) -> bool:
         return self is PASS
 
+    @property
+    def why(self) -> str:
+        """The delegate's own account of what is missing — '' when none was carried."""
+        return self._why
+
+    @property
+    def owner(self) -> str:
+        """WHO could not run: the sibling project or library that reported it."""
+        return self._owner
+
+    def is_unavailable(self) -> bool:
+        """Identity-independent test: a reasoned UNAVAILABLE is a distinct object."""
+        return self._name == "UNAVAILABLE"
+
     def __repr__(self) -> str:
+        if self._why:
+            return f"Verdict.{self._name}({self._owner or '?'}: {self._why})"
         return f"Verdict.{self._name}"
 
+
+# Ζ·tier·exit — the exit a check uses to say "I could not run here" (engine-aligned: gate.py's
+# _REFUSE, discriminate's REFUSE, pk_cmd's cannot-run arm).  Named once, read by run_ok.
+_CANNOT_RUN = 3
 
 PASS = Verdict("PASS")
 FAIL = Verdict("FAIL")
 UNAVAILABLE = Verdict("UNAVAILABLE")
 
 
+def unavailable(why: str = "", owner: str = "") -> Verdict:
+    """A cannot-run that CARRIES what would fix it.  Bare (no reason) returns the interned
+    singleton, so existing `is UNAVAILABLE` checks keep holding for the reasonless case."""
+    return Verdict("UNAVAILABLE", why, owner) if (why or owner) else UNAVAILABLE
+
+
 def _pf(ok: bool) -> Verdict:
     """A check that RAN and decided: True → PASS, False → FAIL.  (Never UNAVAILABLE — that is the
     could-not-evaluate seam, returned explicitly at each such site.)"""
     return PASS if ok else FAIL
+
+
+def _sibling_for(project_dir: Path | None, name: str) -> Path:
+    """Ζ·result·seam — WHERE is the sibling project a `result:<name>` names?
+
+    The two paths disagreed about what the target STRING is.  Under Bazel it is a project NAME:
+    bibtex.bzl turns `result:render#rnd-graph` into a dep on `@paperkit_render//:rnd-graph`,
+    resolved in the repo namespace with no filesystem involved.  On the CLI it was a PATH,
+    appended verbatim as the gate's directory argument with cwd set to the CITING project — so
+    `result:render` from talk/ looked for `talk/render/paper.toml` and every one of talk's five
+    delegations came back UNAVAILABLE.  Same bib, same string, two meanings.
+
+    So the CLI now reads it as a NAME too, and resolves it the way `_library_for` resolves a
+    library: the consumer's own neighbourhood first, the repo root next, the engine's only as a
+    FALLBACK.  Λ·location — engine-relative alone is the mistake documented below: it is
+    invisible in this repo (every project sits beside the engine) and fatal outside it, where a
+    downstream `result:theirproject` would resolve into THIS repo. A name that resolves nowhere
+    is returned unchanged, so the gate reports its own cannot-run rather than this layer
+    inventing a diagnosis for it."""
+    cands = []
+    if project_dir is not None:
+        p = Path(project_dir).resolve()
+        cands += [p / name, p.parent / name]           # a nested sub-project, then a true sibling
+    cands.append(_LIBRARY.parent / name)               # the engine's own tree, by FALLBACK
+    for c in cands:
+        if (c / "paper.toml").is_file():
+            return c
+    return Path(name)
 
 
 def _library_for(project_dir: Path | None) -> Path:
@@ -134,8 +205,8 @@ VERBS = {
                 "passes": "the artifact exists"},
     "cmd":     {"arg": "<script>",    "verb": "execs",   "crosses": False,
                 "passes": "the script exits `0`"},
-    "result":  {"arg": "<project>",   "verb": "parses",  "crosses": True,
-                "passes": "the sibling project's gate verdict parses green"},
+    "result":  {"arg": "<project>[#<claim>]", "verb": "parses", "crosses": True,
+                "passes": "the sibling project's gate verdict parses green --- for the whole project, or for the ONE named warrant"},
     "agree":   {"arg": "<p>|||<q>",   "verb": "concurs", "crosses": False,
                 "passes": "the independent producers all exit `0` and emit identical output"},
     "concept": {"arg": "<key>",       "verb": "imports", "crosses": True,
@@ -231,7 +302,7 @@ def _cpu_rlimit(seconds: int):
     return _set
 
 
-def run_ok(cmd: str, cwd: Path) -> Verdict:
+def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
     """Run a shell command: it RAN and exited 0 → PASS, ran and exited non-zero (or exceeded its CPU
     budget / the wall backstop) → FAIL, could not be SPAWNED at all → UNAVAILABLE.  The last arm is the
     same could-not-evaluate seam as the crossing verbs, one verb down: an un-spawnable cmd is not a
@@ -246,12 +317,44 @@ def run_ok(cmd: str, cwd: Path) -> Verdict:
     # start_new_session so a hang kills the WHOLE process group — a `shell=True` timeout otherwise
     # reaps only the shell and orphans the real child (the hanging witness), which then spins on.
     try:
+        # Ζ·unavailable·why — CAPTURE stderr (stdout stays muted: a check's stdout is its own
+        # chatter and nothing parses it).  A check that exits 3 has just explained WHAT it needs
+        # ("its veraPDF validator CANNOT RUN here (toolchain absent)"); with both streams to
+        # DEVNULL that account was destroyed at the moment of execution and the seam three layers
+        # up printed a disjunction naming nothing.  Kept on its OWN handle, never merged
+        # ([[separate-filehandles]]), and read ONLY on the cannot-run arm.
         p = subprocess.Popen(cmd, shell=True, cwd=cwd, env=clean_env(),
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                              start_new_session=True, preexec_fn=_cpu_rlimit(cpu))
         try:
-            rc = p.wait(timeout=wall)
+            # ⚑ communicate(), NEVER wait() — a PIPE that nothing drains DEADLOCKS the child the
+            # moment it writes past the 64KB pipe buffer: the check blocks in anon_pipe_write, this
+            # process blocks in do_wait, and neither ever moves.  Measured 2026-08-26: a def-sweep
+            # cell for edge-formulas sat at 0.0% CPU for 11+ minutes, the whole `cohere` build
+            # stalled on its last action, and `wchan` named both halves of the deadlock.  The
+            # stderr capture (Ζ·unavailable·why) is right and the wait() paired with it was not;
+            # communicate() drains and waits in one call, so the timeout still bounds the run.
+            _out, _err = p.communicate(timeout=wall)   # stdout is DEVNULL; _out is None
+            rc = p.returncode
             # SIGXCPU (‑signal 24) / SIGKILL from the CPU rlimit ⇒ negative returncode ⇒ FAIL, not PASS.
+            #
+            # Ζ·tier·exit — rc 3 is CANNOT-RUN, not a failure.  pk_cmd (verb.bzl) has typed the exit
+            # this way since the tier work ("rc 0 → pass · rc 3 → cannot-run · any other nonzero →
+            # fail"), and the render checks return 3 exactly when their host toolchain is absent.
+            # The CLI path never got that arm, so ONE check answered two different verdicts
+            # depending on which path ran it: cannot-run under Bazel, FAIL under `gate.py`.  That is
+            # the false-red the tier work closed, still open on the other route.
+            #
+            # This does NOT fold discriminate's `3 REFUSE` onto UNAVAILABLE — the distinction the
+            # Verdict docstring protects.  A REFUSE is the ENGINE telling an internal caller it
+            # asked wrong; this rc comes from an EXTERNAL check process reporting it could not reach
+            # its toolchain, which is the "could not evaluate" arm by definition.  The two share a
+            # number across a process boundary, not a meaning.
+            if rc == _CANNOT_RUN:
+                # the check's own last words are the direction of the fix
+                err = (_err.decode("utf-8", "replace").strip() if _err else "")
+                last = err.splitlines()[-1].strip() if err else ""
+                return unavailable(last[:400], owner)
             return _pf(rc == 0)
         except subprocess.TimeoutExpired:
             try:
@@ -281,13 +384,31 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         # subprocess could not run at all (sibling UNREACHABLE — absent path, mid-refactor) → also
         # UNAVAILABLE.  Neither is a REFUTATION of the importing claim; only a sibling that RAN and
         # reported not-pass is FAIL.
+        #
+        # Λ·reduce — `project#claim` addresses ONE of the sibling's warrants.  Bare `project` keeps
+        # whole-project semantics unchanged.  The finer form exists because a claim that names a
+        # SPECIFIC sibling guarantee ("render gates PDF/UA") cannot honestly check the sibling's
+        # whole gate: result:render would be green only when EVERY render warrant holds, asserting
+        # far more than the importing claim needs, and red for a failure in an unrelated warrant.
+        # Both directions are overclaims.  The sibling's gate already had the address (--only, the
+        # Ζ·starlark leaf); it simply did not ANSWER in machine-readable form until now.
+        proj, _, claim = target.partition("#")
         try:
-            argv = [sys.executable, str(_GATE), "--json", "--safe", "--without-K", target]
+            argv = [sys.executable, str(_GATE), "--json", "--safe", "--without-K"]
+            if claim:
+                argv += ["--only", claim]
+            argv.append(str(_sibling_for(project_dir, proj)))
             r = subprocess.run(argv, cwd=project_dir, env=clean_env(),
                                capture_output=True, text=True)
             rec = json.loads(r.stdout or "{}")
             if rec.get("available") is False:         # the sibling's own cannot-run
-                return UNAVAILABLE
+                # Ζ·unavailable·why — carry the DELEGATE'S OWN account.  It already computed one
+                # ("its veraPDF validator CANNOT RUN here (toolchain absent)") and returns it in
+                # --json.reason; dropping it here left the citing gate printing a disjunction of
+                # everything the failure might have been.  A missing dependency is a solvable
+                # problem, and the delegate is the only party that knows WHICH one.
+                return unavailable(rec.get("reason") or "the delegate reported it cannot run",
+                                   target)
             return _pf(bool(rec.get("pass")))
         except Exception:                             # the sibling is unreachable
             return UNAVAILABLE
@@ -345,8 +466,10 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         # UNAVAILABLE, not FAIL: an engine that lacks a verb a bib names has not REFUTED the claim,
         # it CANNOT CHECK it — so a bib written for a newer engine does not read as silently refuted
         # on an older one (the version-skew-as-silent-refutation hazard, ask-result-tristate).
-        return UNAVAILABLE
-    return run_ok(cmd, project_dir)
+        return unavailable(f"this engine has no `{typ}:` verb — a bib written for a newer "
+                           f"engine, or a project [checks.{typ}] this project does not declare",
+                           typ)
+    return run_ok(cmd, project_dir, Path(project_dir).name)
 
 
 def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str | None:
@@ -364,7 +487,10 @@ def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str
     # quoting, but it widens the charset a bib key can hold, so the latent seam gets closed
     # rather than left resting on "no key has ever contained a metacharacter".
     if typ == "result":
-        return f"{sys.executable} {_GATE} --json --safe --without-K {shlex.quote(target)}"
+        proj, _, claim = target.partition("#")
+        only = f"--only {shlex.quote(claim)} " if claim else ""
+        return (f"{sys.executable} {_GATE} --json --safe --without-K {only}"
+                f"{shlex.quote(str(_sibling_for(project_dir, proj)))}")
     if typ == "concept":
         # The CANDIDATE library's command (the project's own first).  In the per-key fallthrough
         # case (Λ·library·fallthrough — the project library answers exit 2 and resolves() retries

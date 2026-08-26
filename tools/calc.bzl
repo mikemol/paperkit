@@ -34,6 +34,29 @@ observe_setting = rule(implementation = _observe_impl, build_setting = config.bo
 # ladder) and passes it as the `mem` attr.  mem=0 means "unmeasured" → the cold-start floor by
 # resolution (a def sweep, project+engine mutation, is far heavier than a file sweep).  The learned
 # layer (Τ·mem·observe → mem.json) overrides these floors per (project,resolution).
+# ⚑ START TINY.  The ladder used to bottom at 128MB and the def floor was 2048 — a number chosen
+# high "to be safe", which nothing ever pushed back on.  Measured: a def-sweep CELL peaked at
+# 2,981,888 bytes (2.8MB), a ~700x over-reservation, because the floor was sized as if a cell were
+# the whole sweep.  An over-reservation is invisible: it never fails, it just idles cores (this box
+# ran 3 concurrent def cells where the budget allowed ~48).  An UNDER-reservation is loud — the cap
+# kills the cell, the failure names the cell, and the next pass raises it.  So the ladder starts
+# where measurements actually live and grows on evidence, rather than starting where nothing can
+# fail and never learning anything.
+def _rs_4(_os, _inputs):
+    return {"memory": 4}
+
+def _rs_8(_os, _inputs):
+    return {"memory": 8}
+
+def _rs_16(_os, _inputs):
+    return {"memory": 16}
+
+def _rs_32(_os, _inputs):
+    return {"memory": 32}
+
+def _rs_64(_os, _inputs):
+    return {"memory": 64}
+
 def _rs_128(_os, _inputs):
     return {"memory": 128}
 
@@ -57,7 +80,73 @@ def _rs_768(_os, _inputs):
 
 # bucket (MB) → its top-level reservation fn.  Learned buckets are pure pow2 (mem_learn clamps to
 # [128,4096]); 768 is the file cold-start floor only.  Add a level here if the distribution grows one.
-_RS = {128: _rs_128, 256: _rs_256, 512: _rs_512, 1024: _rs_1024, 2048: _rs_2048, 4096: _rs_4096, 768: _rs_768}
+_RS = {4: _rs_4, 8: _rs_8, 16: _rs_16, 32: _rs_32, 64: _rs_64, 128: _rs_128, 256: _rs_256, 512: _rs_512, 1024: _rs_1024, 2048: _rs_2048, 4096: _rs_4096, 768: _rs_768}
+
+def _cap_prefix(cap_path, bucket):
+    """Ζ·cell·cap — an OPT-IN per-cell memory ceiling, or "" where none is configured.
+
+    resource_set is a SCHEDULING HINT: it tells Bazel how many cells may run at once and bounds
+    none of them.  Measured: paperkit's cells share ONE cgroup with memory.max=max, so a runaway
+    cell has no boundary and the only backstop is the host OOM killer, which picks by heuristic
+    rather than by culprit.  A real ceiling makes the kill attributable — and turns an over-run
+    into a DATUM at a rung (the event Ζ·mem·climb needs) instead of a box-wide degradation.
+
+    VENDORED, so the cap is paperkit's own and needs no opt-in.  tools/cgroup-scope is a copy of
+    substrate's (251 lines, no substrate-internal references), taken because these cells run on
+    arbitrary machines and depending on a sibling repo by absolute path would trade the PORTABLE
+    memory-bounding Τ·mem exists to provide for a build that only works beside substrate.
+
+    It DEGRADES rather than failing: `cgroup-scope` refuses loudly where the memory controller is
+    not delegated (its own `probe` answers that with no side effects), so a machine without cgroup
+    v2 delegation must still run the cell.  Hence `|| exec "$@"` — the cap is a safety property,
+    never a precondition for grading a document.
+
+    Ζ·cell·cap·swap — the capper must also zero swap.  Measured on this box: a 64MB alloc under an
+    8MB memory.max gave `max 678, oom_kill 0` and SUCCEEDED, because the kernel compressed into
+    zram instead of killing.  memory.max alone is a RECLAIM threshold; only memory.swap.max=0
+    makes it a boundary.  cgroup-scope sets both (verified: 200MB under 64MB → exit 137)."""
+    # ⚑ THE DEGRADATION IS A `probe` GUARD, not `|| exec`.  An earlier version of this docstring
+    # claimed the cell degrades via `|| exec "$@"` and the prefix implemented no fallback at all:
+    # `cgroup-scope` _die()s where no ancestor delegates `memory`, so on such a machine EVERY cell
+    # failed and no document could be graded.  Measured — a sweep under a konsole scope (which
+    # holds processes, so cannot delegate) died with "no usable memory controller" and produced no
+    # output.  A cap is a SAFETY property; it must never become a precondition for grading.
+    #
+    # `|| exec` cannot work here: cgroup-scope may die AFTER partially setting up, and re-exec'ing
+    # the payload would run it twice.  So ask FIRST — `probe` answers "will this work here" with
+    # no side effects and exit 0/non-0, which is exactly the precondition test it was built for.
+    #
+    # PAPERKIT_CELL_CAP=0 disables the cap outright (a bisect, or a machine that wants the old
+    # behaviour); the `:-` default names the vendored tool.
+    # Resolved at EXEC time into a shell VARIABLE, then used as a prefix.  `probe` decides once
+    # per cell whether the capper is usable; where it is not, PK_CAP is empty and the command
+    # runs bare — the same command either way, so the action key does not change with the box.
+    return ('PK_CAP=""; [ "${PAPERKIT_CELL_CAP:-x}" != 0 ] && %s probe >/dev/null 2>&1 && ' +
+            'PK_CAP="%s %d --cpu-weight ${PAPERKIT_CELL_WEIGHT:-100} --"; $PK_CAP ') % (
+                cap_path, cap_path, bucket)
+
+
+def _peak_snippet(observing, path):
+    """Ζ·mem·def·blind — the cgroup-peak read, as ONE owner with two callers (pk_calc and pk_eval).
+
+    Τ·mem·observe·honest — an UNREADABLE peak must not become a ZERO.  `2>/dev/null || echo 0`
+    collapsed three distinct causes onto one value: observe-off (a deliberate clean 0), a real
+    cgroup that never charged a page, and a read that FAILED.  A consumer cannot tell them apart,
+    so a check that never measured anything looks identical to one that measured zero.  (Cost,
+    measured: 170 cells read 0 and the diagnosis was a kernel capability gap; the real cause was a
+    cached non-observe write.)  So: the read's own failure is NAMED.
+
+    Lifted here because the def-sweep needed the same read.  The def resolution is the EXPENSIVE
+    one — 18-25 minute cells — and it was the one resolution with no measurement channel at all:
+    pk_eval returned DefaultInfo only, so `mem_learn` aggregated file-calcs and the `def` bucket
+    could only ever be a cold-start floor.  A second copy of this snippet would put the
+    `unavailable:` vocabulary in two places, drifting from the single reader that parses it."""
+    if observing:
+        return (" ; { P=$(cut -d: -f3 /proc/self/cgroup); F=/sys/fs/cgroup$P/memory.peak; " +
+                "if [ ! -e \"$F\" ]; then echo unavailable:absent; " +
+                "elif ! cat \"$F\" 2>/dev/null; then echo unavailable:unreadable; fi; } > " + path)
+    return " ; echo 0 > " + path
+
 
 def _calc_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
@@ -66,19 +155,20 @@ def _calc_impl(ctx):
     res = (" --resolution " + ctx.attr.resolution) if ctx.attr.resolution else ""
     # Τ·mem — the learned bucket (via the bib generator's ladder), or the cold-start floor by
     # resolution when unmeasured (mem == 0).
-    bucket = ctx.attr.mem if ctx.attr.mem else (2048 if ctx.attr.resolution == "def" else 768)
+    # Ζ·mem·climb — the cold-start floor is the ladder's BOTTOM, not a guess sized to never fail.
+    # An over-reservation is silent (it idles cores; this box ran 3 def cells where the budget
+    # allowed ~48) while an under-reservation is LOUD: the cap kills the cell, the failure names
+    # it, and cgroup-scope's retry doubles until it fits.  Measured: a def cell peaks at 2.8MB
+    # against the old 2048 floor — a ~700x guess nothing could ever falsify.
+    bucket = ctx.attr.mem if ctx.attr.mem else 4
     # Τ·mem·observe·clean — read the cgroup peak ONLY when observing (per-action cgroup ⇒ tree-accurate);
     # otherwise write a clean 0.  The branch makes the flag part of the action key (see ObserveInfo).
-    if ctx.attr._observe[ObserveInfo].enabled:
-        peak = " ; cat /sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)/memory.peak > " + p.path + \
-               " 2>/dev/null || echo 0 > " + p.path
-    else:
-        peak = " ; echo 0 > " + p.path
+    peak = _peak_snippet(ctx.attr._observe[ObserveInfo].enabled, p.path)
     ctx.actions.run_shell(
         outputs = [c, p],
-        inputs = depset(ctx.files.data + [ctx.file._sched], transitive = [py.files]),
-        command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
-                  '"' + ctx.file._sched.path + '" -- "$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
+        inputs = depset(ctx.files.data + [ctx.file._cap], transitive = [py.files]),
+        command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' + _cap_prefix(ctx.file._cap.path, bucket) +
+                  '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
                   " --calc" + res + " " + ctx.attr.project + " > " + c.path + peak,
         mnemonic = "PkCalc",
         progress_message = "Ζ·calc " + ctx.label.name,
@@ -99,9 +189,10 @@ pk_calc = rule(
         "project": attr.string(mandatory = True),
         "resolution": attr.string(default = "", doc = "def = per-definition fingerprint (for emergence); else file"),
         "mem": attr.int(default = 0, doc = "Τ·mem learned reservation (MB, a pow2 bucket in _RS); 0 = unmeasured → cold-start floor by resolution"),
+        # Ζ·cell·cap — the vendored capper, staged so the cell can exec it in the sandbox.
+        "_cap": attr.label(default = "//tools:cgroup-scope", allow_single_file = True, cfg = "exec"),
         "data": attr.label_list(allow_files = True),
         "_observe": attr.label(default = "@@//tools:observe"),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -119,8 +210,8 @@ def _mem_learn_impl(ctx):
         peaks += t[OutputGroupInfo].peak.to_list()
     ctx.actions.run_shell(
         outputs = [out],
-        inputs = depset([ctx.file._tool, ctx.file._sched] + peaks, transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path + " " +
+        inputs = depset([ctx.file._tool] + peaks, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
                   " ".join([p.path for p in peaks]) + " > " + out.path,
         mnemonic = "PkMemLearn",
         progress_message = "Τ·mem·learn " + ctx.label.name,
@@ -134,7 +225,6 @@ pk_mem_learn = rule(
     attrs = {
         "calcs": attr.label_list(mandatory = True, doc = "every pk_calc in the project (its peak output group is aggregated)"),
         "_tool": attr.label(default = "//tools:mem_learn.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -148,8 +238,8 @@ def _mutate_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".mutated.py")
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(ctx.files.data + [ctx.file._sched], transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" paperkit/mutate.py ' +
+        inputs = depset(ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" paperkit/mutate.py ' +
                   ctx.attr.module + " '" + ctx.attr.site + "' > " + o.path,
         mnemonic = "PkMutate",
         progress_message = "Ζ·mutate " + ctx.label.name,
@@ -164,7 +254,6 @@ pk_mutate = rule(
         "module": attr.string(mandatory = True, doc = "path of the .py module to mutate, e.g. paperkit/grader.py"),
         "site": attr.string(mandatory = True, doc = "the def-site qualname whose body is replaced"),
         "data": attr.label_list(allow_files = True, doc = "the staged files (mutate.py + the module)"),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -193,8 +282,8 @@ def _pyc_impl(ctx):
     # under the eval's config (--config=mutant ⇒ host python; OCI ⇒ image python) and matches it.
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, ctx.file.src, ctx.file._sched]),
-        command = '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path + " " + ctx.file.src.path + " " + o.path,
+        inputs = depset([ctx.file._tool, ctx.file.src]),
+        command = '"$(command -v python3)" ' + ctx.file._tool.path + " " + ctx.file.src.path + " " + o.path,
         mnemonic = "PkPyc",
         progress_message = "Ζ·pyc " + ctx.label.name,
     )
@@ -210,7 +299,6 @@ pk_pyc = rule(
         "src": attr.label(allow_single_file = [".py"], mandatory = True, doc = "the .py module to compile"),
         "deps": attr.label_list(providers = [PycInfo], doc = "Ξ·dag — the modules this one imports (paperkit/dag.bzl)"),
         "_tool": attr.label(default = "//tools:pyc.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -221,6 +309,11 @@ pk_pyc = rule(
 # the mutant.  flipped = the check exits non-zero (the mutation broke the claim's assertion).
 def _eval_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".eval.json")
+    # Ζ·mem·def·blind — the def-sweep's cells now carry a peak, like pk_calc's.  Without it the
+    # EXPENSIVE resolution was the one with no measurement channel: mem_learn aggregates
+    # file-calcs, so `def` could only ever be the cold-start floor (2048MB against a measured
+    # ~179MB file cell), and no amount of cold observing could correct it.
+    pk = ctx.actions.declare_file(ctx.label.name + ".peak")
     mpy = ctx.file.mutated_py
     mpyc = ctx.file.mutated_pyc
     # The eval logic lives in tools/eval.py (a real script, not a shell blob in a string); here we
@@ -250,20 +343,30 @@ def _eval_impl(ctx):
         mut = mut + [cf]
         carg = " --content-path " + ctx.attr.content_path + " --content-textfile " + cf.path
     ctx.actions.run_shell(
-        outputs = [o],
-        inputs = depset(mut + ctx.files.project + [ctx.file._sched], transitive = [closure_pyc, closure_py]),
+        outputs = [o, pk],
+        inputs = depset(mut + [ctx.file._cap] + ctx.files.project, transitive = [closure_pyc, closure_py]),
         # Ζ·sched-batch·phase2 — each grid cell self-tunes at exec (SCHED_BATCH + nice 19 + 100ms
         # slice), so concurrent cells run long uninterrupted stretches instead of preempting each
         # other every ~2.8ms (kills ctx-switch AND, under zswap, the refault codec-CPU thrash).
         # Per-cell = thread-independent (the durable fix Phase 1's server-tune could not reach).
-        command = '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
+        command = _cap_prefix(ctx.file._cap.path, ctx.attr.mem if ctx.attr.mem else 4) +
+                  '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --engine-dir paperkit" + marg + carg +
                   " --check " + ctx.attr.check + " --claim " + ctx.attr.claim +
-                  " --site '" + ctx.attr.site + "' --out " + o.path,
+                  " --site '" + ctx.attr.site + "' --out " + o.path +
+                  # Τ·mem·observe·inside — the peak is read BY eval.py, from inside the
+                  # cgroup-scope cell, not by a trailing shell statement outside it.  The
+                  # `; read-the-peak` form ran AFTER the scope exited and sampled bazel's
+                  # sandbox cgroup instead: 4.7MB reported for a cell whose in-scope peak is
+                  # 35MB and which OOMs under a 32MB cap.  A sensor outside the actuator it
+                  # measures cannot close the loop — it under-reports, the manifest sizes the
+                  # cell too small, and the same OOM is re-derived every run.
+                  (" --peak " + pk.path if ctx.attr._observe[ObserveInfo].enabled else "") +
+                  ("" if ctx.attr._observe[ObserveInfo].enabled else " ; echo 0 > " + pk.path),
         mnemonic = "PkEval",
         progress_message = "Ζ·eval " + ctx.label.name,
     )
-    return [DefaultInfo(files = depset([o]))]
+    return [DefaultInfo(files = depset([o])), OutputGroupInfo(peak = depset([pk]))]
 
 pk_eval = rule(
     implementation = _eval_impl,
@@ -272,6 +375,12 @@ pk_eval = rule(
         "claim": attr.string(mandatory = True, doc = "the claim key (the check's {target})"),
         "check": attr.string(mandatory = True, doc = "the claim-witness script, exec-relative (paper/checks/claims.py, checks/readme.py) — the project's [checks.claim] cmd, NOT hardcoded"),
         "site": attr.string(mandatory = True, doc = "the site label: a def-site/import spec for a .py cell, or file+:/file-:<path> for a file cell"),
+        # Ζ·mem·def·blind — the observe flag is part of the ACTION KEY (as in pk_calc), so an
+        # observe-vs-default cell caches as a distinct action and no stale 0 crosses configs.
+        "_observe": attr.label(default = "//tools:observe"),
+        # Ζ·cell·cap — the learned reservation, which is also the CEILING the cell runs under.
+        "mem": attr.int(default = 0, doc = "Τ·mem learned reservation (MB); 0 = def cold-start floor"),
+        "_cap": attr.label(default = "//tools:cgroup-scope", allow_single_file = True, cfg = "exec"),
         "module": attr.string(default = "", doc = "the engine module path mutated, e.g. paperkit/bib.py (empty for a file cell)"),
         "mutated_py": attr.label(allow_single_file = [".py"], doc = "the mutated module SOURCE (pk_mutate; identity for ∅) — the script-run path; absent for a file cell"),
         "mutated_pyc": attr.label(allow_single_file = [".pyc"], doc = "the mutated module BYTECODE (pk_pyc of it) — the import path; absent for a file cell"),
@@ -280,7 +389,6 @@ pk_eval = rule(
         "content_path": attr.string(default = "", doc = "a content cell's target file (its substring toggled in the sandbox); empty for a .py/file cell"),
         "content_text": attr.string(default = "", doc = "the substring a content cell drops/injects — delivered via ctx.actions.write, so any chars are safe"),
         "_tool": attr.label(default = "//tools:eval.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -296,8 +404,8 @@ def _sens_impl(ctx):
     evals = " ".join([e.path for e in ctx.files.evals])
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, ctx.file.baseline, ctx.file._sched] + ctx.files.evals, transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool, ctx.file.baseline] + ctx.files.evals, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --baseline " + ctx.file.baseline.path + " " + evals + " > " + o.path,
         mnemonic = "PkSens",
         progress_message = "Ζ·sens " + ctx.label.name,
@@ -312,7 +420,6 @@ pk_sens = rule(
         "evals": attr.label_list(allow_files = True, mandatory = True, doc = "the pk_eval records for one claim"),
         "baseline": attr.label(allow_single_file = True, mandatory = True, doc = "the ∅-mutation eval — must be flipped=false"),
         "_tool": attr.label(default = "//tools:sens.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -329,8 +436,8 @@ def _decisions_impl(ctx):
     reach = " ".join([e.path for e in ctx.files.reach])
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.flips + ctx.files.reach, transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool] + ctx.files.flips + ctx.files.reach, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --flips " + flips + " --reach " + reach + " > " + o.path,
         mnemonic = "PkDecisions",
         progress_message = "Μ·decisions " + ctx.label.name,
@@ -345,7 +452,6 @@ pk_decisions = rule(
         "flips": attr.label_list(allow_files = True, mandatory = True, doc = "the flip: pk_eval records (condition inversions)"),
         "reach": attr.label_list(allow_files = True, mandatory = True, doc = "the raise-kind pk_eval records (per-arm reach)"),
         "_tool": attr.label(default = "//tools:decisions.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -361,8 +467,8 @@ def _decisions_summary_impl(ctx):
     recs = " ".join([e.path for e in ctx.files.decisions])
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.decisions, transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool] + ctx.files.decisions, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --summary " + recs + " > " + o.path,
         mnemonic = "PkDecisionsSummary",
         progress_message = "Μ·decisions·summary " + ctx.label.name,
@@ -376,7 +482,6 @@ pk_decisions_summary = rule(
     attrs = {
         "decisions": attr.label_list(allow_files = True, mandatory = True, doc = "the per-claim __decisions records"),
         "_tool": attr.label(default = "//tools:decisions.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -390,9 +495,9 @@ def _mutant_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".mutant.json")
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(ctx.files.data + [ctx.file._sched], transitive = [py.files]),
+        inputs = depset(ctx.files.data, transitive = [py.files]),
         command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
-                  '"' + ctx.file._sched.path + '" -- "$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
+                  '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
                   " --mutant '" + ctx.attr.site + "' " + ctx.attr.project + " > " + o.path,
         mnemonic = "PkMutant",
         progress_message = "Ζ·mutant " + ctx.label.name,
@@ -409,7 +514,6 @@ pk_mutant = rule(
         "project": attr.string(mandatory = True),
         "site": attr.string(mandatory = True, doc = "the mutation-site label (path or path::qualname)"),
         "data": attr.label_list(allow_files = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -422,8 +526,8 @@ def _cohere_impl(ctx):
     calcs = " ".join([c.path for c in ctx.files.calcs])
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " cohere cohere " + ctx.attr.project + " " + v.path + " " + calcs,
         mnemonic = "PkCohere",
         progress_message = "Ζ·emerge·gate cohere " + ctx.label.name,
@@ -439,7 +543,6 @@ pk_cohere = rule(
         "project": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
         "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -450,8 +553,8 @@ def _verdict_impl(ctx):
     calc = ctx.file.calc
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool, calc, ctx.file._sched], transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool, calc], transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " calc verdict " + calc.path + " " + v.path,
         mnemonic = "PkVerdict",
         progress_message = "Ζ·calc verdict " + ctx.label.name,
@@ -465,7 +568,6 @@ pk_verdict = rule(
     attrs = {
         "calc": attr.label(allow_single_file = True, mandatory = True),
         "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -479,8 +581,8 @@ def _canary_impl(ctx):
     v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool, ctx.file.pos, ctx.file.nul, ctx.file._sched], transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" ' + ctx.file._tool.path +
+        inputs = depset([ctx.file._tool, ctx.file.pos, ctx.file.nul], transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " canary " + ctx.file.pos.path + " " + ctx.file.nul.path + " " + v.path,
         mnemonic = "PkCanary",
         progress_message = "Ζ·canary " + ctx.label.name,
@@ -495,7 +597,6 @@ pk_canary = rule(
         "pos": attr.label(allow_single_file = True, mandatory = True, doc = "the guaranteed-flip pk_eval record (MUST be flipped)"),
         "nul": attr.label(allow_single_file = True, mandatory = True, doc = "the ∅ identity pk_eval record (MUST NOT be flipped)"),
         "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 
@@ -505,8 +606,8 @@ def _grade_impl(ctx):
     calc = ctx.file.calc
     ctx.actions.run_shell(
         outputs = [g],
-        inputs = depset([calc, ctx.file._sched] + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"' + ctx.file._sched.path + '" -- "$(command -v python3)" tools/read_grade.py ' + calc.path + " > " + g.path,
+        inputs = depset([calc] + ctx.files.data, transitive = [py.files]),
+        command = _pypath(py) + '"$(command -v python3)" tools/read_grade.py ' + calc.path + " > " + g.path,
         mnemonic = "PkGradeRead",
         progress_message = "Ζ·calc grade " + ctx.label.name,
     )
@@ -519,6 +620,5 @@ pk_grade = rule(
     attrs = {
         "calc": attr.label(allow_single_file = True, mandatory = True),
         "data": attr.label_list(allow_files = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )

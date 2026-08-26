@@ -35,6 +35,75 @@ import subprocess
 import sys
 
 
+def _own_cgroup():
+    """This process's own v2 cgroup path, or None."""
+    try:
+        return pathlib.Path("/proc/self/cgroup").read_text().strip().rsplit(":", 1)[-1]
+    except OSError:
+        return None
+
+
+def _peak_bytes():
+    """memory.peak for THIS process's cgroup, or None.
+
+    Τ·mem·observe·inside — read from IN HERE, not from the shell afterwards.  The cell's
+    command is `cgroup-scope N -- eval.py … ; read-the-peak`, so the trailing read runs
+    AFTER the scope has exited and lands in bazel's sandbox cgroup — a DIFFERENT tree from
+    the one that ran the check.  Measured on compose-chains: the outside read reported
+    4.7MB for a cell whose real in-scope peak is 35MB and which OOMs at a 32MB cap.  The
+    sensor under-reported by ~8x, and under-reporting is the dangerous direction: a
+    manifest built from it sizes the cell BELOW what it needs, so the loop re-derives the
+    same OOM every run and never converges.
+
+    ⚑ THE PEAK INCLUDES TMPFS.  A cgroup is charged for the page cache of files its
+    processes write, and TMPDIR here is a tmpfs — so a witness that projects an out.md
+    into a mkdtemp() pays for it in MEMORY, not just disk, and freeing it needs the
+    directory removed rather than the process exited.  Measured on compose-chains the
+    split is anon 32.7MB / file 0.6MB, so THIS cell is driven by nested interpreters
+    rather than its scratch files; a witness projecting a large document would be the
+    other way round.  Either way the reservation is the same number — memory.peak already
+    counts both — but a reader diagnosing a surprising peak must know to check the split
+    (memory.stat's anon/file) before blaming the code.
+    """
+    cg = _own_cgroup()
+    if cg is None:
+        return None
+    try:
+        return int(pathlib.Path("/sys/fs/cgroup" + cg + "/memory.peak").read_text().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _write_peak(path):
+    """Deposit this cell's in-scope peak, in the vocabulary mem_harvest already parses."""
+    if not path:
+        return
+    b = _peak_bytes()
+    pathlib.Path(path).write_text(
+        ("%d" % b) if b is not None else "unavailable:unreadable")
+
+
+def _oom_counts():
+    """(oom, oom_kill) for THIS process's own cgroup, or None where v2 is not reachable.
+
+    Ζ·climb·oom·signal — eval.py runs INSIDE the cgroup-scope cell, so its own
+    memory.events IS the cell's.  No env var, no plumbing: the scope that caps the
+    check is the scope this process is already in.
+    """
+    cg = _own_cgroup()
+    if cg is None:
+        return None
+    try:
+        ev = pathlib.Path("/sys/fs/cgroup" + cg + "/memory.events").read_text()
+    except OSError:
+        return None
+    d = dict(l.split() for l in ev.splitlines() if " " in l)
+    try:
+        return int(d.get("oom", 0)), int(d.get("oom_kill", 0))
+    except ValueError:
+        return None
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine-dir", required=True, help="the staged engine dir, e.g. paperkit")
@@ -47,6 +116,8 @@ def main(argv):
     ap.add_argument("--content-path", default="", help="a content cell's target file (its substring toggled)")
     ap.add_argument("--content-textfile", default="", help="the substring to drop/inject, delivered as a file (no shell escaping)")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--peak", default="", help="write this cell's in-scope memory.peak here "
+                    "(Τ·mem·observe·inside; empty = the caller is not observing)")
     a = ap.parse_args(argv)
 
     tag = sys.implementation.cache_tag                       # e.g. cpython-313 — matches THIS runtime
@@ -105,12 +176,50 @@ def main(argv):
         import resource
         resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 3))
 
+    # Ζ·eval·mute — the BASELINE's stderr is kept.  A ∅-mutation cell that flips is the canary
+    # (sens.py FAILS LOUD on it rather than emitting a plausible-but-wrong sens set), and with both
+    # streams to DEVNULL the cell knew WHY and threw it away — so the loud failure said only
+    # "flipped", and diagnosing one took an hour of inference.  Mutated cells stay muted: a flip
+    # there is the SIGNAL, expected and uninteresting, and 48,011 tracebacks would be noise.
+    _base = a.site == "0"
+    _oom_before = _oom_counts()
     p = subprocess.Popen([sys.executable, a.check, a.claim],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         stdout=(subprocess.PIPE if _base else subprocess.DEVNULL),
+                         stderr=(subprocess.STDOUT if _base else subprocess.DEVNULL),
                          start_new_session=True, preexec_fn=_cpu_rlimit)
     try:
         rc = p.wait(timeout=wall)
+        if _base and rc != 0 and p.stdout is not None:
+            # Ζ·eval·mute — the check reports its diagnosis on STDOUT (concepts.py prints
+            # "concept X: ..." there), so a stderr-only capture reported "no stderr" for a
+            # check that had explained itself perfectly well one stream over.
+            err = p.stdout.read().decode("utf-8", "replace").strip().splitlines()
+            print("eval: BASELINE FLIPPED (the identity mutation broke the check) — %s"
+                  % ("rc=%d; %s" % (rc, " ⏎ ".join(err[-6:]) if err else "no output")), file=sys.stderr)
         flipped = rc != 0                                # SIGXCPU/SIGKILL ⇒ negative rc ⇒ flipped (the hang IS a flip)
+        # Ζ·climb·oom·signal — an OOM is NOT a flip.  `flipped = rc != 0` is right for a HANG (a
+        # mutant that never answers HAS changed behaviour) but wrong for a cell the kernel killed
+        # for memory: that is a verdict about the HARNESS, not the mutant — and for the ∅-baseline
+        # it is impossible on its face, since an identity mutation cannot make a check need more
+        # RAM.  Measured on compose-chains: cap ≤32MB ⇒ "flipped", cap ≥64MB ⇒ not — the same
+        # claim graded `broken` or `behavioral` depending only on the cell's memory ladder.
+        #
+        # ⚑ AND THE OOM WAS INVISIBLE TO THE CLIMB.  cgroup-scope retries on a nonzero PAYLOAD
+        # exit, but its payload is THIS process, which catches the child's death, records a
+        # verdict and exits 0 — so the ladder saw success and never climbed (holder-vs-worker: the
+        # exit code belongs to the holder, the OOM belongs to the worker).  Exiting non-zero hands
+        # the signal back to the layer that OWNS the retry.
+        # ⚑ INCREMENT, never a delta size.  `oom_kill` counts PROCESSES and `oom_group_kill`
+        # counts EVENTS, so under kubelet's `memory.oom.group=1` one OOM raises oom_kill by the
+        # whole tree size while oom_group_kill rises by 1.  Asking only "did it increment" is
+        # correct under both; dividing, or assuming +1, would not be (linux-sources, 2026-08-26).
+        _oom_after = _oom_counts()
+        if flipped and _oom_before is not None and _oom_after is not None and (
+                _oom_after[0] > _oom_before[0] or _oom_after[1] > _oom_before[1]):
+            print("eval: OOM-KILLED at this cell's cap (not a flip) — deferring to the climb",
+                  file=sys.stderr)
+            _write_peak(a.peak)
+            return 3
     except subprocess.TimeoutExpired:
         try:
             os.killpg(os.getpgid(p.pid), signal.SIGKILL)  # kill the whole tree, no orphan spinning on
@@ -118,6 +227,7 @@ def main(argv):
             pass
         p.wait()
         flipped = True                                   # did not terminate → the mutation flipped it
+    _write_peak(a.peak)
     pathlib.Path(a.out).write_text(
         json.dumps({"claim": a.claim, "site": a.site, "flipped": flipped}) + "\n")
     return 0

@@ -7,3 +7,20 @@ rubric = "rubric.tsv"
 out = "library.md"
 numbered = false
 references = false
+
+[checks.claim]
+cmd = "python3 concepts.py {target}"
+
+# Ζ·library·grid — the per-claim WITNESS type, declared so the def-sweep runs as a CELL GRID
+# rather than 42 monolithic sweeps.  The grid gate needs a per-claim closure; _closures() finds
+# the witness module from the declaration ABOVE, and with none declared the library paid ~10
+# minutes per claim, a critical path nothing could parallelise, all-or-nothing cache
+# invalidation, per-claim rather than per-site failures, and no def memory measurement at all.
+#
+# Downstream concept: imports are unaffected — the resolver runs the witness directly and never
+# reads this bib's check field.
+#
+# The declaration sits ABOVE this prose deliberately.  _claim_script scans forward from the
+# section header for the first three-letter command key and takes the first .py token on that
+# line, so ANY prose above it that happens to contain either token shadows the assignment and
+# yields an empty closure.  Measured twice while writing this comment.

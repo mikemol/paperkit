@@ -5,7 +5,7 @@ load("//tools:calc.bzl", "observe_setting")
 # tool is validated and runnable (python3 tools/lint_bzl.py tools/*.bzl); ENFORCEMENT in //:hook is
 # Ξ·lint·wire — it must be authored as a project WARRANT (bnd-check requires hook members be uniform
 # @proj//:{gate,adequacy}), which also projects its prose.  Not a bolted-on py_test.
-exports_files(["assert_pass.sh", "read_grade.py", "mem_learn.py", "sens.py", "decisions.py", "eval.py", "verdict.py", "lint_bzl.py", "pyc.py", "imports.py", "closure.py", "hook_index.py", "otlp_push.py", "ratchet.py"])
+exports_files(["assert_pass.sh", "cgroup-scope", "mem_db.py", "mem_harvest.py", "mem_project.py", "read_grade.py", "mem_learn.py", "sens.py", "decisions.py", "eval.py", "verdict.py", "lint_bzl.py", "pyc.py", "imports.py", "closure.py", "hook_index.py", "otlp_push.py", "ratchet.py"])
 
 # Ξ·lint·wire — the .bzl files exported so the boundaries bnd-lint check (a data dep via //:files) can
 # lint them.  Explicit set (no globs); KEEP in sync with the lint's arg list + //:files.
@@ -16,19 +16,3 @@ observe_setting(name = "observe", build_setting_default = False)
 
 py_binary(name = "pyinfo", srcs = ["pyinfo.py"], main = "pyinfo.py")
 
-# Ζ·sched-batch·phase2 — the per-cell scheduler helper as a bazel artifact, LAZY-BUILT via rustc
-# (mise-provisioned, system fallback) to match substrate's lazy-rustc pattern (consistency across
-# projects) rather than a bazel-specific rust toolchain.  local = 1: runs on the host so mise/rustc
-# resolve.  BEST-EFFORT: if no rustc, emit a no-op shell wrapper (`shift; exec "$@"`) so the grid
-# runs UNTUNED but NEVER breaks — a scheduling hint must not block a build.  Grid actions stage this
-# output and prefix their command with `<bin> -- "$(command -v python3)" …` so each cell self-tunes
-# at exec (SCHED_BATCH + nice 19 + 100ms slice), thread-independent (the durable fix Phase 1 wasn't).
-genrule(
-    name = "sched-batch-bin",
-    srcs = ["sched-batch.rs"],
-    outs = ["sched-batch"],
-    cmd = ("if mise exec -- rustc -O -o $@ $< 2>/dev/null || rustc -O -o $@ $< 2>/dev/null; " +
-           "then :; else printf '#!/bin/sh\\nshift\\nexec \"$$@\"\\n' > $@ && chmod +x $@; fi"),
-    local = 1,
-    visibility = ["//visibility:public"],
-)

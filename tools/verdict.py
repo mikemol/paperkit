@@ -41,10 +41,44 @@ import sys
 # does NOT red the gate (no false-red on a toolchain-less box) yet stays distinguishable from pass
 # (no false-green — it is honestly "not verified here", the ask-result-tristate shape at the record
 # layer).  A bool `ok` still maps pass/fail (the common path); a str verdict passes through verbatim.
+def _write_atomic(path, data):
+    """Ζ·write·atomic — write a sibling temp, then rename over `path`.
+
+    DUPLICATED from layout.write_atomic on purpose, and gated for agreement rather than trusted:
+    this tool is staged into the Bazel sandbox as a LONE FILE (verb.bzl passes it as `_tool`), so
+    `paperkit/` is not on disk beside it and an engine import would fail in the one environment
+    that matters most.  boundaries_write_atomic.py asserts the two implementations behave
+    identically, so the copy cannot drift into a second behaviour unnoticed.
+
+    Why it matters here: a verdict record is the artifact every other verdict is aggregated from,
+    so a torn or twin-corrupted one is a wrong ANSWER rather than a broken file."""
+    import os
+    import tempfile
+    path = pathlib.Path(path)
+    try:                               # preserve the target's mode — mkstemp creates at 0600
+        keep = os.stat(path).st_mode & 0o7777
+    except FileNotFoundError:
+        u = os.umask(0)
+        os.umask(u)
+        keep = 0o666 & ~u
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(data)
+        os.chmod(tmp, keep)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def _write(out, verb, verdict):
     if verdict is True or verdict is False:
         verdict = "pass" if verdict else "fail"
-    pathlib.Path(out).write_text(
+    _write_atomic(out,
         json.dumps({"verb": verb, "verdict": verdict}, separators=(",", ":")) + "\n")
 
 
@@ -113,8 +147,13 @@ def main(argv):
     elif a.cmd == "calc":
         _write(a.out, a.verb, bool(json.loads(pathlib.Path(a.calc).read_text()).get("baseline")))
     elif a.cmd == "cohere":
+        # Ζ·cohere·mute — let coherence's stderr through.  DEVNULL on BOTH streams meant a red
+        # :cohere could only ever say {"verdict":"fail"}: the named misses were computed and
+        # thrown away at the one layer that reads them.  stdout stays muted (the --from-calcs arm
+        # prints no report there), stderr carries the residual, on its own handle — never merged,
+        # since the caller parses this process's own stdout ([[separate-filehandles]]).
         rc = subprocess.run([sys.executable, "paperkit/coherence.py", "--from-calcs", a.project, *a.calcs],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+                            stdout=subprocess.DEVNULL).returncode
         _write(a.out, a.verb, rc == 0)
     elif a.cmd == "canary":
         # Ζ·canary — the positive control's verdict.  Both directions asserted (a gate is sound

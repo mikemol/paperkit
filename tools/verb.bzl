@@ -90,7 +90,7 @@ def _cmd_impl(ctx):
     # record itself is emitted by verdict.py (no JSON built in shell).
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool, ctx.file._sched] + ctx.files.data + ctx.files.consumes + stamp_inputs, transitive = [py.files]),
+        inputs = depset([ctx.file._tool] + ctx.files.data + ctx.files.consumes + stamp_inputs, transitive = [py.files]),
         use_default_shell_env = host_env,
         # Ζ·sched-batch·phase2 — the check `inner` is an arbitrary compound shell command, not a
         # single exec, so we tune the ACTION SHELL ($$, single-threaded) and inner + the emit inherit
@@ -100,10 +100,18 @@ def _cmd_impl(ctx):
         # NOT `fail`.  rc 0 → pass · rc 3 → cannot-run (not verified here, but not a failure — the gate's
         # bad-set is {fail}, so it does not red the commit) · any other nonzero → fail (ran-and-failed).
         # Closes the false-red: on a toolchain-less box an honest "cannot verify" no longer blocks commits.
-        command = pyprefix + consume_prefix + '"' + ctx.file._sched.path + '" --pid $$ 2>/dev/null; ' +
+        command = pyprefix + consume_prefix + '' +
                   "( " + inner + " ) >/dev/null 2>&1; rc=$?; " +
                   'if [ "$rc" = 0 ]; then V=pass; elif [ "$rc" = 3 ]; then V=cannot-run; else V=fail; fi; ' +
                   '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path,
+        # Ρ·check·resource·set — a check action declares NO resource_set, so per-claim checks are
+        # scheduled by job count alone while the sweep grid (pk_calc) is memory-bounded per cell.
+        # MEASURED before concluding this is a defect: a live check peaks at 16-68MB (discriminate
+        # 68, concepts 25, eval 16), against grid cells at 2GB — so 23 concurrent checks cost well
+        # under one cell, and bounding them would buy nothing while adding a reservation to every
+        # generated target.  The asymmetry is CORRECT: reserve where the cost is, not everywhere.
+        # Recorded because the raw sandbox count (23, with the budget flag set) reads like an
+        # escape and is not one; the number to look at is RSS, not process count.
         mnemonic = "PkCmd",
         execution_requirements = er,
     )
@@ -125,7 +133,6 @@ pk_cmd = rule(
         "consumes": attr.label_list(allow_files = True),
         "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),
-        "_sched": attr.label(default = "//tools:sched-batch-bin", allow_single_file = True, cfg = "exec"),
     },
 )
 

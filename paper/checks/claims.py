@@ -1221,7 +1221,39 @@ def forward_direction():
         "dropped a direct grounding edge that has no longer path"
 
 
+def edge_formulas() -> None:
+    """Ζ·dcalc·grid — the formula table is a PROJECTION of the claim-DAG, and drifts if not.
+
+    This claim used to carry `cmd:python3 checks/gen_formulas.py --check`, which put it on the
+    monolithic pk_calc path: ONE serial action, 20+ minutes, the tail of every commit touching
+    the engine.  Not because a def-sweep resists parallelism — it is already a covering argument,
+    and for every other claim here the grid emits one cell per def-site and pk_sens folds them.
+    The reason was narrower: the extension derives a closure for the ONE script `[checks.claim]`
+    names, so a second check script is invisible to it whatever its contents.
+
+    So the fix is convergence rather than accommodation: one router per project, every claim a
+    key on it.  gen_formulas stays the generator (and its `--check` face still works standalone);
+    the WITNESS lives here, where its import cone is derivable and its sweep can fan out.
+    """
+    # ⚑ SPAWN, never import.  `import gen_formulas` would execute a sibling module top-to-bottom
+    # inside the router's own process — arbitrary code at import time.  Tolerable for a module
+    # this repo wrote; not tolerable as an ENGINE discipline, because paperkit is heading for
+    # distribution and a consumer's checks/ directory would then be code the engine imports into
+    # itself.  resolver.py already states the rule — "A check is arbitrary code (cmd: is the
+    # universal escape hatch), so it must not run in whatever ambient environment the gate
+    # happened to inherit" — and honours it by SPAWNING with a sanitised env.  closure.py reads
+    # by AST for the same reason.  A witness that delegates to a sibling must do the same.
+    import subprocess
+    here = Path(__file__).resolve().parent
+    r = subprocess.run([sys.executable, str(here / "gen_formulas.py"), "--check"],
+                       cwd=str(here.parent), capture_output=True, text=True)
+    assert r.returncode == 0, \
+        "assets/formulas.md drifted from the claims that own the formulas: " + (
+            r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "no output")
+
+
 CLAIMS = {
+    "edge-formulas": edge_formulas,
     "collapse-safe": collapse_safe,
     "grouping-residual": grouping_residual,
     "grouping-tail-falls-back": grouping_tail_falls_back,

@@ -68,6 +68,9 @@ test_suite(name = "hook", tests = [
     # bnd-check's completeness never OWED it a member; its gate rotted silently outside the hook.
     # Gate-only (no adequacy/cohere targets exist without those flags), near-free (4 cmd checks).
     "@paperkit_config//:gate",
+    # Ζ·consumer-fields·demo — gate-only: paperkit's own use of a declared consumer field, gated every
+    # commit so the declared-field carry/suppress path has a live in-tree exercise (not a vacuous pass).
+    "@paperkit_demo//:gate",
     "@paperkit_paper//:adequacy",
     "@paperkit_root//:adequacy",
     # Λ·witness — the concept LIBRARY: it self-grades each concept witness (adequacy) and gates its
@@ -88,6 +91,15 @@ test_suite(name = "hook", tests = [
     # the enforcement adversary found).  No cohere (adequacy+calc, no emerge).
     "@paperkit_render//:gate",
     "@paperkit_render//:adequacy",
+    # Ρ·talk·hook·wire — the conference TALK.  It was built to a deadline and lived outside the
+    # hook, so its figure family, its dispatch-table totality gate and its 16 witnesses were
+    # hand-invoked only: verified once by a human, guaranteed by nothing.  That is Ζ·hook-rot
+    # arriving the other way round — not wired-then-rotted, but never wired at all.  Its
+    # witnesses assert things about OTHER projects' bibs (render's warrants back the talk's
+    # pipeline claims), so adequacy matters: an unswept witness would let the talk claim a
+    # guarantee nobody gates.
+    "@paperkit_talk//:gate",
+    "@paperkit_talk//:adequacy",
     # Ζ·emerge·gate — the ∂² coherence reading over each emerge project's def-sweep GRID (the
     # Ξ·dag·eval closure cells).  Pulls the grid into //:hook, so the hook runs under --config=mutant
     # (the hermetic sandbox the mutation cells require; .githooks/pre-commit passes it).

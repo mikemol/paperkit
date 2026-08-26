@@ -28,3 +28,16 @@ tools/sched-batch
 # 2026-08-14 — floor/reports.bib `friction-provisioner-clobbers-a-carve-out`, reported by
 # cassian-observability after the same clobber hit its A119 archive.
 .githooks/local.env
+
+# Ζ·pkg·shape — wheel-build residue.  setuptools writes these beside the source; they are
+# derived, and a repo whose every documentary artifact is a PROJECTION should not carry
+# build output it did not project.
+build/
+dist/
+*.egg-info/
+
+# Ρ·deck — the emitted decks.  render's coalgebra carries pptx/odp as format objects and the
+# engine EMITS them (render/checks/deck_bound.py); like render's own .docx/.pdf/.odt, none of
+# which is tracked, they are build output the repo did not project — the same rule as above.
+talk/talk.odp
+talk/talk.pptx

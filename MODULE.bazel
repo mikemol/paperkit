@@ -21,6 +21,10 @@ python.toolchain(python_version = "3.13", is_default = True)
 bib = use_extension("//tools:bibtex.bzl", "bib")
 bib.project(name = "paperkit_boundaries", bib = "//boundaries:warrants.bib", project = "boundaries", compose = True)  # Ζ·compose (root imports its :proof)
 bib.project(name = "paperkit_config", bib = "//config:warrants.bib", project = "config")
+# Ζ·consumer-fields·demo — the ONE project that DECLARES a consumer field (provenance) and carries it, so
+# the capability paperkit documents + proves is also DEMONSTRATED in-tree; without it the declared-field
+# carry/suppress path is a vacuous pass (invisible from inside — no project exercises it).  Gate-only.
+bib.project(name = "paperkit_demo", bib = "//demo:warrants.bib", project = "demo")
 # Each target's data is footprint-derived (footprints.json, Ζ·foot) — no hand-declared extra_data.
 bib.project(name = "paperkit_paper", bib = "//paper:model.bib", project = "paper", adequacy = True, compose = True, calc = True, emerge = True)  # Ζ·emerge·gate (bib = anchor; the full warrants list is composed from paper.toml)
 bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adequacy = True, compose = True, calc = True, emerge = True)  # Ζ·emerge·gate
@@ -28,8 +32,14 @@ bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adeq
 # it via concept: checks.  owns_concepts ⇒ its per-concept verdict + def-cert records are PUBLIC.
 bib.project(name = "paperkit_library", bib = "//library:concepts.bib", project = "library", adequacy = True, calc = True, emerge = True, owns_concepts = True)
 bib.project(name = "paperkit_guide", bib = "//guide:guide.bib", project = "guide", adequacy = True, calc = True)  # Σ·step5: a view composed from library certificates — zero witness code
+# Ρ·talk·hook·wire — the conference talk as a paperkit project.  adequacy=True because its
+# witnesses assert things about OTHER projects' bibs (render's warrants, its own figure
+# family), and an unswept witness there would let the talk claim a guarantee nobody gates.
+bib.project(name = "paperkit_talk", bib = "//talk:warrants.bib", project = "talk", adequacy = True, calc = True)
 bib.project(name = "paperkit_setup", bib = "//setup:warrants.bib", project = "setup", tier = "local")  # Ζ·resist: host-coupled
 # Ζ·tier — render is the first MIXED-TIER project: pure compliance warrants sandbox-gated+adequacy-swept
 # (standards model + coalgebra enforced every commit); render/oracle warrants tier={toolchain} (cached+stamped).
-bib.project(name = "paperkit_render", bib = "//render:warrants.bib", project = "render", adequacy = True, calc = True)
-use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_guide", "paperkit_library", "paperkit_paper", "paperkit_render", "paperkit_root", "paperkit_setup")
+# owns_warrants ⇒ render EXPORTS its per-claim verdict records: the talk cites SPECIFIC render
+# guarantees (rnd-a11y, rnd-slides, rnd-agree, rnd-wcag-entail) and delegates to each by name.
+bib.project(name = "paperkit_render", bib = "//render:warrants.bib", project = "render", adequacy = True, calc = True, owns_warrants = True)
+use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_demo", "paperkit_guide", "paperkit_library", "paperkit_paper", "paperkit_render", "paperkit_root", "paperkit_setup", "paperkit_talk")

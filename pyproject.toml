@@ -1,0 +1,32 @@
+# Ζ·pkg·shape — packaging metadata.  paperkit is DISTRIBUTABLE: a downstream consumer should be
+# able to `pip install paperkit` and cite concepts, rather than probing $PAPERKIT / ~/github/paperkit
+# for a checkout (which is what every consumer does today).
+#
+# ⚑ THE OPEN QUESTION THIS FILE DOES NOT YET ANSWER: the engine's concept library lives OUTSIDE the
+# package — resolver.py's `_LIBRARY = Path(__file__).parent.parent / "library"` walks UP out of
+# paperkit/ into the repo root.  A wheel shipping only paperkit/ leaves every `concept:` check
+# unresolvable, because the terminal owner of the per-key fallthrough would not be installed.  The
+# library is small (13 files, 256K) and is BOTH a paperkit project and a runtime data dependency,
+# which is why the fix is a placement decision rather than a MANIFEST line.  Deliberately left open:
+# moving it changes what the fallthrough resolves against, and that is Λ·library·manifest's subject.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paperkit"
+version = "0.1.0"
+description = "Documents as projections of verified claim-DAGs"
+readme = "README.md"
+requires-python = ">=3.11"          # tomllib is stdlib from 3.11; the engine reads paper.toml with it
+license = {text = "MIT"}
+authors = [{name = "Mike Mol"}]
+dependencies = []                    # STDLIB ONLY, deliberately — the engine adds no supply chain
+
+[project.scripts]
+# The invocations a consumer runs today as `python3 paperkit/<mod>.py`.
+paperkit-gate = "paperkit.gate:_cli"
+paperkit-project = "paperkit.project:_cli"
+
+[tool.setuptools]
+packages = ["paperkit"]

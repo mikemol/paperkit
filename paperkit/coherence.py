@@ -55,6 +55,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ζ·pkg·shape — the engine's own directory, FIRST on sys.path, and it must stay a per-module
+# line rather than moving to paperkit/__init__.py: a package __init__ runs only when the
+# package is IMPORTED, and these modules are also loaded as siblings by a caller that has
+# already put its own directory ahead of ours.  render/checks/ ships its OWN bib.py, so a
+# witness inserting that directory shadows the engine's parser and `from bib import
+# dep_order` resolves to the wrong module.  MEASURED: removing these six lines reddened
+# seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
+# The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bib  # noqa: E402  (the parser/data-model leaf — read the bib structure + `link` acknowledgments)
 
@@ -116,6 +124,65 @@ def structure_residual(records: list, discharged=frozenset()) -> dict:
     undischarged = sum(1 for k, _, _ in long_edges if k not in discharged)
     return {"carried": carried, "owed": len(long_edges), "undischarged": undischarged,
             "long_edges": long_edges}
+
+
+def grouping_residual(records: list, gamma: float = 1.0, discharged=frozenset()) -> dict:
+    """Face five (Ρ·deck·residual) — the AUTHORED section grouping vs the DERIVED one.
+
+    The other faces read the sweep; this one reads only the bib, so it measures wherever a
+    project parses.  The question: is `section` a projection of the GROUNDING structure, or
+    does it disagree with it?
+
+    σ is the authored partition (claims grouped by `section`).  P* is the partition that
+    maximises rests-on MODULARITY, σ-regularized:  P* = argmax_P [ Q_E(P) − γ·d(P, σ) ].
+    The residual is d(σ, P*): zero means the authored grouping IS the grounding structure;
+    nonzero NAMES the claims whose grounding lives outside their section.
+
+    Two properties that make this honest rather than a beauty contest (both measured, not
+    assumed — prototypes/slides.bib's `measured-grounding-is-sparse-and-section-aligned`):
+
+      * modularity's null term means a SINGLE edge contributes ≈0 (chance-expectation cancels
+        it), so sparse regions are argmax-INDIFFERENT and the −γ·d term dominates there: the
+        ungrounded tail falls back to σ BY CONSTRUCTION, not by a special case.  ~40% of claims
+        having no rests-on edge is therefore not a defect of the measure.
+      * γ is the deck-analog of --min-strength: γ→∞ recovers pure section, γ→0 pure modularity.
+
+    We do NOT gate "is the modularity optimal" (unfalsifiable, a value judgment).  We report
+    the residual and the claims it names — a claim P* pulls out of its section is either
+    MISFILED or a deliberate cross-reference the prose owes a callback.
+
+    DISCHARGE (Ρ·deck·residual·gate).  The second case is common and legitimate: a thesis claim
+    that forward-references machinery defined later grounds outside its section BY DESIGN.  So a
+    named claim carrying a `link` footnote is DISCHARGED, exactly as the structure and grounding
+    faces discharge theirs — the author has acknowledged the divergence and said why.  `residual`
+    stays the raw count (the measurement); `undischarged` is the gateable number.  Without this
+    split a --max-residual gate would red on correct forward references, i.e. measure the wrong
+    thing while looking rigorous.
+    """
+    keys = [r["key"] for r in records]
+    sec = {r["key"]: r.get("section") for r in records}
+    sigma = {}
+    for r in records:
+        sigma.setdefault(r.get("section"), []).append(r["key"])
+
+    # Ρ·deck·residual·wire — the PARTITION is computed by genre.partition (the project component,
+    # which delta depends on), not duplicated here.  One owner, two consumers: the projector cuts
+    # a deck on this partition, this face measures how far it sits from the authored sigma.  A
+    # second copy would drift, and the residual would then be measuring a grouping no deck uses.
+    import genre
+    g = genre.partition(records, gamma)
+    if g["degenerate"]:
+        return {"claims": len(keys), "edges": 0, "residual": 0, "undischarged": 0,
+                "gamma": gamma, "sections": len(sigma), "moved": [], "acknowledged": [],
+                "degenerate": True, "within_sigma": 0, "within_frac": None}
+    part, edges, within = g["part"], g["edges"], g["within"]
+    moved = sorted(k for k in keys if part[k] != sec[k])
+    ack = [k for k in moved if k in discharged]
+    return {"claims": len(keys), "edges": edges, "residual": len(moved),
+            "undischarged": len([k for k in moved if k not in discharged]),
+            "gamma": gamma, "sections": len(sigma), "moved": moved, "acknowledged": ack,
+            "degenerate": False, "within_sigma": within,
+            "within_frac": round(within / edges, 3) if edges else None}
 
 
 def sensitivity_residual(records: list) -> dict:
@@ -331,6 +398,9 @@ def report(records: list, discharged=frozenset(), all_keys=frozenset()) -> dict:
             "sensitivity": sensitivity_residual(cited),
             "grounding": grounding_residual(cited, discharged, universal),
             "emergence": emergence_residual(cited, universal),
+            # Ρ·deck·residual — the AUTHORED section grouping vs the grounding-derived one.
+            # Reads only the bib (no sweep), so it is meaningful even on a degraded grade.
+            "grouping": grouping_residual(cited, discharged=discharged),
             # Ζ·symdiff — what STRUCTURE counted and the measured faces could not see.  Reported
             # beside them so a partial reading declares its own incompleteness.
             "unmeasured": unmeasured_edges(cited, all_keys)}
@@ -369,6 +439,39 @@ def _records_from_calcs(project_dir: Path, calc_files: list) -> list:
                      "section": st.get("section", ""), "from": st.get("from", []),
                      "grade": "behavioral" if c.get("sens") else "vacuous", "cited": True})
     return recs
+
+
+def _coverage(project_dir: Path, records: list) -> tuple:
+    """Ζ·cohere·artifact — how much of the bib's GROUNDING GRAPH this calc set actually covers.
+
+    A partial calc set does not fail; it computes a confident answer over a fraction of the graph
+    and reports it as if it were the whole.  Measured, and it cost a day: `:cohere` consumes the
+    def-sweep certificates (`__dcalc`), and a reproduction that globbed `*.calc.json` picked up 86
+    file-resolution `__calc` records and 1 certificate.  It read 39 of the bib's 80 rests-on edges,
+    reported "39/39 reflected, 0 undischarged", and that number was offered as the evidence a gate
+    was fixed.  Both real misses were in the 41 edges the reading could not see.
+
+    So the reading NAMES its own coverage.  This is the Ζ·pi·unresolved discipline one level down:
+    an incomplete observation must not be indistinguishable from a complete one, and the fix is
+    never to guess the remainder — it is to say what was not looked at."""
+    have = {r["key"] for r in records}
+    # ⚑ ELIGIBLE, not ALL.  The denominator is the claims that CAN carry a def-sweep certificate:
+    # a `concept:` claim is graded by its OWNING library and imported as a certificate (Π-typed
+    # delegation — re-deriving an owner's grade in the importing view is exactly what delegation
+    # refuses), and a `cmd:` claim has no def-site grid at all.  Counting them as coverage GAPS
+    # conflates "not looked at" with "not lookable at", and the refusal then fires on a reading
+    # that is complete.  Measured on paper: 112 bib claims, 85 with a local certificate, and of
+    # the 27 without, 26 are `concept:` imports and 1 is `cmd:` — none of them a miss.
+    F = F_of(project_dir)
+    eligible = {k: f for k, f in F.items()
+                if not str(f.get("check") or "").startswith(("concept:", "cmd:"))}
+    edges = sum(len(f.get("rests-on") or []) for f in eligible.values())
+    seen = sum(len(r.get("rests-on") or []) for r in records)
+    return len(have & set(eligible)), len(eligible), seen, edges
+
+
+def F_of(project_dir: Path) -> dict:
+    return bib.parse_project(project_dir)
 
 
 def _records_from_cache(project_dir: Path) -> list:
@@ -454,20 +557,93 @@ def _vacuous_exit(project_dir: Path, rep: dict) -> bool:
     return True
 
 
+def _grounding_exit(rep: dict) -> int:
+    """Ζ·cohere·mute — the `--from-calcs` gate exit: NAME the undischarged edges, then signal.
+
+    This arm is what `//:cohere` runs, and it used to `return 1` in silence.  The verdict record
+    downstream carries only {"verb","verdict"}, so a red gate said exactly `fail` and nothing
+    else — while `misses` (the precise list of which grounding edge the measurement does not
+    see) sat computed one field away and was discarded.  Diagnosing one red edge then cost a
+    hand reconstruction of a set the code had already built.
+
+    The two sibling exits in this module (`_vacuous_exit`, `_residual_exit`) both print the
+    reason to stderr before returning nonzero; this one is the outlier, not the pattern.  A gate
+    whose failure carries no residual is not cheaper, it just relocates the work to whoever
+    reads it — and it reads as a harness fault (the thing `Ν·vac` exists to distinguish) rather
+    than the genuine finding it usually is."""
+    g = rep["grounding"]
+    if g["undischarged"] == 0:
+        return 0
+    print(f"coherence: GROUNDING {g['undischarged']} of {g['grounding_edges']} rests-on edge(s) "
+          f"un-acknowledged — the claim tests engine capability, but DISJOINT from its premise's. "
+          f"Overlap the fingerprints, or discharge with a `link` stating why they diverge:",
+          file=sys.stderr)
+    for x, y in g["misses"]:
+        print(f"  [@{x}] rests-on [@{y}] — tests engine capability, but not [@{y}]'s",
+              file=sys.stderr)
+    return 1
+
+
+def _residual_exit(rep: dict, max_resid) -> int:
+    """The Ρ·deck·residual·gate exit: 0 unless an explicit budget is exceeded by the
+    UN-ACKNOWLEDGED residual.  No flag → always 0 (instrument, not control)."""
+    if max_resid is None:
+        return 0
+    gr = rep["grouping"]
+    if gr["undischarged"] > max_resid:
+        print(f"coherence: GROUPING RESIDUAL {gr['undischarged']} exceeds --max-residual "
+              f"{max_resid} — {gr['undischarged']} claim(s) group outside their section with no "
+              f"`link` acknowledging why.  Refile them, or discharge each with a `link` stating "
+              f"the cross-reference it makes: "
+              f"{[k for k in gr['moved'] if k not in gr['acknowledged']]}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _max_residual(argv: list):
+    """Ρ·deck·residual·gate — `--max-residual N`: the grouping face's budget, the deck-analog of
+    `--min-strength`.  Absent → the face is an INSTRUMENT (reported, never fatal); present → a
+    CONTROL that fails when the UN-ACKNOWLEDGED residual exceeds N.  An instrument earns trust
+    per-use by re-verifying its output; a control has to be sound in both directions first, which
+    is why the discharge mechanism (a `link` on the named claim) had to land before this flag."""
+    for i, a in enumerate(argv):
+        if a == "--max-residual" and i + 1 < len(argv):
+            return int(argv[i + 1])
+        if a.startswith("--max-residual="):
+            return int(a.split("=", 1)[1])
+    return None
+
+
 def main(argv: list) -> int:
     as_json = "--json" in argv
+    max_resid = _max_residual(argv)
+    # the flag's VALUE is not a positional project dir
+    argv = [a for i, a in enumerate(argv)
+            if not (a == "--max-residual" or a.startswith("--max-residual=")
+                    or (i and argv[i - 1] == "--max-residual"))]
     pos = [a for a in argv if not a.startswith("-")]
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     if "--from-calcs" in argv:
         # Ζ·emerge·gate — cheap coherence: read CACHED calc records (sens) + the bib structure, no
         # re-sweep.  pos = [project, calc.json...].  The gateable reading over the calculation.
-        rep = report(_records_from_calcs(project_dir, pos[1:]), _discharged(project_dir),
-                     _all_keys(project_dir))
+        recs = _records_from_calcs(project_dir, pos[1:])
+        n_claims, tot_claims, n_edges, tot_edges = _coverage(project_dir, recs)
+        if n_edges < tot_edges:
+            # Ζ·cohere·artifact — REFUSE a partial reading rather than report it as whole.  Exit 2
+            # (cannot-run), never 0 or 1: a measurement over part of the graph is neither a pass
+            # nor a refutation, and reading it as either is the error this guard exists for.
+            print(f"Ν·partial: coherence over {project_dir.name or project_dir}: the calc set "
+                  f"covers {n_claims}/{tot_claims} claims and {n_edges}/{tot_edges} rests-on "
+                  f"edges — an INCOMPLETE reading.  `:cohere` consumes the def-sweep certificates "
+                  f"(__dcalc); a glob that also matches file-resolution __calc records silently "
+                  f"reads a fraction of the graph.  Refusing to emit a verdict.", file=sys.stderr)
+            return 2
+        rep = report(recs, _discharged(project_dir), _all_keys(project_dir))
         if as_json:
             print(json.dumps({"document": project_dir.name or str(project_dir), **rep}, indent=2))
         if _vacuous_exit(project_dir, rep):
             return 2
-        return 0 if rep["grounding"]["undischarged"] == 0 else 1
+        return _grounding_exit(rep)
     # Ζ·emerge·resume — read the accumulated per-check cache instead of re-sweeping.  Same
     # faces, same report; the measurement comes from whatever `--state/--budget` increments
     # have graded so far, so a partial grade yields a partial (never a wrong) reading.
@@ -475,7 +651,11 @@ def main(argv: list) -> int:
     rep = report(src(project_dir), _discharged(project_dir), _all_keys(project_dir))
     if as_json:
         print(json.dumps({"document": project_dir.name or str(project_dir), **rep}, indent=2))
-        return 2 if rep["vacuous"] else 0
+        if rep["vacuous"]:
+            return 2
+        # the --max-residual control applies to EVERY output mode: a gate a caller can disable by
+        # asking for JSON is not a gate.
+        return _residual_exit(rep, max_resid)
     if _vacuous_exit(project_dir, rep):
         return 2
     s, se, g, e = rep["structure"], rep["sensitivity"], rep["grounding"], rep["emergence"]
@@ -498,6 +678,22 @@ def main(argv: list) -> int:
     for x, d in e["increments"]:
         print(f"               [@{x}] +{len(d)} engine site(s) beyond its grounding "
               f"— e.g. {[t.split('::')[-1] for t in d[:3]]}")
+    gr = rep["grouping"]
+    if gr["degenerate"]:
+        print(f"  grouping   : no rests-on edges between cited claims — σ ({gr['sections']} "
+              f"sections) is the only partition the grounding graph can express, so the "
+              f"residual is trivially 0 (nothing to disagree with)")
+    else:
+        pct = "—" if gr["within_frac"] is None else f"{gr['within_frac']:.0%}"
+        print(f"  grouping   : d(σ,P*) = {gr['residual']} of {gr['claims']} claims move when the "
+              f"section grouping is re-derived from rests-on modularity (γ={gr['gamma']}); "
+              f"{gr['undischarged']} un-acknowledged; "
+              f"{gr['within_sigma']}/{gr['edges']} grounding edges ({pct}) already stay "
+              f"within-section")
+        for k in gr["moved"]:
+            ack = " [discharged by `link`]" if k in gr["acknowledged"] else ""
+            print(f"               [@{k}] — its grounding lives outside its section "
+                  f"(MISFILED, or a deliberate cross-reference the prose owes a callback){ack}")
     um = rep["unmeasured"]
     if um["unmeasured"]:
         print(f"  unmeasured : {len(um['pending'])} declared edge(s) STRUCTURE counts that "
@@ -507,7 +703,7 @@ def main(argv: list) -> int:
             print(f"               [@{x}] rests-on [@{y}] — target ungraded (grade it to measure)")
         for x, y in um["dangling"]:
             print(f"               [@{x}] rests-on [@{y}] — NO SUCH ENTRY (a broken edge)")
-    return 0
+    return _residual_exit(rep, max_resid)
 
 
 if __name__ == "__main__":

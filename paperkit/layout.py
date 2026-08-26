@@ -8,6 +8,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import shutil
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -115,7 +116,7 @@ def _suffixless_text(f: Path) -> bool:
     reads it and mutating its content can change a claim, so Δ must be able to corrupt it.  This
     generalizes the old one-off `.githooks` exception to the class it belonged to (summit's
     ask-delta-extensionless): the exception was drawn around ONE artifact, not the property.  Keyed
-    on CONTENT (a NUL byte ⇒ binary, so a compiled command like `tools/sched-batch` is excluded)
+    on CONTENT (a NUL byte ⇒ binary, so a compiled command is excluded)
     because the Δ sandbox is a copy without `.git` and mode is not reliable there — content is the
     only signal always present.  MUTABLE_SUFFIXES still owns the SUFFIXED text files; this owns the
     suffixless ones, and together they are a closer proxy for "could this file's content change a

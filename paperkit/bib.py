@@ -159,10 +159,140 @@ def _bibpath(project: Path, b: str) -> Path:
     return project / b
 
 
+def paper_keys() -> tuple:
+    """The [paper] keys `load_config` actually reads — parsed from its OWN source.
+
+    Λ·registry — the set has ONE owner: the `p.get("k", …)` calls in load_config.  A guard that
+    kept its own copy would certify a tautology the moment the two drifted, and adding a key
+    would then be a two-site edit with no signal when only one site was done.  checks/gen_fields.py
+    derives the documented key table the same way, from the same source."""
+    import inspect
+    import re
+    src = inspect.getsource(load_config)
+    seen = []
+    for k in re.findall(r'p\.get\(\s*"([^"]+)"', src):
+        if k not in seen:
+            seen.append(k)
+    return tuple(seen)
+
+
+def _param_config_keys() -> tuple:
+    """The [paper] keys owned by Ω·config Params, read from the engine's own sources via AST.
+
+    Λ·registry — a Param DECLARES its paper.toml key (`Param(..., config="root")`), so the
+    declarations are the owner.  Parsed rather than imported: load_config runs on every gate
+    invocation and importing every engine module here would be both slow and circular.  AST,
+    never grep — a regex matches the name in prose and strings too (the lesson closure.py
+    records); this reads the keyword argument of an actual Param(...) call.
+
+    ⚑ THE [paper] KEY SET HAS TWO OWNERS.  load_config's `p.get` calls are one; these Params are
+    the other, and they are what makes `root` a [paper] key even though load_config never reads
+    it.  A guard over only the first would have missed the very instance that prompted it."""
+    import ast as _ast
+    out = []
+    for f in sorted(Path(__file__).resolve().parent.glob("*.py")):
+        try:
+            tree = _ast.parse(f.read_text())
+        except (OSError, SyntaxError):
+            continue
+        for node in _ast.walk(tree):
+            if not isinstance(node, _ast.Call):
+                continue
+            fn = node.func
+            if getattr(fn, "id", None) != "Param" and getattr(fn, "attr", None) != "Param":
+                continue
+            for kw in node.keywords:
+                if kw.arg == "config" and isinstance(kw.value, _ast.Constant) \
+                        and isinstance(kw.value.value, str) and kw.value.value not in out:
+                    out.append(kw.value.value)
+    return tuple(out)
+
+
+def _misplaced_paper_key(cfg: Path) -> None:
+    """Refuse LOUDLY if a [paper] key was declared in a table that is not [paper].
+
+    Ζ·toml·scope — the general form of Ζ·consumer·scope, which guarded exactly one key.  TOML
+    scoping is POSITIONAL and invisible: `root = "."` on line 8 with `[paper]` opening on line 10
+    is inert, while the same three characters above line 1 of a `[paper]`-first file are correct.
+    Same characters, opposite effect, indistinguishable by eye.
+
+    Three faces are on record, and only the first was guarded:
+      · `consumer_fields` under a [checks.X] header — a downstream consumer lost SIX fields, and
+        the only signal was drop-warnings scrolling past a green exit.
+      · the [checks.claim]-cmd shadowing trap — same class, one level down.
+      · `root` declared ABOVE [paper] — reported by summit against memmesh.  layout.py reads
+        `.get("paper", {})`, so a top-level key is outside that dict.  ⚑ An absent root is
+        INFERRED SILENTLY, so the misplacement is unfalsifiable on every green board until the
+        one run where Δ actually copies the parent — the most expensive possible moment.
+
+    Two of the three were found by downstream consumers, and paperkit's own eleven paper.toml
+    files are all correctly scoped: this is a trap that catches CONSUMERS and never us, which is
+    why it survived two sightings.  So the check is TOTAL over the owner's key set rather than
+    per-key, and it covers the TOP LEVEL as well as sibling tables — the top level is where the
+    reported instance actually sat, and the per-key guard did not look there at all.
+
+    REFUSES rather than warns: a warning is what the consumer already had, and it did not stop
+    the build."""
+    import tomllib as _t
+    keys = set(paper_keys()) | set(_param_config_keys())
+    raw = _t.loads(cfg.read_text())
+
+    def _refuse(key, where):
+        sys.exit(f"paperkit: `{key}` is declared {where}, but it belongs under [paper].  TOML "
+                 f"scoped it out of the [paper] table, so the engine reads NONE of it and the "
+                 f"build would still report success.  Move it below the [paper] header.")
+
+    for k, v in raw.items():                       # the TOP level: a key above [paper]
+        if k in keys and not isinstance(v, dict):
+            _refuse(k, "at the top level of paper.toml (above any [paper] header)")
+    for table, body in raw.items():                # any NON-[paper] table, and its subtables
+        if table == "paper" or not isinstance(body, dict):
+            continue
+        for k, v in body.items():
+            if k in keys and not isinstance(v, dict):
+                _refuse(k, f"under [{table}]")
+            if isinstance(v, dict):
+                for k2 in v:
+                    if k2 in keys:
+                        _refuse(k2, f"under [{table}.{k}]")
+
+
+def _misplaced_consumer_fields(cfg: Path) -> list:
+    """[] — and a LOUD refusal first if `consumer_fields` was declared in the wrong TOML table.
+
+    Called as load_config's DEFAULT for the key, so the `p.get("consumer_fields", ...)` read stays
+    visible in load_config's own source: checks/gen_fields.py derives the documented [paper] key
+    set by parsing that source, and a read hidden inside a helper silently drops the key from the
+    generated field table (measured — it reddened rm-fields).
+
+    Ζ·consumer·scope — `consumer_fields` belongs under [paper].  Put it after a [checks.X] header
+    and TOML scopes it into THAT table, so `paper.get("consumer_fields")` is empty, every declared
+    field loud-drops as unknown, and THE BUILD STILL REPORTS SUCCESS.  Reported by a downstream
+    consumer who lost six fields that way; the only signal was drop-warnings scrolling past a
+    green exit.  Same class as the [checks.claim]-cmd shadowing trap: a real misconfiguration
+    that degrades the output while the gate stays quiet.
+
+    A misplaced key is unambiguous — no other table has any use for it — so this REFUSES rather
+    than warning.  A warning is what they already had, and it did not stop the build."""
+    import tomllib as _t
+    raw = _t.loads(cfg.read_text())
+    for table, body in raw.items():
+        if table != "paper" and isinstance(body, dict):
+            for sub, inner in list(body.items()) + [(table, body)]:
+                d = inner if isinstance(inner, dict) else body
+                if isinstance(d, dict) and "consumer_fields" in d:
+                    sys.exit(f"paperkit: `consumer_fields` is declared under [{table}"
+                             f"{'.' + sub if isinstance(inner, dict) else ''}], but it belongs "
+                             f"under [paper].  TOML scoped it into that table, so the engine sees "
+                             f"NONE and every field you declared would drop silently.")
+    return []
+
+
 def load_config(project: Path) -> dict:
     cfg = project / "paper.toml"
     if not cfg.exists():
         sys.exit(f"paperkit: no paper.toml in {project}")
+    _misplaced_paper_key(cfg)          # Ζ·toml·scope — refuse a [paper] key scoped out of [paper]
     p = tomllib.loads(cfg.read_text()).get("paper", {})
     return {
         "title": p.get("title", "Untitled"),
@@ -186,7 +316,24 @@ def load_config(project: Path) -> dict:
         # (e.g. a summit report's reporter/genre/target), carried by the parser but consumed by no
         # paperkit invariant.  The policy (which fields) is the consumer's, declared here per project;
         # the mechanism is the engine's.  An UNdeclared unknown field is still named loud by parse.
-        "consumer_fields": tuple(p.get("consumer_fields", [])),
+        "consumer_fields": tuple(p.get("consumer_fields", _misplaced_consumer_fields(cfg))),
+        # Ζ·talk·tier — the check TYPES this project declares NON-MECHANICAL: gated, never graded.
+        # A `premise:` ("everyone here has shipped a doc that lies") or a `definition:` ("a passing
+        # example is DOCUMENTATION") is not a claim a mutation can flip; its `cmd = "true"` is
+        # unfalsifiable BY CONSTRUCTION, so the def-sweep correctly measures sens=∅ and the grade
+        # lands `indeterminate` — below the adequacy floor.  That is a true measurement of a claim
+        # that was never a sweep candidate, and failing adequacy on it would force the project to
+        # either delete its honest premises or dress them in a fake mechanism, which is exactly the
+        # dishonesty the premise: verb exists to prevent.
+        #
+        # DECLARED, never inferred: `cmd == "true"` would be a tempting tell and a hole — any
+        # project could then silence adequacy by routing a real claim through a trivial command.
+        # The declaration is the policy (the project's), the exclusion is the mechanism (the
+        # engine's) — the same split as consumer_fields above.  Same shape as `tier`, which
+        # already means "gated but not graded" for a host-run check the sandbox cannot grade.
+        "nonmechanical": tuple(sorted(
+            t for t, spec in tomllib.loads(cfg.read_text()).get("checks", {}).items()
+            if isinstance(spec, dict) and spec.get("mechanical") is False)),
     }
 
 
@@ -200,6 +347,16 @@ def parse_project(project_dir: Path) -> dict:
     for b in cfg["bibs"]:
         F.update(parse(b, cfg["consumer_fields"]))
     return F
+
+
+def load_bib(bib_path: Path, project_dir: Path) -> dict:
+    """Parse ONE bib with the consumer_fields declared by project_dir's paper.toml — the single-bib
+    analogue of parse_project, for a caller that reads a LONE bib by a narrower projection (footdeps: a
+    MODULE.bazel row's bib; gen_formulas: one of paper/*.bib) rather than a project's full warrant list.
+    It still binds the project's DECLARED consumer fields, so such a caller cannot loud-drop a field the
+    project carries — the same "none can forget" owner as parse_project, one bib at a time.  load_config
+    exits on a missing paper.toml, so a caller against an unconfigured tree must guard existence first."""
+    return parse(bib_path, load_config(project_dir)["consumer_fields"])
 
 
 def rubric(path: Path) -> list:

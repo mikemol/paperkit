@@ -1,0 +1,9 @@
+[paper]
+title = "paperkit consumes its own consumer_fields"
+subtitle = "The one project that DECLARES a consumer field and carries it on a claim — so the feature paperkit documents and proves is also DEMONSTRATED end-to-end, and the parse paths that must stay quiet on a declared field have a live exercise (a declared field warns ZERO times; a project with none cannot exhibit that)."
+warrants = ["warrants.bib"]
+rubric = "rubric.tsv"
+out = "DEMO.md"
+numbered = false
+references = false
+consumer_fields = ["provenance"]

@@ -1,0 +1,12 @@
+% warrants.bib — the demonstration that paperkit consumes its OWN declared consumer field.  This
+% project's paper.toml declares `consumer_fields = ["provenance"]`; the claim below CARRIES a
+% `provenance` field, and its check (checks/carries.py) parses this bib through bib.load_bib (the owner
+% that binds the project's declared fields) and asserts the field survived, carried and quiet.  So the
+% consumer_fields capability paperkit documents and proves is here DEMONSTRATED — the live in-tree
+% exercise a tree of zero-declaration projects cannot supply.
+@misc{demo-carries-a-declared-field,
+  section = {demo},
+  claim   = {paperkit demonstrates the consumer_fields capability on its own tree --- this claim carries a `provenance` field, declared by this project's paper.toml, that no paperkit invariant reads but the engine parses and carries verbatim, so the feature documented in prose and proven in the boundary suite is also EXERCISED by a real gated project (without which a declared field's carry-and-stay-quiet path is invisible from inside paperkit --- a vacuous pass on a tree that declares none)},
+  provenance = {cassian-observability 2026-08-19, the downstream consumer whose 4-field dashboard exhibited the bare-parse loud-drop this project exists to keep fixed},
+  check   = {cmd:python3 checks/carries.py}
+}

@@ -1,0 +1,319 @@
+% deck-observe.bib — Ρ·deck·observe: what remains between the SLIDE FORMAT (landed) and a deck
+% that is a PROJECTION of the claim-DAG (not built).
+%
+% Stored as a paperkit bib for the same reason slides.bib is: the reasoning about a rendering
+% surface, kept in the format that surface projects.  DRAFT — no `check` fields: these are DESIGN
+% claims, not gated warrants (prototypes/README.md's lifecycle: it earns checks when it lands).
+%
+% This file is the SUCCESSOR record to slides.bib, written after Ρ·deck·node landed.  slides.bib
+% worked out the coalgebra; this one states what node DID and did NOT deliver, and what the
+% remaining rungs actually depend on.  Read the DAG (follow rests-on), not the file order.
+%
+% Session: 2026-08-22.
+
+% ── what landed: the format, and the bound that keeps it honest ───────────────────────────────
+
+@misc{node-landed-the-format,
+  section = {landed},
+  claim   = {Ρ·deck·node LANDED the slide FORMATS: pptx and odp are format OBJECTS in the render coalgebra (graph.py), md-to-pptx is a pandoc morphism, pptx-to-odp an office morphism, and SLIDE_ROUTES composes them --- so `graph.py --check` gates that every declared slide edge's tool is present and every slide route composes real edges, exactly as it does for the pdf routes}
+}
+
+@misc{node-did-not-land-the-observation,
+  section = {landed}, from = {node-landed-the-format},
+  claim   = {but node did NOT land a deck PROJECTION --- every slide edge is a downstream TRANSFORM of the pandoc observation of an already-linearized document, so the content reaching a slide is prose that has ALREADY lost the DAG structure; this is precisely the exporter-of-finished-prose that slides.bib's docx-pdf-are-transforms-not-observations names as the trap},
+  rests-on = {node-landed-the-format}
+}
+
+@misc{the-bound-is-gated-not-noted,
+  section = {landed}, from = {node-did-not-land-the-observation},
+  claim   = {the distinction is GATED rather than left as a comment --- rnd-deck-bound (render/checks/deck_bound.py) asserts both halves: the slide objects really are first-class in the coalgebra (the positive half), AND no slide format appears in project.TARGET.choices (the falsifier).  So the sentence "a deck projected from the DAG remains unbuilt" is a claim that CAN become false: the moment someone adds a slide target to the projector, the bound goes red and must be honoured or rewritten},
+  rests-on = {node-did-not-land-the-observation}
+}
+
+@misc{the-bound-is-the-landing-trigger,
+  section = {landed}, from = {the-bound-is-gated-not-noted},
+  claim   = {and that falsifier is not merely a guard but the LANDING TRIGGER for observe --- the check is designed to go red exactly when Ρ·deck·observe lands, at which point the correct move is to REWRITE the claim and the check together, not to weaken either; a bound that can only be satisfied by never building the thing would be a bound on the roadmap, not on the artifact},
+  rests-on = {the-bound-is-gated-not-noted}
+}
+
+% ── the measurement that landed beside it, and what it unblocks ───────────────────────────────
+
+@misc{residual-landed-independently,
+  section = {measure},
+  claim   = {Ρ·deck·residual LANDED as coherence.py's FIFTH face (grouping_residual) --- the authored section partition sigma checked against P* = argmax_P [Q_E(P) - gamma*d(P,sigma)] over the rests-on graph, reported as d(sigma,P*) plus the NAMED claims that move.  It reads only the bib, no sweep, so it measures wherever a project parses --- which is why it was buildable before observe and useful independently of decks}
+}
+
+@misc{residual-calibrated-against-an-outside-arm,
+  section = {measure}, from = {residual-landed-independently},
+  claim   = {the measure agrees with an INDEPENDENT prior measurement --- slides.bib's measured-grounding-is-sparse-and-section-aligned recorded 57 rests-on edges and 61 percent within-section on the paper project from a separate analysis, and the implemented face, run on the paper AS IT STOOD AT THAT COMMIT, reported exactly 57 edges and 61 percent; a relative instrument built only of comparisons cannot detect a uniform bias in its own primitive, so agreeing with a value fixed OUTSIDE the instrument is the calibration that mere internal consistency could not supply.  The live numbers MOVE as claims are added (adding this arc's own grouping-residual claim took them to 58 edges and 62 percent, and surfaced a fifth named claim) --- which is the point: the calibration is a fixed historical agreement, not a constant the document must hold},
+  rests-on = {residual-landed-independently}
+}
+
+@misc{residual-found-real-signal,
+  section = {measure}, from = {residual-calibrated-against-an-outside-arm},
+  claim   = {and it names FOUR claims on the paper (claim-is-record, claims-are-warrants, fail-omits, paper-is-projection), every one of them a thesis-level claim whose grounding sits across the intro/model/engine boundary --- the deliberate forward-reference case the design predicted, not misfiling; so the residual behaves as a NAMING instrument (these claims owe a projected callback) rather than as a score to minimise, which is the disposition slides.bib's the-primitive-is-the-residual argued for},
+  rests-on = {residual-calibrated-against-an-outside-arm}
+}
+
+@misc{residual-is-the-grouping-observe-needs,
+  section = {measure}, from = {residual-found-real-signal},
+  claim   = {and that same partition is what a deck would CUT on --- observe needs a grouping of the DAG into bounded windows, residual computes exactly such a grouping and reports how far it sits from the authored one, so the grouping half of observe is now MEASURED rather than hypothetical; what observe still lacks is not the grouping but the PAGINATION of it},
+  rests-on = {residual-found-real-signal, node-did-not-land-the-observation}
+}
+
+@misc{emit-walks-the-route,
+  section = {measure}, from = {residual-is-the-grouping-observe-needs},
+  claim   = {Ρ·deck·emit then WALKED the declared route rather than leaving it declarable --- render/checks/slides.py performs md-to-pptx and pptx-to-odp with each tool DERIVED from the matrix, through lo.convert so the office edge inherits the isolated-profile and unlink-first provenance guarantees, and the gate holds the deliverable to carrying the paper's title and to a slide count that TRACKS the projection's own section headings; the first cut, taken at the wrong heading level, collapsed an 86-claim paper to FOUR slides and passed a nonzero-pages check, so the level is now derived from the document and the collapse is what the check catches},
+  rests-on = {residual-is-the-grouping-observe-needs, node-did-not-land-the-observation}
+}
+
+@misc{the-collapse-is-the-bound-made-visible,
+  section = {measure}, from = {emit-walks-the-route},
+  claim   = {and that collapse is the BOUND made observable rather than a bug in the producer --- a transform over linearized prose can only cut where the PROSE has a boundary, so the deck's structure says something about the document's headings and NOTHING about the argument's grounding; the slide count tracking section headings is exactly the strongest guarantee this rung can offer, and wanting a cut that means something about the claim-DAG is the definition of Ρ·deck·observe},
+  rests-on = {emit-walks-the-route}
+}
+
+@misc{gate-needed-discharge-first,
+  section = {measure}, from = {the-collapse-is-the-bound-made-visible},
+  claim   = {Ρ·deck·residual·gate then turned the instrument into an OPTIONAL control --- coherence gained --max-residual N, the deck-analog of --min-strength, gating the UN-ACKNOWLEDGED residual only; the discharge had to land first, because the four claims the face names on the paper are correct forward references a thesis makes deliberately, and a threshold on the raw count would have redded on them, i.e. measured the wrong thing while looking rigorous.  Absent the flag the face stays an instrument (reported, never fatal); the flag applies in every output mode, since a control a caller can disable by asking for JSON is not a control},
+  rests-on = {the-collapse-is-the-bound-made-visible, residual-found-real-signal}
+}
+
+% ── genre RESOLVED: open registry (owner decision, 2026-08-22) ────────────────────────────────
+
+@misc{genre-is-open,
+  section = {genre},
+  claim   = {RESOLVED (owner, 2026-08-22): the genre set is OPEN, a registry on the check-verb model, not a closed enumeration on the paragraph model --- slides.bib's open-gamma-set weighed a two-valued `paragraph` precedent against a genre-is-a-reusable-named-cost reading and could not settle it from inside; the decision is that decks have visibly more genres than prose and a consumer must be able to register its own pagination objective without editing the engine, exactly as a domain registers a check type in its own paper.toml}
+}
+
+@misc{open-registry-has-a-known-shape,
+  section = {genre}, from = {genre-is-open},
+  claim   = {and OPEN here has a PRECEDENT shape, not a blank one --- resolver.VERBS is the model: the BUILT-IN set is data in one owner (each entry carrying the STRUCTURAL bits downstream sites ask rather than re-list, the way `crosses` tells the grader to delegate, the footprint audit to skip, and the generator to wire a cross-repo dep), while a project registers its OWN in paper.toml; so a genre registry means built-in genres as data in one engine module plus a [genres.<name>] table a consumer declares, and every consumer of the genre set DERIVES from that registry rather than hardcoding a list},
+  rests-on = {genre-is-open}
+}
+
+@misc{open-does-not-resolve-the-objectives,
+  section = {genre}, from = {open-registry-has-a-known-shape},
+  claim   = {but OPEN answers only slides.bib's open-gamma-set, NOT its open-objective-per-genre --- deciding that any consumer may register a pagination objective says nothing about what the objective FUNCTIONS are, and the built-in ones still have to be written; the registry decision makes that tractable rather than smaller, since a wrong built-in objective is now correctable by a consumer registering a better one instead of being frozen into a closed enumeration},
+  rests-on = {open-registry-has-a-known-shape}
+}
+
+@misc{open-shifts-the-gate-question,
+  section = {genre}, from = {open-does-not-resolve-the-objectives},
+  claim   = {and an OPEN registry moves the gating burden the way the check-verbs already show --- a closed set could be gated by exhaustive case analysis, an open one cannot, so what must be gated is the REGISTRY's own invariants (a declared genre resolves, its objective is a real function of the grouping, and a project naming an unregistered genre is a loud refusal rather than a silent fallback), which is the same move `cmd:` forced on the resolver: the escape hatch is universal, so the gate holds the SEAM rather than the enumeration},
+  rests-on = {open-does-not-resolve-the-objectives, genre-is-open}
+}
+
+@misc{genre-name-is-free,
+  section = {genre}, from = {open-registry-has-a-known-shape},
+  claim   = {and the NAME is free at the level the knob needs, checked rather than assumed --- bib.py's consumer_fields comment already uses "genre" as its example of a downstream consumer's per-warrant vocabulary, which reads like a collision, but no project declares it (only demo/ declares consumer_fields, and only `provenance`) and no bib carries a genre field; a project-level [paper] genre knob and a per-claim consumer field are different levels and different mechanisms in any case, so the collision is illustrative rather than real --- worth having verified before building on the name, since an occupied word discovered late is a rename across every consumer},
+  rests-on = {open-registry-has-a-known-shape}
+}
+
+@misc{registry-landed,
+  section = {genre}, from = {open-shifts-the-gate-question},
+  claim   = {Ρ·deck·genre·registry LANDED that shape --- paperkit/genre.py holds the built-in objectives as data in one owner and reads a project's [genres.<name>] table exactly as the resolver reads [checks.<type>], so a consumer registers a pagination objective without touching the engine; the module imports NO engine module (it reads paper.toml through a function-local tomllib), which keeps it off the staged-input surface of every grid cell that touches a genre --- the dead-import trap Μ·kernel·fixture·reads closed, avoided here by construction rather than found later},
+  rests-on = {open-shifts-the-gate-question, genre-name-is-free}
+}
+
+@misc{registry-gates-the-seam-in-four-directions,
+  section = {genre}, from = {registry-landed},
+  claim   = {and the SEAM is gated in the four directions it can fail, each exercised against a real breach rather than asserted --- an unregistered name REFUSES (mutating the refusal into a fallback to `staged` flips the witness red), an objective must be a total function of the grouping (mutating the totality test into a constant true flips it red, and all four ways an objective breaks totality --- dropping, duplicating, inventing, raising --- are refused individually), a project's declaration must actually register (ignoring the [genres.*] table flips it red), and the per-project registry must not be GLOBAL state (aliasing the built-in dict instead of copying it lets a project's registration leak into the engine's own set, and that flips it red too)},
+  rests-on = {registry-landed, open-shifts-the-gate-question}
+}
+
+@misc{two-builtins-is-the-point,
+  section = {genre}, from = {registry-gates-the-seam-in-four-directions},
+  claim   = {and the built-in set is deliberately TWO (staged, atomic), not the four slides.bib sketched --- an open registry means a built-in that guessed wrong is a closed set's mistake made slowly, so the engine ships only the objectives whose definition is forced (staged is the identity on the grouping, atomic one unit per claim) and leaves brief and collection to the consumers that actually need them, which is precisely what open-objective-per-genre says is still unwritten; shipping four guesses would have converted an honest gap into three plausible defaults nobody measured},
+  rests-on = {registry-gates-the-seam-in-four-directions, open-does-not-resolve-the-objectives}
+}
+
+% ── the sweep: what the residual face reads across the whole repo ─────────────────────────────
+
+@misc{sweep-finds-the-corpus-mostly-degenerate,
+  section = {sweep},
+  claim   = {MEASURED (Ρ·deck·residual·sweep, 2026-08-22): running the grouping face over all eleven projects, SEVEN are DEGENERATE --- root, config, demo, guide, image, render, report have ZERO rests-on edges between cited claims, so sigma is the only partition their grounding graph can express and the residual is trivially 0; only paper (87 claims, 59 edges, 63 percent within-section, d=5 of which 4 un-acknowledged) and setup (29 claims, 26 edges, 69 percent, d=4) carry a graph the measure can read at all, with boundaries and library holding a single edge each},
+  rests-on = {residual-landed-independently}
+}
+
+@misc{degeneracy-is-about-the-edge-not-the-projects,
+  section = {sweep}, from = {sweep-finds-the-corpus-mostly-degenerate},
+  claim   = {and the cause is VOCABULARY ADOPTION, not thin documents --- every project uses `from` heavily (0.26 to 1.03 edges per claim, and the degenerate ones sit mid-range: render 0.64, report 0.75, root 0.67) while only paper and setup use `rests-on` at ALL; so the projects are richly connected in PROSE ORDER and almost unconnected in GROUNDING, which is exactly the two-graphs distinction the engine draws --- the corpus has adopted one edge type and largely not the other},
+  rests-on = {sweep-finds-the-corpus-mostly-degenerate}
+}
+
+@misc{degeneracy-bounds-what-the-face-can-claim,
+  section = {sweep}, from = {degeneracy-is-about-the-edge-not-the-projects},
+  claim   = {which BOUNDS the face honestly rather than indicting it --- a grouping residual is a statement about a grounding graph, so on a project with no such graph the correct output is a declared DEGENERATE, never a 0 read as agreement (which is why the degenerate flag was built before the sweep found seven cases needing it); and it bounds the deck work too: an observation-cut derived from rests-on can only be as rich as the rests-on a project actually declares, so for seven of eleven projects today a DAG-derived cut would reduce to the section cut a transform already gives},
+  rests-on = {degeneracy-is-about-the-edge-not-the-projects, residual-is-the-grouping-observe-needs}
+}
+
+@misc{objective-measured-before-written,
+  section = {genre}, from = {two-builtins-is-the-point},
+  claim   = {Ρ·deck·objective wrote the FIRST real objective, and measured the corpus before choosing its cost --- over paper/ a claim runs 4 to 164 words (median 27, p75 42) while a SECTION runs 34 to 850 (median 146), so neither built-in is presentable: staged puts a whole section on one unit, atomic gives a four-word claim its own; the talk objective is therefore staged PLUS a load budget of 84 words, that being the corpus's own p75 claim length doubled --- a measurement made visible as a module constant rather than a threshold picked for feel},
+  rests-on = {two-builtins-is-the-point, sweep-finds-the-corpus-mostly-degenerate}
+}
+
+@misc{the-budget-splits-at-the-atom,
+  section = {genre}, from = {objective-measured-before-written},
+  claim   = {and it splits only at CLAIM boundaries, which is forced rather than chosen --- a claim is the atom the whole engine is built on, so a pagination cutting below one would be inventing a unit the document model does not define; the consequence is accepted openly: a single claim longer than the budget keeps its own over-full unit, measured as 4 such units on paper/ (max 164 words) against staged's 11 over-budget units (max 850), and two of those four are claims this very arc wrote},
+  rests-on = {objective-measured-before-written}
+}
+
+@misc{the-objective-indicts-its-own-author,
+  section = {genre}, from = {the-budget-splits-at-the-atom},
+  claim   = {and the instrument's first real finding is about the hand that built it --- the two longest claims in paper/ are the ones this arc wrote (genre-registry at 239 words, grouping-residual at 160) against a prior corpus maximum of 74, so the talk objective flags its own author's prose as unpresentable; the budget itself is unaffected (p75 stays 42 words, since two outliers do not move a quartile of 87) which is the useful part --- a measure grounded in a robust statistic keeps reading correctly even when its author adds bad data, and the finding is a KEEP-warning about those two claims rather than a reason to move the threshold},
+  rests-on = {the-budget-splits-at-the-atom}
+}
+
+@misc{adoption-splits-honest-from-gap,
+  section = {sweep}, from = {degeneracy-bounds-what-the-face-can-claim},
+  claim   = {Ρ·deck·rests-on·adoption then SPLIT the seven degenerate projects rather than treating degeneracy as one verdict --- config, guide and image use ZERO grounding language in their prose (no because/therefore/since/follows), so they are reference and description pages with no argument to ground and their degeneracy is HONEST; render, report and the root README each carry claims that assert a dependency in prose while declaring no rests-on edge, which is a GAP},
+  rests-on = {degeneracy-bounds-what-the-face-can-claim}
+}
+
+@misc{the-gap-was-mine-too,
+  section = {sweep}, from = {adoption-splits-honest-from-gap},
+  claim   = {and the sharpest instance was self-inflicted --- rnd-deck-bound and rnd-slides, both written in THIS arc and AFTER the instrument that detects the gap existed, declared only `from` while genuinely grounding on rnd-graph (the bound is about the coalgebra's nodes; the producer walks its declared morphisms); declaring those two edges took render from DEGENERATE to 3 edges at 100 percent within-section, which is the adoption gap closed by one author noticing it in his own work rather than a corpus-wide campaign},
+  rests-on = {adoption-splits-honest-from-gap}
+}
+
+@misc{adoption-is-the-real-observe-blocker,
+  section = {sweep}, from = {the-gap-was-mine-too},
+  claim   = {so the honest statement about a DAG-derived cut is that it is bounded by ADOPTION, not by the measure --- where authors declare grounding the cut has something to read (paper 59 edges, setup 26), where they declare only prose order it collapses to the section cut a transform already gives, and the fix is authorial rather than algorithmic; an observe that shipped without saying so would present a section cut as a claim-DAG cut on most of this repo},
+  rests-on = {the-gap-was-mine-too, degeneracy-bounds-what-the-face-can-claim}
+}
+
+@misc{the-remaining-two-were-not-gaps,
+  section = {sweep}, from = {adoption-is-the-real-observe-blocker},
+  claim   = {and Ρ·deck·adoption·sweep CLOSED as a null result on the other two, which is the finding rather than a disappointment --- the keyword heuristic (because/since/therefore) flagged report's rpt-reproducible and the README's rm-ci-enable, but tracing each to the artifact refutes both: rm-ci-enable grounds on a fact about GIT ("git cannot auto-enable a hook from a commit"), not on the claim preceding it, and rpt-reproducible's "run above" is a reference to the report's LAYOUT while its check (determinism.py) reads the projects' own check strings and never rpt-status-out's output, so the two claims are independent in truth even though the prose reads as consequent},
+  rests-on = {adoption-is-the-real-observe-blocker}
+}
+
+@misc{grounding-language-is-not-a-grounding-edge,
+  section = {sweep}, from = {the-remaining-two-were-not-gaps},
+  claim   = {so the heuristic that FOUND the real gap cannot ADJUDICATE one --- prose connectives mark rhetorical consequence, which is exactly what `from` already encodes, and a rests-on edge is a claim about what makes a claim TRUE; the only sound test is tracing the dependency to the artifact (does this claim's witness read what that one establishes), and on that test one of three flagged cases was real --- a two-thirds false-positive rate that would have been banked as three edges had the keyword been trusted as the verdict},
+  rests-on = {the-remaining-two-were-not-gaps, the-gap-was-mine-too}
+}
+
+% ── what observe still needs, and the honest blocker ──────────────────────────────────────────
+
+@misc{observe-needs-a-new-observation-type,
+  section = {remaining},
+  claim   = {observe changes the projector's TYPE, not its output format --- project is S to String indexed by target (one flat stream seeded by rubric-order and dep-order); a deck is S to RoseTree(S) indexed by (target, genre), a SEGMENTATION into bounded observation-windows.  So it is not a new branch in the existing dispatch: it is a second observation shape the existing targets are all instances of the flat case of},
+  rests-on = {residual-is-the-grouping-observe-needs}
+}
+
+@misc{genre-is-the-genuine-blocker,
+  section = {remaining}, from = {observe-needs-a-new-observation-type},
+  claim   = {and the blocker WAS genre, of which the SHAPE half is now settled and the CONTENT half is not --- slides.bib's open-gamma-set (closed enumeration or open registry) is resolved OPEN by owner decision, so the surface question that would have bound three downstream consumers no longer blocks; what remains is open-objective-per-genre, the actual pagination objective functions, which is an implementation question inside a now-fixed shape rather than a vocabulary question about the shape itself},
+  rests-on = {observe-needs-a-new-observation-type, genre-is-open, open-does-not-resolve-the-objectives}
+}
+
+@misc{observe-landed-as-a-sibling,
+  section = {remaining}, from = {the-honest-order},
+  claim   = {Ρ·deck·observe LANDED as project.observe(), a SIBLING of project() rather than a branch inside it --- project returns one flat stream that every citation target materializes differently, observe returns UNITS indexed by (target, genre), and a function returning a string cannot host a segmentation; it deliberately returns the units and not rendered prose, since re-linearizing there would undo the very thing it exists to do.  Measured on paper/: staged 15 units at median 146 words, talk 46 at median 61, atomic 92 at median 31 --- one carrier, three paginations},
+  rests-on = {the-honest-order, registry-landed}
+}
+
+@misc{the-guard-caught-an-upward-edge,
+  section = {remaining}, from = {observe-landed-as-a-sibling},
+  claim   = {and the component guard caught a real architectural breach in the first draft --- observe imported coherence to describe what measures its grouping, which is an UPWARD edge (delta depends on project, never the reverse) and was besides a DEAD import the docstring alone justified; bnd-components refused it, the fix was deleting the import rather than widening the lattice, and the measurement stays where it belongs: the grade reads the projection, the projector never reads the grader},
+  rests-on = {observe-landed-as-a-sibling}
+}
+
+@misc{the-bound-was-rewritten-not-weakened,
+  section = {remaining}, from = {the-guard-caught-an-upward-edge},
+  claim   = {and rnd-deck-bound did NOT go red, which is the correct outcome and not a missed trigger --- the falsifier watches for a slide format becoming a citation-materialization TARGET, and a sibling function adds none, so the check stayed green while its CLAIM became false (it said a deck from the DAG was unbuilt); the claim was therefore rewritten to what now holds, that the render graph's deliverable is the TRANSFORM's until a route carrying units is declared, and the falsifier re-verified to still bite --- rewritten to match reality, never weakened to stay green},
+  rests-on = {the-guard-caught-an-upward-edge, the-bound-is-the-landing-trigger}
+}
+
+@misc{route-carries-units,
+  section = {remaining}, from = {the-bound-was-rewritten-not-weakened},
+  claim   = {Ρ·deck·route closed the clause the rewritten bound left open --- the coalgebra gained `units` as an OBSERVATION object, a sibling SOURCE to `md` rather than anything downstream of it, and a units-to-pptx morphism beside the md-to-pptx one; slides.py walks it, and the gate holds the observed deck to CORRESPOND with the units one-to-one while DIFFERING from the prose cut, since a route whose deliverable matched the transform's would be a name with no referent.  Measured on paper/: the transform gives 20 slides from 16 prose headings, the observation 50 from 49 units},
+  rests-on = {the-bound-was-rewritten-not-weakened, observe-landed-as-a-sibling}
+}
+
+@misc{the-object-is-the-distinction,
+  section = {remaining}, from = {route-carries-units},
+  claim   = {and the two routes use the SAME TOOL, which is why the distinction had to live in the OBJECT --- both end in pandoc and both deliver a .odp, so nothing about the tool, the format, or the file extension tells a consumer which it received; making `units` its own node is what lets the graph state the difference, and it is the same move the engine made when it split `from` from `rests-on`: two edges that look alike until the model names them apart},
+  rests-on = {route-carries-units}
+}
+
+@misc{collection-runs-the-other-way,
+  section = {genre}, from = {the-budget-splits-at-the-atom},
+  claim   = {Ρ·deck·objective·two registered a second objective, and it proves the axis is genuinely open by running the OTHER DIRECTION --- the collection cut MERGES where talk SPLITS, closing the grounding graph transitively so each unit is self-contained, with the cross-unit rests-on edge as its cost exactly as slides.bib's genre-names-the-objective predicted; measured, it takes paper/ from 22 cross-unit grounding edges to 0 (15 units to 11) and setup/ from 8 to 0, while leaving render/ untouched because its units were already self-contained --- and a closed enumeration built around splitting would have had no room for it},
+  rests-on = {the-budget-splits-at-the-atom, genre-is-open}
+}
+
+@misc{one-owner-for-the-partition,
+  section = {remaining}, from = {the-object-is-the-distinction},
+  claim   = {Ρ·deck·residual·wire connected the two halves that had been built separately --- the residual face was measuring a partition the projector did not use, so the grade graded a grouping no deck was cut on; the fix was place-by-ownership rather than a call across the lattice: the sigma-regularized partition moved into genre.partition (the project component), coherence CONSUMES it, and observe REGROUPS on it, so the projector's cut and the grade's measurement are the SAME object by construction.  Measured on paper/: 2 units now mix authored sections (intro+conclusion, and the intro/model/selfhost claim-is-a-record chain) --- groupings a section cut cannot produce},
+  rests-on = {the-object-is-the-distinction, residual-is-the-grouping-observe-needs}
+}
+
+@misc{the-partition-relabels-but-does-not-merge,
+  section = {remaining}, from = {one-owner-for-the-partition},
+  claim   = {and an honest bound on that: the greedy sweep RELABELS claims into existing groups and never creates or merges one, so the derived partition has sigma's CARDINALITY --- 15 groups for paper/ at every gamma tried, with 5 to 9 claims moving between them; the staged cut therefore yields 15 units whether or not the wiring is in effect, and only inspecting which claims land together shows it working.  A partition operator that could change the group COUNT is a different algorithm, not a tuning of this one},
+  rests-on = {one-owner-for-the-partition}
+}
+
+@misc{the-knob-could-not-use-choices,
+  section = {genre}, from = {collection-runs-the-other-way},
+  claim   = {Ρ·deck·genre·knob surfaced the registry as --genre with --observe, and the interesting part is what it could NOT reuse --- config.Param carries a `choices` tuple validated at resolve time, which is exactly wrong for an OPEN per-project set: a static tuple would either freeze the registry or duplicate and drift from it, so choices is left None and validation routes through genre.resolve, the same reason a check TYPE is validated by the resolver rather than enumerated in a Param.  The completeness guard then caught both consumers (gate and discriminate compose their registries from their import cone) --- the flags would otherwise have been silently ignored},
+  rests-on = {collection-runs-the-other-way, registry-landed}
+}
+
+@misc{materialize-or-the-deck-is-less-honest,
+  section = {remaining}, from = {the-partition-relabels-but-does-not-merge},
+  claim   = {Ρ·deck·materialize closed the last inversion --- the observed route's first carrier dumped raw claim text while the transform route ran source.cite_split and earned a verification marker per claim, so the deck sourced from the VERIFIED DAG stated LESS provenance than the reflowed prose; units now carry the same marker derived from each claim's own check type (85 of them on paper/), and the gate refuses a deck without them, since an artifact closer to the proof that says less about it inverts the reason for building the route},
+  rests-on = {the-partition-relabels-but-does-not-merge, route-carries-units}
+}
+
+@misc{the-segmentation-gets-its-own-drift-gate,
+  section = {remaining}, from = {materialize-or-the-deck-is-less-honest},
+  claim   = {Ρ·deck·observe·gate gave the segmentation the hold the prose already had --- the deck-correspondence check compares two things computed in the same breath, so it cannot catch the units drifting from the claim-DAG (both sides move together); the units are now COMMITTED as a manifest and regenerated fresh, and re-sectioning a single claim moves the cut and fails the check.  The MANIFEST rather than the .odp is the gated artifact, because a binary two toolchain runs need not reproduce byte-for-byte would gate the toolchain instead of the projection --- the deck is then held to the manifest, so the chain closes claims to units to slides},
+  rests-on = {materialize-or-the-deck-is-less-honest, route-carries-units}
+}
+
+@misc{merge-made-gamma-structural,
+  section = {remaining}, from = {the-partition-relabels-but-does-not-merge},
+  claim   = {Ρ·deck·partition·merge closed the bound the previous rung stated --- adding a MERGE of two grounded-adjacent groups beside the relabelling move makes gamma control cardinality, measured on paper/ as 15 groups at gamma=4 (pure sigma, nothing moved) against 11 at gamma<=1, where before it was 15 at every gamma; the staged cut went from 15 units to 11, so the derived grouping now differs from the authored one in COUNT and not only in membership.  Adjacency is the restriction that matters: merging unconnected groups would fuse a document on no evidence},
+  rests-on = {the-partition-relabels-but-does-not-merge}
+}
+
+@misc{the-declared-half-is-open-in-fact,
+  section = {genre}, from = {the-knob-could-not-use-choices},
+  claim   = {Ρ·deck·genre·cmd made the open half open in FACT rather than in principle --- the registry recorded a declared genre's cmd and nothing ran it, so a consumer could register an objective it could not use; the engine now invokes it on the `cmd:` model (groups in on stdin, units out on stdout, the format the CLI already prints) and holds the result to the SAME totality invariant a built-in meets, verified against a declared objective that drops a claim and one that exits non-zero --- both refused, because what a pagination IS does not depend on who wrote it},
+  rests-on = {the-knob-could-not-use-choices, registry-gates-the-seam-in-four-directions}
+}
+
+@misc{units-carry-the-full-materialization,
+  section = {remaining}, from = {the-segmentation-gets-its-own-drift-gate},
+  claim   = {and a unit now carries everything the PROSE route materializes for its claims, not just their sentences --- an emitted table, image, code block or raw include (rendered by the projector's OWN emit_block, so the two views cannot diverge), a proof-step depth, an expound-rung link, and the check that supplies provenance; a deck dropping those would be a LOSSY view of one carrier and the render layer could not recover what the projector discarded, so the gate now refuses a deck whose placed assets did not reach it, checked against the asset's own text rather than a count},
+  rests-on = {the-segmentation-gets-its-own-drift-gate, materialize-or-the-deck-is-less-honest}
+}
+
+@misc{three-projects-observe-not-one,
+  section = {sweep}, from = {the-remaining-two-were-not-gaps},
+  claim   = {Ρ·deck·units·sweep found observe() runs on ALL ELEVEN projects and widened the manifest gate from one to three --- the densest grounded cut, a SECOND grounded project so the gate is not a single instance, and a DEGENERATE one (nine units, nine placed assets, no rests-on) whose partition falls back to its authored sections, exercising a path the grounded projects never reach; the asset-heavy projects turn out to be the degenerate ones, so the case a deck gains most from is exactly the case the grouping can say least about},
+  rests-on = {the-remaining-two-were-not-gaps, units-carry-the-full-materialization}
+}
+
+@misc{gamma-became-a-knob,
+  section = {genre}, from = {merge-made-gamma-structural},
+  claim   = {Ρ·deck·gamma·declare made the resolution dial reachable --- gamma was a constant inside each registry entry, so a document could only be re-cut by picking a genre that happened to carry the value wanted; it is now a knob resolving through the same arg-over-env-over-config pipeline as every other, defaulting to NONE so that absence means "whatever the genre asks for" rather than an engine-wide constant silently overriding every genre's declared resolution.  Measured: the staged cut gives 11 units at the genre default and 15 at gamma=4, which is the authored sections recovered},
+  rests-on = {merge-made-gamma-structural, the-knob-could-not-use-choices}
+}
+
+@misc{the-new-machinery-grades-behavioral,
+  section = {remaining}, from = {units-carry-the-full-materialization},
+  claim   = {Ρ·deck·observe·adequacy turned the grader on this arc's OWN checks, which had gone ungraded through nineteen rungs of building a system for grading checks --- all fourteen new claims grade BEHAVIORAL, the strongest non-imported rung, so each is proven falsifiable by a single-file mutation rather than merely passing; the def-resolution sweep proved too slow to sit in the loop, killed after minutes on ONE claim, while file resolution answered every claim in seconds --- which is itself the reading: the precise instrument is an on-demand pass, not the one to reach for when the question is whether a check was graded at all},
+  rests-on = {units-carry-the-full-materialization}
+}
+
+@misc{the-honest-order,
+  section = {remaining}, from = {genre-is-the-genuine-blocker},
+  claim   = {THE ORDER, stated so it cannot be misread as a roadmap of equal rungs: node is DONE and bounded; residual is DONE, gateable, and independently useful; emit is DONE and walks the route; genre's SHAPE is decided (open registry) while its objective FUNCTIONS are unwritten; observe is DESIGNED and now blocked on those functions rather than on a vocabulary question.  The one thing that must NOT happen is observe landing by quietly widening the slide transform into a target and letting the deck bound be deleted rather than rewritten --- which is exactly the move rnd-deck-bound exists to make impossible},
+  rests-on = {genre-is-the-genuine-blocker, the-bound-is-the-landing-trigger, gate-needed-discharge-first}
+}

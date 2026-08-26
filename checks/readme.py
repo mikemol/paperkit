@@ -56,7 +56,7 @@ def rm_resolver_premise():
         "the premise provenance note does not surface 'not machine-checked'"
     assert "Machine-verified" in P._verify_note("cmd:true"), "the cmd provenance note regressed"
     assert "Agda-proved" in P._verify_note("agda:Foo.bar"), "the agda provenance note regressed"
-    assert gate.resolves("premise:x", ENGINE, {}) is resolver.UNAVAILABLE, \
+    assert gate.resolves("premise:x", ENGINE, {}).is_unavailable(), \
         "premise resolved as a built-in gate verb — it must be a provenance KIND, not a verb"
 
 
@@ -158,7 +158,7 @@ def rm_resolver_tbl():
         assert row in tbl, f"the table's {typ}: row does not match the engine's declaration\n  want: {row}"
     assert gate.resolves("cmd:true", ENGINE, {}).passed and gate.resolves("file:gate.py", ENGINE, {}).passed, \
         "the tabled built-in verbs do not dispatch"
-    assert gate.resolves("nosuchverb:x", ENGINE, {}) is resolver.UNAVAILABLE, "the built-in set is not closed"
+    assert gate.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(), "the built-in set is not closed"
 
 
 def rm_resolver_eg():

@@ -82,7 +82,7 @@ A verifier is named type:target, and one type ships built in per verb — exists
 | --- | --- | --- |
 | `file:<path>` | exists | the artifact exists |
 | `cmd:<script>` | execs | the script exits `0` |
-| `result:<project>` | parses | the sibling project's gate verdict parses green |
+| `result:<project>[#<claim>]` | parses | the sibling project's gate verdict parses green --- for the whole project, or for the ONE named warrant |
 | `agree:<p>\|\|\|<q>` | concurs | the independent producers all exit `0` and emit identical output |
 | `concept:<key>` | imports | the project's concept library --- else the engine's --- certifies that key |
 

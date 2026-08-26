@@ -19,6 +19,8 @@ The knobs, each with its flag, environment variable, config key, and default —
 | `delta-pulse` (value) | `--delta-pulse` | `PAPERKIT_DELTA_PULSE` | — | `2` |
 | `delta-repeat` (value) | `--delta-repeat` | `PAPERKIT_DELTA_REPEAT` | — | `1` |
 | `footprint` (flag) | `--footprint` | `PAPERKIT_FOOTPRINT` | — | `—` |
+| `gamma` (value) | `--gamma` | `PAPERKIT_GAMMA` | `gamma` | `—` |
+| `genre` (value) | `--genre` | `PAPERKIT_GENRE` | `genre` | `talk` |
 | `invariants` (flag) | `--invariants` | `PAPERKIT_INVARIANTS` | — | `—` |
 | `jobs` (value) | `--jobs` | `PAPERKIT_JOBS` | `jobs` | `—` |
 | `json` (flag) | `--json` | `PAPERKIT_JSON` | — | `—` |
@@ -26,6 +28,7 @@ The knobs, each with its flag, environment variable, config key, and default —
 | `min-strength` (value) | `--min-strength` | `PAPERKIT_MIN_STRENGTH` | `min_strength` | `—` |
 | `mutant` (value) | `--mutant` | `PAPERKIT_MUTANT` | — | `—` |
 | `no-cache` (flag) | `--no-cache` | `PAPERKIT_NO_CACHE` | — | `—` |
+| `observe` (flag) | `--observe` | `PAPERKIT_OBSERVE` | — | `—` |
 | `only` (value) | `--only` | `PAPERKIT_ONLY` | — | `—` |
 | `path` (value) | `--path` | `PAPERKIT_PATH` | — | `—` |
 | `resolution` (value) | `--resolution` | `PAPERKIT_RESOLUTION` | `resolution` | `file` |

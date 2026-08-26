@@ -210,7 +210,64 @@ durable index. Append-only, retirement-logged (see README).
   sweep needs a sandbox that blocks `resolve()` symlink-escape; processwrapper lets checks
   resolve out to the real unmutated tree. Mechanism CONFIRMED; agent's eval.py:90 fix REFUTED.
 
+- **Ρ·deck·{node,emit,route,materialize,notes}** `[uncommitted]` — the slide surface: pptx/odp as
+  coalgebra OBJECTS with their tools derived from the matrix; the route WALKED not merely declared;
+  a `units` object making the transform/observation distinction live in the GRAPH (same tool, same
+  extension, only the source object tells them apart); claims materialized with the prose route's
+  own verification markers and emit blocks; speaker notes via the reserved engine-inert `note`.
+- **Ρ·deck·{residual,residual·gate,partition·merge}** `[uncommitted]` — coherence's FIFTH face:
+  the authored σ vs the rests-on-modularity P*, `d(σ,P*)` NAMING the claims that move. Calibrated
+  against slides.bib's independently-measured 57 edges / 61%. `--max-residual` gates the
+  UN-acknowledged residual only (a `link` discharges), since the 4 named claims are correct
+  forward references. A MERGE operator made γ structural — before it, γ moved labels but never
+  the group COUNT.
+- **Ρ·deck·{genre·registry,objective,genre·cmd,gamma·declare}** `[uncommitted]` — pagination as an
+  OPEN registry on the resolver.VERBS model (owner decision), gated at the SEAM not the set:
+  RESOLVES / TOTAL / LOUD, plus per-project isolation. `talk` objective's budget is the corpus's
+  own p75 claim length doubled. A project-declared genre RUNS its cmd, held to the same totality
+  invariant a built-in meets.
+- **Ρ·deck·observe** `[uncommitted]` — the projector's SECOND observation shape: `project` is
+  S→String, `observe` is S→units indexed by (target, genre). A sibling function, not a fifth
+  target — a function returning a string cannot host a segmentation. The component guard caught
+  the first draft's UPWARD edge (project importing coherence) and a dead import justified only by
+  a docstring.
+- **Ρ·deck·{observe·gate,units·sweep}** `[uncommitted]` — the segmentation gets the hold the prose
+  has: a committed manifest, regenerated fresh, across FOUR projects (two grounded, one degenerate
+  exercising the σ-fallback). The deck-correspondence check alone cannot catch unit drift — it
+  compares two things computed in the same breath.
+- **Ρ·talk** `[uncommitted]` — an 11th project: the delivered CI/CD-for-writing talk, projected to
+  a 23-slide .odp with 21 speaker-note pages and 4 colour-safe figures. Zero `cmd:true`: 12
+  imported certificates, 16 own witnesses, 4 honest premises, 2 stipulated definitions. Δ confirms
+  the labelling exactly (imported/behavioral/indeterminate ↔ concept/claim/premise).
+- **Ρ·render·alt** `[uncommitted]` — the session's sharpest CLASS: a description PRESENT but
+  useless passes a presence check. Found on the slide route (pandoc's pptx writer discards
+  markdown alt-text and writes the image PATH), then measured on the real PDF (**18 of 19** links
+  carried a bare footnote digit while the check said "0 undescribed remain"). Both routes now
+  19/19 and 11/11 under ONE predicate. Three sub-findings, each mine: the fixture modelled a
+  condition the pipeline never presents; `uninformative()` carried a duplicate predicate that
+  disagreed; and my own expansion `"note 1"` failed the bar I was applying.
+- **Ρ·render·selfbar** `[uncommitted]` — SWEPT: seven render warrants graded only by their
+  producer's own `--selftest`. Legitimate for a METHOD; the gap is QUALITY on the shipped
+  artifact. Closed for `mathalt` (21/21 formulas, gated in pdf.py) and `rnd-widen` (a deliverable
+  `fits()` predicate: before-widen 1 cell needs 5956 twips and has 2741; after, none clipped).
+  `rnd-latex` re-pointed at its own deliverable mode beside the selftest.
+- **Ρ·deck·hook** `[OPEN]` — the repo-wide `bazel test //:hook` was deferred across this whole arc
+  and is the largest unverified surface: engine modules (genre/coherence/project/gate/discriminate,
+  components.bzl, dag.bzl), four manifests, linkalt's changed skip, the alt-text repair, and all of
+  `talk/`. Nine projects unverified against these changes.
+
 ## Practice (banked as memory)
+
+- **Λ·measure·completion** — I report ACTIVITY as PROGRESS about my own builds: load average,
+  process count, live sandboxes, "it is working hard, not hung".  Three times in one session,
+  while zero artifacts had been produced.  The tell is citing a rate-like number (load 55, 23
+  sandboxes) instead of a COUNT of finished outputs; the correction is to measure completions
+  (artifacts written, tests executed) and to treat "live" as a liveness check only.  Same shape as
+  presence-vs-meaning (an alt-text that is present but useless) and instrument-vs-gate (a signal
+  that is useful but not sound) — which I caught reliably in the CODE and repeatedly missed about
+  my own tooling.  Cost here: a 368-second hook reported as an unbounded scaling problem, plus two
+  extrapolations from a per-cell cost measured under self-inflicted thrash.
+
 
 Λ·contact · Λ·outward · Λ·rationale · Λ·risk · Λ·act · Λ·iface · Λ·evidence · Ζ·pipestatus ·
 Λ·instrument-vs-gate · Λ·standing-vs-construct · Λ·artifact-state.

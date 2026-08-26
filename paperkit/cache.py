@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import durable
 from layout import SKIP_DIRS, _ENGINE, _mutable, _nested_roots
 
 
@@ -124,6 +125,6 @@ def load(project_dir: Path) -> dict:
 
 def save(project_dir: Path, data: dict) -> None:
     try:
-        (project_dir / ".delta-cache.json").write_text(json.dumps(data))
+        durable.write_atomic(project_dir / ".delta-cache.json", json.dumps(data))
     except Exception:
         pass

@@ -46,6 +46,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# Ζ·pkg·shape — the engine's own directory, FIRST on sys.path, and it must stay a per-module
+# line rather than moving to paperkit/__init__.py: a package __init__ runs only when the
+# package is IMPORTED, and these modules are also loaded as siblings by a caller that has
+# already put its own directory ahead of ours.  render/checks/ ships its OWN bib.py, so a
+# witness inserting that directory shadows the engine's parser and `from bib import
+# dep_order` resolves to the wrong module.  MEASURED: removing these six lines reddened
+# seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
+# The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bib  # noqa: E402  (the parser/data-model leaf — NOT project, so rhetoric no longer closes the project↔rhetoric cycle)
 

@@ -35,6 +35,14 @@ import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+# Ζ·pkg·shape — the engine's own directory, FIRST on sys.path, and it must stay a per-module
+# line rather than moving to paperkit/__init__.py: a package __init__ runs only when the
+# package is IMPORTED, and these modules are also loaded as siblings by a caller that has
+# already put its own directory ahead of ours.  render/checks/ ships its OWN bib.py, so a
+# witness inserting that directory shadows the engine's parser and `from bib import
+# dep_order` resolves to the wrong module.  MEASURED: removing these six lines reddened
+# seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
+# The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
 import bib  # noqa: E402  (the parser/data-model leaf)
@@ -80,7 +88,7 @@ INVARIANTS = config.Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
                           help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks")
 # The gate CLI's composed registry: exactly the Params its import cone hosts (own 6 +
 # project's + resolver's; bnd-config asserts this completeness).
-REGISTRY = [SAFE, WITHOUT_K, JOBS, JSON, ONLY, INVARIANTS, P.TARGET, P.CHECK, resolver.PATH]
+REGISTRY = [SAFE, WITHOUT_K, JOBS, JSON, ONLY, INVARIANTS, P.TARGET, P.GENRE, P.GAMMA, P.OBSERVE, P.CHECK, resolver.PATH]
 
 
 def cited_keys(prose: str) -> set:
@@ -173,11 +181,29 @@ def main(argv: list) -> int:
     only = config.resolve(ONLY)
     if only:
         if only not in F or not F[only].get("check"):
+            # A key naming no check is a caller BUG, not a ran-and-failed verdict.  Under --json it
+            # must still SPEAK — the leaf was addressable but MUTE (info() is suppressed and the
+            # --json block sits past the early return), so a machine consumer saw an exit code and
+            # empty stdout and could not tell refuse from pass.  That silence is why result: could
+            # not delegate per-warrant: the address existed, the ANSWER did not.
+            if as_json:
+                print(json.dumps({"available": False, "reason": f"no check for claim {only!r}",
+                                  "pass": False, "only": only}, indent=2))
             print(f"paperkit-gate: no check for claim {only!r}", file=sys.stderr)
-            return _REFUSE      # a key naming no check is a caller BUG, not a ran-and-failed verdict
-        ok = resolves(F[only]["check"], project_dir, custom).passed
-        info(f"paperkit-gate: {only} {'ok' if ok else 'FAIL'} — {F[only]['check']}")
-        return 0 if ok else 1
+            return _REFUSE
+        v = resolves(F[only]["check"], project_dir, custom)
+        # Ω·verdict — the leaf answers the same TRISTATE the node does (ask-result-tristate): a
+        # check that could not be EVALUATED is not a refutation of the claim.  Collapsing
+        # unresolvable to FAIL here would make an unreachable sibling look like a failing one.
+        if as_json:
+            print(json.dumps({"available": not v.is_unavailable(), "pass": bool(v.passed),
+                              "only": only, "check": F[only]["check"],
+                              "reason": None if not v.is_unavailable() else (v.why or "check unresolvable")},
+                             indent=2))
+        info(f"paperkit-gate: {only} {'ok' if v.passed else 'FAIL'} — {F[only]['check']}")
+        if v.is_unavailable():
+            return _REFUSE
+        return 0 if v.passed else 1
 
     out = cfg["out"]
     if not out.exists():
@@ -262,9 +288,13 @@ def main(argv: list) -> int:
         # just not-pass, and does not read "I could not check it" as "the claim is false".  Both
         # keep the premise from certifying (fail-closed), but only across a repo boundary; in-repo
         # every sibling is present so `unresolvable` is empty.
+        # Ζ·unavailable·why — test the STATE, not object identity: a cannot-run that carries the
+        # delegate's reason is a distinct object, and `is UNAVAILABLE` would file it under `bad`,
+        # turning "I could not check this" back into "the claim is false" — the exact conflation
+        # the tristate exists to prevent.
         bad = sorted(k for k in to_verify if not cache[F[k]["check"]].passed
-                     and cache[F[k]["check"]] is not resolver.UNAVAILABLE)
-        unresolvable = sorted(k for k in to_verify if cache[F[k]["check"]] is resolver.UNAVAILABLE)
+                     and not cache[F[k]["check"]].is_unavailable())
+        unresolvable = sorted(k for k in to_verify if cache[F[k]["check"]].is_unavailable())
     if undefined:
         print(f"paperkit-gate: undefined citations: {', '.join(undefined)}", file=sys.stderr)
         rc = 1
@@ -282,8 +312,14 @@ def main(argv: list) -> int:
         # not refuted.  Named distinctly from FAILED so a caller reads "I could not check this", not
         # "the claim is false" — and the gate still reds (fail-closed: an unverified claim cannot ship).
         for k in unresolvable:
-            print(f"paperkit-gate: check UNRESOLVABLE for [@{k}]: {F[k]['check']} — could not evaluate "
-                  "(unreachable delegate or unknown verb), NOT a refutation", file=sys.stderr)
+            v = cache[F[k]["check"]]
+            # Report the incomplete Π, not the sum: name WHO could not run and WHAT is missing,
+            # so the reader is pointed at the fix.  The disjunction this replaced ("unreachable
+            # delegate or unknown verb") named everything it might have been and nothing it was.
+            why = (f"{v.owner}: {v.why}" if v.owner and v.why else
+                   v.why or "unreachable delegate or unknown verb")
+            print(f"paperkit-gate: check UNRESOLVABLE for [@{k}]: {F[k]['check']} — {why}; "
+                  "NOT a refutation", file=sys.stderr)
         rc = 1
     if inv_only:
         info(f"paperkit-gate: invariants node — {len(to_verify)} claim check(s) deferred to the leaf targets")
@@ -380,5 +416,14 @@ def main(argv: list) -> int:
     return rc
 
 
-if __name__ == "__main__":
+def _cli():
+    """Console-script entry point (pyproject [project.scripts]).
+
+    A wheel cannot point an entry point at `__main__`, so the same one-liner is named here
+    and reused below — one call site, not two implementations that can drift.
+    """
     raise SystemExit(main(sys.argv[1:]))
+
+
+if __name__ == "__main__":
+    _cli()

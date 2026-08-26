@@ -27,6 +27,14 @@ import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+# Ζ·pkg·shape — the engine's own directory, FIRST on sys.path, and it must stay a per-module
+# line rather than moving to paperkit/__init__.py: a package __init__ runs only when the
+# package is IMPORTED, and these modules are also loaded as siblings by a caller that has
+# already put its own directory ahead of ours.  render/checks/ ships its OWN bib.py, so a
+# witness inserting that directory shadows the engine's parser and `from bib import
+# dep_order` resolves to the wrong module.  MEASURED: removing these six lines reddened
+# seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
+# The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bib  # noqa: E402  (the parser/data-model leaf — footdeps needs only the bib, not the projector)
 import resolver  # noqa: E402
@@ -48,7 +56,18 @@ def _wired(repo_root: Path) -> list:
         bib_path = repo_root / bib_lbl.group(1).lstrip("/").replace(":", "/")
         if not bib_path.is_file():
             continue
-        f = bib.parse(bib_path)
+        # consumer_fields — a declared field must be quiet HERE too, else _wired (which runs on every
+        # commit via the pre-commit) loud-drops a consumer's carried field.  Route through the owner
+        # (load_bib binds the project's declared fields) when the project has a paper.toml.  A row WITHOUT
+        # one is still a real project that must be AUDITED — it just has no declared consumer fields, so
+        # parse with the empty default (() = no declaration, the honest value): its bib's non-builtin
+        # fields are then genuinely undeclared and warned, correctly.  NOT a silent skip: dropping the row
+        # would narrow the audit set with no signal — the exact silent-failure this codebase refuses.
+        # (load_config exits on a missing paper.toml; _wired runs against arbitrary consumer repo roots,
+        # repo_root = git toplevel, so guard existence before the owner call.  A row's `project` gives a
+        # NAME; `repo_root / "."` correctly resolves the root row to repo_root.)
+        pdir = repo_root / proj.group(1)
+        f = bib.load_bib(bib_path, pdir) if (pdir / "paper.toml").is_file() else bib.parse(bib_path)
         # a sandbox-tier check = has a check and its effective tier is sandbox (no tier field / "sandbox")
         if any(w.get("check") and (w.get("tier") or "sandbox") == "sandbox" for w in f.values()):
             out.append(proj.group(1))

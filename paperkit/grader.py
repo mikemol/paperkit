@@ -386,7 +386,18 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
         # whole transitive footprint into this sandbox.  Sound by COMPOSITION: the sibling carries
         # its own gate AND Δ in //:hook, and the GATE (not Δ) resolves result: live — so a broken or
         # bogus sibling fails THERE.  The falsifiability tier need not, and does not, re-verify it.
+        sproj, _, sclaim = target.partition("#")
         return {"grade": "imported", "tests": [target],
+                # Λ·pi·carry — the DELEGATION EDGE, carried as data rather than collapsed into the
+                # tag.  `imported` alone is an EXISTENTIAL ("somebody vouched") and forgets the
+                # owner, which is why a cross-boundary clamp could not be written: the value to
+                # clamp against had nowhere to come from.  Naming (owner, claim) makes this a
+                # dependent PAIR — the fiber and the point in it — so a reader holding the owner's
+                # grade record can resolve the import to a real grade (grade.clamp does exactly
+                # this).  The CLI cannot resolve it ITSELF: certificates are build artifacts, and
+                # re-deriving one here is the rm-status cost bomb the delegation exists to avoid.
+                # So this returns the MAP, not its value; whoever holds the certificate applies it.
+                "delegates_to": {"owner": sproj, "claim": sclaim or None, "verb": "result"},
                 "why": f"adequacy delegated to the separately-gated sibling project '{target}' "
                        "(composition, not re-derivation — its own gate + Δ are the guarantee)",
                 "not_higher": "imported is a delegation, not a falsifiability tier",
@@ -403,6 +414,13 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
         # imports the certificate's measured engine fingerprint into this view's adequacy and :cohere
         # (pk_grade over @paperkit_library//:<key>__dcalc), so the proof itself travels with the import.
         return {"grade": "imported", "tests": [f"library/{target}"],
+                # Λ·pi·carry — see result: above.  The owner here is the concept LIBRARY, and the
+                # Bazel path already resolves this edge for real: pk_grade reads the library's
+                # __dcalc certificate, so the importing view's grade record carries the OWNER'S
+                # measured grade (verified: paper's paper-is-projection record reads "behavioral",
+                # byte-identical to the library's, and paper holds no calc of its own to derive it
+                # from).  Naming the edge here lets the in-process clamp reach the same value.
+                "delegates_to": {"owner": "library", "claim": target, "verb": "concept"},
                 "why": f"adequacy delegated to the concept library, which owns, grades and gates the "
                        f"'{target}' witness (composition, not re-derivation)",
                 "not_higher": "imported is a delegation, not a falsifiability tier",
@@ -635,6 +653,65 @@ def _perturb_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Pa
         ds.file.write_bytes(saved)
 
 
+# Ζ·delta·tmpdir — WHERE a sweep's sandbox copies live, and why not the default /tmp.
+#
+# Each concurrent def-sweep copies the WHOLE repo (measured on paperkit itself: 1.4-3.2GB per
+# copy, three concurrent = 7.2GB).  On a distro whose /tmp is a tmpfs that is RAM, so the copies
+# compete with the page cache AND with the very memory budget the sweep schedules against —
+# one resource counted once, spent twice.  Measured the hard way: a //:hook run filled a 7.7GB
+# /tmp to 100%, at which point nothing on the box could write a temp file at all.
+#
+# The scheduler models RAM (tools/sweep_budget.py) and says nothing about disk, so the collision
+# is invisible to it.  Rather than teach the budget a second axis, put the copies somewhere disk
+# BACKED — 80GB free there against 7.7GB of tmpfs on this box — and the two resources decouple.
+#
+# Resolution ladder (= the Ω·config ladder): PAPERKIT_SCRATCH > XDG_CACHE_HOME > ~/.cache, and
+# only then the platform default.  A machine that WANTS tmpfs sets PAPERKIT_SCRATCH=/tmp.
+_SANDBOX_PREFIX = "paperkit-delta-"
+
+
+def _scratch_dir() -> str | None:
+    """The parent for sweep sandboxes — disk-backed by preference.  None ⇒ platform default."""
+    for cand in (os.environ.get("PAPERKIT_SCRATCH"),
+                 os.environ.get("XDG_CACHE_HOME"),
+                 os.path.expanduser("~/.cache") if os.path.expanduser("~") != "~" else None):
+        if not cand:
+            continue
+        d = Path(cand) / "paperkit-sweep" if not os.environ.get("PAPERKIT_SCRATCH") else Path(cand)
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            if os.access(d, os.W_OK):
+                return str(d)
+        except OSError:
+            continue
+    return None                                   # tempfile's default: never a hard failure
+
+
+def reap_sandboxes(older_than_s: int = 1800) -> int:
+    """Ζ·delta·leak — remove sweep sandboxes no live sweep owns.  Returns the count removed.
+
+    `_grade_one` and `mutate_one` both rmtree their sandbox in a `finally`, which is correct and
+    runs on every normal exit.  It does NOT run on SIGKILL — and a long sweep gets killed: three
+    interrupted //:hook runs in one session left 42 husks behind.  They were small (672K total,
+    the copy having been reclaimed by the kernel when the process died mid-write), so this is
+    hygiene rather than the disk fix above; the two are separate defects and only one of them
+    was ever going to fill a filesystem.
+    A directory is reaped only if it is older than the window AND holds no open file — a live
+    sweep's copy is neither."""
+    import time
+    parent = Path(_scratch_dir() or tempfile.gettempdir())
+    now, n = time.time(), 0
+    for d in parent.glob(_SANDBOX_PREFIX + "*"):
+        try:
+            if now - d.stat().st_mtime < older_than_s:
+                continue
+            shutil.rmtree(d, ignore_errors=True)
+            n += 1
+        except OSError:
+            continue
+    return n
+
+
 def _sandbox_setup(project_dir, resolution="def"):
     """A fresh sandbox COPY of the project + engine (the bounded mutation universe), shared by the
     grade sweep (_grade_one) and the single-site probe (mutate_one).  Returns
@@ -647,7 +724,7 @@ def _sandbox_setup(project_dir, resolution="def"):
     sweep's engine copy is missing: refuse to degrade to file resolution and emit a vacuous
     fingerprint (the Bazel-symlink degeneracy that once shipped a green-for-nothing gate).  Caller
     rmtree's tmp."""
-    tmp = Path(tempfile.mkdtemp(prefix="paperkit-delta-"))
+    tmp = Path(tempfile.mkdtemp(prefix=_SANDBOX_PREFIX, dir=_scratch_dir()))
     root = _sandbox_root(project_dir)
     _copy_sandbox(root, tmp / root.name)
     root_copy = tmp / root.name

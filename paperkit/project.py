@@ -25,9 +25,18 @@ import sys
 import tomllib
 from pathlib import Path
 
+# Ζ·pkg·shape — the engine's own directory, FIRST on sys.path, and it must stay a per-module
+# line rather than moving to paperkit/__init__.py: a package __init__ runs only when the
+# package is IMPORTED, and these modules are also loaded as siblings by a caller that has
+# already put its own directory ahead of ours.  render/checks/ ships its OWN bib.py, so a
+# witness inserting that directory shadows the engine's parser and `from bib import
+# dep_order` resolves to the wrong module.  MEASURED: removing these six lines reddened
+# seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
+# The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
 import bib  # noqa: E402  (paperkit.bib — the one .bib parser + data model)
+import durable  # noqa: E402  (Ζ·write·atomic — the alias-safe replace)
 # the projector parses then renders, so it uses the bib data model internally (short names).
 from bib import dep_order, emit_path, is_placed, load_config, rubric  # noqa: E402,F401
 from bib import parse as entries  # noqa: E402,F401
@@ -346,7 +355,8 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
 def project(cfg: dict, target: str = "pandoc") -> str:
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
-        F.update(entries(b))
+        F.update(entries(b, cfg["consumer_fields"]))     # thread the project's declared consumer_fields
+
     by_sec = {}
     for k, f in F.items():
         if f.get("section"):
@@ -436,6 +446,120 @@ def project(cfg: dict, target: str = "pandoc") -> str:
     return "\n".join(lines).rstrip("\n") + "\n"          # exactly one trailing newline (MD012-clean)
 
 
+def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -> list:
+    """Ρ·deck·observe — the projector's SECOND observation shape: S → RoseTree(S), indexed by
+    (target, genre), beside project()'s S → String indexed by target alone.
+
+    project() LINEARIZES: one flat stream seeded by rubric-order × dep_order, which every existing
+    target (pandoc/web/footnote/plain) is a citation-materialization of.  A deck is not a
+    linearization but a SEGMENTATION into bounded observation-windows, so it cannot be a fifth
+    target — it is a different observation of the same carrier, which is why this is a sibling
+    function and not a branch inside project().
+
+    Two axes, kept apart (slides.bib's grouping-is-not-pagination):
+      GROUPING   what coheres — the claims' own structure.  Read from `section`, the authored
+                 partition.  How far that sits from the rests-on-derived one is measured by
+                 coherence.grouping_residual — in the DELTA component, which depends on this one,
+                 so the measurement reads the projection and never the reverse.
+      PAGINATION where a unit breaks — a rhetoric choice, supplied by the genre registry.
+
+    Returns a list of UNITS, each {"keys": [...], "claims": [...], "section": …}.  Deliberately NOT
+    a rendered string: what a unit becomes on a slide is the render layer's business, and returning
+    prose here would re-linearize the thing this function exists to avoid.
+
+    HONEST BOUND (measured, Ρ·deck·rests-on·adoption): the grouping is only as rich as the
+    `rests-on` a project actually declares.  Where authors declare grounding this cut reads real
+    structure; where they declare only prose order it reduces to the section cut — which is a fact
+    about the corpus, not the mechanism, and `residual` in the returned metadata says which case a
+    given project is in.  (That residual is reported by the ∂² grade, not computed here: project
+    must not import the grader — the component lattice has delta depending on project.)
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import genre as genre_mod          # the pagination registry (project component; no upward edge)
+
+    F = {}
+    for b in cfg["bibs"]:
+        F.update(entries(b, cfg["consumer_fields"]))
+    recs = [{"key": k, **f} for k, f in F.items()]
+
+    # the GROUPING, in document order (rubric × dep_order), so a unit's claims read in the order
+    # the document already establishes — pagination changes the bracketing, never the order.
+    by_sec = {}
+    for k, f in F.items():
+        if f.get("section"):
+            by_sec.setdefault(f["section"], []).append(k)
+    groups, sections = [], []
+    for sk, _t in rubric(cfg["rubric"]):
+        keys = dep_order(by_sec.get(sk, []), F)
+        if keys:
+            groups.append(keys)
+            sections.append(sk)
+
+
+    # the PAGINATION — resolved from the registry, which REFUSES an unregistered name rather than
+    # falling back (so a deck is never cut by a genre nobody asked for).
+    spec = genre_mod.resolve(genre_name, project_dir)
+    objective = spec.get("objective")
+    # Ρ·deck·residual·wire — REGROUP on the grounding-derived partition at the resolution this
+    # genre asks for (γ, which every registry entry carries and nothing read until now).  σ stays
+    # the prior: where the rests-on graph is too sparse to say anything, modularity's null term
+    # leaves the −γ·d term deciding and the partition falls back to section BY CONSTRUCTION — so a
+    # project with no grounding (measured: 7 of 11 in this repo) gets exactly the section cut it
+    # would have had, and one WITH grounding gets a cut that answers to it.
+    # an explicit γ overrides the genre's own; absent, the genre's declared value stands.
+    derived = genre_mod.partition(recs, float(gamma if gamma is not None
+                                              else spec.get("gamma", 1.0)))
+    if not derived["degenerate"]:
+        order = {k: i for i, g in enumerate(groups) for k in g}   # document order, preserved
+        by_group: dict = {}
+        for k in sorted(order, key=order.get):
+            by_group.setdefault(derived["part"][k], []).append(k)
+        # groups in the document order of their FIRST claim, so the deck still reads forward
+        groups = sorted(by_group.values(), key=lambda g: order[g[0]])
+
+    # a BUILT-IN runs in-process; a project-DECLARED one runs its `cmd` through the registry's
+    # seam (Ρ·deck·genre·cmd), which validates the result against the same totality invariant.
+    units = (objective(groups, recs) if objective is not None
+             else genre_mod.run_declared(spec, groups, recs, cwd=project_dir))
+
+    # which section a unit came from — a unit never spans sections (the objective splits within a
+    # group, never merges across), so the first key's section names the whole unit.
+    sec_of = {k: f.get("section") for k, f in F.items()}
+    out = []
+    for u in units:
+        # Ρ·deck·materialize — a unit carries everything the PROSE route materializes for these
+        # claims, not just their sentences.  A deck that dropped a claim's emitted table, its
+        # proof-step nesting, or its expound-rung footnote would be a lossy view of the same
+        # carrier, and the render layer could not recover what the projector discarded.
+        items = []
+        for k in u:
+            f = F.get(k, {})
+            item = {"key": k, "claim": f.get("claim", "")}
+            if f.get("depth"):
+                item["depth"] = f["depth"]          # proof-step nesting, as an indent level
+            if f.get("link"):
+                item["link"] = f["link"]            # the expound-rung note
+            if f.get("emit"):
+                # the placed asset, rendered by its declared `as` — the SAME lines the prose route
+                # emits, produced by the same function, so the two views cannot diverge.
+                item["emit"] = {"path": f["emit"], "as": f.get("as"),
+                                "lines": emit_block(cfg, f)}
+            if f.get("check"):
+                item["check"] = f["check"]          # provenance: the render layer marks it
+            if f.get("note"):
+                # Ρ·deck·notes — the SPEAKER NOTE.  `note` was already in the bib grammar and
+                # engine-inert ("parsed but consumed nowhere, reserved"), so a deck reads the
+                # reserved field rather than inventing one: a note is what an author says ABOUT a
+                # claim, which is exactly the register a presenter needs and no other target wants.
+                item["note"] = f["note"]
+            items.append(item)
+        out.append({"keys": list(u),
+                    "claims": [F[k].get("claim", "") for k in u],
+                    "items": items,
+                    "section": sec_of.get(u[0]) if u else None})
+    return out
+
+
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).  TARGET is also resolved by gate/discriminate — they reference
 # project.TARGET (the lowest common component in the DEPS lattice owns it).
@@ -443,12 +567,34 @@ TARGET = config.Param("target", "PAPERKIT_TARGET", config="target", default="pan
                       help="citation render target: pandoc ([@key] for citeproc/PDF), web (intra-page hyperlinks + anchors, for a blog), "
                            "footnote (each clause's provenance as a document-end footnote — self-contained, no bibliography), "
                            "or plain (no citation surfaced at all — a clean SUBMISSION view; the claim-DAG stays the author-side gate)")
+# Ρ·deck·genre·knob — the pagination genre.  choices is DELIBERATELY None: the genre set is an
+# OPEN registry (built-ins + a project's [genres.*]), so a static tuple here would either freeze
+# the set — contradicting the registry — or duplicate it and drift.  Validation therefore happens
+# where the set actually lives: genre.resolve() REFUSES an unregistered name, which is the same
+# reason resolver.VERBS validates a check type rather than config.Param enumerating them.
+GENRE = config.Param("genre", "PAPERKIT_GENRE", config="genre", default="talk",
+                     help="pagination genre for --observe: a registered objective over the grouping "
+                          "(built-ins staged/talk/atomic/collection; a project adds its own with a "
+                          "[genres.<name>] table in paper.toml).  Validated by the registry, not by "
+                          "a fixed list — the set is open")
+# Ρ·deck·gamma·declare — the RESOLUTION dial, the deck-analog of --min-strength.  Each genre
+# carries a default γ (its own idea of how much to trust the grounding over the authored sections);
+# this makes that reachable, so a deck can be re-cut coarser or finer without inventing a genre.
+# Default None = "whatever the genre asks for", which keeps a genre's declared γ meaningful instead
+# of overriding it with an engine-wide constant.
+GAMMA = config.Param("gamma", "PAPERKIT_GAMMA", config="gamma", default=None,
+                     help="observe: the grouping resolution γ, overriding the genre's own — "
+                          "γ→∞ recovers the authored sections, γ→0 the modularity optimum; "
+                          "omit to use the genre's declared value")
+OBSERVE = config.Param("observe", "PAPERKIT_OBSERVE", flag=True,
+                       help="project: emit the DAG's segmentation into units (one per line, "
+                            "tab-separated keys) instead of the linearized document")
 CHECK = config.Param("check", "PAPERKIT_CHECK", flag=True,
                      help="project: verify the projection round-trips against the bib, then exit")
 # The projector CLI's composed registry: exactly the Params its import cone hosts
 # (bnd-config asserts this completeness — a cone-resolved Param missing here would be
 # a silently ignored flag).
-REGISTRY = [TARGET, CHECK]
+REGISTRY = [TARGET, GENRE, GAMMA, OBSERVE, CHECK]
 
 
 def main(argv: list) -> int:
@@ -457,6 +603,23 @@ def main(argv: list) -> int:
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     cfg = load_config(project_dir)
     pol = tomllib.loads((project_dir / "paper.toml").read_text()).get("paper", {})
+
+    if config.resolve(OBSERVE):
+        import genre as _genre
+        # Ρ·deck·observe via the CLI: the SECOND observation shape, printed as units.  Not written
+        # to cfg["out"] — that path holds the linearization the gate's PROJECT invariant compares
+        # against, and a segmentation is not a candidate for it.
+        try:
+            _g = config.resolve(GAMMA, pol)
+            units = observe(cfg, config.resolve(GENRE, pol), project_dir, _g)
+        except _genre.Unregistered as e:
+            # a CLI refusal reads as a message, not a traceback — the registry's LOUD invariant is
+            # about telling the caller what happened, and a stack trace tells them where.
+            print(f"paperkit-project: {e}", file=sys.stderr)
+            return 1
+        for u in units:
+            print(f"{u['section']}\t" + "\t".join(u["keys"]))
+        return 0
 
     out = project(cfg, config.resolve(TARGET, pol))   # Ω·config: pandoc (default) | web
 
@@ -471,10 +634,19 @@ def main(argv: list) -> int:
     if "-o" in argv and argv[argv.index("-o") + 1] == "-":
         sys.stdout.write(out)
         return 0
-    cfg["out"].write_text(out)
+    durable.write_atomic(cfg["out"], out)
     print(f"paperkit-project: wrote {cfg['out'].name} ({len(out.split())} words)", file=sys.stderr)
     return 0
 
 
-if __name__ == "__main__":
+def _cli():
+    """Console-script entry point (pyproject [project.scripts]).
+
+    A wheel cannot point an entry point at `__main__`, so the same one-liner is named here
+    and reused below — one call site, not two implementations that can drift.
+    """
     raise SystemExit(main(sys.argv[1:]))
+
+
+if __name__ == "__main__":
+    _cli()

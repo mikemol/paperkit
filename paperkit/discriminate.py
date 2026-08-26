@@ -71,6 +71,14 @@ import sys
 import tomllib
 from pathlib import Path
 
+# Ζ·pkg·shape — the engine's own directory, FIRST on sys.path, and it must stay a per-module
+# line rather than moving to paperkit/__init__.py: a package __init__ runs only when the
+# package is IMPORTED, and these modules are also loaded as siblings by a caller that has
+# already put its own directory ahead of ours.  render/checks/ ships its OWN bib.py, so a
+# witness inserting that directory shadows the engine's parser and `from bib import
+# dep_order` resolves to the wrong module.  MEASURED: removing these six lines reddened
+# seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
+# The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
 import bib  # noqa: E402  (the parser/data-model leaf — discriminate needs only the bib, not the projector)
@@ -129,7 +137,7 @@ MUTANT = config.Param("mutant", "PAPERKIT_MUTANT",
 REGISTRY = [MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, MUTANT,
             grader.DELTA_REPEAT, grader.DELTA_PULSE, layout.ROOT, resolver.PATH,
             G.SAFE, G.WITHOUT_K, G.JOBS, G.JSON, G.ONLY, G.INVARIANTS,
-            project.TARGET, project.CHECK]
+            project.TARGET, project.GENRE, project.GAMMA, project.OBSERVE, project.CHECK]
 
 
 def _fine(rec: dict) -> list:

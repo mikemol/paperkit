@@ -36,7 +36,7 @@ code for the ⟨P,F,δ⟩ proof.  Best-effort throughout: a down endpoint WARNs,
 
 Wire (dependency-free by construction): the OTLP protobuf is built with the ephemeral
 opentelemetry-proto lib (`uv run --with opentelemetry-proto` — leaves no venv, the
-sched-batch lazy-provision precedent); the /api/v1/query GET is stdlib urllib; absent the proto
+the lazy-provision precedent); the /api/v1/query GET is stdlib urllib; absent the proto
 lib the push is a warned no-op.  The offline half (parse → map → families → the query-response
 value extractor) is pure stdlib and self-proves under --selftest.
 

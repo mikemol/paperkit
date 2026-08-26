@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""gatewatch — live one-line view of a running paperkit gate.
+
+    tools/gatewatch [logfile]        default /tmp/pk-commit.log
+
+⚑ ONE PROCESS, NO FORKS PER TICK.  The first version was a bash loop that spawned ~20 subshells
+(grep, ls, awk, date, nproc, wc) to print ONE line — measured at 130ms of real time per tick, on
+a box the build had already oversubscribed 2x.  A monitor that competes with what it measures is
+an instrument that changes its own reading, and it was slow enough to watch each line appear.
+This reads the same files in-process: one open, one seek, no children.
+
+⚑ INCREMENTAL, NOT RE-SCANNING.  It seeks to where it last read rather than re-grepping the whole
+log each tick, so cost is proportional to NEW output, not to log size.  A 3-hour run's log is
+tens of MB and a re-scanning monitor gets slower exactly as the run gets more interesting.
+
+⚑ AND THE DENOMINATOR GROWS: bazel discovers the mutation grid while analysing (one run went
+3,887 -> 72,628 total), so [done/total] is a lower bound and the per-minute RATE is the honest
+number.
+"""
+from __future__ import annotations
+
+import os
+import re
+import sys
+import time
+from pathlib import Path
+
+LOG = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/pk-commit.log")
+SCOPES = Path("/sys/fs/cgroup/user.slice")
+_PROG = re.compile(rb"\[([\d,]+) / ([\d,]+)\]")
+_RUN = re.compile(rb"(\d+) running")
+_CUR = re.compile(rb"([^\s;]+); (\d+)s")
+_FAIL = re.compile(rb"^FAIL: (\S+)", re.M)
+_CLIMB = re.compile(rb"retrying at (\d+)MB")
+
+
+def cap_scopes() -> int:
+    """Live capped cells — the only count that proves the cap is actually applied."""
+    n = 0
+    try:
+        for u in SCOPES.iterdir():
+            app = u / f"{u.name.replace('user-', 'user@').replace('.slice', '.service')}/app.slice"
+            if app.is_dir():
+                n += sum(1 for d in app.iterdir() if d.name.startswith("mb-"))
+    except OSError:
+        pass
+    return n
+
+
+def main() -> int:
+    pos, done, total, running = 0, 0, 0, "?"
+    seen_file = None
+    fails, climbs, top, cur = set(), 0, 0, ""
+    prev_done, prev_t = 0, time.time()
+    rate = "--"
+    ncpu = os.cpu_count() or 1
+    print()
+    while True:
+        try:
+            with LOG.open("rb") as f:
+                # ⚑ DETECT A NEW RUN.  Seeking to a remembered offset is only valid while it is
+                # the SAME file: a relaunch deletes and recreates the log, and an inode/size
+                # change means every accumulated counter now describes a build that no longer
+                # exists.  Measured — a watcher left running across a relaunch reported
+                # 23614/28455 and climb:50974 from the DEAD run while the live one was at
+                # 2918/10612, and the numbers looked authoritative because the display was
+                # still updating.  A stale reading that keeps refreshing is worse than a stopped
+                # one: it cannot be told apart from a current reading by looking at it.
+                st = os.fstat(f.fileno())
+                ident = (st.st_ino, st.st_dev)
+                if ident != seen_file or st.st_size < pos:
+                    pos, done, total, running = 0, 0, 0, "?"
+                    fails, climbs, top, cur = set(), 0, 0, ""
+                    prev_done, prev_t, rate = 0, time.time(), "--"
+                    seen_file = ident
+                    sys.stdout.write("\r\033[K  -- new run detected, counters reset --\n")
+                f.seek(pos)
+                chunk = f.read()          # only what is NEW since the last tick
+                pos = f.tell()
+        except OSError:
+            chunk = b""
+        if chunk:
+            if (m := _PROG.findall(chunk)):
+                done = int(m[-1][0].replace(b",", b"")); total = int(m[-1][1].replace(b",", b""))
+            if (m := _RUN.findall(chunk)):
+                running = m[-1].decode()
+            if (m := _CUR.findall(chunk)):
+                cur = f"{m[-1][0].decode()[-30:]} {m[-1][1].decode()}s"
+            fails.update(x.decode() for x in _FAIL.findall(chunk))
+            c = _CLIMB.findall(chunk)
+            climbs += len(c)
+            if c:
+                top = max(top, max(int(x) for x in c))
+            if b"COMMIT_RC=" in chunk:
+                rc = chunk.split(b"COMMIT_RC=")[-1].split()[0].decode()
+                print(f"\r\033[K\n  COMMIT_RC={rc}  climbs={climbs}  failures={len(fails)}")
+                for x in sorted(fails):
+                    print(f"    FAIL {x}")
+                return 0
+        now = time.time()
+        if done > prev_done:
+            rate = f"{(done - prev_done) * 60 / max(now - prev_t, 1):.0f}/m"
+            prev_done, prev_t = done, now
+        try:
+            st = Path("/proc/stat").read_text()
+            rq = int(next(l for l in st.splitlines() if l.startswith("procs_running")).split()[1])
+        except (OSError, StopIteration):
+            rq = 0
+        sys.stdout.write(
+            f"\r\033[K  {time.strftime('%H:%M:%S')}  {done:>6}/{total:<6} {rate:>7}"
+            f"  par:{running:<3} cap:{cap_scopes():<3} climb:{climbs}@{top}MB"
+            f"  rq/c:{rq / ncpu:.1f}  fail:{len(fails)}  {cur[:32]}")
+        sys.stdout.flush()
+        time.sleep(2)
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print()

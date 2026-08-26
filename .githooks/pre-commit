@@ -32,13 +32,21 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
 # PK_HOOK_ALLOW_DIRTY=1 downgrades it to a loud advisory for a deliberate split commit.
 run "hook-index (worktree ≡ index)"   mise exec -- python3 tools/hook_index.py
 
-# Ζ·sched-batch — the grid's concurrent CPU-bound cells self-tune PER-ACTION (SCHED_BATCH + nice 19 +
-# a 100ms EEVDF slice, vs the 2.8ms default) via the //tools:sched-batch-bin prefix baked into every
-# pk_* action (tools/calc.bzl, tools/verb.bzl) — so a cell runs a long uninterrupted stretch instead
-# of preempting a peer every ~2.8ms (measured ~30% sys / 15-20k ctx-switch/s; under zswap the refault
-# churn is codec CPU, so this also cuts swap TRAFFIC si/so).  Per-action = thread-independent, the
-# durable fix (Phase 1's server-tune could reach cells only nondeterministically).  Nothing to do here
-# — the tuning is in the build graph; PK_SCHED_OFF=1 (an --action_env) disables it, best-effort.
+# Ζ·cell·admit — the grid's CPU share is governed by ONE lever: a proportional cpu.weight on the
+# build's own cgroup (set below, next to the RAM budget).  The per-cell SCHED_BATCH + nice 19 +
+# 100ms-slice wrapper that used to live here was REMOVED, verified against the kernel sources and
+# a live A/B:
+#   * SCHED_BATCH is VESTIGIAL post-EEVDF — the only semantic site in kernel/sched/ is
+#     sched.h's `fair_policy()`, which returns true for BATCH and NORMAL alike; the
+#     GENTLE_FAIR_SLEEPERS wakeup-preemption path it used to suppress no longer exists.
+#   * nice 19 cannot RAISE the group's share (calc_group_shares clamps to tg_shares = our
+#     cpu.weight) but CAN depress it toward MIN_SHARES under contention — it fights the weight.
+#   * the 100ms slice is scaled into virtual time by calc_delta_fair inversely with task weight,
+#     so nice 19 (weight 15 vs NICE_0_LOAD 1024) inflated it ~68x — pushing our own virtual
+#     deadlines ~6.8s out and making our cells the LAST picked whenever anything else is eligible.
+# Measured A/B, 3 tuned vs 3 untuned burners side by side: untuned 19.2-25.0M iters (1.3x spread),
+# tuned 4.2-26.2M (6.2x spread), worst tuned cell 4.5x slower than its untuned peer.  The tuning
+# was not helping contention; it was inflicting erratic latency on us.
 
 # --config=mutant: the hook includes each emerge project's :cohere, whose def-sweep GRID cells
 # (Ξ·dag·eval) run as counterfactuals in the HERMETIC linux-sandbox (else a check's resolve()
@@ -57,14 +65,93 @@ PK_T0=$(date +%s)
 # conservative floor (real RAM, not zram — zram is the cgroup cap's safety, not the scheduler's
 # budget), raised by the operator via PAPERKIT_SWEEP_RAM_MB.  A build-orchestration value, computed
 # here and passed to Bazel (invoke-don't-embed: tools/sweep_budget.py, not inline arithmetic).
+# Ρ·hook·doc — the budget bounds the SWEEP GRID (pk_calc declares a resource_set per cell), NOT
+# the per-claim checks (PkCmd/PkFile/PkResult declare none).  A check that spawns subprocesses —
+# a concept: witness resolving against a library, a result: importing a sibling gate — is
+# therefore scheduled by job count alone.  Measured the hard way: running this target WITHOUT the
+# flags below put 23 sandboxes on a 15GB box and produced ZERO artifacts in 60 minutes, load 55
+# with no throughput.  Bare `bazel test //:hook` is not the same command as this line.
+# Ζ·delta·leak — collect sweep sandboxes a KILLED run left behind.  _grade_one rmtrees its copy
+# in a `finally`, which is correct and does not run on SIGKILL; three interrupted hooks in one
+# session left 42 husks.  Only touches directories older than the window, so a concurrent sweep's
+# copy is never taken out from under it.  Best-effort: never fails a commit.
+python3 -c "import sys; sys.path.insert(0, 'paperkit'); import grader; n = grader.reap_sandboxes(); print(f'[pre-commit] reaped {n} stale sweep sandbox(es)') if n else None" || true
+# Ζ·mem·project·gate — mem.json is a PROJECTION of mem.sqlite (the observation store), and the
+# bib generator reads it at fetch time to size every sweep cell.  A drifted projection means the
+# build sized itself from a number the store does not support, which is derived state trusted
+# without a freshness check — the shape project-dont-author exists to refuse.  Advisory here, not
+# fatal: a stale reservation is a perf hint, never a wrong verdict, and reddening a commit over a
+# perf hint would be the wrong trade.
+for _p in library paper .; do
+  _j="${_p%/}/mem.json"; [ "$_p" = "." ] && _j="mem.json"
+  [ -f "$_j" ] && [ -f mem.sqlite ] && \
+    python3 tools/mem_project.py mem.sqlite "$([ "$_p" = "." ] && echo root || echo "$_p")" "$_j" --check \
+    || true
+done
 PK_SWEEP_RAM=$(python3 tools/sweep_budget.py)
-run "bazel test //:hook"   mise exec -- bazel test //:hook --config=mutant \
-    --local_resources=memory="$PK_SWEEP_RAM" --execution_log_json_file="$PK_EXECLOG"
+# Ζ·cell·admit — the sweep budget above bounds RAM; nothing bounded CPU SHARE.  Bazel's scheduler
+# sees only its own actions, so a concurrent build in ANOTHER repo is invisible to it and the two
+# oversubscribe together (measured: 4.7-5.4 runnable/core on 10 cores with procs_blocked=0 — pure
+# CPU contention — while substrate's selftests ran alongside).  So the build runs inside a cgroup
+# WE CREATE, under a proportional cpu.weight: it yields hard to interactive work under contention
+# and takes ALL spare CPU at idle, unlike a hard cap, which cannot lend idle capacity.
+# The cgroup is CREATED, not discovered: a bare `bazel` leaves its cells in the CALLER's cgroup —
+# the operator's terminal, alongside their editor and browser — and weighting that would throttle
+# the machine to make a build slower.  Creating our own makes membership true by construction.
+# Best-effort: on a machine without cgroup-v2 or without `cpu` delegated, it says so and execs
+# the build unweighted — a QoL lever must never be able to fail a commit.
+# Ρ·telemetry·logs — the hook's own output is TEED to a file so a RED run has something durable
+# to push.  `run()` captures stdout and prints it only on failure; the residual a red gate computes
+# (a coherence GROUNDING line, a gate UNRESOLVABLE, a JVM OOM) lives in that stream and used to
+# survive only in whatever /tmp file the next run overwrote.  Measured this session: a 4-hour red
+# hook's entire diagnosis existed in one such file.
+PK_HOOKLOG=$(mktemp)
+# Ρ·telemetry·bes — Bazel's FIRST-PARTY event stream, when a machine points at one.  Per-target
+# results and per-action timing straight from bazel, so it cannot drift from a text format.
+PK_BES=""
+[ -n "${PAPERKIT_BES:-}" ] && PK_BES="--bes_backend=${PAPERKIT_BES} --bes_upload_mode=fully_async"
+# NOT wrapped in run(): run() exits on failure, and telemetry that only fires on success loses
+# exactly the builds worth keeping.  Capture the rc, push either way, THEN decide.
+# Redirect to the file and TAIL it to fd 3, rather than piping through tee: this hook is
+# #!/bin/sh, and PIPESTATUS is a bashism (dash: "Bad substitution"), so a pipe here would leave
+# the rc unreadable and silently mis-report a red build as green.  No pipe ⇒ $? is the build's own.
+set +e
+( tail -n +1 -f "$PK_HOOKLOG" >&3 2>/dev/null & echo $! > "$PK_HOOKLOG.tailpid" ) 
+python3 tools/cpuweight.py --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
+    --exec mise exec -- bazel test //:hook --config=mutant \
+    --local_resources=memory="$PK_SWEEP_RAM" --execution_log_json_file="$PK_EXECLOG" \
+    $PK_BES > "$PK_HOOKLOG" 2>&1
+PK_HOOK_RC=$?
+kill "$(cat "$PK_HOOKLOG.tailpid" 2>/dev/null)" 2>/dev/null; rm -f "$PK_HOOKLOG.tailpid"
+set -e
+PK_SECS=$(( $(date +%s) - PK_T0 ))
 if [ -n "${PAPERKIT_OTLP_METRICS:-}" ]; then
   uv run --with opentelemetry-proto python3 tools/otlp_push.py "$PK_EXECLOG" \
-      --build-seconds "$(( $(date +%s) - PK_T0 ))" || true
+      --build-seconds "$PK_SECS" || true
 fi
-rm -f "$PK_EXECLOG"
+# Ζ·mem·harvest·hook — the warm-up step.  Every cell wrote its cgroup peak as a side effect of
+# work that ran anyway; harvest folds those into mem.sqlite so the NEXT sweep is sized from
+# measurement rather than the cold-start floor.  The first pass is over-reserved and that is the
+# design: it fails fast, deposits peaks, and converges — cheaper than a barrier that cannot be
+# crossed the first time (making mem_learn DEPEND on the cells was measured at 41,468 deps).
+# Runs on RED as well as green: a failed build still measured whatever cells it got through.
+for _p in library paper .; do
+  python3 tools/mem_harvest.py "$_p" --run "${PK_T0}-$$" >/dev/null 2>&1 || true
+done
+
+if [ -n "${PAPERKIT_LOGS_URL:-}" ]; then
+  # --execlog carries the SPAWN TIMELINE (bazel's own metrics.startTime, absolute), so the store
+  # can interleave "what happened" with "what was running".  Pushed BEFORE the rm below: the
+  # execution log is a temp file, and a red run's timeline is the half worth keeping.
+  python3 tools/logs_push.py "$PK_HOOKLOG" --rc "$PK_HOOK_RC" --seconds "$PK_SECS" \
+      --execlog "$PK_EXECLOG" --run-id "${PK_T0}-$$" || true
+fi
+rm -f "$PK_EXECLOG" "$PK_HOOKLOG"
+if [ "$PK_HOOK_RC" -ne 0 ]; then
+  echo "[pre-commit] FAIL: bazel test //:hook" >&2
+  exit 1
+fi
+echo "[pre-commit] ok: bazel test //:hook"
 
 # Ξ·dag·reads — the footprint audit: every claim's declared `reads` ⊇ its live Φ·footprint (strace).
 # A gate HERE, not in //:hook, for the same reason as hook-index/cotype: it must read the CURRENT

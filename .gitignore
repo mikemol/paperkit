@@ -41,3 +41,6 @@ dist/
 # which is tracked, they are build output the repo did not project — the same rule as above.
 talk/talk.odp
 talk/talk.pptx
+
+# Agda build artifacts (Ζ·pyc: a .agdai is derived, like a .pyc or a .o)
+*.agdai

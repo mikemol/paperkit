@@ -42,8 +42,9 @@ _MATH = re.compile(r"(?<!\\)\$(?!\$)(.+?)(?<!\\)\$", re.S)
 
 def _claims() -> dict:
     recs = {}
-    for f in sorted((Path(__file__).resolve().parents[1]).glob("*.bib")):
-        recs.update(bib.parse(f))
+    pdir = Path(__file__).resolve().parents[1]           # the paper project dir (has paper.toml)
+    for f in sorted(pdir.glob("*.bib")):
+        recs.update(bib.load_bib(f, pdir))               # route through the owner — bind paper's consumer_fields
     return recs
 
 

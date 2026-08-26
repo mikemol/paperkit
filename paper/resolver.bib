@@ -73,3 +73,69 @@
   rests-on = {dataset-backed},
   check   = {claim:dataset-fresh}
 }
+
+@misc{concept-builtin,
+  section = {resolver}, from = {dataset-fresh}, rests-on = {result-builtin}, join = {. },
+  link    = {the second boundary-crossing verb, beside the verdict import},
+  claim   = {the fifth verb IMPORTS rather than runs --- concept resolves a key against a LIBRARY that authored and graded that witness once, and the citing view gets its CERTIFICATE (the verdict, and the engine fingerprint the grade was measured against) instead of re-executing a proof},
+  check   = {concept:concept-builtin}
+}
+
+@misc{concept-interned,
+  section = {resolver}, from = {concept-builtin}, rests-on = {concept-builtin}, join = {, and },
+  claim   = {a library is a hash-cons table, not a cache of repeats --- every concept interns to exactly ONE canonical node and a view holds a reference, so the test for lifting something into it is whether it IS a concept, never whether it has been written down twice},
+  check   = {concept:concept-interned}
+}
+
+@misc{concept-views,
+  section = {resolver}, from = {concept-interned}, rests-on = {concept-interned}, join = {, which is what lets },
+  claim   = {one truth carry SEVERAL prose faces --- a pitch, a deep exposition and a tutorial may each say a concept in their own register while importing the identical proof, so the faces cannot drift apart and a view may add no witness code at all},
+  check   = {concept:concept-views}
+}
+
+@misc{concept-shareable,
+  section = {resolver}, from = {concept-views}, rests-on = {concept-builtin}, join = {. },
+  link    = {the seam that makes a library reusable OUTSIDE the repository that wrote it},
+  claim   = {and a library is shareable because the seam resolves CONSUMER-FIRST --- a project's own library answers a key if it has one, and only otherwise does the engine's, with the fallthrough decided PER KEY rather than per directory, so a downstream repository may keep its own concepts without eclipsing the engine's and may cite an engine concept where that is the honest import},
+  check   = {concept:concept-shareable}
+}
+
+% Ζ·library·kernel — the concept seam's MECHANISM, as engine surface.  The four warrants below
+% document modules that were library-local files until they were lifted into paperkit/: they are
+% concept-library mechanism, not any one library's content, so every consumer stages them.  A
+% module promoted to engine surface without a warrant is undocumented internal detail, which is
+% the thing this paper exists to refuse — so the lift is only complete once each is projected.
+
+@misc{key-graded,
+  section = {resolver}, from = {concept-shareable}, rests-on = {concept-builtin}, join = {. },
+  link    = {the seam's other half --- the verb names a LIBRARY, this names the WITNESS inside it},
+  claim   = {resolving a key to its witness is itself GRADED --- a key is family/subfamily/argument, walked by one depth-agnostic loop, so a parameter axis costs no copy per argument: two keys may share ONE implementation and still read as distinct witnesses, because --without-K decides distinctness at KEY granularity},
+  check   = {concept:graded-key}
+}
+
+@misc{label-orbit,
+  section = {resolver}, from = {key-graded}, rests-on = {concept-interned}, join = {. },
+  link    = {what interning costs, and how the library pays it back},
+  claim   = {interning to one canonical node does not erase the names a concept was coined under --- a label is a point in an orbit, naming the concept FROM a carrier, so the index maps concept to carrier-to-label and a reader meets the concept under the name their own field uses},
+  check   = {concept:label-carrier}
+}
+
+@misc{cache-slice,
+  section = {resolver}, from = {label-orbit}, rests-on = {key-graded}, join = {. },
+  link    = {the cost of a growing library, and the only sound key for reusing a verdict},
+  claim   = {a verdict is reusable exactly when nothing it REACHED has changed --- the cache keys on the slice a check can reach, its witness plus the transitive closure of the module-level names that witness references and the files those live in, so an edit invalidates what touched it rather than the whole module},
+  check   = {concept:slice-cache}
+}
+
+@misc{conclusion-gated,
+  section = {resolver}, from = {cache-slice}, rests-on = {claim-bears-check}, join = {. },
+  link    = {the gap the check apparatus leaves open, and the mechanical gate that closes it},
+  claim   = {a PRINTED conclusion must be backed by an ASSERTION --- the apparatus covers landed claims, so an analysis script may print a conclusion beside output from the same run that refutes it and nothing notices, because the conclusion was never a claim},
+  check   = {concept:conclusion-backed}
+}
+
+@misc{conclusion-direction,
+  section = {resolver}, from = {conclusion-gated}, rests-on = {conclusion-gated}, join = {, and },
+  claim   = {the gate is deliberately one-directional --- it can force a conclusion to be backed, but not force the backing assertion to be the RIGHT one, so it closes the unbacked-conclusion set and leaves the wrong-assertion set to review},
+  check   = {concept:conclusion-weak-direction}
+}

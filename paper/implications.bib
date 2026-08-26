@@ -57,6 +57,92 @@
   check   = {claim:collapse-safe}
 }
 
+@misc{grouping-residual,
+  section = {implications}, from = {collapse-safe}, rests-on = {grounding-reflected}, join = {. },
+  link    = {a fourth residual face, grounded in the same declared-vs-measured comparison as grounding-reflected},
+  claim   = {the same declared-vs-measured comparison runs one level UP, on the document's own SECTIONS --- the authored grouping $\sigma$ is checked against the partition $P^* = \arg\max_P [Q_E(P) - \gamma \cdot d(P, \sigma)]$ that rests-on modularity derives, and the residual $d(\sigma, P^*)$ NAMES the claims whose grounding lives outside their section rather than scoring the grouping},
+  check   = {claim:grouping-residual}
+}
+
+@misc{grouping-tail-falls-back,
+  section = {implications}, from = {grouping-residual}, rests-on = {grouping-residual}, join = {, and },
+  claim   = {the ungrounded tail falls back to $\sigma$ BY CONSTRUCTION rather than by a special case --- modularity's null term cancels a lone edge's chance-expectation, so a sparsely-connected region is argmax-indifferent and the $\gamma$ term decides there},
+  check   = {claim:grouping-tail-falls-back}
+}
+
+@misc{grouping-discharge,
+  section = {implications}, from = {grouping-tail-falls-back}, rests-on = {grouping-residual}, join = {; and },
+  claim   = {a named claim carrying a `link` is DISCHARGED, as the structure and grounding faces discharge theirs, so the raw residual stays the measurement while the un-acknowledged count is what an explicit budget gates --- without that split a threshold would red on the deliberate forward references a thesis makes, measuring the wrong thing while looking rigorous},
+  check   = {claim:grouping-discharge}
+}
+
+@misc{grouping-not-pagination,
+  section = {implications}, from = {grouping-discharge}, rests-on = {genre-registry}, join = {. },
+  claim   = {and grouping is not PAGINATION --- what coheres is structural and emergent, where a unit BREAKS is a rhetoric choice on top, so the same cluster may render as one staged unit, as a unit per claim, or as a summary line},
+  check   = {claim:grouping-not-pagination}
+}
+
+@misc{genre-registry,
+  section = {implications}, from = {grouping-not-pagination}, rests-on = {grouping-not-pagination}, join = {, which },
+  claim   = {makes the second axis a named objective, REGISTERED rather than enumerated --- the built-in objectives are data in one engine module and a project declares its own in paper.toml exactly as it declares a check type, so a consumer adds a pagination objective without touching the engine},
+  check   = {claim:genre-registry}
+}
+
+@misc{genre-gates-the-seam,
+  section = {implications}, from = {genre-registry}, rests-on = {genre-registry}, join = {; and },
+  claim   = {because an OPEN set cannot be gated by exhaustive case analysis, what is gated is the SEAM --- an objective must be a real function of the grouping (every claim lands in exactly one unit, so a cut that drops or duplicates a claim is refused) and an unregistered name must REFUSE rather than fall back to a default, since a silent fallback would paginate a document under a genre nobody asked for},
+  check   = {claim:genre-gates-the-seam}
+}
+
+@misc{genre-budget,
+  section = {implications}, from = {genre-gates-the-seam}, rests-on = {genre-registry}, join = {. },
+  claim   = {a BUDGETED objective shows why the axis needed to be its own --- the unbudgeted cluster cut leaves this paper's largest section on one unit while a per-claim cut gives a four-word claim its own, so the talk objective keeps the grouping's bracketing and splits only over-full clusters, always at a CLAIM boundary, leaving a single over-long claim its own unit rather than inventing a boundary the document does not have},
+  check   = {claim:genre-budget}
+}
+
+@misc{genre-collection,
+  section = {implications}, from = {genre-budget}, rests-on = {genre-registry}, join = {, and },
+  claim   = {a second registered objective proves the axis is genuinely OPEN rather than two-valued --- the collection cut MERGES where the talk cut splits, since its cost is the cross-unit grounding edge (a unit resting on a claim outside itself is not self-contained), so it closes the grounding graph transitively into standalone subtrees; a closed enumeration built around splitting would have had no room for an objective running the other direction},
+  check   = {claim:genre-collection}
+}
+
+@misc{observe-second-shape,
+  section = {implications}, from = {genre-budget}, rests-on = {grouping-not-pagination, genre-registry}, join = {. },
+  link    = {the two axes composed: the grouping it cuts on, and the registry that paginates it},
+  claim   = {so the projector gains a SECOND observation shape rather than a fifth target --- project linearizes the DAG to one flat stream that every citation target materializes differently, while observe SEGMENTS it into bounded units indexed by target AND genre, which cannot be a branch inside a function returning a string; it returns the units themselves, not rendered prose, since re-linearizing there would undo the segmentation it exists to perform},
+  check   = {claim:observe-second-shape}
+}
+
+@misc{observe-regroups-on-grounding,
+  section = {implications}, from = {observe-second-shape}, rests-on = {grouping-residual, observe-second-shape}, join = {, and },
+  claim   = {the units it cuts are grouped by the GROUNDING-derived partition rather than the authored sections, at the resolution the genre asks for --- and ONE owner computes that partition for both consumers, since the projector cutting a deck on it and the $\partial^2$ grade measuring its distance from $\sigma$ sit on opposite sides of the component lattice; a second copy would drift, and the grade would then be measuring a grouping no deck uses},
+  check   = {claim:observe-regroups-on-grounding}
+}
+
+@misc{partition-merges,
+  section = {implications}, from = {observe-regroups-on-grounding}, rests-on = {observe-regroups-on-grounding}, join = {, where },
+  claim   = {$\gamma$ controls the group COUNT and not merely which claims group together --- a relabelling sweep alone can never create or merge a group, so the derived partition would always carry $\sigma$'s cardinality and the resolution knob would move labels while leaving the structure fixed; adding the MERGE of two GROUNDED-adjacent groups is the operator that makes $\gamma \to \infty$ recover the authored sections and $\gamma \to 0$ recover the modularity optimum, and restricting it to adjacency is what stops a document being fused on no evidence},
+  check   = {claim:partition-merges}
+}
+
+@misc{gamma-is-reachable,
+  section = {implications}, from = {partition-merges}, rests-on = {partition-merges}, join = {, and },
+  claim   = {that resolution is REACHABLE rather than frozen into each genre --- $\gamma$ is the deck-analog of the adequacy floor, so a document may be re-cut coarser or finer without inventing a genre to carry the value; an explicit setting overrides the genre's own while its absence leaves the genre's declared resolution meaningful, which an engine-wide default would have destroyed},
+  check   = {claim:gamma-is-reachable}
+}
+
+@misc{genre-declared-runs,
+  section = {implications}, from = {partition-merges}, rests-on = {genre-gates-the-seam}, join = {. },
+  claim   = {and a project-declared objective RUNS, so the open half is open in fact and not only in principle --- a consumer registering an objective it could not invoke would have a registry entry and no pagination; the engine runs the declared command on the `cmd:` model, groups in and units out, and holds the result to the SAME totality invariant a built-in meets, since what a pagination IS does not depend on who wrote it},
+  check   = {claim:genre-declared-runs}
+}
+
+@misc{observe-bounded-by-adoption,
+  section = {implications}, from = {observe-second-shape}, rests-on = {observe-second-shape}, join = {, and },
+  claim   = {its cut is bounded by what authors DECLARE, not by the mechanism --- a grouping reads only the grounding a project actually states, so where rests-on is dense the segmentation carries argument structure and where only prose order is declared it reduces to the section cut a flat render already gives; the honest form of the feature therefore reports which case a document is in rather than presenting the second as though it were the first},
+  check   = {claim:observe-bounded-by-adoption}
+}
+
 @misc{forward-direction,
   section = {implications}, from = {grounding-reflected}, join = {. },
   claim   = {the structure residual closes by PROJECTION rather than collapse --- a grounding edge that runs beyond prose adjacency now renders as a transitively-reduced cross-reference, making the grounding DAG visible in the prose and not only in the metadata; its richer materializations, an expounding clause or a figure beyond the bare citation, are the open rhetorical work},

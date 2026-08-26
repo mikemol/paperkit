@@ -230,8 +230,9 @@ def claims_are_warrants():
     # this paper's claims ARE its warrants: warrants.bib parses to the cited claim records
     import project as P
     recs = {}                                             # bib-list-aware: claims may be authored across modules
-    for b in P.load_config(PAPER_DIR)["bibs"]:
-        recs.update(P.entries(b))
+    cfg = P.load_config(PAPER_DIR)
+    for b in cfg["bibs"]:
+        recs.update(P.entries(b, cfg["consumer_fields"]))  # thread the project's declared consumer_fields
     assert recs.get("paper-is-projection", {}).get("claim"), "the paper's claims are not its warrants"
 
 
@@ -282,8 +283,9 @@ def closes_gap():
     # closes the say/check gap: every claim in the ledger carries a verifier
     import project as P
     F = {}                                                # bib-list-aware: claims may be authored across modules
-    for b in P.load_config(PAPER_DIR)["bibs"]:
-        F.update(P.entries(b))
+    cfg = P.load_config(PAPER_DIR)
+    for b in cfg["bibs"]:
+        F.update(P.entries(b, cfg["consumer_fields"]))    # thread the project's declared consumer_fields
     # an entry with an `author` is an external reference (resolves by being defined), not an
     # assertion the paper makes — only the paper's OWN claims owe a verifier.
     missing = [k for k, f in F.items()
@@ -804,6 +806,410 @@ def collapse_safe():
         "the increment's escaping input was not surfaced as the keep-residual"
 
 
+def grouping_residual():
+    # Ρ·deck·residual — σ (authored sections) vs P* (rests-on modularity), reported as the NAMED
+    # claims that move.  A SYNTHETIC fixture with a KNOWN answer calibrates the measure.
+    import coherence
+    dense_a = [{"key": f"a{i}", "section": "A",
+                "rests-on": [f"a{j}" for j in range(3) if j != i]} for i in range(3)]
+    dense_b = [{"key": f"b{i}", "section": "B",
+                "rests-on": [f"b{j}" for j in range(3) if j != i]} for i in range(3)]
+    stray = [{"key": "stray", "section": "B", "rests-on": ["a0", "a1", "a2"]}]
+    r = coherence.grouping_residual(dense_a + dense_b + stray)
+    assert not r["degenerate"], "a fixture with rests-on edges was read as having no grounding graph"
+    assert r["moved"] == ["stray"] and r["residual"] == 1, \
+        f"the residual must NAME exactly the misfiled claim, got {r['moved']}"
+    # AGREEMENT ⇒ ZERO, the other direction: without it the measure could report a constant.
+    agree = coherence.grouping_residual(dense_a + dense_b)
+    assert agree["residual"] == 0 and agree["moved"] == [], \
+        f"a grouping that IS the grounding structure must have residual 0, got {agree}"
+    # DEGENERATE is declared, not silently zero.
+    none = coherence.grouping_residual([{"key": "x", "section": "A", "rests-on": []}])
+    assert none["degenerate"] and none["edges"] == 0, \
+        "a record set with no grounding edges must declare itself degenerate, not report agreement"
+
+
+def grouping_tail_falls_back():
+    # The sparse tail falls back to σ BY CONSTRUCTION, and γ is what makes it do so.  A no-edge
+    # claim is trivially unmovable, so it would pass even with the regularizer deleted; the
+    # DISCRIMINATING case is one weak cross-section edge, where modularity's null term makes the
+    # lone edge contribute ≈0 and the −γ·d term must decide.
+    import coherence
+    dense_a = [{"key": f"a{i}", "section": "A",
+                "rests-on": [f"a{j}" for j in range(3) if j != i]} for i in range(3)]
+    dense_b = [{"key": f"b{i}", "section": "B",
+                "rests-on": [f"b{j}" for j in range(3) if j != i]} for i in range(3)]
+    weak = dense_a + dense_b + [{"key": "weak", "section": "B", "rests-on": ["a0"]}]
+    assert "weak" not in coherence.grouping_residual(weak)["moved"], \
+        "a claim with ONE cross-section edge was reassigned — γ is not holding the tail to σ"
+    # and at γ→0 it SHOULD move: the fallback is γ's doing, not the fixture's.
+    assert "weak" in coherence.grouping_residual(weak, gamma=0.0)["moved"], \
+        "at γ=0 the lone edge should dominate — else the assertion above proves nothing about γ"
+
+
+def grouping_discharge():
+    # Ρ·deck·residual·gate — a `link`-acknowledged claim leaves the residual (the measurement) but
+    # clears `undischarged` (the gateable count); the budget gates only the latter.
+    import coherence
+    dense_a = [{"key": f"a{i}", "section": "A",
+                "rests-on": [f"a{j}" for j in range(3) if j != i]} for i in range(3)]
+    dense_b = [{"key": f"b{i}", "section": "B",
+                "rests-on": [f"b{j}" for j in range(3) if j != i]} for i in range(3)]
+    fx = dense_a + dense_b + [{"key": "stray", "section": "B", "rests-on": ["a0", "a1", "a2"]}]
+    d = coherence.grouping_residual(fx, discharged=frozenset({"stray"}))
+    assert d["residual"] == 1 and d["undischarged"] == 0 and d["acknowledged"] == ["stray"], \
+        f"a `link`-acknowledged claim must leave the residual but clear the gateable count, got {d}"
+    assert coherence._residual_exit({"grouping": d}, 0) == 0, \
+        "a fully-discharged residual must pass even a zero budget"
+    u = coherence.grouping_residual(fx)
+    assert coherence._residual_exit({"grouping": u}, 0) == 1, \
+        "an un-acknowledged residual must FAIL a zero budget — the control is inert"
+    assert coherence._residual_exit({"grouping": u}, None) == 0, \
+        "with no --max-residual the face must report without failing (instrument, not control)"
+
+
+def grouping_not_pagination():
+    # The two axes are INDEPENDENT: one grouping, several paginations of it.  Same input, different
+    # unit counts — if a genre could not change the cut, the axis would not be separate.
+    import genre
+    groups = [["a", "b"], ["c"]]
+    staged = genre.resolve("staged")["objective"](groups, ())
+    atomic = genre.resolve("atomic")["objective"](groups, ())
+    assert staged == [["a", "b"], ["c"]], "the staged cut must be the identity on the grouping"
+    assert atomic == [["a"], ["b"], ["c"]], "the atomic cut must be one unit per claim"
+    assert len(staged) != len(atomic), \
+        "two genres produced the same pagination — the rhetoric axis does not vary independently"
+
+
+def genre_registry():
+    # OPEN registry: a PROJECT registers its own without touching the engine, and that registration
+    # must NOT leak into the engine's built-in set (per-project, not global mutation).
+    import genre
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "paper.toml").write_text('[paper]\ntitle = "t"\n\n'
+                                      '[genres.brief]\nwhat = "one line per cluster"\n'
+                                      'cmd = "python3 checks/brief.py"\ngamma = 4.0\n')
+        reg = genre.registry(d)
+        assert "brief" in reg and reg["brief"]["cmd"] == "python3 checks/brief.py", \
+            "a project's [genres.*] table did not register — the open half of the registry is closed"
+        assert reg["brief"]["gamma"] == 4.0, "a declared genre's gamma was not carried"
+        assert "brief" not in genre.registry(), \
+            "a project's registration leaked into the ENGINE's built-in set — the registry is global state"
+        assert set(genre.BUILTIN) <= set(reg), "registering a genre dropped a built-in"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def genre_gates_the_seam():
+    # An open set cannot be gated by case analysis, so the SEAM is gated: TOTAL and LOUD, each
+    # against a real breach.
+    import genre
+    groups = [["a", "b"], ["c"]]
+    # LOUD — an unregistered name REFUSES rather than falling back.
+    try:
+        genre.resolve("no-such-genre")
+        raise AssertionError("an unregistered genre RESOLVED — the registry falls back silently")
+    except genre.Unregistered:
+        pass
+    # TOTAL — each of the four ways an objective stops being a function of the grouping is refused.
+    for name, obj in (("drops", lambda g, r: [u[:1] for u in g]),
+                      ("duplicates", lambda g, r: [list(u) for u in g] + [list(g[0])]),
+                      ("invents", lambda g, r: [list(u) for u in g] + [["ghost"]]),
+                      ("raises", lambda g, r: (_ for _ in ()).throw(ValueError("x")))):
+        ok, _ = genre.is_total(obj, groups)
+        assert not ok, f"an objective that {name} passed TOTAL — a cut that {name} is not a pagination"
+    for name in ("staged", "atomic", "talk"):
+        ok, why = genre.is_total(genre.resolve(name)["objective"], groups)
+        assert ok, f"the built-in {name!r} objective failed TOTAL: {why}"
+
+
+def genre_budget():
+    # A BUDGETED objective keeps the grouping's bracketing and splits only over-full clusters, at
+    # CLAIM boundaries — never mid-claim, since the claim is the atom the engine is built on.
+    import genre
+    recs = [{"key": "x", "claim": "w " * 50}, {"key": "y", "claim": "w " * 50},
+            {"key": "z", "claim": "w " * 200}]
+    u = genre.resolve("talk")["objective"]([["x", "y"], ["z"]], recs)
+    assert u == [["x"], ["y"], ["z"]], \
+        f"two 50-word claims exceed an 84-word budget together and must SPLIT, got {u}"
+    assert genre.resolve("staged")["objective"]([["x", "y"], ["z"]], recs) == [["x", "y"], ["z"]], \
+        "the unbudgeted `staged` must NOT split — the budget is what distinguishes talk from it"
+    assert ["z"] in u, "a single over-budget claim must keep its own unit, never be cut mid-claim"
+    ok, why = genre.is_total(genre.resolve("talk")["objective"], [["x", "y"], ["z"]])
+    assert ok, f"the budgeted objective broke TOTAL: {why}"
+
+
+def genre_collection():
+    # Ρ·deck·objective·two — the collection cut MERGES where talk SPLITS, and its cost is the
+    # cross-unit grounding edge: a unit that rests outside itself is not self-contained.
+    import genre
+    obj = genre.resolve("collection")["objective"]
+    # two groups joined by ONE grounding edge must become ONE unit.
+    recs = [{"key": "a", "rests-on": []}, {"key": "b", "rests-on": ["a"]}]
+    assert obj([["a"], ["b"]], recs) == [["a", "b"]], \
+        "two groups joined by a grounding edge must MERGE — the collection cut is upward"
+    # an ungrounded group stays its own unit (so the degenerate corpus is the identity).
+    recs2 = [{"key": "a", "rests-on": []}, {"key": "b", "rests-on": []}]
+    assert obj([["a"], ["b"]], recs2) == [["a"], ["b"]], \
+        "groups with no grounding between them must stay separate — else it merges everything"
+    # ORDER-INDEPENDENT: the same edge set gives the same partition whichever way it is written.
+    fwd = obj([["a"], ["b"]], [{"key": "a", "rests-on": ["b"]}, {"key": "b", "rests-on": []}])
+    rev = obj([["a"], ["b"]], [{"key": "a", "rests-on": []}, {"key": "b", "rests-on": ["a"]}])
+    assert fwd == rev, f"edge DIRECTION changed the partition ({fwd} vs {rev}) — not a closure"
+    # TRANSITIVE: a-b and b-c must land all three together, which a left-to-right sweep misses.
+    tri = [{"key": "a", "rests-on": []}, {"key": "b", "rests-on": ["a"]},
+           {"key": "c", "rests-on": ["b"]}]
+    assert obj([["a"], ["b"], ["c"]], tri) == [["a", "b", "c"]], \
+        "a chain of grounding edges must close transitively into ONE unit"
+    # and it stays TOTAL under merging.
+    ok, why = genre.is_total(obj, [["a"], ["b"], ["c"]])
+    assert ok, f"the collection objective broke TOTAL: {why}"
+
+
+def observe_regroups_on_grounding():
+    # Ρ·deck·residual·wire — observe() cuts on the GROUNDING-derived partition, not the authored
+    # sections, and one owner computes that partition for both the projector and the ∂² grade.
+    import genre, coherence
+    # ONE OWNER: the grade's partition IS the projector's, not a second copy that could drift.
+    recs = [{"key": "a", "section": "A", "rests-on": []},
+            {"key": "b", "section": "B", "rests-on": ["a"]},
+            {"key": "c", "section": "B", "rests-on": []}]
+    p = genre.partition(recs, 0.0)
+    assert not p["degenerate"] and p["part"], "the shared partition returned nothing to group on"
+    r = coherence.grouping_residual(recs, gamma=0.0)
+    # the residual's `moved` must be exactly the claims the shared partition relabels — if the two
+    # disagreed, the grade would be measuring a grouping no deck uses.
+    sec = {x["key"]: x["section"] for x in recs}
+    assert r["moved"] == sorted(k for k in sec if p["part"][k] != sec[k]), \
+        f"the ∂² residual and the projector's partition disagree — two copies, not one owner"
+    # DEGENERATE ⇒ the section cut, by construction: a project with no grounding is unchanged.
+    flat = [{"key": "x", "section": "S", "rests-on": []},
+            {"key": "y", "section": "S", "rests-on": []}]
+    d = genre.partition(flat, 1.0)
+    assert d["degenerate"] and d["part"] == {"x": "S", "y": "S"}, \
+        "with no grounding the partition must fall back to section, not invent a grouping"
+    # and γ is live: it is the resolution knob, so different γ may give different partitions.
+    assert genre.partition(recs, 0.0)["part"] is not None, "γ=0 must still yield a partition"
+
+
+def partition_merges():
+    # Ρ·deck·partition·merge — γ must control the group COUNT, not just which claims group
+    # together.  Before the merge operator the derived partition always carried σ's cardinality,
+    # so γ moved labels and never structure.
+    import genre
+    # two sections densely grounded INTO each other: at low γ they should become ONE group,
+    # at high γ σ must win and they stay two.
+    recs = ([{"key": f"a{i}", "section": "A", "rests-on": [f"a{j}" for j in range(3) if j != i]}
+             for i in range(3)]
+            + [{"key": f"b{i}", "section": "B",
+                "rests-on": [f"b{j}" for j in range(3) if j != i] + [f"a{i}"]} for i in range(3)])
+    lo = genre.partition(recs, 0.0)
+    hi = genre.partition(recs, 100.0)
+    assert lo["groups"] < hi["groups"], \
+        f"γ does not change the group COUNT ({lo['groups']} vs {hi['groups']}) — merge is inert"
+    assert hi["groups"] == 2, f"at high γ the authored σ must win, got {hi['groups']} groups"
+    # a merge must only join CONNECTED groups — unconnected ones fuse a document on no evidence.
+    apart = ([{"key": "x", "section": "X", "rests-on": []},
+              {"key": "y", "section": "Y", "rests-on": []}])
+    d = genre.partition(apart, 0.0)
+    assert d["degenerate"] or d["groups"] == 2, \
+        "two groups with NO grounding edge between them were merged — fused on no evidence"
+
+
+def genre_declared_runs():
+    # Ρ·deck·genre·cmd — a project-DECLARED objective actually runs, and is held to the same
+    # totality invariant as a built-in (the open half cannot buy laxity by living outside).
+    import genre
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "ok.py").write_text(
+            "import sys\n"
+            "for g in [l.split(chr(9)) for l in sys.stdin.read().splitlines() if l.strip()]:\n"
+            "    [print(k) for k in g]\n")
+        spec = {"cmd": f"python3 {d / 'ok.py'}"}
+        units = genre.run_declared(spec, [["a", "b"]], [])
+        assert units == [["a"], ["b"]], f"the declared objective's units did not come back, got {units}"
+        # DROPS ⇒ refused, with the same message a built-in would get.
+        (d / "bad.py").write_text(
+            "import sys\n"
+            "for g in [l.split(chr(9)) for l in sys.stdin.read().splitlines() if l.strip()]:\n"
+            "    print(g[0])\n")
+        try:
+            genre.run_declared({"cmd": f"python3 {d / 'bad.py'}"}, [["a", "b"]], [])
+            raise AssertionError("a declared objective that DROPS a claim was accepted")
+        except SystemExit:
+            pass
+        # a FAILING objective is refused rather than read as an empty pagination.
+        (d / "fail.py").write_text("import sys\nsys.exit(3)\n")
+        try:
+            genre.run_declared({"cmd": f"python3 {d / 'fail.py'}"}, [["a"]], [])
+            raise AssertionError("a declared objective that FAILED was accepted")
+        except SystemExit:
+            pass
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def gamma_is_reachable():
+    # Ρ·deck·gamma·declare — γ is the resolution dial and must be REACHABLE, not frozen into each
+    # genre.  An explicit γ overrides the genre's own; absent, the genre's declared value stands.
+    import genre, project as P
+    recs = ([{"key": f"a{i}", "section": "A", "rests-on": [f"a{j}" for j in range(3) if j != i]}
+             for i in range(3)]
+            + [{"key": f"b{i}", "section": "B",
+                "rests-on": [f"b{j}" for j in range(3) if j != i] + [f"a{i}"]} for i in range(3)])
+    assert genre.partition(recs, 100.0)["groups"] > genre.partition(recs, 0.0)["groups"], \
+        "γ does not change the grouping — the resolution dial is inert"
+    # the knob exists and defaults to None, so a genre's declared γ is not overridden by a constant
+    assert P.GAMMA.default is None, \
+        "a non-None γ default would override every genre's declared resolution with one constant"
+    assert P.GAMMA.choices is None, "γ is continuous — a choices tuple would fix it to a few values"
+
+
+def observe_second_shape():
+    # Ρ·deck·observe — a SECOND observation shape beside project()'s linearization.
+    import project as P
+    from _fixture_model import entry
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
+                                      'rubric = "r.tsv"\nout = "o.md"\n')
+        (d / "r.tsv").write_text("s\tSec\n")
+        (d / "w.bib").write_text(
+            "@misc{a,\n section = {s},\n claim = {%s},\n check = {cmd:true}\n}\n"
+            "@misc{b,\n section = {s}, from = {a},\n claim = {%s},\n check = {cmd:true}\n}\n"
+            % ("w " * 50, "w " * 50))
+        cfg = P.load_config(d)
+        # project() LINEARIZES — one string; observe() SEGMENTS — units.
+        flat = P.project(cfg)
+        assert isinstance(flat, str), "project() must still return one flat stream"
+        units = P.observe(cfg, "staged", d)
+        assert isinstance(units, list) and units and isinstance(units[0], dict), \
+            "observe() must return UNITS, not a rendered string — returning prose re-linearizes"
+        # the two axes compose: same carrier, different pagination.
+        assert len(P.observe(cfg, "staged", d)) == 1, "staged must keep the section as one unit"
+        assert len(P.observe(cfg, "atomic", d)) == 2, "atomic must give each claim its own unit"
+        assert len(P.observe(cfg, "talk", d)) == 2, \
+            "two 50-word claims exceed the talk budget and must split into two units"
+        # a unit carries its keys and its section, and never spans sections.
+        u = P.observe(cfg, "talk", d)[0]
+        assert u["keys"] and u["section"] == "s", "a unit must name its keys and its section"
+        # LOUD propagates through the projector: an unregistered genre REFUSES here too.
+        import genre
+        try:
+            P.observe(cfg, "no-such-genre", d)
+            raise AssertionError("observe() accepted an unregistered genre — LOUD does not propagate")
+        except genre.Unregistered:
+            pass
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def observe_bounded_by_adoption():
+    # The cut is bounded by DECLARED grounding: a project with no rests-on has nothing for a
+    # DAG-derived grouping to read, and the residual face says so by declaring itself degenerate
+    # rather than reporting 0 as agreement.
+    import coherence
+    no_ground = [{"key": "a", "section": "S", "rests-on": []},
+                 {"key": "b", "section": "S", "rests-on": []}]
+    r = coherence.grouping_residual(no_ground)
+    assert r["degenerate"] and r["edges"] == 0, \
+        "a project declaring no grounding must be reported DEGENERATE, not as agreeing"
+    grounded = [{"key": "a", "section": "S", "rests-on": ["b"]},
+                {"key": "b", "section": "S", "rests-on": ["a"]}]
+    assert not coherence.grouping_residual(grounded)["degenerate"], \
+        "a project WITH grounding edges must not be reported degenerate"
+
+
+def compose_two_imports():
+    # Ρ·paper·compose — exactly TWO verbs cross a project boundary, and that is a STRUCTURAL bit
+    # in the engine's own registry, not a convention.  Derived from VERBS, never re-listed here
+    # (a guard must not copy the set it guards).
+    import resolver
+    crossing = {v for v, spec in resolver.VERBS.items() if spec["crosses"]}
+    assert crossing == {"result", "concept"}, \
+        f"the boundary-crossing verb set changed: {sorted(crossing)} — the claim names two"
+    # and `crosses` is load-bearing: the derived prefix tuple every consumer reads comes from it.
+    assert set(resolver.CROSSING) == {f"{v}:" for v in crossing}, \
+        "CROSSING is not derived from VERBS — a consumer could re-list the set and drift"
+
+
+def compose_delegates():
+    # Both crossing verbs DELEGATE adequacy to the owner: Δ grades them `imported` rather than
+    # sweeping the imported proof.  Asserted for BOTH, since a rule holding for one verb only
+    # would be a special case rather than the composition rule the claim states.
+    import grader
+    d = Path(tempfile.mkdtemp())
+    try:
+        sib = d / "g"
+        sib.mkdir()
+        (sib / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
+                                        'rubric = "r.tsv"\nout = "out.md"\n')
+        (sib / "r.tsv").write_text("s\tSec\n")
+        (sib / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n"
+                                   "  check = {cmd:true}\n}\n")
+        import project as P
+        (sib / "out.md").write_text(P.project(P.load_config(sib)))
+        assert grader.grade_check("result:g", d, set(), {}, d)["grade"] == "imported", \
+            "a verdict-import did not delegate its grade to the sibling that owns it"
+        eng = Path(__file__).resolve().parents[2]
+        assert grader.grade_check("concept:adequacy-pitch", eng / "paper", set(), {},
+                                  eng / "paper")["grade"] == "imported", \
+            "a certificate-import did not delegate its grade to the library that owns it"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def compose_refuses_regrid():
+    # The anti-pattern: re-deriving a sibling's proof locally.  The engine REFUSES it structurally
+    # — the sweep's footprint skips a crossing check rather than stracing a whole sibling gate, so
+    # an importing project cannot accidentally pay for (or contradict) the owner's measurement.
+    import footdeps
+    import resolver
+    src = _src("footdeps.py")
+    assert "CROSSING" in src, \
+        ("the footprint audit no longer asks the verb registry which checks cross a boundary — "
+         "it would strace a sibling's whole gate and re-derive what the owner already measured")
+    # and the skip is per-VERB, so adding a crossing verb reaches this site by declaration alone.
+    assert len(resolver.CROSSING) >= 2, "the derived crossing-prefix set collapsed"
+
+
+def compose_chains():
+    # Imports CHAIN: a project resting on a sibling that rests on a third.  Built and gated, so
+    # transitivity is exhibited rather than asserted — a two-link chain where the middle project's
+    # verdict depends on the innermost one's.
+    import gate
+    import project as P
+    d = Path(tempfile.mkdtemp())
+    try:
+        def mk(name, check):
+            p = d / name
+            p.mkdir()
+            (p / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
+                                          'rubric = "r.tsv"\nout = "out.md"\n')
+            (p / "r.tsv").write_text("s\tSec\n")
+            (p / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n"
+                                     "  check = {%s}\n}\n" % check)
+            (p / "out.md").write_text(P.project(P.load_config(p)))
+            return p
+        mk("inner", "cmd:true")
+        # the sibling path is relative to the CITING project's dir (resolver runs the sub-gate
+        # with cwd = that project), so middle cites ../inner, not inner.
+        mk("middle", "result:../inner")
+        assert gate.resolves("result:middle", d, {}).passed, \
+            "a two-link chain of verdict-imports did not resolve — imports do not compose"
+        # and the chain is LOAD-BEARING: breaking the innermost must break the outermost.
+        mk_inner = d / "inner" / "w.bib"
+        mk_inner.write_text("@misc{c,\n  section = {s},\n  claim = {x},\n"
+                            "  check = {cmd:false}\n}\n")
+        assert not gate.resolves("result:middle", d, {}).passed, \
+            ("breaking the INNERMOST project left the outermost green — the verdict does not "
+             "carry the cone beneath it, so the chain is decorative")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def forward_direction():
     import project as P
     # the structure residual is closed by PROJECTION: the grounding DAG renders as transitively-REDUCED
@@ -817,10 +1223,28 @@ def forward_direction():
 
 CLAIMS = {
     "collapse-safe": collapse_safe,
+    "grouping-residual": grouping_residual,
+    "grouping-tail-falls-back": grouping_tail_falls_back,
+    "grouping-discharge": grouping_discharge,
+    "grouping-not-pagination": grouping_not_pagination,
+    "genre-registry": genre_registry,
+    "genre-gates-the-seam": genre_gates_the_seam,
+    "genre-budget": genre_budget,
+    "genre-collection": genre_collection,
+    "observe-regroups-on-grounding": observe_regroups_on_grounding,
+    "partition-merges": partition_merges,
+    "gamma-is-reachable": gamma_is_reachable,
+    "genre-declared-runs": genre_declared_runs,
+    "observe-second-shape": observe_second_shape,
+    "observe-bounded-by-adoption": observe_bounded_by_adoption,
     "fresh-by-construction": fresh_by_construction,
     "trust-boundary": trust_boundary,
     "env-sanitized": env_sanitized,
     "path-surface": path_surface,
+    "compose-two-imports": compose_two_imports,
+    "compose-delegates": compose_delegates,
+    "compose-refuses-regrid": compose_refuses_regrid,
+    "compose-chains": compose_chains,
     "forward-direction": forward_direction,
     "multi-project": multi_project,
     "project-dag": project_dag,

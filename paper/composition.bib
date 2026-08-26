@@ -77,3 +77,31 @@
   check   = {claim:report-live},
   reads   = {report}
 }
+
+% ── how projects COMPOSE (Ρ·paper·compose): the two import verbs, the delegation rule they
+%    share, and the anti-pattern they exist to refuse.
+
+@misc{compose-two-imports,
+  section = {projects}, from = {project-dag}, join = {. },
+  claim   = {a project rests on another through exactly two imports --- a VERDICT import takes a sibling's whole gate result, a CERTIFICATE import takes one concept its library graded --- and both cross a project boundary, which the engine's verb registry marks as a structural property rather than leaving to convention},
+  check   = {claim:compose-two-imports}
+}
+
+@misc{compose-delegates,
+  section = {projects}, from = {compose-two-imports}, rests-on = {compose-two-imports}, join = {, and both },
+  claim   = {DELEGATE their adequacy to the owner instead of re-deriving it --- the importing side does not sweep the proof it imported, because the owner already graded it and grading it again would measure the same thing twice while claiming independence},
+  check   = {claim:compose-delegates}
+}
+
+@misc{compose-refuses-regrid,
+  section = {projects}, from = {compose-delegates}, rests-on = {compose-delegates}, join = {, which is the point: },
+  claim   = {the alternative was measured and refused --- re-deriving a sibling's proof in the citing view costs the whole grid again for an answer the owner already holds, and worse, produces a SECOND result that can disagree with the first, so composition is dispatch on ownership rather than recomputation},
+  check   = {claim:compose-refuses-regrid}
+}
+
+@misc{compose-chains,
+  section = {projects}, from = {compose-refuses-regrid}, rests-on = {compose-two-imports}, join = {. },
+  link    = {the transitivity that makes a family of projects a single verified structure},
+  claim   = {and the imports CHAIN --- a project may rest on a sibling that itself rests on a third, so a verdict carries the whole cone beneath it and the family of projects is one claim-DAG at a coarser grain, the same relation between claims holding between the documents that contain them},
+  check   = {claim:compose-chains}
+}

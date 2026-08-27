@@ -52,10 +52,10 @@ def main() -> int:
     # Ζ·corro·honest — the value names what was MEASURED (the producer strings differ), not
     # what was hoped (they share no upstream).  `independent` is now reserved for a certified
     # disjoint read footprint, which nothing yet computes — so it must be UNREACHABLE here.
-    check("agree: of ≥2 distinct concurring producers reads DISTINCT, not independent",
-          indep["grade"] == "behavioral" and indep["corroboration"] == "distinct")
-    check("`independent` is not claimable without a footprint comparison (Ε·corro·phi)",
-          indep["corroboration"] != "independent")
+    # Ε·corro·phi landed, so `independent` is now REACHABLE — and earned by measurement rather
+    # than by the producer strings differing.  These two producers read disjoint inputs.
+    check("agree: of producers with DISJOINT footprints is independent — certified, not assumed",
+          indep["grade"] == "behavioral" and indep["corroboration"] == "independent")
     check("ORTHOGONAL — same falsifiability grade, different corroboration (not one scalar)",
           lone["grade"] == indep["grade"] and lone.get("corroboration", "single") != indep["corroboration"])
     check("identical producers concur TRIVIALLY — single; string-distinctness is a NECESSARY\n           condition and this is the case it correctly rejects",
@@ -63,15 +63,39 @@ def main() -> int:
     check("disagreeing producers do not corroborate — broken, no corroboration claimed",
           disagree["grade"] == "broken" and disagree.get("corroboration", "single") == "single")
 
+    # ---- Ε·corro·phi: the MEASURED verdict, from per-producer read footprints ----
+    # `distinct` says the producer strings differ.  Their FOOTPRINTS say whether they share an
+    # input — disjoint reads provably share no ground (a certificate, not a heuristic), and an
+    # overlap NAMES the files a bug could hide in.  Φ·degrade leaves `distinct` standing: an
+    # unmeasurable sharing must not read as a measured one, in either direction.
+    import shutil as _sh
+    import tempfile as _tf
+    import resolver as _R
+    _d = Path(_tf.mkdtemp())
+    try:
+        (_d / "a.txt").write_text("CANON\n")
+        # two producers reading the SAME file — correlated, and the file is named
+        v = _R.corroboration_of("agree:cat a.txt ||| cat a.txt && true", _d, {})
+        check("two producers reading one file are CORRELATED, and the shared read is NAMED",
+              v is not None and v[0] == "correlated" and "a.txt" in v[1])
+        # δ: the second producer reads NOTHING — the only change, and the verdict flips
+        v2 = _R.corroboration_of("agree:cat a.txt ||| printf CANON", _d, {})
+        check("δ: a producer that reads nothing shared ⇒ INDEPENDENT, certified not assumed",
+              v2 is not None and v2[0] == "independent" and v2[1] == [])
+        check("a non-agree check has no producers to partition ⇒ None, never a verdict",
+              _R.corroboration_of("cmd:true", _d, {}) is None)
+    finally:
+        _sh.rmtree(_d, ignore_errors=True)
+
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     P = indep.get("corroboration")
     F = grade("agree:cat a.txt ||| cat a.txt").get("corroboration", "single")
-    ok = P == "distinct" and F == "single"
+    ok = P == "independent" and F == "single"
     fails.append("distinct-producer-delta") if not ok else None
-    print(f"  {'ok ' if ok else 'XX '}a distinct oracle vs a copy flips corroboration")
-    print("      P (distinct):     agree:cat a.txt ||| printf CANON  — a distinct producer, shared ground UNCHECKED")
+    print(f"  {'ok ' if ok else 'XX '}an independent oracle vs a copy flips corroboration")
+    print("      P (independent): agree:cat a.txt ||| printf CANON  — disjoint footprints — MEASURED")
     print("      F (single):      agree:cat a.txt ||| cat a.txt     — the second producer is a copy")
-    print("      δ (min delta): the second producer is textually DISTINCT — all that is measured\n")
+    print("      δ (min delta): the second producer shares no read with the first\n")
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")

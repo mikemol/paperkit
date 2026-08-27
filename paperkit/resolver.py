@@ -540,6 +540,65 @@ def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> "list | None
     return sorted(reads) if traced else None
 
 
+def producer_footprints(check: str, project_dir: Path, custom: dict,
+                        scope: "Path | None" = None) -> "dict | None":
+    """Ε·corro·phi — Φ per PRODUCER, for an `agree:` check.  {producer: [reads]}, or None.
+
+    `footprint()` traces the whole check and returns ONE list; for `agree:` the traced command is
+    the producers `; `-joined, so their reads are UNIONED and the partition — the only thing that
+    could say whether they share ground — is discarded at that join.  This traces each producer
+    separately and keeps them apart.
+
+    ⚑ WHY THIS IS THE RIGHT INSTRUMENT AND A STRING COMPARISON IS NOT.  Corroboration asks
+    whether two producers are DECORRELATED, and `set()` over their command strings answers only
+    whether they were SPELLED differently.  Two producers with DISJOINT read footprints provably
+    share no input — a sound certificate, not a heuristic.  Two that overlap share at least those
+    files, and the intersection does not merely suggest shared premises, it NAMES them.
+
+    Measured on the tree's only live agree:, whose two producers both run
+    `python3 checks/prose.py < ../paper/paper.md` and both use pandoc: the intersection is the
+    shared normalizer and the shared source, so a bug in either is invisible to that check BY
+    CONSTRUCTION — while the string test called it `independent`.
+
+    None (never {}) when the trace is unavailable, matching footprint()'s Φ·degrade contract: an
+    unmeasurable footprint must not read as a measured-empty one.  A non-`agree:` check gets None
+    too — it has no producers to partition."""
+    typ, _, target = check.partition(":")
+    if typ != "agree":
+        return None
+    project_dir = Path(project_dir).resolve()
+    scope = Path(scope).resolve() if scope else project_dir
+    out = {}
+    for prod in (x.strip() for x in target.split("|||")):
+        if not prod:
+            continue
+        reads = footprint("cmd:" + prod, project_dir, custom, scope)
+        if reads is None:                      # Φ·degrade on ANY producer ⇒ no partition at all
+            return None
+        out[prod] = reads
+    return out or None
+
+
+def corroboration_of(check: str, project_dir: Path, custom: dict,
+                     scope: "Path | None" = None) -> "tuple | None":
+    """Ε·corro·phi — the CORROBORATION verdict for an `agree:`, from measured footprints.
+
+    Returns (value, shared) where value is `independent` (pairwise-disjoint reads — no shared
+    input, certified) or `correlated` (some pair overlaps), and `shared` names the intersection
+    that made it correlated.  None when the footprints could not be measured, which the caller
+    must render as `distinct` — the honest "≥2 producers, sharing NOT measured" state — rather
+    than as either verdict."""
+    fps = producer_footprints(check, project_dir, custom, scope)
+    if not fps or len(fps) < 2:
+        return None
+    sets = [set(v) for v in fps.values()]
+    shared = set()
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            shared |= sets[i] & sets[j]
+    return ("correlated", sorted(shared)) if shared else ("independent", [])
+
+
 def footprint(check: str, project_dir: Path, custom: dict, scope: "Path | None" = None) -> list:
     """Φ·footprint — the READ footprint: the files this check OPENS for reading when it runs
     (traced with strace), relative to `scope` (default the project dir).  A SOUND basis for

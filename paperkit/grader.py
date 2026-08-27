@@ -490,6 +490,19 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
         # of it.  `independent` is reserved for a certified disjoint read footprint.
         rec["corroboration"] = "distinct" if len(set(producers)) >= 2 else "single"
         rec["producers"] = len(producers)
+        # Ε·corro·phi — upgrade the STRING answer to a MEASURED one where the trace is available.
+        # `distinct` says only that the producers were spelled differently; their read footprints
+        # say whether they share an input.  Disjoint ⇒ `independent`, certified.  Overlapping ⇒
+        # `correlated`, NAMING the intersection — which is more actionable than a bare downgrade,
+        # because the shared file is the thing a bug can hide in.  Φ·degrade (no strace, or any
+        # producer untraceable) leaves `distinct` standing: an unmeasurable sharing must not read
+        # as a measured one, in either direction.
+        if rec["corroboration"] == "distinct":
+            verdict = resolver.corroboration_of(chk, sandbox_project, custom)
+            if verdict is not None:
+                rec["corroboration"], shared = verdict
+                if shared:
+                    rec["corroboration_shared"] = shared
     # Μ·sweep·atom — the decision-coverage AXIS (orthogonal, never a rung): of the branch decisions the
     # check REACHES, which does it never ASSERT on?  Only meaningful at def resolution (branch:/flip:
     # sites live in the engine surface) and only when the sweep found reached arms; the flip: probe is

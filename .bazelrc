@@ -7,6 +7,33 @@ test --test_output=errors --test_summary=terse
 # an unchanged toolchain keeps it cached — the check is enforceable every commit AND fast.  The same
 # keys are the fingerprint a consumer needs to trust which environment proved a claim (the VPAT tier
 # disclosure).  Cheap: the status command runs once per build; stable keys invalidate only on change.
+# Ζ·jvm·raise — the COORDINATOR's heap, on the same climb ladder every sweep cell already uses.
+#
+# Bazel passes NO heap flag: src/main/cpp/startup_options.cc's AddJVMMemoryArguments is an empty
+# stub (unnamed parameters, `return SUCCESS`), declared virtual and overridden nowhere — verified
+# in the 8.7.0 dist and against the live server's argv, which carries only -Xverify:none and
+# -XX:-MaxFDLimit.  So the ceiling is pure HotSpot ergonomics: MaxRAMPercentage=25 of MemTotal.
+# Measured on this box: 15.26 GiB * 25% = 3.81 GiB, matching the observed MaxHeapSize exactly.
+#
+# ⚑ THAT CEILING IS NOT ABSENT, IT IS TOO LOW — and it is the one number here nobody chose.
+# Every sweep cell runs under a per-action cgroup lease; the server holding them all runs on a
+# default derived from a machine it SHARES.  It died twice with `Build completed successfully,
+# 32325 total actions` immediately above the OOM: all the work done, the JVM out of room to
+# write up the result.
+#
+# ⚑⚑ AND SWAP IS NOT THE ANSWER, which is why this is a heap number and not a memory one.
+# `OutOfMemoryError: Java heap space` is the collector refusing to grow past its own bound — the
+# allocation never reaches the kernel, so there is no page for zram or zswap to receive.  The box
+# had 27.9 GB of free swap and memory PSI peaked at ~4% across the crash window (cassian's host
+# series, queried over 20:40-21:10).  Nothing failed to reclaim; nothing needed reclaiming.
+#
+# THE LADDER.  Same discipline as tools/cgroup-scope's OOM climb, one layer up: start at the
+# rung above the observed failure and DOUBLE on the next one.  It OOM'd at 3.81 -> take 4G.  If
+# it OOMs again -> 8G.  A too-small guess costs one retry and self-corrects; a too-large one
+# holds RAM this box needs for the cells and for whatever else the operator is running.  Raising
+# it far enough to break something else would, in the operator's phrasing, be an important lesson.
+startup --host_jvm_args=-Xmx4g
+
 build --stamp --workspace_status_command=tools/toolchain_status.sh
 # Ζ·tier·toolchain — a toolchain-tier check runs under the HOST toolchain unsandboxed (verb.bzl:
 # use_default_shell_env), and part of that toolchain lives under $HOME: lualatex resolves its

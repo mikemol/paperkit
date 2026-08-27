@@ -140,7 +140,8 @@ def mark_content_sensitive(records: list, content: set) -> list:
     return records
 
 
-def clamp(records: list, owner_grades: dict | None = None) -> list:
+def clamp(records: list, owner_grades: dict | None = None,
+          keys: set | None = None) -> list:
     """Effective grade — clamp by entailment: a claim is no better grounded than the weakest
     premise it (transitively) depends on along rests-on.  Annotates each record with
     effective_grade, clamp (rungs dropped from the self-contained grade), and clamped_by (the
@@ -205,6 +206,19 @@ def clamp(records: list, owner_grades: dict | None = None) -> list:
             return effc[k]
         r = rby.get(k)
         if r is None:
+            # Ζ·rests·unresolved — "not in scope" is TWO cases and this constant is only right
+            # for one.  A key with no record is either genuinely outside this argument (another
+            # project's key: imposing nothing is correct) or IN the argument and simply never
+            # graded — excluded by tier/nonmechanical, or a grading that did not finish.  The
+            # second is an unfold that stopped, and reading it as `behavioral` does not merely
+            # fail to clamp: rung 3 of 5 ASSERTS the premise is falsifiable, and verify_hop's
+            # monotonicity bound then certifies against a value nothing measured.
+            #
+            # `keys` (the bib's own key set) is what tells them apart, so the caller supplies it;
+            # absent, behaviour is exactly as before.  The truncation is surfaced through the
+            # EXISTING axis rather than a new one: RESOLUTION_C already means "the unfold did not
+            # reach everything", _bracket already widens on `unresolved`, and Λ·reduce says use
+            # the structure that is there.  Same treatment the delegation seam already gets.
             return (RANK_C["behavioral"], None, [])   # not in scope: impose no constraint
         best, by, path = RANK_C.get(r["grade"], 0), None, []
         de = _delegated(r)                           # resolve the delegation edge, if we can
@@ -216,6 +230,19 @@ def clamp(records: list, owner_grades: dict | None = None) -> list:
             og_pin = (r.get("delegated") or {}).get("clamped_by")
             path = [owner] + ([og_pin] if og_pin else [])
         for d in r.get("rests-on", []):              # clamp over GROUNDING edges
+            # Ζ·rests·unresolved — a premise with NO record is skipped here, and silence about
+            # that is indistinguishable from an edge that resolved to no constraint.  Two cases
+            # hide in the skip: genuinely outside this argument (another project's key — imposing
+            # nothing is right), or IN the argument and never graded (excluded by tier/
+            # nonmechanical, or a grading that did not finish).  The second is an unfold that
+            # STOPPED, and reading it as no-constraint lets `behavioral` — rung 3 of 5 — stand as
+            # if measured, with verify_hop's monotonicity bound then certifying against it.
+            # `keys` (the bib's own key set) separates them; absent, behaviour is exactly as
+            # before.  Surfaced through the EXISTING axis: RESOLUTION_C already means "the unfold
+            # did not reach everything", and _bracket already widens on `unresolved` (Λ·reduce —
+            # the delegation seam gets this treatment already; grounding edges did not).
+            if d not in rby and keys is not None and d in keys:
+                r.setdefault("unresolved", []).append(d)
             if d in rby and d not in stack and d != k:
                 dg, _, dpath = eff(d, stack + (k,))
                 if dg < best:

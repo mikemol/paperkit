@@ -400,7 +400,9 @@ def main(argv: list) -> int:
     # mark content-sensitivity, then clamp the effective grade by entailment over rests-on.
     content = {p.name for p in cfg["bibs"]} | {cfg["rubric"].name, cfg["out"].name}
     mark_content_sensitive(records, content)
-    clamp(records)
+    # Ζ·rests·unresolved — hand clamp the bib's key set so a `rests-on` target that was
+    # never graded reads as a TRUNCATION rather than as an edge imposing no constraint.
+    clamp(records, keys=set(F))
 
     if as_json:
         print(json.dumps(records, indent=2))

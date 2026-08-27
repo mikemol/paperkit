@@ -237,6 +237,32 @@ def main() -> int:
     check("UNREACHABLE is falsy — every existing `if not baseline` is unaffected",
           not GR.UNREACHABLE and GR.UNREACHABLE is not False)
 
+    # ---- Ζ·rests·unresolved: an UNGRADED premise is a truncation, not a free pass ----
+    # A `rests-on` target with no record is SKIPPED by the clamp loop, and silence about that
+    # reads identically to an edge that resolved to no constraint.  Two cases hide in the skip:
+    # genuinely outside this argument, or in it and never graded (tier/nonmechanical exclusion,
+    # or a grading that did not finish).  The second is an unfold that STOPPED — and letting it
+    # pass silently leaves `behavioral` (rung 3 of 5) standing as if measured, which verify_hop's
+    # monotonicity bound then certifies against.
+    def _one(rests, **kw):
+        rs = [{"key": "a", "grade": "behavioral", "rests-on": rests}]
+        G.clamp(rs, **kw)
+        return rs[0]
+
+    ung = _one(["ghost"], keys={"a", "ghost"})
+    check("an IN-ARGUMENT premise that was never graded reads as TRUNCATED",
+          ung.get("resolution") == "truncated" and ung.get("unresolved") == ["ghost"])
+    check("and the bracket WIDENS to the floor — the honest width of an unfold that stopped",
+          ung.get("effective_min") == "broken" and ung.get("effective_max") == "behavioral")
+    # δ: the SAME record, one key removed from the universe — now genuinely out of argument
+    out = _one(["ghost"], keys={"a"})
+    check("δ: the same edge, out of the argument, imposes nothing and is NOT a truncation",
+          out.get("resolution") == "resolved" and not out.get("unresolved")
+          and out.get("effective_min") == out.get("effective_max") == "behavioral")
+    # and omitting the key universe reproduces the prior behaviour exactly
+    check("no key set supplied ⇒ behaviour is unchanged (backward-compatible by construction)",
+          _one(["ghost"]).get("resolution") == "resolved")
+
     print(f"CLAMP BOUNDARIES: {'PASS' if not _fails else 'FAIL'}")
     return 1 if _fails else 0
 

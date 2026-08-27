@@ -145,7 +145,7 @@
     "//tools:bibtex.bzl%bib": {
       "general": {
         "bzlTransitiveDigest": "9+QTQ8bZIgy8IMwfJ01ZM2J+P4D4b0PmxjRB59k1Vmg=",
-        "usagesDigest": "q+rUFaBIlmxR7eKUmN2zPWRk6/XoeQPi4LLNY8DsxOc=",
+        "usagesDigest": "MPmjAA4kEDZnwQyRULFaqbw9QEXWl7j3Os7BIQnSGzQ=",
         "recordedFileInputs": {
           "@@//checks/readme.py": "a0fc393f977779e837ae93ea68ddf38ffaf3a5fd278062d3d1154e733092c842",
           "@@//library/concepts.py": "a1f757811eb67b5cf9a72d7aeebb933a85a6abfc8aa3d8301f81e3840c1eb9b4",
@@ -210,10 +210,10 @@
             "attributes": {
               "bib": "@@//config:warrants.bib",
               "project": "config",
-              "adequacy": false,
+              "adequacy": true,
               "tier": "sandbox",
               "compose": false,
-              "calc": false,
+              "calc": true,
               "emerge": false,
               "owns_concepts": false,
               "owns_warrants": false,
@@ -226,10 +226,10 @@
             "attributes": {
               "bib": "@@//demo:warrants.bib",
               "project": "demo",
-              "adequacy": false,
+              "adequacy": true,
               "tier": "sandbox",
               "compose": false,
-              "calc": false,
+              "calc": true,
               "emerge": false,
               "owns_concepts": false,
               "owns_warrants": false,

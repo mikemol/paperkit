@@ -66,11 +66,19 @@ test_suite(name = "hook", tests = [
     "@paperkit_boundaries//:gate",
     # Ζ·hook-rot — config is wired (bib.project) but declares neither adequacy nor emerge, so
     # bnd-check's completeness never OWED it a member; its gate rotted silently outside the hook.
-    # Gate-only (no adequacy/cohere targets exist without those flags), near-free (4 cmd checks).
+    # Ζ·config·adequacy — now ADEQUACY-graded too, not gate-only.  Four cmd: checks against the
+    # INTROSPECTED knob union: an exit code alone says they ran, never that a mutation could flip
+    # them, and a registry check that cannot fail is the one that most looks like coverage.
     "@paperkit_config//:gate",
-    # Ζ·consumer-fields·demo — gate-only: paperkit's own use of a declared consumer field, gated every
-    # commit so the declared-field carry/suppress path has a live in-tree exercise (not a vacuous pass).
+    "@paperkit_config//:adequacy",
+    # Ζ·consumer-fields·demo — paperkit's own use of a declared consumer field, gated every commit so
+    # the declared-field carry/suppress path has a live in-tree exercise.  Ζ·demo·adequacy adds the
+    # SWEEP: a non-vacuous pass was the stated intent and the exit code never measured it — this
+    # project exists to prove a parse path stays quiet, which is exactly a claim a mutation must flip.
+    # (No quoted phrases in these comments: bnd-check reads quoted tokens out of the member list, so
+    # scare-quotes here parse as a bogus hook member — it caught exactly that.)
     "@paperkit_demo//:gate",
+    "@paperkit_demo//:adequacy",
     "@paperkit_paper//:adequacy",
     "@paperkit_root//:adequacy",
     # Λ·witness — the concept LIBRARY: it self-grades each concept witness (adequacy) and gates its

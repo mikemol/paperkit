@@ -102,6 +102,7 @@ COMPONENTS = {
         "tests/boundaries_references.py",
         "tests/boundaries_result_addr.py",
         "tests/boundaries_sandbox.py",
+        "tests/boundaries_scope.py",
         "tests/boundaries_surface.py",
         "tests/boundaries_target.py",
         "tests/boundaries_toplevel.py",

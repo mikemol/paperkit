@@ -98,6 +98,70 @@ RESOLUTION_C = {"truncated": 0, "resolved": 1}
 BASELINE_C = {"unreachable": 0, "refuted": 1, "established": 2}
 
 
+# Ξ·entails — SCOPE: how much of its claim a check actually reaches.  A check may be perfectly
+# falsifiable about a PART of what its sentence asserts: `ruler.py` proves 1.4.1 within TABLES
+# while the criterion is document-wide.  Falsifiability and scope are independent — a fragment
+# can be behavioral, a full-scope check vacuous — so this is an axis, not a rung on RANK_C.
+#
+# It is DECLARED, not measured.  The other axes above read a measurement (a mutation flipped it,
+# producers agreed, the unfold reached bottom); no sweep can know that a sentence means more than
+# its witness tests, because that gap lives between the prose and the code.  So the author states
+# it and the gate holds them to it — the same standing `mem`/`tier` have.
+#
+# ⚑ AND IT IS CHECKED AGAINST THE MEASUREMENT.  A declared shortfall that only ever LOWERED the
+# number would be self-fulfilling: say `fragment`, get a smaller grade, with nothing asking whether
+# the shortfall was real.  That is the naming-not-entailment gap again, one level up — an author's
+# word standing in for a fact.  So this axis never clamps (the discipline of the three above holds)
+# and instead the gate holds the declaration to the measurement: a scope must CORRESPOND to what
+# the sweep found, and a disclosure that disagrees with its own evidence is the defect.
+#
+# Absence means `full`: a claim is read as covering what it says.  That is the honest default —
+# the overclaim it permits is the author's own sentence, unchanged from before this axis existed,
+# and requiring every warrant to restate `full` would make the common case noise.
+# Ranked here, OWNED by bib._SCOPES — the parser is what must refuse a typo, and it may not reach
+# up into this layer for the constant (bib.py is model, this is delta; the partition check caught
+# exactly that edge).  So ownership runs the other way and this derives, rather than keeping a
+# second list that would drift silently.  Ordered fragment < full: less coverage is the lower end.
+#
+# ⚑ Derived LAZILY, and the reason is a real failure: an eager `SCOPE_C = _scopes()` at module
+# level made `grade` unimportable wherever `bib` is not staged.  tools/read_grade.py stages grade
+# ALONE, so every Ζ·calc cell died with ModuleNotFoundError before running — a hard red across
+# render/adequacy.  A module-level CALL is a module-level dependency even when its `import` sits
+# inside a function; what matters is when it EXECUTES, not where it is written.
+class _ScopeC(dict):
+    """The scope axis, ranked, derived from the model layer's vocabulary on FIRST USE.
+
+    A dict subclass rather than a function so every consumer keeps reading `SCOPE_C` as the mapping
+    it already is (`in`, `sorted`, indexing) — the derivation is invisible at the use site, and a
+    module that only imports `grade` never pays for `bib`."""
+
+    _loaded = False
+
+    def _fill(self):
+        if not self._loaded:
+            import bib
+            self.update({v: i for i, v in enumerate(bib._SCOPES)})
+            self._loaded = True
+
+    def __contains__(self, k):
+        self._fill(); return dict.__contains__(self, k)
+
+    def __getitem__(self, k):
+        self._fill(); return dict.__getitem__(self, k)
+
+    def __iter__(self):
+        self._fill(); return dict.__iter__(self)
+
+    def __len__(self):
+        self._fill(); return dict.__len__(self)
+
+    def keys(self):
+        self._fill(); return dict.keys(self)
+
+
+SCOPE_C = _ScopeC()
+
+
 # Ζ·ladder — the two DERIVATIONS every consumer needs, so none re-declares the rungs.  A ladder
 # re-listed downstream drifts silently and in the WORST direction: a display order that omits a
 # rung SILENTLY DROPS claims from its own total (report/gen.py counted 79 of 80), and an adequacy
@@ -275,6 +339,13 @@ def clamp(records: list, owner_grades: dict | None = None,
         r["clamp"] = RANK_C.get(r["grade"], 0) - e
         r["clamped_by"] = by
         r["clamp_path"] = path                   # Λ·pi·path — the prefix, not just the last step
+        # Ξ·entails — DISCLOSE the scope beside the clamp it produced.  A reader asking "why is
+        # this one rung down" gets `clamped_by` = "<key>#scope"; a reader asking "what does this
+        # witness actually cover" needs the axis itself, and a consumer gating on coverage (a
+        # conformance table, --min-scope) must read a VALUE, never infer it from an arithmetic
+        # difference.  Defaulted here rather than at parse so an ungraded record and a full-scope
+        # one read alike downstream.
+        r["scope"] = r.get("entails", "full")
         # Ζ·pi·unresolved — surface the truncation as a VALUE.  An edge we could not resolve
         # imposed no constraint, and silence about that is indistinguishable from an edge that
         # resolved to no constraint.  Both peers independently named this as the first move.

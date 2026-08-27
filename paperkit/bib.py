@@ -28,13 +28,18 @@ import re
 # parses and carries it so it is a quiet, owned field, not a loud-dropped unknown; the generator
 # reads the same bib text (Ζ·tier).
 _SCALAR = ("title", "author", "year", "note", "section", "claim",
-           "check", "glue", "join", "move", "emit", "as", "mem", "link", "depth", "tier")
+           "check", "glue", "join", "move", "emit", "as", "mem", "link", "depth", "tier",
+           "entails")
 # list-valued fields.  `from` = prose-order edge (dep_order + glue); `rests-on` =
 # grounding/entailment edge (adequacy clamping, NOT prose) — the two are often
 # reversed (prose runs general→specific, grounding specific→general); `reads` =
 # the declared cross-package footprint (the declare+audit source, Ζ·foot);
 # `consumes` = sibling warrant keys whose verdict RECORD this check reads (records-as-deps).
 _LIST = ("from", "rests-on", "reads", "consumes")
+# Ξ·entails — the legal `entails` values.  Owned at the MODEL layer because the parser is
+# what must refuse a typo, and the parser may not reach up into the delta layer for a
+# constant.  grade.SCOPE_C ranks these; it does not re-list them.
+_SCOPES = ("fragment", "full")
 # Standard BibTeX reference metadata paperkit TOLERATES on a references.bib citation but does
 # not consume (the projector reads only title/author/year).  Kept so the unknown-field warning
 # below fires on a MEANINGFUL dropped field (a downstream author's `points`, a mistyped `check`)
@@ -144,6 +149,21 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
                           + (f" plus this project's declared {', '.join(consumer_fields)}"
                              if consumer_fields else "")
                           + "; use one, or remove it", file=sys.stderr)
+            # Ξ·entails — REFUSE an unrecognized scope rather than warn.  The drop-warning above is
+            # right for an unknown FIELD (it may be deliberate documentation), but `entails` is a
+            # known field whose value gates a clamp: a typo'd `entails = {fragmnt}` would read as
+            # `full` and silently restore the very rung the author was disclosing away.  Failing
+            # open on a shortfall declaration is the one direction this axis must not fail.
+            #
+            # ⚑ The legal set lives HERE, not imported from grade.SCOPE_C, because bib.py is the
+            # MODEL layer and grade.py is DELTA: reaching up for the constant is a component
+            # violation the partition check catches (and did).  A guard must not copy the set it
+            # guards — so the copy is inverted instead: `_SCOPES` is the owner and grade.SCOPE_C
+            # DERIVES its keys from it, one direction, checked by boundaries_scope.py.
+            if "entails" in f and f["entails"] not in _SCOPES:
+                raise SystemExit(
+                    f"paperkit-bib: {path.name} @{key}: entails = {{{f['entails']}}} is not a "
+                    f"scope — use one of {', '.join(sorted(_SCOPES))}")
             out[key] = f
     return out
 

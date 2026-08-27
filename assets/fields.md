@@ -18,6 +18,7 @@ A bibliography entry (a warrant, or a `references.bib` citation) may carry these
 | `link` | an expound-rung footnote (a technical name, or a ∂² long-edge discharge) | warrant |
 | `depth` | renders the claim as a nested (indented) proof-step list item | warrant |
 | `tier` | the check's enforcement tier (Ζ·tier) — sandbox (hermetic, mutation-swept; default), local (host-coupled, uncached), or toolchain (host toolchain, cached + stamped with the toolchain fingerprint); a non-sandbox check is gated but not swept | warrant |
+| `entails` | SCOPE (Ξ·entails) — how much of its claim this check reaches: `fragment` (the witness covers PART of what the sentence asserts) or `full` (default when absent). Never clamps the grade — an author's declaration that lowered its own number would be self-fulfilling — and coherence's scope face reds a `fragment` declared over a witness nothing flips | warrant |
 | `from` | prose-order edge: topological ordering + glue adjacency (general→specific) | warrant |
 | `rests-on` | grounding edge: effective-grade clamping + citation provenance (NOT prose order) | warrant |
 | `reads` | the check's declared cross-package footprint — staging + audit tokens (Ζ·foot) | warrant |

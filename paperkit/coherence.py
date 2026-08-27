@@ -206,6 +206,52 @@ def sensitivity_residual(records: list) -> dict:
     }
 
 
+def scope_residual(records: list) -> dict:
+    """Face six (Ξ·entails) — the DECLARED scope vs the MEASURED reach.
+
+    `entails = {fragment}` is an author saying "this witness covers PART of what the sentence
+    claims".  Every other axis here reads a measurement; this one reads a declaration, so on its
+    own it is just a word — and a word that lowered its own grade would be self-fulfilling.  This
+    face is what makes it falsifiable: the disclosure has to CORRESPOND to the evidence.
+
+    ⚑ What can be checked SOUNDLY is narrower than "is the fragment real", and saying so matters.
+    `tests` records which def-sites flip the check, not what proportion of a SENTENCE it covers —
+    no sweep can know the latter, because the shortfall lives between prose and code.  So this
+    face does not attempt a coverage ratio.  It checks the one direction the measurement genuinely
+    contradicts:
+
+      · `fragment` on a witness with NO measured reach (vacuous/indeterminate, `tests` empty).
+        A fragment claims the witness reaches PART of the sentence; a witness that nothing flips
+        reaches none of it.  The disclosure describes a partial proof where there is no proof, and
+        reads as modesty while being an overclaim — the worse direction, since a reader takes
+        `fragment` as "less than all" rather than "possibly nothing".
+
+    Everything else is REPORTED, not judged: `full` claims are the default and unremarkable, and a
+    `fragment` on a behavioral witness is exactly what the axis is for.  The residual is the count
+    of contradicted disclosures — a face that reds only where the declaration and its own evidence
+    cannot both be true."""
+    # Read the AUTHORED field, falling back to the clamp-annotated one.  `scope` is written by
+    # grade.clamp; reading only that would make this face silently empty on any record that had
+    # not been through it — a face that measures nothing while reporting residual 0 is the
+    # degenerate-green this whole apparatus exists to refuse.  `entails` is the author's own word
+    # and is always present when declared, so it is the primary read.
+    declared = [r for r in records
+                if (r.get("entails") or r.get("scope") or "full") != "full"]
+    contradicted = [r["key"] for r in declared
+                    if not r.get("tests") and r.get("grade") in ("vacuous", "indeterminate")]
+    return {
+        "declared": len(declared),                      # claims disclosing a shortfall
+        "behavioral": len([r for r in declared if r.get("grade") == "behavioral"]),
+        "residual": len(contradicted),                  # disclosures their evidence contradicts
+        "contradicted": sorted(contradicted),
+        # Ζ·symdiff, one face over — `residual: 0` over ZERO declarations is not a clean bill, it
+        # is a face that measured nothing, and the two render identically once collapsed to a
+        # count.  A corpus where no claim declares a scope is the CURRENT state of every project
+        # here, so this is the common reading, not an edge case: say which one it is.
+        "measured": bool(declared),
+    }
+
+
 def _engine_cap(tests, universal=frozenset()) -> set:
     """The capability fingerprint — the sites that DISCRIMINATE this claim from its siblings.
 
@@ -401,6 +447,10 @@ def report(records: list, discharged=frozenset(), all_keys=frozenset()) -> dict:
             # Ρ·deck·residual — the AUTHORED section grouping vs the grounding-derived one.
             # Reads only the bib (no sweep), so it is meaningful even on a degraded grade.
             "grouping": grouping_residual(cited, discharged=discharged),
+            # Ξ·entails — the DECLARED scope against the measured reach.  Like grouping this reads
+            # a bib declaration, but unlike it the declaration is checked against the SWEEP, so it
+            # is meaningful only where a grade was established.
+            "scope": scope_residual(cited),
             # Ζ·symdiff — what STRUCTURE counted and the measured faces could not see.  Reported
             # beside them so a partial reading declares its own incompleteness.
             "unmeasured": unmeasured_edges(cited, all_keys)}

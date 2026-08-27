@@ -13,7 +13,11 @@ test --test_output=errors --test_summary=terse
 # stub (unnamed parameters, `return SUCCESS`), declared virtual and overridden nowhere — verified
 # in the 8.7.0 dist and against the live server's argv, which carries only -Xverify:none and
 # -XX:-MaxFDLimit.  So the ceiling is pure HotSpot ergonomics: MaxRAMPercentage=25 of MemTotal.
-# Measured on this box: 15.26 GiB * 25% = 3.81 GiB, matching the observed MaxHeapSize exactly.
+# Measured on this box: MemTotal/4 = 4095440896 against an observed MaxHeapSize of 4095737856
+# — the ratio holds to 7.25e-05, which identifies the mechanism beyond doubt (MemTotal+Swap
+# would give 14.10 GiB, MemAvailable 0.55).  NOT an exact match, and the heap is the LARGER
+# by 296,960 bytes; no obvious granule reproduces it.  The earlier "exactly" was a
+# two-decimal eyeball promoted to a precision nobody measured (peer's own correction).
 #
 # ⚑ THAT CEILING IS NOT ABSENT, IT IS TOO LOW — and it is the one number here nobody chose.
 # Every sweep cell runs under a per-action cgroup lease; the server holding them all runs on a

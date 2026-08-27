@@ -485,7 +485,10 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     # the field; its absence reads as single (one witness).
     if typ == "agree" and rec["grade"] != "broken":
         producers = [p.strip() for p in target.split("|||") if p.strip()]
-        rec["corroboration"] = "independent" if len(set(producers)) >= 2 else "single"
+        # Ζ·corro·honest — `distinct`, not `independent`: this measures that the producer
+        # STRINGS differ, which is a necessary condition for decorrelation and no evidence
+        # of it.  `independent` is reserved for a certified disjoint read footprint.
+        rec["corroboration"] = "distinct" if len(set(producers)) >= 2 else "single"
         rec["producers"] = len(producers)
     # Μ·sweep·atom — the decision-coverage AXIS (orthogonal, never a rung): of the branch decisions the
     # check REACHES, which does it never ASSERT on?  Only meaningful at def resolution (branch:/flip:

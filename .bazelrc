@@ -36,7 +36,15 @@ test --test_output=errors --test_summary=terse
 # it OOMs again -> 8G.  A too-small guess costs one retry and self-corrects; a too-large one
 # holds RAM this box needs for the cells and for whatever else the operator is running.  Raising
 # it far enough to break something else would, in the operator's phrasing, be an important lesson.
-startup --host_jvm_args=-Xmx4g
+# ⚑ RUNG 2 (Ζ·jvm·8g), 2026-08-27.  4G OOM'd too, on a full 125,471-action run — so the ladder
+# doubles, exactly as a cell's does.  And this time the climb is EVIDENCED rather than inferred:
+# the coordinator sampler (Ρ·telemetry·red, landing in the same arc) caught the curve the old
+# end-of-run push structurally could not — 2,479 samples over 41 minutes, RSS climbing 0.09G ->
+# 4.34G, PEAKING AT 99% THROUGH THE RUN.  It dies writing up results, with every action already
+# done, which is what `Build completed successfully` above the OOM had been saying all along.
+# The instrument built for the failure caught the failure on its first occurrence, before it was
+# even committed.
+startup --host_jvm_args=-Xmx8g
 
 build --stamp --workspace_status_command=tools/toolchain_status.sh
 # Ζ·tier·toolchain — a toolchain-tier check runs under the HOST toolchain unsandboxed (verb.bzl:

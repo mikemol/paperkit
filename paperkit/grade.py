@@ -30,9 +30,28 @@ GRADE_C = {v: k for k, v in RANK_C.items()}
 # this asks "is the verdict confirmed by INDEPENDENT producers" (CORROBORATION).  A check's
 # strength is the PAIR (falsifiability, corroboration), never one collapsed scalar: a lone
 # behavioral witness and a behaviorally-agreeing oracle share a GRADE but differ HERE.  An
-# agree: verdict that passes with ≥2 textually-distinct producers is `independent`; one
-# witness — or identical producers concurring trivially — is `single`.  single < independent.
-CORRO_C = {"single": 0, "independent": 1}
+# agree: verdict that passes with ≥2 textually-distinct producers is `distinct`; one witness —
+# or identical producers concurring trivially — is `single`.
+#
+# ⚑ Ζ·corro·honest — THE MIDDLE VALUE IS THE HONEST ONE AND EVERY RECORD IS IN IT.  This axis
+# used to call ≥2 distinct producers `independent`, which is a positive claim of DECORRELATION
+# made on the strength of not having looked: the test is `set()` over producer command STRINGS,
+# and nothing traces whether they share an upstream.  Measured on the tree's only live agree:
+# both producers run `python3 checks/prose.py < ../paper/paper.md` and both use pandoc, differing
+# by one docx round-trip — so a bug in prose.py is invisible to that check BY CONSTRUCTION, and
+# it graded `independent`.
+#
+# String-distinctness is a fine NECESSARY condition (it catches `agree:cat a.txt ||| cat a.txt`)
+# and was only ever wrong as a SUFFICIENT one, because no third value existed to hold the
+# difference.  So `distinct` says what was measured, `independent` is reserved for what a
+# footprint comparison can certify (Ε·corro·phi), and `correlated` names a MEASURED overlap.
+# Same discipline as RESOLUTION_C and BASELINE_C: an unmeasured thing must not read as measured.
+#
+# ORDER — `correlated` below `distinct` because the floor's job is to fail CLOSED: a measured
+# overlap is a known-weak state, while `distinct` is merely unexamined.  A floor of `independent`
+# is now unreachable until Ε·corro·phi lands, which is the honest consequence of never having
+# measured it.
+CORRO_C = {"single": 0, "correlated": 1, "distinct": 2, "independent": 3}
 
 # Decision-coverage — a THIRD, ORTHOGONAL axis (Μ·sweep·atom), again NOT a rung on RANK_C.  The
 # grade asks "does a mutation flip this check" (FALSIFIABILITY, over the raise-monotone branch:/def:

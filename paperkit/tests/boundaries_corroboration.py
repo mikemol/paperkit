@@ -3,7 +3,7 @@
 
 ⟨P, F, δ⟩ per the boundary practice.  A grade is the PAIR (falsifiability, corroboration),
 NOT one collapsed scalar.  The grade ("behavioral" …) asks whether a mutation flips the
-check; corroboration ("single" | "independent") asks whether the verdict is confirmed by ≥2
+check; corroboration ("single" | "correlated" | "distinct" | "independent") asks whether the verdict is confirmed by ≥2
 TEXTUALLY DISTINCT producers (agree:).  The axes are ORTHOGONAL — a lone behavioral witness
 and a behaviorally-agreeing oracle share a GRADE but differ in corroboration.
 
@@ -49,24 +49,29 @@ def main() -> int:
 
     check("a lone witness is behavioral but NOT independently corroborated",
           lone["grade"] == "behavioral" and lone.get("corroboration", "single") == "single")
-    check("agree: of ≥2 distinct concurring producers is independently corroborated",
-          indep["grade"] == "behavioral" and indep["corroboration"] == "independent")
+    # Ζ·corro·honest — the value names what was MEASURED (the producer strings differ), not
+    # what was hoped (they share no upstream).  `independent` is now reserved for a certified
+    # disjoint read footprint, which nothing yet computes — so it must be UNREACHABLE here.
+    check("agree: of ≥2 distinct concurring producers reads DISTINCT, not independent",
+          indep["grade"] == "behavioral" and indep["corroboration"] == "distinct")
+    check("`independent` is not claimable without a footprint comparison (Ε·corro·phi)",
+          indep["corroboration"] != "independent")
     check("ORTHOGONAL — same falsifiability grade, different corroboration (not one scalar)",
           lone["grade"] == indep["grade"] and lone.get("corroboration", "single") != indep["corroboration"])
-    check("identical producers concur TRIVIALLY — single, not independent",
+    check("identical producers concur TRIVIALLY — single; string-distinctness is a NECESSARY\n           condition and this is the case it correctly rejects",
           trivial.get("corroboration", "single") == "single")
-    check("disagreeing producers do not corroborate — broken, no independence claimed",
+    check("disagreeing producers do not corroborate — broken, no corroboration claimed",
           disagree["grade"] == "broken" and disagree.get("corroboration", "single") == "single")
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     P = indep.get("corroboration")
     F = grade("agree:cat a.txt ||| cat a.txt").get("corroboration", "single")
-    ok = P == "independent" and F == "single"
+    ok = P == "distinct" and F == "single"
     fails.append("distinct-producer-delta") if not ok else None
-    print(f"  {'ok ' if ok else 'XX '}an independent oracle vs a copy flips corroboration")
-    print("      P (independent): agree:cat a.txt ||| printf CANON  — a distinct oracle confirms it")
+    print(f"  {'ok ' if ok else 'XX '}a distinct oracle vs a copy flips corroboration")
+    print("      P (distinct):     agree:cat a.txt ||| printf CANON  — a distinct producer, shared ground UNCHECKED")
     print("      F (single):      agree:cat a.txt ||| cat a.txt     — the second producer is a copy")
-    print("      δ (min delta): the second producer is textually distinct (independent), not a duplicate\n")
+    print("      δ (min delta): the second producer is textually DISTINCT — all that is measured\n")
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")

@@ -13,6 +13,19 @@ cd "$(git rev-parse --show-toplevel)"
 # endpoint is a POINTER a machine sets at another machine's store; it is NOT tracked (each clone's
 # operator points at their own), so it lives here, sourced if present, absent by default.
 [ -f .githooks/local.env ] && . .githooks/local.env
+# Ρ·telemetry·share — NAME a configured endpoint that does not answer.  These are per-clone
+# pointers and they go stale silently: VM/VLogs moved to k8s NodePorts and this clone pushed at
+# the retired ports for a day, losing every run's telemetry, because a best-effort pusher cannot
+# fail a commit and so said nothing.  The pushers stay best-effort — that is right — but a dead
+# pointer is now VISIBLE at the top of the run instead of a shrug in the middle of it.  Probe
+# only, never fatal: an unreachable sink must not stop a commit.
+for _pk_ep in "${PAPERKIT_OTLP_METRICS:-}" "${PAPERKIT_LOGS_URL:-}" "${PAPERKIT_BES:-}"; do
+  [ -n "$_pk_ep" ] || continue
+  _pk_hp=$(printf '%s' "$_pk_ep" | sed -e 's|^[a-z+]*://||' -e 's|/.*$||')
+  case "$_pk_hp" in *:*) : ;; *) continue ;; esac
+  (exec 9<>"/dev/tcp/${_pk_hp%%:*}/${_pk_hp##*:}") 2>/dev/null \
+    || echo "[pre-commit] telemetry endpoint DOES NOT ANSWER: $_pk_ep (stale pointer? see .githooks/local.env.example)" >&2
+done
 exec 3>&2                     # fd 3 = the terminal, for live pass-through
 
 run() {                       # run "label" cmd...; STDERR streams live (progress reads as alive,
@@ -117,12 +130,24 @@ PK_BES=""
 # the rc unreadable and silently mis-report a red build as green.  No pipe ⇒ $? is the build's own.
 set +e
 ( tail -n +1 -f "$PK_HOOKLOG" >&3 2>/dev/null & echo $! > "$PK_HOOKLOG.tailpid" ) 
+# Ρ·telemetry·red — sample the COORDINATOR live, to a durable file.  The two pushers below are a
+# POST at the END of a run and so cannot report a crash that kills the run: measured, the server
+# died twice with `Build completed successfully` above `OutOfMemoryError` and both runs pushed
+# nothing.  A peer's host collectors already cover the BOX (memory PSI peaked near 4% across that
+# window — nothing was starved); what nothing sampled was the bazel server itself, the one process
+# outside our per-action cgroup budget.  Best-effort in every arm, like the pushers.
+PK_COORDLOG="${TMPDIR:-/tmp}/pk-coord-$$.jsonl"
+( _cpid=$(mise exec -- bazel info server_pid 2>/dev/null | tail -1)
+  case "$_cpid" in ''|*[!0-9]*) : ;; *)
+    python3 tools/coord_sample.py "$_cpid" "$PK_COORDLOG" --interval=1 >/dev/null 2>&1 &
+    echo $! > "$PK_COORDLOG.pid" ;; esac ) || true
 python3 tools/cpuweight.py --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
     --exec mise exec -- bazel test //:hook --config=mutant \
     --local_resources=memory="$PK_SWEEP_RAM" --execution_log_json_file="$PK_EXECLOG" \
     $PK_BES > "$PK_HOOKLOG" 2>&1
 PK_HOOK_RC=$?
 kill "$(cat "$PK_HOOKLOG.tailpid" 2>/dev/null)" 2>/dev/null; rm -f "$PK_HOOKLOG.tailpid"
+kill "$(cat "$PK_COORDLOG.pid" 2>/dev/null)" 2>/dev/null; rm -f "$PK_COORDLOG.pid"
 set -e
 PK_SECS=$(( $(date +%s) - PK_T0 ))
 if [ -n "${PAPERKIT_OTLP_METRICS:-}" ]; then

@@ -453,7 +453,12 @@ def report(records, share, graded, n_cited, n_checked, consider_all):
         # a reader would otherwise assume was zero.  Orthogonal to the rung, like crash-sensitivity.
         un = r.get("unmeasured") or []
         tag += f"  ⚠ {len(un)} unmeasured input(s): {', '.join(un[:3])}" if un else ""
-        corro = f"  + {r['corroboration']} ({r.get('producers','?')} producers)" if r.get("corroboration") == "independent" else ""
+        # Ζ·corro·honest — report ANY multi-producer corroboration, not only the top rung.
+        # This printed nothing unless the value was `independent`, so widening the axis
+        # would have made every record silent — the value most worth showing is the one
+        # that says the producers were never checked for shared ground.
+        corro = (f"  + {r['corroboration']} ({r.get('producers','?')} producers)"
+                 if r.get("corroboration", "single") != "single" else "")
         print(f"  {r['grade']:13} [@{r['key']}]{dil}{tag}{corro}")
         print(f"  {'':13} check: {r['check']}")
         if r["tests"]:

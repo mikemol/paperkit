@@ -15,6 +15,7 @@ render); the edge/token fields (`from`, `rests-on`, `reads`) are lists.
 """
 from __future__ import annotations
 
+import csv
 import sys
 import tomllib
 from pathlib import Path
@@ -379,16 +380,35 @@ def load_bib(bib_path: Path, project_dir: Path) -> dict:
     return parse(bib_path, load_config(project_dir)["consumer_fields"])
 
 
+def rubric_rows(path: Path) -> list:
+    """The rubric's DATA ROWS, parsed by the csv module — the ONE reader of the .tsv format.
+
+    Ζ·rubric·csv — this was two hand-rolled splitters: `rubric` took columns 1-2 and
+    rhetoric.schemes_from_rubric took column 3, each re-implementing the same strip/comment/tab
+    skip.  Two readers of one format drift, and they had already diverged on ROBUSTNESS: the
+    scheme reader guarded `len(parts) >= 3` while this one indexed `parts[1]` bare, so a line
+    carrying a tab but no second field raised IndexError out of the parser rather than being
+    reported as a malformed rubric.  csv is stdlib and project.py already reads .tsv with it —
+    the right tool was in the repo, used by a sibling, and unused here.
+
+    A row is skipped when blank or comment-led; a data row must carry at least a key and a title,
+    and one that does not is REFUSED by name rather than crashing on an index.  Returns the full
+    row so every consumer reads the same parse and takes the columns it owns."""
+    rows = []
+    with path.open(newline="") as fh:
+        for n, row in enumerate(csv.reader(fh, delimiter="\t"), 1):
+            if not row or not row[0].strip() or row[0].lstrip().startswith("#"):
+                continue
+            if len(row) < 2 or not row[1].strip():
+                raise SystemExit(f"paperkit-bib: {path.name}:{n}: rubric row '{row[0].strip()}' "
+                                 f"has no title — a row is `key<TAB>title[<TAB>scheme]`")
+            rows.append([c.strip() for c in row])
+    return rows
+
+
 def rubric(path: Path) -> list:
-    out = []
-    for ln in path.read_text().splitlines():
-        ln = ln.strip()
-        if ln and not ln.startswith("#") and "\t" in ln:
-            # key <TAB> title [<TAB> scheme …]; the title is the 2nd column only.
-            # A 3rd column (rhetorical scheme) is read by rhetoric.py, not here.
-            parts = ln.split("\t")
-            out.append((parts[0].strip(), parts[1].strip()))
-    return out
+    """(key, title) per section, in file order — columns 1-2 of rubric_rows."""
+    return [(r[0], r[1]) for r in rubric_rows(path)]
 
 
 def dep_order(keys: list, F: dict) -> list:

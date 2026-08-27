@@ -86,14 +86,12 @@ def kind_of(move: str):
 
 def schemes_from_rubric(path: Path) -> dict:
     """{section_key: scheme} from the optional 3rd tab-column of rubric.tsv."""
-    out = {}
-    for ln in path.read_text().splitlines():
-        ln = ln.strip()
-        if ln and not ln.startswith("#") and "\t" in ln:
-            parts = ln.split("\t")
-            if len(parts) >= 3 and parts[2].strip():
-                out[parts[0].strip()] = parts[2].strip()
-    return out
+    # Ζ·rubric·csv — the ROWS come from bib.rubric_rows (the csv-backed single owner of the .tsv
+    # format); this function owns only the MEANING of column 3.  It used to re-implement the
+    # strip/comment/tab skip beside bib.rubric's copy, so the two could drift on which lines are
+    # data — and they had already drifted on robustness.
+    import bib
+    return {r[0]: r[2] for r in bib.rubric_rows(path) if len(r) >= 3 and r[2]}
 
 
 def check_scheme(scheme: str, claims: list, moves: list) -> list:

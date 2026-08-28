@@ -30,7 +30,7 @@ becomes a gated warrants.bib like any other. Until then it lives here, tracked, 
 
 ## Status: DRAINING (2026-08-27)
 
-⚑ **This folder is being emptied, not maintained.** Every one of its 217 entries was given a
+⚑ **This folder is being emptied, not maintained.** Every one of its 217 entries (101 remaining after the mem-climb purge) was given a
 per-entry verdict by an exhaustive two-pass reconciliation — pass 1 (six agents, one per file
 or chunk) and an adversarial pass 2. No sampling, no arc-level inheritance.
 
@@ -76,9 +76,8 @@ of them, so this list is the whole of the not-yet-implemented arm:
 | G2 | `collection`'s objective IS gated (`claim:genre-collection`); only a committed manifest is absent |
 | G3 | `--max-residual` parses but is never invoked with a value — a CONTROL only ever tested as an INSTRUMENT |
 | G4 | `setup` and `report` are outside `//:hook`. `BUILD.bazel:102-104` names this exact failure mode for the talk and then wires it. ⚑ **Operator decision** |
-| `Λ·memory·pi` | `memory/pi-typed-boundary-delegation.md` asserts a Π-typing framing that `mem-climb.bib`'s entry 92 retracts. ⚑ **Operator decision** |
 
-## The four files
+## The files
 
 - `slides.bib` (32) — the deck/collection design. Its successor `deck-observe.bib` built almost
   all of it. Several entries are **self-retracted in-file**: `rubric-becomes-the-override` is
@@ -87,8 +86,16 @@ of them, so this list is the whole of the not-yet-implemented arm:
 - `deck-observe.bib` (50) — roughly four hours of implementation immediately before the talk this
   arc produced the deck for. 40 IN-CORE, 9 obsolete, 1 in-core-but-ungated, 0 undetermined. The
   only genuinely dropped thing is the `brief` genre.
-- `mem-climb.bib` (116) — the memory-climb arc. Contains the bazel install-base diagnosis
-  (ops knowledge, no gate-shaped fix, deletable once read) and a ~12-entry epistemic chain.
+- `mem-climb.bib` — **PURGED 2026-08-28.** The memory-measurement material is engine-EXTERNAL:
+  the reservation belongs to the encapsulating environmental context (Bazel's execution layer, the
+  cgroup, `--local_resources`), not to paperkit's semantics. `bnd-parallel` is not a coverage gap
+  over it but the correct and complete statement of the relationship — the engine is inert to the
+  reservation BY DESIGN, so no claim asserting the instrumentation's correctness belongs in
+  `boundaries/` or root. The file's 116 entries hung off six roots, five of them memory roots, so
+  it was a tree with an engine-external trunk rather than a removable prefix. Its one surviving
+  engine-semantic finding (`result:` is an ADDRESS, not a Π-typed vector) was applied to
+  `memory/pi-typed-boundary-delegation.md` before deletion; the floor/derived-domain cluster had
+  already landed as `units.py`'s `_OBSERVED_FLOOR` with its rationale intact.
 - `result-tristate.bib` (19) — the `result:` tristate. The ARM shipped (`resolver.py:37`,
   `:114-122`); the Π INDEX is deliberately deferred with the reason recorded at `resolver.py:59-62`.
 

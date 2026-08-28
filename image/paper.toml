@@ -1,6 +1,6 @@
 [paper]
 title = "Paperkit — The Proof Object as an Immutable Image"
-subtitle = "Built and verified fresh-by-construction: the image is rebuilt from this repository and its gate run network-isolated, so a green verdict here is the proof reproducing itself."
+subtitle = "Built and verified fresh-by-construction: the image is rebuilt from this repository and its gate run network-isolated, so a green verdict here is the proof reproducing itself — on demand rather than every commit, because the build and run take minutes."
 warrants = ["warrants.bib"]
 rubric = "rubric.tsv"
 out = "IMAGE.md"

@@ -1,6 +1,6 @@
 # Paperkit — Rendering: paper.md → docx, Gated to Agree
 
-*On-demand: the paper renders to a Word document, and the document is gated to PRESENT the verified paper faithfully — presentation agreement extends prose≡projection down the render stack.*
+*Gated every commit: the paper renders to a Word document, and the document is gated to PRESENT the verified paper faithfully — presentation agreement extends prose≡projection down the render stack, with the toolchain-coupled checks gated but not mutation-swept (Ζ·tier).*
 
 ## The Render Coalgebra: Format Nodes and Conversion Edges
 

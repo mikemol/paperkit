@@ -1,6 +1,6 @@
 # Paperkit — The Proof Object as an Immutable Image
 
-*Built and verified fresh-by-construction: the image is rebuilt from this repository and its gate run network-isolated, so a green verdict here is the proof reproducing itself.*
+*Built and verified fresh-by-construction: the image is rebuilt from this repository and its gate run network-isolated, so a green verdict here is the proof reproducing itself — on demand rather than every commit, because the build and run take minutes.*
 
 ## The Proof Object, Reproduced
 

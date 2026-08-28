@@ -1,5 +1,3 @@
-% warrants.bib — Ρ·render: the paper renders to a document, and the document is gated to
-% present the VERIFIED paper.  On-demand (pandoc); not the pre-commit hook.
 @misc{rnd-graph,
   section = {graph},
   claim   = {the render pipeline is a COALGEBRA tracked as data --- format OBJECTS (md, docx, odt, latex, pdf, and the slide objects pptx and odp) and conversion MORPHISMS (pandoc from markdown, the office suite between docx/odt/pdf and between pptx/odp, lualatex from latex) live as an explicit many-to-many adjacency matrix with ONE owner, and the format-node producers and the pdf router DERIVE their edges from it rather than each hardcoding a tool --- so every declared morphism's tool is present (the graph cannot claim an edge the toolchain cannot perform), every declared object is reached by some morphism (a node the graph cannot deliver is a finding), and every route composes real edges, whether to the terminal PDF or to a terminal slide deliverable, so a new node or edge is added in ONE place},

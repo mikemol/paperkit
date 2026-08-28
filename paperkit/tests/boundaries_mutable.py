@@ -30,8 +30,18 @@ import layout  # noqa: E402
 
 def main() -> int:
     fails = []
+    ran = []
+    deltas = []
 
     def check(desc, cond):
+        # Λ·guard-must-not-copy — `ran` COUNTS the arms and `deltas` the ⟨P,F,δ⟩ pairs; the summary
+        # must not restate a number authored beside the set it describes.  This suite printed a
+        # hardcoded "8 behaviors, 1 delta" with NO counter feeding it: deleting an arm left the
+        # line reading 8, so a SHRINKING suite reported as an unchanged one.  Proven by mutation,
+        # not inferred.  ⚑ And the literal was WRONG: 7 check() arms run, plus the δ pair which
+        # prints its own line — the 8 counted that δ arm as a BEHAVIOUR while the same line also
+        # reported it as the 1 delta.  Double-counted, and only a derived count could show it.
+        ran.append(desc)
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
@@ -87,6 +97,7 @@ def main() -> int:
         probe.write_bytes(b"ru\x00n\n")
         as_binary = layout._mutable(probe)
         ok = as_text and not as_binary
+        deltas.append("mutable-delta")
         fails.append("mutable-delta") if not ok else None
         print(f"  {'ok ' if ok else 'XX '}one NUL byte flips a suffixless command out of the surface")
         print("      P (as shipped): a suffixless text command → mutable")
@@ -96,7 +107,8 @@ def main() -> int:
     if fails:
         print(f"MUTABLE: FAIL ({len(fails)})")
         return 1
-    print("MUTABLE: PASS (8 behaviors, 1 delta)")
+    print(f"MUTABLE: PASS ({len(ran)} behaviors, {len(deltas)} delta"
+          f"{'' if len(deltas) == 1 else 's'})")
     return 0
 
 

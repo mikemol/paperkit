@@ -44,7 +44,7 @@ import sys
 def _write_atomic(path, data):
     """Ζ·write·atomic — write a sibling temp, then rename over `path`.
 
-    DUPLICATED from layout.write_atomic on purpose, and gated for agreement rather than trusted:
+    DUPLICATED from durable.write_atomic on purpose, and gated for agreement rather than trusted:
     this tool is staged into the Bazel sandbox as a LONE FILE (verb.bzl passes it as `_tool`), so
     `paperkit/` is not on disk beside it and an engine import would fail in the one environment
     that matters most.  boundaries_write_atomic.py asserts the two implementations behave

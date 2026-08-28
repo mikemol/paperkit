@@ -24,8 +24,16 @@ from hook_index import ALLOW, divergent  # noqa: E402  (the owner of the equival
 
 def main() -> int:
     fails = []
+    ran = []
+    deltas = []
 
     def check(desc, cond):
+        # Λ·guard-must-not-copy — `ran` COUNTS the arms and `deltas` the ⟨P,F,δ⟩ pairs.  The summary
+        # was the literal "10 behaviors, 1 delta" with NO counter feeding it: mutation proved that
+        # deleting an arm left the line reading 10, so the number could not fail however the suite
+        # changed.  It happened to be RIGHT — which is the point: a correct-by-coincidence count is
+        # indistinguishable from a stale one until something derives it.
+        ran.append(desc)
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
@@ -53,6 +61,7 @@ def main() -> int:
     p = divergent("M  paperkit/grade.py\0")
     f = divergent("MM paperkit/grade.py\0")
     ok = p == [] and f == ["paperkit/grade.py"]
+    deltas.append("index-delta")
     fails.append("index-delta") if not ok else None
     print(f"  {'ok ' if ok else 'XX '}one worktree-column bit flips the verdict")
     print("      P (staged):    M  → worktree ≡ index; the hook's verdict is the commit's")
@@ -62,7 +71,8 @@ def main() -> int:
     if fails:
         print(f"HOOK-INDEX: FAIL ({len(fails)} drifted)")
         return 1
-    print("HOOK-INDEX: PASS (10 behaviors, 1 delta)")
+    print(f"HOOK-INDEX: PASS ({len(ran)} behaviors, {len(deltas)} delta"
+          f"{'' if len(deltas) == 1 else 's'})")
     return 0
 
 

@@ -8,7 +8,8 @@ an already-linearized document.  It is NOT a new OBSERVATION of the claim-DAG.
 The distinction is the whole content of prototypes/slides.bib's `docx-pdf-are-transforms-not-
 observations`: an exporter-of-finished-prose makes a deck a second-class artifact that has ALREADY
 lost the DAG structure.  `project(cfg, target)` is S -> String — ONE flat stream seeded by
-rubric-order × dep-order.  A deck is S -> RoseTree(S) indexed by (target, genre) — a SEGMENTATION
+rubric-order × dep-order.  A deck is S -> List(Unit) indexed by (target, genre) — a SEGMENTATION
+(one level: slides.bib's recursive RoseTree is unbuilt, Ζ·observe·rosetree) —
 into bounded observation-windows.  Different observation type, not a different file extension.
 
 This check gates the bound so it cannot rot into a comment nobody honours.  It asserts:

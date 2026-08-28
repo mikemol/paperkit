@@ -447,8 +447,16 @@ def project(cfg: dict, target: str = "pandoc") -> str:
 
 
 def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -> list:
-    """Ρ·deck·observe — the projector's SECOND observation shape: S → RoseTree(S), indexed by
+    """Ρ·deck·observe — the projector's SECOND observation shape: S → List(Unit), indexed by
     (target, genre), beside project()'s S → String indexed by target alone.
+
+    ⚑ ONE LEVEL, not a tree.  slides.bib designed this as S → RoseTree(S) — deck > chapters >
+    slides > claims, one grouping applied recursively — and that is NOT what shipped: this
+    returns a flat list of units, each carrying its own `items`.  The recursive form is
+    UNBUILT, and the RoseTree language was copied into three render check docstrings before
+    anyone compared it to the return.  A type a function advertises and does not meet is the
+    same defect class as a claim whose witness cannot fail; it is named here rather than left
+    for the next reader to trip over.
 
     project() LINEARIZES: one flat stream seeded by rubric-order × dep_order, which every existing
     target (pandoc/web/footnote/plain) is a citation-materialization of.  A deck is not a

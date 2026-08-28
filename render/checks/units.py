@@ -35,7 +35,11 @@ sys.path.insert(0, str(_ROOT / "paperkit"))
 # manifest; the genre is part of the declaration because a different genre is a different cut, and
 # a manifest that did not say which would be ungateable.
 OBSERVED = {
-    "paper": "talk",       # 87 claims, 68 grounding edges — the densest cut available
+    "paper": "talk",       # the densest cut available.  (A count once sat here — "87 claims,
+                           #   68 grounding edges" — against slides.bib's 84/57 for the same
+                           #   project: two uncoordinated snapshots, neither marked stale.
+                           #   Dropped rather than re-measured; the manifest itself carries
+                           #   the live numbers and cannot drift from them.)
     "setup": "talk",       # 26 edges: a SECOND grounded project, so the gate is not one instance
     "talk": "talk",        # the delivered talk: a FOURTH project, and the only one whose claims
                            #   are a mix of imported certificates, own witnesses and honest

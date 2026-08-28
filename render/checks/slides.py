@@ -10,8 +10,9 @@ produce from the ONE resolved source every node shares (source.py), exactly as d
 This walks a TRANSFORM chain over an ALREADY-LINEARIZED document.  `project()` is S → String — one
 flat stream seeded by rubric-order × dep-order — and pandoc reflows that stream onto slides at its
 `--slide-level` heading boundary.  The cut is therefore the PROSE's section structure, not a
-segmentation of the claim-DAG.  A deck as a genuine OBSERVATION is S → RoseTree(S) indexed by
-(target, genre); that is Ρ·deck·observe, it is not this, and prototypes/deck-observe.bib records why
+segmentation of the claim-DAG.  A deck as a genuine OBSERVATION is S → List(Unit) indexed by
+(target, genre) — one level, since slides.bib's recursive RoseTree is unbuilt (Ζ·observe·rosetree);
+that is Ρ·deck·observe, it is not this, and `rnd-units` gates the difference, because why
 the difference is worth keeping visible rather than collapsing.
 
 So: what this delivers is the verified prose, in a slide container, gated to be a well-formed one.

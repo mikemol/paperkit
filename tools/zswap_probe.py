@@ -21,7 +21,14 @@ so a page moved to zswap is re-charged smaller rather than leaving the charge: m
 FALLS as pages compress, and two workloads with identical RSS report different peaks.
 
 Scope: measured against linux-source 7.0.0-30.30.  These are claims about THIS pin.
-"""
+
+
+    ⚑ INSTRUMENT, NOT A GATE (Ζ·mem·unwired).  This file is referenced by no
+    BUILD.bazel, no .bzl, no .githooks hook and no warrant — nothing runs it, so
+    nothing would notice it breaking.  Re-verify its output at each use rather than
+    trusting a past reading; an instrument earns trust per-use, a gate by proven
+    soundness in both directions, and this has only ever been the former.
+    """
 import json
 import sys
 from pathlib import Path

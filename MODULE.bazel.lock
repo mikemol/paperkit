@@ -172,7 +172,7 @@
           "@@//paperkit/labelmap.py": "967dd44f77479501dff69a3dc9ad559dffbdfbc4b90e71ef9151fd96e5661b95",
           "@@//paperkit/layout.py": "b31e3ed671ed8debe660167662860b7af30b8ecc7ff2952203db967f38e7a969",
           "@@//paperkit/mutate.py": "dac6fdce25f6f6700e676d0c56393ed07f5a097fee849c29e912e387ef6990eb",
-          "@@//paperkit/project.py": "d423de2474c3cb276e9577b1a815db936ed356dc5eb4c6a15ab6aaca60ed07cc",
+          "@@//paperkit/project.py": "3d24138451866768a9986ec451d8ae1a6eff574b5a56eaaf4ea3a5096fa2ba05",
           "@@//paperkit/prove.py": "83b75dc4dd84d0ebca361ca9c95fae13675a0ddfca8f2d30a27afaf677c7368e",
           "@@//paperkit/resolver.py": "483064536e96c44ebe7f8fe0ac5c3907d68a2ef2648e8c91fc5c58eb3cd7d741",
           "@@//paperkit/rhetoric.py": "88cf7370f52826ad57efd1ceeb55ce41eee0b900af9e2871c53bd5764396a1d3",

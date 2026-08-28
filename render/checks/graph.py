@@ -64,7 +64,8 @@ MORPHISMS = {
 # ALREADY-LINEARIZED document: project() is S -> String (one flat stream seeded by rubric-order ×
 # dep-order), and these edges reflow that stream onto slides.
 #
-# A deck as a genuine OBSERVATION of the claim-DAG is S -> RoseTree(S) indexed by (target, genre) —
+# A deck as a genuine OBSERVATION of the claim-DAG is S -> List(Unit) indexed by (target, genre) —
+# (slides.bib designed a RoseTree; observe() ships one level, a flat list of units — Ζ·observe·rosetree) —
 # a SEGMENTATION into bounded observation-windows, not a linearization.  That is Ρ·deck·observe, and
 # it is NOT what this matrix delivers; prototypes/slides.bib holds its design DAG, whose
 # `docx-pdf-are-transforms-not-observations` names exactly the trap of shipping an

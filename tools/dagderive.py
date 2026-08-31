@@ -37,8 +37,36 @@ import ast
 from pathlib import Path
 
 
-def imports(text: str, names: set[str]) -> set[str]:
-    """Collect the engine-internal module names `text` imports, restricted to `names`."""
+def imports(text: str, names: set[str], pkg: str = "paperkit") -> set[str]:
+    """Collect the engine-internal module names `text` imports, restricted to `names`.
+
+    ⚑ BOTH SPELLINGS RECORD THE SAME EDGE, AND READING ONLY THE FLAT ONE ERASES THE DAG.
+    `import bibparse` and `from paperkit import bibparse` are the same dependency written two
+    ways.  This read only the first: an `ImportFrom` matched when `n.module` was itself an engine
+    stem (the `from _fixture_model import X` form), so for `from paperkit import bibparse`
+    `n.module` is `"paperkit"` — not a stem — and the imported name in `n.names` was never
+    inspected.
+
+    MEASURED 2026-08-31.  Converting `paperkit/bib.py`'s ONE import to the package spelling and
+    regenerating dag.bzl DELETED the edge:
+
+        -    "bib.py": ["bibparse.py"],
+
+    The dependency still existed; only its spelling had changed.  dag.bzl is what Bazel stages
+    each cell's .pyc closure from, so a bulk conversion would have under-staged cells one edge at
+    a time — the ModuleNotFoundError-inside-a-sandbox class that components.bzl records costing
+    four batch runs, and that Ξ·dag·script fixed for subprocess edges the day before.  Caught by
+    `bnd-components`' freshness arm, which named the missing edge exactly.
+
+    ⚑⚑ THREE FORMS, ONE EDGE.  `pkg` names the engine's own package so a subpackage import is
+    resolved to the same STEM the flat form yields — callers key on stems (`edges()` maps them
+    through `stem_index`), so returning a dotted name here would silently drop the edge instead.
+
+        import bibparse                      -> bibparse      (flat)
+        from paperkit import bibparse        -> bibparse      (package)
+        from paperkit.tools import vfs       -> vfs           (subpackage)
+        from _fixture_model import fx        -> _fixture_model (flat from-import, unchanged)
+    """
     out: set[str] = set()
     try:
         tree = ast.parse(text)
@@ -47,8 +75,13 @@ def imports(text: str, names: set[str]) -> set[str]:
     for n in ast.walk(tree):
         if isinstance(n, ast.Import):
             out |= {a.name for a in n.names if a.name in names}
-        elif isinstance(n, ast.ImportFrom) and n.module in names:
-            out.add(str(n.module))
+        elif isinstance(n, ast.ImportFrom):
+            mod = n.module or ""
+            if mod in names:                       # `from _fixture_model import fx`
+                out.add(mod)
+            elif mod == pkg or mod.startswith(pkg + "."):
+                # `from paperkit[.sub] import X` — X is the module, not the package
+                out |= {a.name for a in n.names if a.name in names}
     return out
 
 

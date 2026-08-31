@@ -153,7 +153,7 @@
           "@@//paper.toml": "5f9ad08942219d85ba68074f848bddd43096ee9321b93333b698ca3c02e6e0c4",
           "@@//paper/checks/claims.py": "5eaf98a9dddf85415337a84edbee4fe1f136a4aadda14d30896c56e70c0ca71a",
           "@@//paper/paper.toml": "202a8ba3efd17366212e14601105e65a16300ef73e975d5be25b9de568078f0f",
-          "@@//paperkit/__init__.py": "7e97a46d5b8f67429150fb5d38e78a9fcac5cf6cc4c60c94a8e424f12f4f418f",
+          "@@//paperkit/__init__.py": "d6650981710162be67e0c7ef14196eb1b2bcd2b35b32414900d38ce0d8dff3a0",
           "@@//paperkit/bib.py": "b714bd273622c29c70b117653a5b21bb9973d9b2141bc982aabe6b5b2863e35d",
           "@@//paperkit/bibfidelity.py": "27ebde39e8ab6f37a4137ed24df0cf9e33cbe79bea714ab1cb6314354adfe3c4",
           "@@//paperkit/bibparse.py": "8ad19f4d6d77ce6174f306f9a3a770346a3379064d5b520f2c3c98d80fb649cb",

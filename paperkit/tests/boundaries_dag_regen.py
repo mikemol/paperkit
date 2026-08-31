@@ -50,6 +50,11 @@ ENG = Path(__file__).resolve().parent.parent
 ROOT = ENG.parent
 ANCHOR = "import sys\n"
 EDGE = "import sys\nimport durable  # boundaries_dag_regen probe\n"
+# ⚑ Ζ·dagderive·pkg — THE SAME EDGE, WRITTEN THE OTHER WAY.  `import durable` and `from paperkit
+# import durable` are one dependency in two spellings, and the derivation MUST record both
+# identically or converting a file silently deletes its edges from dag.bzl — which is what Bazel
+# stages each cell's .pyc closure from.
+PKG_EDGE = "import sys\nfrom paperkit import durable  # boundaries_dag_regen probe\n"
 
 
 def main() -> int:
@@ -124,6 +129,33 @@ def main() -> int:
         probe.write_text(pristine_probe)
         run("--write")
         s.check("ROUND TRIP: dag.bzl returns BYTE-IDENTICAL once the edge is removed",
+                dag.read_text() == pristine_dag)
+
+        # ── Ζ·dagderive·pkg — the SAME edge in the package spelling ────────────────────────
+        #
+        # ⚑ THE DEFECT THIS PINS DELETED A REAL EDGE AND REPORTED SUCCESS.  `dagderive.imports`
+        # matched an `ImportFrom` only when `n.module` was itself an engine stem, so
+        # `from paperkit import bibparse` — where `n.module` is `"paperkit"` and the module sits
+        # in `n.names` — recorded NOTHING.  Measured 2026-08-31: converting paperkit/bib.py's one
+        # import and regenerating dropped `"bib.py": ["bibparse.py"]` from dag.bzl entirely.  A
+        # bulk conversion would have erased the engine's import DAG one file at a time, and the
+        # consequence is under-staged sandbox cells — the ModuleNotFoundError class components.bzl
+        # records costing four batch runs.
+        #
+        # ⚑⚑ AND IT WOULD HAVE PASSED EVERY ARM ABOVE, because they all write the FLAT spelling.
+        # A round-trip that only ever exercises one form cannot see a derivation that understands
+        # only that form.  This arm is the second form, asserting the identical output.
+        probe.write_text(pristine_probe.replace(ANCHOR, PKG_EDGE, 1))
+        s.check("the PACKAGE-spelling probe edit landed",
+                "from paperkit import durable" in probe.read_text())
+        rc, _ = run("--write")
+        s.check("--write accepts the package spelling", rc == 0)
+        s.check("   ...and records the SAME edge the flat form does",
+                '"genre.py": ["durable.py"]' in dag.read_text())
+
+        probe.write_text(pristine_probe)
+        run("--write")
+        s.check("   ...and it round-trips out byte-identically too",
                 dag.read_text() == pristine_dag)
 
         rc, out = run("--write")

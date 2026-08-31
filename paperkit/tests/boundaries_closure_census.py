@@ -26,17 +26,24 @@ import sys
 import tempfile
 from pathlib import Path
 
+# ⚑ NAMED IN FULL, AND NO PATH MUTATION (Ζ·path·retire).  This carried
+# `sys.path.insert(0, str(ROOT))` when the imports were converted, on the assumption the packages
+# needed reaching.  They do not: `pyproject.toml` declares `packages = ["paperkit", "tools"]`, so
+# under the project venv both import from ANY directory — measured by `tools/pathaudit.py
+# --probe` with cwd OUTSIDE the repo, which is the only place a real declaration is
+# distinguishable from an accident of where the prober stood.
+#
+# ⚑⚑ THE MUTATION IS THE ROOT OF THE WHOLE Ζ·flat ARC, not a companion to it.  It is what makes a
+# flat `import x` possible, and the flat import is what makes the module unresolvable to mypy
+# (2,497 findings across 66 files), order-dependent (I001 moved a load-bearing import above its
+# bootstrap five times, which is the only reason `tools/sortaudit.py` exists), and ambiguous (two
+# directories named `tools`).  Removing the mutation retires all three.  This file is the first
+# one converted; `pathaudit` enumerates the remaining 95.
+from paperkit.tests._boundary import Suite
+from tools import closure_census as cc
+
 ENGINE = Path(__file__).resolve().parent.parent
 ROOT = ENGINE.parent
-sys.path.insert(0, str(ROOT))
-
-# ⚑ NAMED IN FULL, NOT FLAT (Ζ·engine·flat).  `from _boundary import Suite` behind a
-# `sys.path.insert(ENGINE)` is unresolvable to mypy, so `Suite` types as Any and every call site
-# poisons — 17 findings in a file whose own subject is an under-declared dependency.  Both
-# `paperkit.tests` and `tools` are packages; the full name costs nothing and is checkable.
-from paperkit.tests._boundary import Suite  # noqa: E402
-from tools import closure_census as cc  # noqa: E402
-
 PY = sys.executable or "python3"
 MIN_WITNESSES = 30
 

@@ -17,22 +17,42 @@ legacy accident here — it is the form the build graph is a projection of.
 So the modules keep `import bib`, and THIS file makes that resolvable however the package is
 reached.  It is the one owner for the PACKAGE form, executed once at package import.
 
-⚑ It does NOT replace the six `sys.path.insert(0, Path(__file__).parent)` lines in gate, project,
-rhetoric, discriminate, coherence and footdeps — those are still there, deliberately, and this
-docstring claimed otherwise until it was measured.  Removing them regressed seven talk claims:
-each module may be run AS A SCRIPT (`python3 paperkit/gate.py`), where this file never executes,
-and the insert also asserts a PRIORITY — `render/checks/bib.py` exists and would shadow the
-engine's `bib` on a path that resolved the other way.  So the inserts are not six copies of one
-fix; they solve a case the package form cannot reach (Λ·guard-must-not-copy — the seventh module to forget it would fail
-only on the path nobody tested).
+⚑ THE SIX SIBLING INSERTS (gate, project, rhetoric, discriminate, coherence, footdeps) DEFEND
+ONE THING, NOT TWO — AND THIS DOCSTRING CLAIMED TWO UNTIL IT WAS MEASURED.
 
-A module run directly as a script does not import this file at all — Python puts its own directory
-on sys.path first, which is exactly what these lines reproduce for the other two entry paths.  That
-is why the same flat import serves all three.
+It said they also assert a PRIORITY: that `render/checks/bib.py` exists and would shadow the
+engine's `bib` on a path resolving the other way, so the inserts "solve a case the package form
+cannot reach".  ⚑ THAT HALF IS FALSE.  The shadowing is a property of the FLAT NAME.
+`paperkit.bib` and `render.checks.bib` are different names, and a directory early on sys.path
+cannot shadow a package attribute.  Measured directly — the hostile order the claim describes,
+both spellings asked in ONE interpreter:
+
+    sys.path[0] = render/checks
+      flat  import bib                -> render/checks/bib.py     dep_order? False
+      pkg   from paperkit import bib  -> paperkit/bib.py          dep_order? True
+
+The flat name IS shadowed, reproducing the original failure exactly; the package name reaches the
+engine regardless of what sits earlier.  So the insert defends a SPELLING, not a property, and
+retires with the spelling.  (The probe that measured this, `tools/shadowprobe.py`, was a one-shot
+instrument and is deleted with the finding recorded here — a tool whose method is constructing a
+hostile sys.path has no place in the tree that is retiring sys.path mutation, and after the
+conversion there is no flat `import bib` left for it to shadow.)
+
+⚑⚑ WHAT REMAINS TRUE IS THE SCRIPT ROUTE, AND IT IS THE ARC'S ACTUAL BLOCKER.  A module run as
+`python3 paperkit/gate.py` never imports this file — Python puts the SCRIPT's own directory on
+sys.path instead — so the flat `import bib` inside it resolves by that rule alone.  Every Bazel
+action and every bib `cmd:` spells exactly that invocation.  Removing the inserts without changing
+how the engine is INVOKED regressed seven talk claims, which is what the earlier measurement
+actually showed.
+
+That makes Ζ·path·retire a change to the INVOCATION (the bib's `cmd:` and the sandbox's staging),
+not a change to the imports alone — and the venv already answers it: `pyproject.toml` declares
+`packages = ["paperkit", "tools"]`, and `tools/pathaudit.py --probe` measures both importable from
+outside the repo with no mutation at all.
 """
-import os
 import sys
+from pathlib import Path
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = str(Path(__file__).resolve().parent)
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)

@@ -18,7 +18,7 @@ exports_files(["assert_pass.sh", "cgroup-scope", "mem_db.py", "mem_harvest.py", 
 # These three are consumed by a `cmd:` check through the //:files FILEGROUP, which has no runfiles
 # tree — so they are exported and the marker travels with them.  When Ζ·engine·flat lands and the
 # suites become py_binary-shaped, this export retires in favour of that mechanism.
-exports_files(["__init__.py", "dagderive.py", "dagbzl.py", "dagnames.py", "closure_census.py", "buildpulse.py", "indexdiverge.py", "witness_reach.py", "vendor_hooks.py"])
+exports_files(["__init__.py", "dagderive.py", "dagbzl.py", "dagnames.py", "closure_census.py", "buildpulse.py", "flatorder.py", "pathaudit.py", "indexdiverge.py", "witness_reach.py", "vendor_hooks.py"])
 
 # Ξ·lint·wire — the .bzl files exported so the boundaries bnd-lint check (a data dep via //:files) can
 # lint them.  Explicit set (no globs); KEEP in sync with the lint's arg list + //:files.

@@ -59,3 +59,20 @@ paperkit/scratch/
 # tmpfs, deliberately: a 4.45 GB execution log in RAM leaked across days), and bibstruct's
 # selftest leaves a mkdtemp per run.  Build residue by construction — never a source.
 .tmp/
+
+# ⚑ Ζ·summit·recur — ANOTHER REPO'S COORDINATION DATA, WRITTEN INTO THIS TREE BY A PEER'S HOOK.
+# `paperkit/summit/floor/` appeared twice on 2026-08-31 holding summit's floor bibs — first one
+# file (142 friction reports, 331 KB), then three (719 KB, +asks +corroboration).  It is NOT
+# paperkit's: nothing here references `summit/floor`, and the live floor is `substrate/scratch/
+# summit/floor/`.  The writer is one of the PreToolUse hooks symlinked from ../../substrate
+# (Κ·hook·vendor's accepted cost: an adopter inherits upstream's bugs with its fixes).
+#
+# ⚑⚑ THIS IS A SYMPTOM FIX AND SAYS SO.  The cause is a cross-repo writer composing a path this
+# repo never declares — the inbox convention (`/inbox/*`, ignored, ruling at summit's
+# inbox-drop-zone.md) exists precisely so an incoming drop cannot dirty the tree, and it works;
+# what bypassed it was a write that never went near it.  An ignore rule only protects paths it
+# knows about, so this stops the NEXT one from being swept in by `git add -A` (summit's own floor
+# records that exact failure as `friction-git-add-A-swept-a-delegate-letter-into-an-unrelated-
+# commit`) without pretending the write has been prevented.
+/summit/
+paperkit/summit/

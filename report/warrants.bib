@@ -5,7 +5,6 @@
 % re-derives every figure and fails if the committed copy has drifted).  Refresh
 % with `python3 report/gen.py`.
 
-% ── status ───────────────────────────────────────────────────────────────────
 @misc{rpt-status,
   section = {status},
   claim   = {every document the local CI gates passes the gate with zero postulates},
@@ -30,7 +29,6 @@
   check   = {cmd:python3 mitigation.py}
 }
 
-% ── adequacy ─────────────────────────────────────────────────────────────────
 @misc{rpt-delta,
   section = {adequacy},
   claim   = {Δ grades each cited claim's check by whether it can actually fail},
@@ -43,7 +41,6 @@
   check   = {fresh:all}
 }
 
-% ── proof ────────────────────────────────────────────────────────────────────
 @misc{rpt-proof,
   section = {proof},
   claim   = {in every document, every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another)},
@@ -56,7 +53,6 @@
   check   = {fresh:all}
 }
 
-% ── dag ──────────────────────────────────────────────────────────────────────
 @misc{rpt-dag,
   section = {dag},
   claim   = {walking the paper's GROUNDING DAG (rests-on, distinct from prose order; the paper is the one document with grounding edges) from foundational atoms to the theses they support, each claim's adequacy grade plots against its grounding depth},

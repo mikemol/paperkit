@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import resolver  # noqa: E402  (clean_env lives in the resolver core — small blast radius, no gate loop)
+import resolver
 
 DIRTY = {
     "PATH": "/usr/bin" + os.pathsep + "." + os.pathsep + os.pathsep + "rel/x",  # abs kept; .,"",rel dropped

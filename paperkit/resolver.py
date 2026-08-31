@@ -75,8 +75,10 @@ class Verdict:
     `.passed` and identity semantics are untouched: PASS/FAIL stay interned singletons, a bare
     UNAVAILABLE stays the module-level one, and `is UNAVAILABLE` keeps working because
     `__eq__`/`__hash__` are still not overridden — a REASONED unavailable is a distinct object
-    that compares unequal, so callers testing identity must use `is_unavailable()`."""
-    __slots__ = ("_name", "_why", "_owner")
+    that compares unequal, so callers testing identity must use `is_unavailable()`.
+    """
+
+    __slots__ = ("_name", "_owner", "_why")
 
     def __init__(self, name: str, why: str = "", owner: str = "") -> None:
         object.__setattr__(self, "_name", name)
@@ -118,13 +120,15 @@ UNAVAILABLE = Verdict("UNAVAILABLE")
 
 def unavailable(why: str = "", owner: str = "") -> Verdict:
     """A cannot-run that CARRIES what would fix it.  Bare (no reason) returns the interned
-    singleton, so existing `is UNAVAILABLE` checks keep holding for the reasonless case."""
+    singleton, so existing `is UNAVAILABLE` checks keep holding for the reasonless case.
+    """
     return Verdict("UNAVAILABLE", why, owner) if (why or owner) else UNAVAILABLE
 
 
 def _pf(ok: bool) -> Verdict:
     """A check that RAN and decided: True → PASS, False → FAIL.  (Never UNAVAILABLE — that is the
-    could-not-evaluate seam, returned explicitly at each such site.)"""
+    could-not-evaluate seam, returned explicitly at each such site.)
+    """
     return PASS if ok else FAIL
 
 
@@ -144,7 +148,8 @@ def _sibling_for(project_dir: Path | None, name: str) -> Path:
     invisible in this repo (every project sits beside the engine) and fatal outside it, where a
     downstream `result:theirproject` would resolve into THIS repo. A name that resolves nowhere
     is returned unchanged, so the gate reports its own cannot-run rather than this layer
-    inventing a diagnosis for it."""
+    inventing a diagnosis for it.
+    """
     cands = []
     if project_dir is not None:
         p = Path(project_dir).resolve()
@@ -175,14 +180,108 @@ def _library_for(project_dir: Path | None) -> Path:
     sentinel contract concepts.py declares) must not ECLIPSE the engine's concepts, so
     resolves() falls through to the engine's library per key.  Directory-level selection alone
     made every engine key unreachable from any repo owning a library — the downstream audit's
-    live instance: they could never cite an engine concept even where it was the honest import."""
+    live instance: they could never cite an engine concept even where it was the honest import.
+    """
+    # Ζ·lib·contract / Ζ·cite·resolve — A LIBRARY IS A PROJECT, AND A PROJECT IS A `paper.toml`.
+    #
+    # This tested `(cand / "concepts.py").is_file()` — a WEAKER predicate than the contract, and
+    # measured across the ecosystem the gap is populated: `gcalculus/library/` holds concepts.py
+    # ALONE (no paper.toml, no concepts.bib), `summit/library/` holds concepts.py + witnesses/,
+    # and `substrate/catalog/library/` has no concepts.py at all and fell through to THIS repo's
+    # library — the exact failure the docstring above says was fixed ("a downstream `concept:` then
+    # ran THIS repo's library, which has none of their keys"), live in-tree, because
+    # directory-shaped evidence is not project-shaped.
+    #
+    # ⚑ AN EARLIER DRAFT OF THIS COMMENT SAID THOSE LIBRARIES "cannot answer".  THAT WAS FALSE, and
+    # both consumers disproved it by RUNNING theirs: summit measured `library/concepts.py
+    # ask/tristate` → exit 0, and gcalculus's `paths.py --check` passes standalone.  They answer
+    # fine; the tightened predicate stopped ASKING them.  A capability-absence claim written from a
+    # directory listing instead of an invocation — in the comment justifying a change that broke
+    # exactly those consumers.
+    #
+    # ⚑ AND `concepts.py` WAS THE SECOND HARDCODED NAME.  The library's own paper.toml already
+    # declares BOTH facts the resolver was reconstructing — `warrants = ["concepts.bib"]` and
+    # `[checks.claim] cmd = "python3 concepts.py {target}"`.  Keying on `paper.toml` and reading
+    # the declared command is Λ·registry applied to resolution: the owner declares, the consumer
+    # reads, and renaming the witness module stops being a silent break in a file that never
+    # mentions it.  `_sibling_for` two functions up ALREADY tests `paper.toml`; this was the
+    # outlier, not the pattern.
+    #
+    # The directory name stays `library` — that is a search key for a CANDIDATE, and the honest
+    # scope of this fix: WHICH directory is still conventional, but WHETHER it is a library is now
+    # a declaration.  Naming the library by citation rather than by directory is the rest of
+    # Ζ·cite·resolve, and it needs a place for a consumer to write the name.
+    # ⚑ Ζ·lib·fallback — THE TIGHTENING MUST BE SOFT, AND `_library_cmd` BELOW ALREADY KNEW THAT.
+    #
+    # Keying on paper.toml alone was a HARD break for every library that predates the contract.
+    # It reddened TWO downstream consumers within hours — summit's board (three concepts it owns,
+    # reported UNRESOLVABLE) and gcalculus's nested `paths/` project (~40).  Both were correct
+    # invocations against libraries that answer.
+    #
+    # The asymmetry is the bug, not the predicate.  `_library_cmd`, the very next function, reads
+    # `[checks.claim] cmd` from paper.toml and FALLS BACK to the historical `python3 concepts.py
+    # {target}` spelling when the declaration is absent — its docstring calls that "the
+    # compatibility path, not the contract".  I wrote the soft landing one function down and not
+    # this one, so the same tightening was graceful there and abrupt here.
+    #
+    # So: paper.toml is the CONTRACT and settles ambiguity; a directory that answers the witness
+    # contract (a `concepts.py` to run) still resolves, and `_library_cmd`'s fallback then invokes
+    # it exactly as before.  A library declaring paper.toml WINS over a bare concepts.py at the
+    # same level — the declaration is more specific than the convention — which is what keeps this
+    # a compatibility path rather than a rollback.
+    #
+    # ⚑ AND THE DIAGNOSIS GAP IS WORTH RECORDING, because it is not about libraries at all.
+    # gcalculus asked every question their tooling knows how to ask — `git log` on this file (last
+    # change predated their green board), `git show` on the day's two commits (docstring-only),
+    # `git log` on their own invocation (unchanged 17 days) — all TRUE, none sufficient, because
+    # the cause was UNCOMMITTED in this tree and invisible to a peer.  Their finding, filed as
+    # `a-consumers-reach-stops-at-the-peers-last-commit`: every diagnostic question a consumer can
+    # ask about a peer is a question about COMMITTED state.  A text search would also have said
+    # "unchanged" — this comment block carries BOTH spellings, the old one in narration and the new
+    # one in the test.
     if project_dir is not None:
         p = Path(project_dir).resolve()
         for base in (p, p.parent):                    # the project's own, then its repo root's
             cand = base / "library"
+            if (cand / "paper.toml").is_file():
+                return cand
+        for base in (p, p.parent):                    # compatibility: a pre-contract library
+            cand = base / "library"
             if (cand / "concepts.py").is_file():
                 return cand
     return _LIBRARY
+
+
+def _library_cmd(lib: Path, target: str) -> list:
+    """The argv that asks `lib` to witness `target` — READ from the library's own declaration.
+
+    Ζ·cite·resolve — `[checks.claim] cmd` in the library's paper.toml is what the gate itself runs
+    for that project's claims, so it is the one authority on how to invoke its witness.  The
+    resolver used to hardcode `python3 <lib>/concepts.py <target>`, a second copy of that
+    declaration living in the consumer — the shape Λ·registry names (an enumeration re-declared
+    beside its owner drifts, and this one could drift into a SILENT break: rename the module,
+    paper.toml stays correct, `concept:` stops resolving).
+
+    Falls back to the historical spelling when the declaration is absent or unreadable, so a
+    library that predates this still answers; the fallback is the compatibility path, not the
+    contract.
+    """
+    fallback = [sys.executable, str(lib / "concepts.py"), target]
+    try:
+        import tomllib
+        cfg = tomllib.loads((lib / "paper.toml").read_text())
+        cmd = ((cfg.get("checks") or {}).get("claim") or {}).get("cmd")
+        if not cmd:
+            return fallback
+        # `{target}` is the declared substitution point (the same one bib/gate use for a custom
+        # verb).  Split as a shell word list, then resolve the module RELATIVE TO THE LIBRARY —
+        # the declaration is written from the project's own directory, which is why the run below
+        # sets cwd=lib.
+        parts = shlex.split(cmd.replace("{target}", target))
+        return [str(lib / a) if a.endswith(".py") and not Path(a).is_absolute() else a
+                for a in parts]
+    except Exception:
+        return fallback
 
 
 # Λ·registry — THE built-in verb set.  This dict OWNS the enumeration: `resolves` dispatches one
@@ -246,10 +345,39 @@ def clean_env(env: dict | None = None) -> dict:
     """A sanitized environment for running a check: the controlled allow-list only, so
     no LD_PRELOAD/IFS/BASH_ENV/PYTHONPATH and the like reach the command.  PATH's relative
     and empty entries are dropped (Τ·path) — they would resolve a tool to the cwd (the
-    project dir being gated), so a document could shadow a tool by planting it beside itself."""
+    project dir being gated), so a document could shadow a tool by planting it beside itself.
+    """
     src = os.environ if env is None else env
     out = {k: v for k, v in src.items()
            if (k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)) and k not in _ENV_DROP}
+    # ⚑ Ζ·check·debug — GUARANTEE `__debug__` TO THE CHECK, POSITIVELY.
+    #
+    # Under `-O` / PYTHONOPTIMIZE, python DELETES every `assert`.  A witness built on asserts then
+    # exits 0 having verified NOTHING, and this gate reports it as passing — a check that cannot
+    # fail, certified by the engine whose whole claim is that a green gate means the evidence RAN.
+    # It is the same condition adequacy grading already refuses downstream (an unfalsifiable check
+    # grades `vacuous`, below the floor); a runner able to silently create it is a hole in the
+    # thing paperkit is FOR.
+    #
+    # ⚑ THE ALLOWLIST ABOVE ALREADY EXCLUDED PYTHONOPTIMIZE — BY ACCIDENT, AND THAT IS THE POINT.
+    # `_ENV_KEEP` was built against injection and reproducibility; nobody left PYTHONOPTIMIZE out
+    # *because of asserts*, nothing tested that it stayed out, and an accidental invariant with no
+    # witness is one refactor from gone — silently, since the failure mode is a GREEN gate.
+    # Setting it to "0" here makes the guarantee POSITIVE rather than a side effect of an omission:
+    # a future edit that widened the allowlist would now be overridden instead of quietly fatal.
+    #
+    # ⚑ AND IT DOES NOT COVER argv, WHICH IS STATED RATHER THAN HIDDEN.  `python -O script.py` in a
+    # `[checks.X] cmd` template is a FLAG, not an environment variable, and no environment
+    # sanitisation can strip it.  That surface is a project's own paper.toml — data this engine
+    # executes but does not author.  Closing it needs the CHILD to refuse, which is a separate rung
+    # (the witness contract), and the two are not substitutes: this closes the route an operator
+    # can trip from a shell profile, which is the one that travels between repos.
+    #
+    # Reported by gcalculus, whose entire evidence base is 2,839 asserts and whose own census then
+    # found the entrypoint THIS runner spawns (`library/concepts.py`) is the one their guard misses
+    # — so a per-consumer guard requires every consumer to notice first, and one demonstrably did
+    # not.  place-by-ownership-not-need: the claim "this check passed" is made HERE.
+    out["PYTHONOPTIMIZE"] = "0"
     pinned = config.resolve(PATH)
     if pinned is not None:
         # Τ·path: PIN tool resolution to a DECLARED set of absolute, existing dirs —
@@ -295,7 +423,8 @@ CHECK_TIMEOUT = 600     # wall-clock BACKSTOP for a stuck-waiting (zero-CPU) pro
 def _cpu_rlimit(seconds: int):
     """A preexec_fn that caps the child's (and its tree's) CPU time — SIGXCPU at `seconds`, SIGKILL a
     few seconds later.  Runs in the forked child before exec, so the whole check subprocess is bounded
-    by WORK DONE, not wall time."""
+    by WORK DONE, not wall time.
+    """
     def _set():
         import resource
         resource.setrlimit(resource.RLIMIT_CPU, (seconds, seconds + 3))
@@ -309,7 +438,8 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
     refuted claim, it is an unchecked one, and folding it into FAIL would be the exact bug this change
     removes for the most-used verb.  A cmd that BURNS its CPU budget (a mutation-induced busy loop), by
     contrast, IS a fail — a check that never answers has not passed, and the hang is a real behavioural
-    flip the sweep must see; measuring CPU not wall keeps a lease-queued check from a false FAIL."""
+    flip the sweep must see; measuring CPU not wall keeps a lease-queued check from a false FAIL.
+    """
     import os
     import signal
     cpu = int(os.environ.get("PAPERKIT_CHECK_CPU", CHECK_CPU))
@@ -410,8 +540,20 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
                 return unavailable(rec.get("reason") or "the delegate reported it cannot run",
                                    target)
             return _pf(bool(rec.get("pass")))
-        except Exception:                             # the sibling is unreachable
-            return UNAVAILABLE
+        except Exception as e:
+            # ⚑ Ζ·result·owner — THE UNREACHABLE PATH NAMES ITS OWNER TOO.  The widening above
+            # carried a reason only when the sibling RAN and reported its own cannot-run; a
+            # sibling that could not be reached AT ALL returned the bare interned singleton, so
+            # gate.py's `f"{v.owner}: {v.why}"` fell through to the disjunction its own comment
+            # says it replaced ("unreachable delegate or unknown verb" — everything it might have
+            # been and nothing it was).  Two cannot-runs, one attributable and one mute, and the
+            # mute one is the case a downstream consumer hits FIRST (an absent path, a sibling
+            # mid-refactor, a repo not checked out beside this one).
+            #
+            # The owner is the CITED TARGET, matching the arm above — a consumer reading a
+            # cannot-run learns which delegation failed, not merely that one did.
+            return unavailable(f"the sibling could not be reached: {type(e).__name__}: {e}"[:400],
+                               target)
     if typ == "concept":
         # Λ·witness — a concept: check IMPORTS a concept authored and GRADED once in the library.
         # For the LIVE verdict (the direct-CLI gate path; the Bazel //:hook path reads the library's
@@ -421,22 +563,33 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         # nothing staged; its adequacy is the imported certificate (verdict + engine fingerprint).
         try:
             lib = _library_for(project_dir)
-            r = subprocess.run([sys.executable, str(lib / "concepts.py"), target],
+            r = subprocess.run(_library_cmd(lib, target),
                                cwd=lib, env=clean_env(), capture_output=True)
             # Λ·library·fallthrough — per-KEY, not per-directory: exit 2 is the library's own
             # "not mine" sentinel, so a project library lacking the key falls through to the
             # engine's (the true owner answers); any other exit is the OWNING library's verdict.
             # The owning case runs ONCE; only a fallthrough pays the cheap rc-2 probe first.
             if r.returncode == 2 and lib != _LIBRARY:
-                r = subprocess.run([sys.executable, str(_LIBRARY / "concepts.py"), target],
+                r = subprocess.run(_library_cmd(_LIBRARY, target),
                                    cwd=_LIBRARY, env=clean_env(), capture_output=True)
             # exit 2 from the FINAL owner = "nobody owns this key": the concept is UNAVAILABLE (no
             # library can witness it), NOT refuted.  Any other exit is the owning library's verdict.
             if r.returncode == 2:
-                return UNAVAILABLE
+                # ⚑ Ζ·result·owner — NAME THE LIBRARY THAT DISCLAIMED IT.  This returned the bare
+                # singleton, so "nobody owns this key" reached the citing gate without saying WHO
+                # was asked — and the consumer-first ladder means the answer is genuinely useful:
+                # a key the author believes their own library owns, disclaimed by the ENGINE's,
+                # says the ladder picked a different library than they think.  concepts.py already
+                # prints which library answered (Λ·doc·concept) and then throws it away here.
+                return unavailable(
+                    f"no library owns concept {target!r} — asked {lib}"
+                    + (f", then the engine's {_LIBRARY}" if lib != _LIBRARY else ""),
+                    str(lib))
             return _pf(r.returncode == 0)
-        except Exception:                             # the library is unreachable
-            return UNAVAILABLE
+        except Exception as e:
+            # The library is unreachable — the concept analogue of the sibling case above.
+            return unavailable(f"the concept library could not be run: {type(e).__name__}: {e}"[:400],
+                               target)
     if typ == "agree":
         # Δ·agree (Ε·agree) — agree CONCURS (see VERBS; no ordinal, no count).
         # The SAME fact established by N INDEPENDENT producers (split on |||) that
@@ -453,6 +606,24 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
                                    capture_output=True, text=True)
             except Exception:
                 return UNAVAILABLE                    # a producer could not be SPAWNED — cannot evaluate
+            # ⚑ Ε·fold — rc 3 IS CANNOT-RUN HERE TOO, and `!= 0` was scoring it as a refutation.
+            # `run_ok` has carried this arm since the tier work ("rc 0 → pass · rc 3 → cannot-run ·
+            # any other nonzero → fail"), and its comment names the exact hazard: ONE check
+            # answering two different verdicts depending on which path ran it.  `agree:` is the
+            # path that never got the arm — so a producer whose TOOLCHAIN IS ABSENT (a veraPDF, a
+            # pandoc) was reported as DISAGREEING with its peers, which is a false red in the verb
+            # whose entire purpose is evidential strength.  A producer that could not run has not
+            # dissented; it has not spoken.
+            #
+            # The distinction is the one the Verdict docstring protects: `_CANNOT_RUN` from an
+            # EXTERNAL producer means it could not reach its toolchain, not that the engine asked
+            # wrong.  Its last line is the direction of the fix, so it rides along — the same
+            # Ζ·unavailable·why widening result: takes, at the verb that most needs it (a
+            # disagreement report must say WHICH producer, and why).
+            if r.returncode == _CANNOT_RUN:
+                last = (r.stderr or "").strip().splitlines()
+                return unavailable((last[-1].strip()[:400] if last else
+                                    "a producer reported it cannot run"), prod[:120])
             if r.returncode != 0:
                 return FAIL                           # a producer that RAN and failed cannot concur
             outs.add(r.stdout.rstrip())
@@ -475,7 +646,8 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
 def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str | None:
     """The shell command a check RUNS — or None for file:, which opens only its target.
     The single source of the command behind cmd:/custom/result:, so footprint() traces
-    exactly what resolves() runs."""
+    exactly what resolves() runs.
+    """
     typ, _, target = check.partition(":")
     if typ == "file":
         return None
@@ -520,7 +692,8 @@ def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> "list | None
     CAPTURE (the strace subprocess — a process op = Bazel's job, Φ·spawn·foot), so the parse (the
     paperkit-owned logic: which opens count as inputs) is testable IN-PROCESS over a canned trace,
     not by running strace.  Returns the sorted read set; None if the trace shows NO opens at all
-    (strace never attached — the Φ·degrade sentinel; [] would falsely mean 'reads nothing')."""
+    (strace never attached — the Φ·degrade sentinel; [] would falsely mean 'reads nothing').
+    """
     reads, traced = set(), False
     for line in trace_text.splitlines():
         m = _OPEN_RE.search(line)
@@ -562,7 +735,8 @@ def producer_footprints(check: str, project_dir: Path, custom: dict,
 
     None (never {}) when the trace is unavailable, matching footprint()'s Φ·degrade contract: an
     unmeasurable footprint must not read as a measured-empty one.  A non-`agree:` check gets None
-    too — it has no producers to partition."""
+    too — it has no producers to partition.
+    """
     typ, _, target = check.partition(":")
     if typ != "agree":
         return None
@@ -587,7 +761,8 @@ def corroboration_of(check: str, project_dir: Path, custom: dict,
     input, certified) or `correlated` (some pair overlaps), and `shared` names the intersection
     that made it correlated.  None when the footprints could not be measured, which the caller
     must render as `distinct` — the honest "≥2 producers, sharing NOT measured" state — rather
-    than as either verdict."""
+    than as either verdict.
+    """
     fps = producer_footprints(check, project_dir, custom, scope)
     if not fps or len(fps) < 2:
         return None
@@ -610,7 +785,8 @@ def footprint(check: str, project_dir: Path, custom: dict, scope: "Path | None" 
 
     scope=repo_root captures CROSS-PACKAGE reads (.githooks, sibling projects, the engine) as
     repo-relative paths — the basis Ζ·foot maps to each check target's Bazel deps; the default
-    (project-relative) is the Δ cache's key, which must stay project-scoped."""
+    (project-relative) is the Δ cache's key, which must stay project-scoped.
+    """
     project_dir = Path(project_dir).resolve()
     scope = Path(scope).resolve() if scope else project_dir
     typ, _, target = check.partition(":")

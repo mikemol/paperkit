@@ -3,7 +3,6 @@
 % flags and what it passes; the `check` RUNS that suite.  This file is a makefile —
 % the gate runs every check below in parallel — and BOUNDARIES.md is its projection.
 
-% ── Δ grader + --without-K ───────────────────────────────────────────────────
 @misc{bnd-delta,
   section = {delta},
   claim   = {the Δ grader's boundary --- it flags a check that provably cannot fail (vacuous) and passes one a mutation can break (behavioral), and a def-resolution sweep that cannot find the engine in its sandbox fails loudly rather than silently degrading to file resolution},
@@ -20,7 +19,6 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_coherence.py}
 }
 
-% ── projector + gate ─────────────────────────────────────────────────────────
 @misc{bnd-emit,
   section = {engine},
   claim   = {the projector's boundary --- it emits a cited example verbatim, and --safe rejects an uncited placement (a postulate)},
@@ -52,7 +50,6 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_footprint.py}
 }
 
-% ── driver + cache ───────────────────────────────────────────────────────────
 @misc{bnd-driver,
   section = {runtime},
   claim   = {the driver's boundary --- a witness pumps and serializes resumably, so a slow check is interruptible, not broken},
@@ -236,4 +233,13 @@
   section = {engine}, from = {bnd-otlp}, join = {. },
   claim   = {the bib PARSER's boundary --- it carries the known fields (_SCALAR, _LIST) and NAMES any other field loudly on stderr rather than dropping it in silence, staying quiet only on the standard BibTeX metadata a references.bib citation is expected to carry, and its top-level field scan tracks brace depth so an equals sign inside a value is not mistaken for a field},
   check   = {cmd:python3 ../paperkit/tests/boundaries_bib.py}
+}
+
+@misc{bnd-closure-script,
+  section  = {engine},
+  from     = {bnd-footprint},
+  join     = {.},
+  claim    = {the closure derivation subprocess boundary --- a witness that SHELLS OUT to a sibling generator has that generator own engine imports staged as closure roots, transitively, so the cone the build stages covers what the subprocess actually loads; without it the claim unmutated baseline dies with ModuleNotFoundError and grades broken},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_closure_census.py},
+  reads    = {.}
 }

@@ -51,7 +51,8 @@ _PATTERNS = [
 
 def findings(log: Path) -> list:
     """Every recognised finding in a hook log, in order.  Unrecognised lines are DROPPED, not
-    forwarded: a log store full of build chatter is a log store nobody queries."""
+    forwarded: a log store full of build chatter is a log store nobody queries.
+    """
     out = []
     try:
         text = log.read_text(errors="replace")
@@ -83,7 +84,8 @@ def spawns(execlog: Path) -> list:
     The clock is bazel's own `metrics.startTime` (absolute ISO-8601) plus `executionWallTime`, so
     a spawn's interval is exact and needs no correlation with our own wall clock.  Bazel's console
     output carries NO wall clock — only per-action elapsed — which is why the log text alone
-    cannot supply this and the execution log must."""
+    cannot supply this and the execution log must.
+    """
     out = []
     try:
         text = execlog.read_text()

@@ -22,9 +22,10 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import discriminate as D  # noqa: E402
+import discriminate as D
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_model import DISCRIMINATE, _write, entry  # noqa: E402
+from _fixture_model import DISCRIMINATE, _write, entry
 
 
 def _disc(proj, *flags):

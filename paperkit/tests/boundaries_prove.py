@@ -29,13 +29,14 @@ LIB = ROOT / "library"
 
 
 def main() -> int:
-    fails = []
-
-    def check(desc, cond):
-        fails.append(desc) if not cond else None
-        print(f"  {'ok ' if cond else 'XX '}{desc}")
-
-    print("Ζ·prove·degrade — a certificate is never emitted unmeasured\n")
+    # Ζ·suite·count — the recorder is SHARED, so the summary has an owner.  This suite's local
+    # `check` appended to `fails` alone: it recorded what BROKE and never what RAN, so its
+    # summary line had no accumulator to derive from and printed a literal ("1 sound arm, 2
+    # degraded-arm refusals") that no arm could move.  `Suite` counts the arms it is given.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _boundary import Suite
+    s = Suite("PROVE", "Ζ·prove·degrade — a certificate is never emitted unmeasured")
+    check = s.check
 
     # P — the sound path: the same entry point, real engine, cheap verdict mode (the prove
     # mode's full def-sweep is gated separately as the library's __dcalc in //:hook — not
@@ -60,16 +61,12 @@ def main() -> int:
     check("F: ...and emits NO record (an absent measurement cannot masquerade as an insensitive one)",
           not emitted_record and '"fingerprint"' not in f.stdout)
 
-    print("\n⟨P, F, δ⟩")
-    print("      P (real engine):    concepts.py <key> → exit 0")
-    print("      F (engine absent):  concepts.py <key> --prove → nonzero, zero records emitted")
-    print("      δ (min delta): one env var — PAPERKIT_ENGINE, present → an empty dir\n")
-
-    if fails:
-        print(f"PROVE: FAIL ({len(fails)} drifted)")
-        return 1
-    print("PROVE: PASS (1 sound arm, 2 degraded-arm refusals)")
-    return 0
+    s.delta("a certificate is emitted only when the engine was REACHABLE to measure",
+            p.returncode == 0, not emitted_record,
+            p="real engine:   concepts.py <key> → exit 0",
+            f="engine absent: concepts.py <key> --prove → nonzero, zero records emitted",
+            d="one env var — PAPERKIT_ENGINE, present → an empty dir")
+    return s.finish()
 
 
 if __name__ == "__main__":

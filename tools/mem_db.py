@@ -34,7 +34,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mem_learn import pow2  # noqa: E402
+from mem_learn import pow2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS peak (
@@ -64,7 +64,8 @@ def record(c: sqlite3.Connection, rows: list, run: str = "") -> int:
 
     A harvest sees only the cells that happened to run, and a smaller reading is not evidence a
     cell got cheaper — it is evidence of a different (often narrower) measurement.  The `max` in
-    the upsert is that rule, enforced by the database rather than by a hand-written merge."""
+    the upsert is that rule, enforced by the database rather than by a hand-written merge.
+    """
     now = int(time.time())
     c.executemany(
         "INSERT INTO peak (project,resolution,claim,cell,bytes,run,at) VALUES (?,?,?,?,?,?,?) "
@@ -80,7 +81,8 @@ def manifest(c: sqlite3.Connection, project: str) -> dict:
     """The reservation manifest as a QUERY — the same shape mem.json always had.
 
     A claim's reservation is the MAX over its cells: a def grid's cells run concurrently and each
-    must fit, so the worst cell is the number, not the typical one."""
+    must fit, so the worst cell is the number, not the typical one.
+    """
     out: dict = {"claims": {}}
     per_claim = c.execute(
         "SELECT resolution, claim, max(bytes) FROM peak WHERE project=? GROUP BY resolution, claim",

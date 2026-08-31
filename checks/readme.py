@@ -20,9 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 ENGINE = ROOT / "paperkit"
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))
-import gate  # noqa: E402
-import resolver  # noqa: E402  — for VERBS, the engine's OWN verb set (never re-listed here)
-import project as P  # noqa: E402
+import gate
+import project as P
+import resolver
 
 # (Μ·kernel·fixture·reads — no module-level source reads: a witness that inspects a module's
 # SOURCE reads it inside its own body, so only that witness stages the module and sweeps its
@@ -133,7 +133,7 @@ def rm_delta_tbl():
     # Ζ·ladder: read from grade.py, never re-listed here.  The old form hardcoded its own 4-tuple
     # and asserted only membership, so it was green while the table omitted `broken` and
     # `imported` — a witness that carries its own copy of the set it guards proves a tautology.
-    import grade  # noqa: E402
+    import grade
     tbl = (ROOT / "assets" / "grades.md").read_text()
     tabled = re.findall(r"\| `(\w+)` \|", tbl)
     assert tabled == grade.rungs(), \
@@ -164,7 +164,7 @@ def rm_resolver_tbl():
 def rm_resolver_eg():
     # the example config declares custom check types in the shape the resolver consumes, and the
     # engine dispatches a type declared that way
-    import tomllib  # noqa: E402
+    import tomllib
     checks = tomllib.loads((ROOT / "assets" / "resolver.toml").read_text()).get("checks", {})
     assert checks, "the example declares no [checks.<type>]"
     for typ, spec in checks.items():
@@ -185,6 +185,48 @@ def rm_fields():
         "assets/fields.md drifted from bib's field set — regenerate: python3 checks/gen_fields.py > assets/fields.md"
 
 
+def rm_wheel_ships_library():
+    """Ζ·wheel·library — an INSTALLED paperkit must resolve `concept:`.  ⚑ DELIBERATELY UNWIRED.
+
+    ⚑⚑ THIS WITNESS IS NOT IN `CLAIMS`, AND THAT IS THE POINT OF IT BEING HERE.  It FAILS today —
+    `_LIBRARY = Path(__file__).parent.parent / "library"` walks up out of the package while
+    pyproject ships `packages = ["paperkit"]`, so the built wheel carries the engine and not the
+    concept library, and the library is the TERMINAL owner of the per-key `concept:` fallthrough.
+    Measured 2026-08-28: 28 entries in the wheel, zero of them the library.  Wiring it into
+    `CLAIMS` would red //:hook on every commit until the resolution arc lands, so it sits here
+    RUNNABLE BY HAND (`python3 checks/readme.py rm-wheel-ships-library`) rather than in a
+    scratch directory, because a debt marker that lives in volatile /tmp is a comment with extra
+    steps — and a comment is exactly what this replaces.
+
+    ⚑ IT IS THE ACCEPTANCE TEST FOR Ζ·cite·resolve, not a packaging task.  The fix is not to add
+    `library` to `packages` — that would green this arm for the WRONG REASON, installing a generic
+    top-level `library/` into every consumer's site-packages while `_LIBRARY` still walks out of
+    the package.  The arc is that resolution READS the owning project's paper.toml (which already
+    declares `warrants` and `[checks.claim] cmd`) instead of hunting for two hardcoded names.
+    This is the only arm that can prove that from OUTSIDE a source tree, which is why it stays
+    separately invokable after the design question folded into the arc.
+
+    Both arms are proven: it fails with the count above, and greens under a candidate layout
+    change (verified in a scratch copy, then discarded as the wrong fix).
+    """
+    import subprocess
+    import sys
+    import tempfile
+    import zipfile
+    with tempfile.TemporaryDirectory() as td:
+        r = subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "-q",
+                            "--wheel-dir", td, str(ROOT)], capture_output=True, text=True)
+        whls = list(Path(td).glob("*.whl"))
+        assert r.returncode == 0 and whls, \
+            f"the wheel must BUILD before it can be inspected: {r.stderr[-400:]}"
+        names = zipfile.ZipFile(whls[0]).namelist()
+    concepts = [n for n in names if n.endswith("concepts.py") and "library" in n]
+    assert concepts, (
+        f"the built wheel ships {len(names)} entries and NONE of them is the concept library's "
+        "concepts.py — an installed paperkit cannot resolve any `concept:` check, because the "
+        "terminal owner of the per-key fallthrough is not installed (Ζ·cite·resolve)")
+
+
 CLAIMS = {
     "rm-selfhost": rm_selfhost,
     "rm-resolver-premise": rm_resolver_premise,
@@ -196,12 +238,22 @@ CLAIMS = {
 }
 
 
+# ⚑ Ζ·wheel·library — UNWIRED, and reachable anyway.  A witness the gate must not run but a
+# maintainer must be able to run is a real category: it states a debt the engine has not paid,
+# so it belongs in the tree (a comment cannot fail; a /tmp file evaporates) while staying OUT of
+# CLAIMS, which is the set `//:hook` resolves.  Kept in a separate table rather than behind a
+# flag so the two sets are visibly disjoint and neither can quietly absorb the other.
+UNWIRED = {"rm-wheel-ships-library": rm_wheel_ships_library}
+
+
 def main(argv):
-    if len(argv) != 2 or argv[1] not in CLAIMS:
-        print(f"usage: readme.py <{'|'.join(CLAIMS)}>", file=sys.stderr)
+    if len(argv) != 2 or (argv[1] not in CLAIMS and argv[1] not in UNWIRED):
+        print(f"usage: readme.py <{'|'.join(CLAIMS)}>\n"
+              f"  unwired (a DECLARED debt, not gated — see each docstring): "
+              f"{'|'.join(UNWIRED)}", file=sys.stderr)
         return 2
     try:
-        CLAIMS[argv[1]]()
+        (CLAIMS.get(argv[1]) or UNWIRED[argv[1]])()
     except AssertionError as e:
         print(f"claim {argv[1]}: FAIL — {e}", file=sys.stderr)
         return 1

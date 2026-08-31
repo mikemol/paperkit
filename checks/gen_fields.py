@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "paperkit"))
-import bib  # noqa: E402  — the OWNER of _SCALAR / _LIST / load_config; never re-listed here
+import bib
 
 # What the ENGINE does with each entry field — the gloss is authored, the KEY SET is bib's.
 # Kind: `warrant` (a claim), `reference` (a bibliography citation), `both`, or an INERT marker.
@@ -64,7 +64,8 @@ _PAPER_KEY_DOC = {
 
 def _paper_keys() -> list:
     """The [paper] keys load_config actually reads — parsed from its OWN source (the owner),
-    so a new `p.get("k", …)` cannot be documented-or-not by hand.  Deduped, first-seen order."""
+    so a new `p.get("k", …)` cannot be documented-or-not by hand.  Deduped, first-seen order.
+    """
     src = inspect.getsource(bib.load_config)
     seen, out = set(), []
     for k in re.findall(r'p\.get\(\s*"([^"]+)"', src):

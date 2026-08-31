@@ -9,7 +9,8 @@ point of the mutation set) runs the UNMUTATED check in the very same sandbox.  I
 flipped=false: if it flipped, the failure is in the HARNESS (the environment, the delivery), not in
 any mutation — and every site would then read as sensitive (the degenerate all-flip that hid a
 non-idempotent eval).  So a flipped baseline makes this action FAIL LOUD rather than emit a
-plausible-but-wrong sens set.  The baseline is excluded from `sens` (∅ is not a site)."""
+plausible-but-wrong sens set.  The baseline is excluded from `sens` (∅ is not a site).
+"""
 import argparse
 import json
 import sys

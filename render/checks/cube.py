@@ -78,7 +78,8 @@ ABSENT = "∅"           # C on neither endpoint — the edge is irrelevant to C
 def edge_action(cap: str, src: str, dst: str) -> str | None:
     """edge*(cap) across src→dst: the IMAGE capability (what cap BECOMES), or LOST/ABSENT.  DERIVED
     from the endpoint affordances, with the genuine TWISTS declared.  `md` (the source object)
-    affords nothing terminal, so an md→X edge ESTABLISHES cap (image = cap) iff X affords it."""
+    affords nothing terminal, so an md→X edge ESTABLISHES cap (image = cap) iff X affords it.
+    """
     dstf = _dst_format(src, dst)
     on_dst = _affords(cap, dstf)
     on_src = _affords(cap, src) if src != "md" else False
@@ -108,7 +109,8 @@ def kind(cap: str, src: str, dst: str) -> str:
 def route_delivers(cap: str, route: str) -> str | None:
     """What `route` delivers `cap` AS at its final format (the composite edge* action) — the image
     capability name, or None if a losing edge drops it on the way.  A capability may arrive under a
-    DIFFERENT name than it started (native-math arrives as math-alt on the office route)."""
+    DIFFERENT name than it started (native-math arrives as math-alt on the office route).
+    """
     path = graph.ROUTES[route]
     current = cap
     for a, b in zip(path, path[1:]):
@@ -130,7 +132,8 @@ def check() -> tuple[bool, list[str]]:
     a11y∈{post,native} must ESTABLISH or PRESERVE pdf-ua; every declared TWIST's image capability must
     be afforded at the edge's destination (an edge cannot twist into a capability the dst does not
     carry); and every capability afforded at a route's final format is delivered there (possibly under
-    a twisted name), no silent loss.  This ties the third face back so it cannot drift."""
+    a twisted name), no silent loss.  This ties the third face back so it cannot drift.
+    """
     problems = []
     for (s, d), m in graph.MORPHISMS.items():
         if m["a11y"] in ("post", "native") and kind("pdf-ua", s, d) not in ("established", "preserved"):
@@ -152,7 +155,8 @@ def check() -> tuple[bool, list[str]]:
 
 def _face() -> str:
     """The capability × edge ACTION face (rows = capabilities, cols = edges): each cell is the image
-    capability edge*(cap) — `=` if preserved/established as itself, the image NAME if twisted, LOST or ·."""
+    capability edge*(cap) — `=` if preserved/established as itself, the image NAME if twisted, LOST or ·.
+    """
     edges = _edges()
     labels = [f"{s}>{d}" for s, d in edges]
     cw = max(max(len(x) for x in labels), 9) + 1

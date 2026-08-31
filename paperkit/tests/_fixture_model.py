@@ -40,7 +40,8 @@ def entry(key, *, claim=None, emit=None, as_=None, frm=None, rests=None, glue=No
           join=None, move=None, check="file:w.bib", section="s", mem=None):
     """A valid multi-line bibliography entry.  The parser requires the closing
     brace on its own line, so this never silently fails to parse.  section=None
-    omits the field — a SECTIONLESS node (grounding-only, reachable via rests-on)."""
+    omits the field — a SECTIONLESS node (grounding-only, reachable via rests-on).
+    """
     fs = [f"  section = {{{section}}}"] if section else []
     if frm:
         fs.append(f"  from = {{{frm}}}")
@@ -85,7 +86,8 @@ def _call(main, argv, env=None):
     (config.apply_args, Ω·config) — process-isolated when spawned, but in-process it would LEAK into
     the witness and later calls (the recursive-check leak).  env=None inherits the current environment
     (saved/restored); env=<dict> replaces it for the call, as a subprocess env= would.  A main() that
-    returns None or raises SystemExit yields its exit code."""
+    returns None or raises SystemExit yields its exit code.
+    """
     o, e = io.StringIO(), io.StringIO()
     saved = os.environ.copy()
     if env is not None:

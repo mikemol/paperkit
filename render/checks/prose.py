@@ -42,7 +42,8 @@ _MATH = re.compile(r"\$\$.+?\$\$|(?<!\\)\$(?!\$).+?(?<!\\)\$", re.S)
 def strip_math(md: str) -> str:
     """Delegate the render-context-owned spans: a raw placement block → `[RAW]` (its layout is owned
     by rnd-widen, its structure by the fresh check, its math by rnd-omml), then each remaining math
-    span → `[EQ]` (owned by rnd-omml).  What is left is the prose agree concurs."""
+    span → `[EQ]` (owned by rnd-omml).  What is left is the prose agree concurs.
+    """
     md = _RAW.sub("[RAW]", md)
     return _MATH.sub("[EQ]", md)
 

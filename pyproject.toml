@@ -5,10 +5,32 @@
 # ⚑ THE OPEN QUESTION THIS FILE DOES NOT YET ANSWER: the engine's concept library lives OUTSIDE the
 # package — resolver.py's `_LIBRARY = Path(__file__).parent.parent / "library"` walks UP out of
 # paperkit/ into the repo root.  A wheel shipping only paperkit/ leaves every `concept:` check
-# unresolvable, because the terminal owner of the per-key fallthrough would not be installed.  The
-# library is small (13 files, 256K) and is BOTH a paperkit project and a runtime data dependency,
-# which is why the fix is a placement decision rather than a MANIFEST line.  Deliberately left open:
-# moving it changes what the fallthrough resolves against, and that is Λ·library·manifest's subject.
+# unresolvable, because the terminal owner of the per-key fallthrough would not be installed.
+# MEASURED 2026-08-28: `pip wheel --no-deps .` produces 28 entries, ZERO of them the library, and
+# no concepts.py.  An installed paperkit resolves no concept at all.
+#
+# ⚑⚑ AND IT IS NOT A PLACEMENT DECISION, WHICH IS WHAT THIS COMMENT USED TO SAY.  Every candidate
+# considered — move it under paperkit/, ship it as package data, split a second distribution,
+# locate it via importlib.resources — is a different way to SEARCH for the library, and search is
+# the defect.  The owner's correction: *finding such things requires DECLARED DEPENDENCIES, not
+# autodiscovery* — and paperkit already has the declaration, because a bib entry citing
+# `concept:<key>` IS a consumer naming its dependency.  Citations are executable here; this is the
+# one citation the engine answers by guessing where the source might be shelved, hunting for a
+# directory literally named `library` holding a file literally named `concepts.py`, both of which
+# `library/paper.toml` already declares (`warrants`, `[checks.claim] cmd`).
+#
+# So the arc is Ζ·cite·resolve — resolution READS the owning project's paper.toml instead of
+# hardcoding two names — and this file's gap is its wheel-shaped face: an installed paperkit is a
+# bibliography whose citations have no resolvable referents, which is the same failure the engine
+# refuses at the document layer, one level up.
+#
+# ⚑ Ζ·wheel·library is that arc's ACCEPTANCE TEST, and it stays separately invokable because it is
+# the only thing that can prove the fix from OUTSIDE a source tree: build the wheel, install it
+# clean, resolve a `concept:` check.  A witness exists and both arms are proven — it fails today
+# with the count above, and greens under a candidate layout change.  It is deliberately NOT wired
+# into //:hook yet: it would red every commit, and the one-line change that greens it (adding
+# `library` to `packages`) would pass for the WRONG REASON — a generic top-level `library/` in
+# every consumer's site-packages, with `_LIBRARY` still walking out of the package.
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
@@ -29,4 +51,192 @@ paperkit-gate = "paperkit.gate:_cli"
 paperkit-project = "paperkit.project:_cli"
 
 [tool.setuptools]
-packages = ["paperkit"]
+# ⚑ `tools` IS A PACKAGE FOR THE CHECKER, NOT FOR THE WHEEL.  Ζ·tools·package made tools/ an
+# importable name so a sibling edge can be DECLARED (`from tools import cellcgroup`) rather than
+# rely on the script-directory rule only the interpreter knows — which is what made Ζ·eval·split's
+# two new modules unfollowable.  But a CONSUMER installing paperkit has no use for the sweep's
+# cell runner or the memory-manifest harvester, and this file already records what shipping the
+# wrong thing costs (Ζ·wheel·library, above).
+#
+# ⚑⚑ THIS BLOCK USED TO CLAIM "the dev environment gets both, via the editable install", AND THAT
+# WAS FALSE.  `packages` names one distribution and the editable install follows it exactly, so
+# `tools` resolved by CWD and nowhere else — measured:
+#
+#     from tools import cellcgroup    cwd=repo root   ok
+#     from tools import cellcgroup    cwd=elsewhere   ModuleNotFoundError
+#
+# So every consumer outside the root still carried `sys.path.insert(0, ROOT)` to reach a package
+# this file said was already reachable, and mypy could not follow the edge from any file it
+# checked out of tree.  A declaration that is documented but not made is worse than an absent one:
+# the next reader budgets for it.
+#
+# ⚑ DECLARING IT IS THE FIX, AND THE WHEEL STAYS ONE PACKAGE.  `packages` is what the editable
+# install exposes AND what the wheel ships, so listing `tools` here would ship it — which is the
+# Ζ·wheel·library defect one door over.  `[tool.setuptools.packages.find]` with an explicit
+# exclude keeps the dev environment complete while the built distribution stays paperkit-only,
+# and Ζ·wheel·library remains the acceptance test that proves the built artifact from OUTSIDE.
+packages = ["paperkit", "tools"]
+
+# ⚑ THE WHEEL MUST NOT CARRY `tools`.  Declared as data rather than left to a build-time flag, so
+# `pip wheel --no-deps .` and the editable install disagree BY CONSTRUCTION about this one package
+# instead of by accident.  Ζ·wheel·library is the test that catches it if this drifts.
+[tool.setuptools.exclude-package-data]
+tools = ["*"]
+
+# ═══ Ζ·lint·bar — THE DECLARED BAR, AND WHY IT IS NOT A COPY OF THE HOUSE STANDARD ═══════════
+#
+# Adopting the ecosystem's `hook_pycheck` (ruff + mypy, one hook) needs a bar to enforce.  The
+# house standard is earley's, adopted verbatim by linux-sources: `select = ["ALL"]` plus six mypy
+# flags beyond `strict`.  ⚑ THAT BAR WAS CHOSEN UNDER CONSTRAINTS PAPERKIT DOES NOT HAVE, and
+# copying it because a peer uses it is the failure this engine names elsewhere — a mechanism built
+# against one instance, reused without auditing the second.  Measured before choosing:
+#
+#     ruff --select=ALL   over paperkit/ tools/ checks/   ->  8,570 findings
+#
+# and 65% OF THAT IS ONE RULE.  E501 line-too-long was 5,536 at ruff's DEFAULT 88 columns — an
+# instrument set to someone else's ruler, not a defect population.  Measured across 32,513 lines
+# of this tree's own Python:
+#
+#     p50  55    p90  97    p95 100    p98 103    p99 107    p99.9 126
+#     >88: 7,751 (23.8%)   >100: 1,302 (4.0%)   >110: 183 (0.56%)
+#
+# paperkit already writes to ~100 columns.  Both peers independently chose 100 too.  So 100 is the
+# HOUSE STYLE RECORDED, not a limit imposed — and the 183 lines past 110 are the real outliers.
+#
+# ⚑ THE SECOND LARGE CATEGORY IS THIS REPO'S VOCABULARY, NOT A DEFECT.  RUF001/2/3
+# (ambiguous-unicode) totals 525 findings, and they are the ARC SYMBOLS — `Ζ· Δ· Λ· Ξ· Μ· ⚑ ⟨P,F,δ⟩`
+# — which are how every claim, defect and lesson in this tree is addressed.  A rule that flags
+# `Ζ` as a confusable for `Z` is right about Unicode and wrong about this codebase: the symbols
+# are the index the operator invokes work by.  Ignored deliberately, with the reason stated, rather
+# than suppressed per-line 525 times.
+#
+# WHAT IS NOT RELAXED: every rule that gates MEANING.  The point of adopting pycheck is that the
+# three hooks already armed (structural-query, no-chaining, cmdparse) gate SHAPE and none of them
+# reads what the code DOES.  A style rule set to the wrong ruler is noise that trains an operator
+# to disable the guard; a correctness rule is the whole reason to arm it.
+[tool.ruff]
+line-length = 100
+target-version = "py311"        # matches requires-python; check the FLOOR, not the newest runtime
+extend-exclude = [
+    ".venv", "bazel-*",
+    # ⚑ EXCLUDED BY OWNERSHIP, NOT BY STANDARD (linux-sources' precedent).  These are symlinks
+    # into ../substrate/scripts/ — adopted, not written here.  Linting them would report findings
+    # about code this repo cannot fix without forking, which is the one thing the symlink pattern
+    # exists to prevent.
+    "scripts/hook_cmdparse.py",
+    "scripts/hook_no_chaining.py",
+    "scripts/hook_structural_query.py",
+]
+
+[tool.ruff.lint]
+# ⚑ EVERY RULE RUFF HAS.  Not a curated subset: a selection silently omits whole families, and the
+# omission is invisible afterwards.  The `ignore` list below is the ENUMERABLE relief — each entry
+# a decision with a reason, which is what a `# noqa` scattered through the tree is not.
+select = ["ALL"]
+ignore = [
+    # Direct opposites ruff refuses to run together (it warns and drops one anyway); listing the
+    # choice RECORDS it rather than burying it in a warning nobody reads.
+    "D203",     # opposite of D211 — no blank line before a class docstring
+    "D213",     # opposite of D212 — summary on line 1
+    "COM812",   # the linter wants a trailing comma the formatter removes; ruff's own advice
+    # ⚑ THE ARC SYMBOLS.  525 findings, all of them this repo's addressing vocabulary in comments,
+    # docstrings and strings (`Ζ·bib·wire`, `Λ·terminus`, `⚑`, `⟨P, F, δ⟩`).  See the block above.
+    # This one passes the DOMAIN test below: the rule is right about Unicode and wrong about this
+    # codebase, where the confusables ARE the index work is addressed by.
+    "RUF001", "RUF002", "RUF003",
+    # A copyright header on every file, in a single-author repo whose licence is declared once in
+    # this file.  107 findings of pure ceremony.
+    "CPY001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# ⚑ S101 (no `assert`) applies to library code, where asserts are stripped under `python -O`.
+# The boundary suites are never run optimized and their F-arms DEPEND on assert; scoping a rule
+# to where its reason obtains is not lowering a standard.  (Merged with the T201 scoping below —
+# one entry per glob, because TOML's last-wins on a duplicated key would silently drop whichever
+# list came first, which is a waiver appearing by accident rather than by decision.)
+#
+# ⚑ T201 IS SCOPED, NOT IGNORED — AND THE FIRST DRAFT IGNORED IT TREE-WIDE, WHICH WAS THE
+# CONVENIENCE WAIVER linux-sources DECLINED.  Their test, and it is the right one: *"is this rule
+# wrong for our DOMAIN, or wrong for our CONVENIENCE?  A short ignore list of domain-conflicts is
+# a bar; a growing list of convenience-waivers is a subset wearing a bar's name."*  They have the
+# same printed-verdict protocol and paid ~64 edits per module to convert to `sys.stdout.write`
+# rather than take the waiver.
+#
+# MEASURED HERE BEFORE DECIDING, because their advice was CONDITIONAL (*"is your printed verdict
+# protocol confined to a few emit sites?"*) and the condition DOES NOT HOLD:
+#
+#     1,021 findings across 138 files; the top 20 files hold only 40%.
+#     51 files carry <=3 prints each.
+#
+# Smeared, not concentrated.  So neither answer is clean — `gate.py`'s 18 prints ARE the verdict
+# protocol (domain), while `paperkit/tools/vfs.py`'s 25 are a vendored library and the 51 thin
+# files are exactly where a stray debug print would hide.  A tree-wide ignore surrenders that
+# signal to buy silence on the entrypoints; scoping keeps it where the reason does not obtain.
+#
+# The reason obtains in exactly two places: an ENTRYPOINT whose stdout IS its protocol (a check
+# reporting a verdict, a projector reporting what it wrote), and a SELFTEST arm printing its
+# ⟨P, F, δ⟩ record.  Library modules are NOT on this list, deliberately: `resolver.py` and
+# `bibparse.py` have zero prints today and T201 is what keeps it that way.
+"paperkit/gate.py" = ["T201"]
+"paperkit/project.py" = ["T201"]
+"paperkit/discriminate.py" = ["T201"]
+"paperkit/coherence.py" = ["T201"]
+"paperkit/tests/*" = ["S101", "T201"]
+"checks/*" = ["S101", "T201"]
+"*/checks/*" = ["S101", "T201"]
+"tools/*" = ["T201"]
+# Vendored from a peer (Κ·bibstruct) — excluded by OWNERSHIP, as the symlinked hooks are.
+"paperkit/tools/*" = ["T201"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.mypy]
+# ⚑ THE FULL BAR AT ONCE — AND THE FIRST DRAFT OF THIS BLOCK STAGED IT, WHICH WAS WRONG.
+#
+# I omitted `strict` and `disallow_any_expr` and called it "staged deliberately", reasoning that a
+# bar the tree does not meet cannot be armed against.  linux-sources, who took the full bar the
+# same week, named the failure mode I had not seen:
+#
+#     a "staged" mypy config with strict=false is a DIFFERENT bar that READS AS THE SAME ONE, and
+#     the intermediate state is not a bar you can arm at — because `disallow_any_expr` off means
+#     Any flows freely and the tree fills with Any-typed code that then costs MORE to tighten
+#     later (every caller of an Any-returning function is now Any too, it FANS OUT).
+#
+# Staging is cheaper per step and more expensive in total: you pay interest on the Any that the
+# intermediate bar let in.  So the bar is the house bar, and the tree meets it file-by-file as
+# each file is next edited — which is what a PER-FILE gate makes possible (see the hook note in
+# .claude/settings.json).  A tree-wide count is not the thing being enforced; a file is.
+#
+# ⚑ NO `[[tool.mypy.overrides]]`, AND THE ABSENCE IS THE DESIGN (adopted from linux-sources, who
+# adopted it from earley).  A per-module escape is where a bar like this rots: one module gets
+# exempted, the exemption outlives its reason, and the next reader cannot tell a deliberate
+# carve-out from an abandoned one.  If something here cannot be typed, that is a FINDING ABOUT
+# THE DESIGN, not a category of code that is inherently dynamic.
+python_version = "3.11"         # the declared FLOOR in requires-python, not the newest runtime
+strict = true
+# ⚑ BEYOND `strict`, WHICH IS NOT MYPY'S MAXIMUM.  disallow_any_expr is the load-bearing one:
+# every `json.load()` / `tomllib.loads()` / `getattr()` result is Any and poisons every expression
+# downstream, so this flag forces the untyped boundary to be NARROWED AT THE EDGE rather than
+# carried inward.  paperkit reads tomllib and json at exactly such boundaries (paper.toml, verdict
+# records, mem.json), which is precisely where the narrowing belongs.
+extra_checks = true
+strict_equality = true
+disallow_any_decorated = true
+disallow_any_explicit = true
+disallow_any_expr = true
+warn_unused_ignores = true
+warn_unreachable = true
+# A bare `# type: ignore` silences everything; requiring a code keeps a suppression narrow.
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+# ⚑ DEV-ONLY, AND `dependencies` STAYS EMPTY.  The engine's stdlib-only promise is a property of
+# what a CONSUMER installs; a dependency group is not installed by `pip install paperkit`.
+# Declared rather than fetched per-run so every checkout has the same gate, and an offline box
+# fails loudly instead of silently skipping the check.
+[dependency-groups]
+dev = [
+    "ruff",
+    "mypy>=1.8",
+]

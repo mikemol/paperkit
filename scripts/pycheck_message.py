@@ -1,0 +1,1 @@
+../../substrate/scripts/pycheck_message.py

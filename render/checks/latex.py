@@ -64,16 +64,17 @@ def _deps_absent() -> str | None:
     return None
 
 
-import a11y          # owns _find_verapdf (portable veraPDF resolution — never a hardcoded absolute path)
-import source        # the render graph's md node — the ONE resolved-source logic every format node shares
+import a11y  # owns _find_verapdf (portable veraPDF resolution — never a hardcoded absolute path)
 import ruler_inject  # apply ruler-sequence rules to every table by construction (WCAG 1.4.1, the latex route affords it)
+import source  # the render graph's md node — the ONE resolved-source logic every format node shares
 
 
 def _assemble_tex(body: str, title: str, ruler_preamble: str = "") -> str:
     """Assemble the .tex with `\\DocumentMetadata` FIRST (it must precede `\\documentclass`, so
     pandoc's standalone preamble cannot carry it), the minimal mat230 tagging preamble, the
     per-codepoint font fallback, and the ruler-sequence nicematrix definitions (empty if the
-    document has no rulable table)."""
+    document has no rulable table).
+    """
     return "\n".join([
         _METADATA,                                           # first line — before \documentclass
         r"\documentclass{article}",
@@ -95,7 +96,8 @@ def _assemble_tex(body: str, title: str, ruler_preamble: str = "") -> str:
 def build(paper_md: Path, out_pdf: Path, work: Path) -> Path | None:
     """Render `paper_md` to a tagged PDF/UA-2 at `out_pdf`.  Returns the path, or None if a
     dependency is absent (loud) — so a box without the LaTeX stack does not fail the build, it
-    reports it cannot produce this format."""
+    reports it cannot produce this format.
+    """
     if _deps_absent():
         print(f"latex: {_deps_absent()} absent — cannot build the LaTeX deliverable here",
               file=sys.stderr)
@@ -158,7 +160,8 @@ def _selftest() -> int:
       P: a math fixture builds a Tagged PDF whose /Formula elements carry /AF (MathML), veraPDF ua2==0.
       F: the same fixture with the tagging metadata REMOVED is untagged and veraPDF ua2 fails.
       δ: the \\DocumentMetadata line — the whole tagged/UA-2 state hangs off it.
-    SKIPS LOUD if the LaTeX stack is absent."""
+    SKIPS LOUD if the LaTeX stack is absent.
+    """
     absent = _deps_absent()
     if absent:
         print(f"  -- {absent} absent; the LaTeX stack is unrunnable here.\n"

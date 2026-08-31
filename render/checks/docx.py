@@ -25,7 +25,8 @@ import source
 
 def docx(paper_md: Path, out_docx: Path) -> Path:
     """The md→docx morphism (graph.tool_for('md','docx') = pandoc): cite_split the source, then
-    pandoc it to a .docx with the title in the core metadata."""
+    pandoc it to a .docx with the title in the core metadata.
+    """
     assert graph.tool_for("md", "docx") == "pandoc"          # the edge the graph declares
     with tempfile.TemporaryDirectory() as t:
         md = Path(t) / "p.md"

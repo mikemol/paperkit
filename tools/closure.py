@@ -22,7 +22,8 @@ project`).  Emits `claim<TAB>paperkit/<relpath>.py` per (claim, import-cone modu
 plain //paperkit:<relpath>.py file label.  The check module's module-level roots are shared by
 every claim (claims.py imports _fixture_model + read_texts three sources).
 
-Usage: closure.py --check paper/checks/claims.py <engine.py>…"""
+Usage: closure.py --check paper/checks/claims.py <engine.py>…
+"""
 import argparse
 import ast
 import sys
@@ -55,7 +56,8 @@ def _parents_prefix(node, parts):
     hermetic sandbox, so parents[N] is that path with N+1 trailing components dropped: for
     checks/readme.py parents[1] = "" (root); for paper/checks/claims.py parents[1] = "paper".  Handled
     both as a module/function const (ROOT = …parents[1]) AND inline inside a path expression (local_ci:
-    …parents[2] / ".githooks" / "pre-commit")."""
+    …parents[2] / ".githooks" / "pre-commit").
+    """
     if (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute)
             and node.value.attr == "parents" and isinstance(node.slice, ast.Constant)
             and isinstance(node.slice.value, int)
@@ -68,7 +70,8 @@ def _dir_consts(relpath, stmts, pref=None):
     """Path DIR constants in `stmts` → their sandbox-relative prefix.  `Path(__file__)….parents[N]`
     (see _parents_prefix); NAME / "sub" extends a known prefix (ENGINE = ROOT / "paperkit" →
     "paperkit").  Called on the module body for the shared consts, then EXTENDED per witness with its
-    function-local ones (project_dag binds `root` inside the function)."""
+    function-local ones (project_dag binds `root` inside the function).
+    """
     parts = relpath.split("/")
     pref = dict(pref) if pref else {}
     for n in stmts:
@@ -87,7 +90,8 @@ def _dir_consts(relpath, stmts, pref=None):
 def _resolve_path(node, pref, parts):
     """A Path EXPRESSION built from dir constants and string literals → its sandbox path, or None.
     A `Path(__file__)….parents[N]` base (inline), a bare dir constant (Name in pref), or `<expr> /
-    "sub"` (nested, e.g. root / "report" / "gen.py", or parents[2] / ".githooks" / "pre-commit")."""
+    "sub"` (nested, e.g. root / "report" / "gen.py", or parents[2] / ".githooks" / "pre-commit").
+    """
     pp = _parents_prefix(node, parts)
     if pp is not None:
         return pp
@@ -104,7 +108,8 @@ def _exists_paths(node, pref, parts):
     """Sandbox paths a witness tests via `(BASE / "leaf").exists()` — the EXISTS edges.  A claim
     asserting a file's presence/absence is falsifiable by TOGGLING that file (Ζ·mutant·struct·node-kinds):
     the file analog of the import+/- toggle.  Only plain-constant path leaves are resolved (not
-    f-strings / loop vars)."""
+    f-strings / loop vars).
+    """
     out = set()
     for c in ast.walk(node):
         if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "exists":
@@ -120,7 +125,8 @@ def _content_edges(fn, pref, parts):
     `_delta("paper")`/`--json` in the report generator) is falsifiable by TOGGLING that substring — the
     finest-grain content perturbation, a precise DAG-EDGE drop (not a whole-file corruption that flips
     every reader identically).  Resolves the comparator when it is an inline `F.read_text()` or a
-    FUNCTION-LOCAL name bound to one (module-level SRC constants are a coarser, later rung)."""
+    FUNCTION-LOCAL name bound to one (module-level SRC constants are a coarser, later rung).
+    """
     reads = {}                                           # local name → file path (bound to X.read_text())
     for n in ast.walk(fn):
         if (isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name)
@@ -256,6 +262,43 @@ def main(argv):
             rr |= nr
         return ri, rr
 
+    # Ξ·dag·script — THE SECOND SUBPROCESS EDGE, and the same lesson one shape over.  A witness that
+    # runs a SIBLING GENERATOR (`checks/gen_formulas.py`, invoked as a subprocess to regenerate a
+    # projected asset and byte-diff it) does not IMPORT what that script imports: the generator does
+    # its own `sys.path.insert` + flat `import bib` in a fresh interpreter.  The concept edge above
+    # cannot see it — it looks for `concept:KEY` constants, and a generator is named as a PATH.
+    #
+    # MEASURED: edge-formulas staged ONE root (_fixture_model.py) where its bib-touching siblings
+    # stage nine, and its BASELINE — the unmutated run — died with `ModuleNotFoundError: No module
+    # named 'bibparse'` the moment bib.py grew that dependency.  The claim graded `broken` (-1) and
+    # reddened @paperkit_paper//:adequacy after a 152,058-action hook run.
+    #
+    # ⚑⚑ AND THE CENSUS (tools/closure_census.py) FOUND THE POPULATION IS 1 ONLY BY ACCIDENT.
+    # `checks/gen_fields.py` carries the IDENTICAL shape and is safe purely because its caller,
+    # readme.py, imports bib/bibparse at module level, so the shared base roots happen to cover the
+    # subprocess.  Nothing enforced that; removing one import from readme.py reproduces this bug
+    # exactly.  Deriving the edge converts three accidental passes into three guaranteed ones.
+    #
+    # A script's own imports seed the cone like any other root (the `_cone` call below expands
+    # them), so a generator that imports `bib` contributes bib's whole transitive closure.
+    check_dir = Path(a.check).parent
+
+    def _script_roots(fn):
+        """Engine roots of every sibling script this witness names as a path constant."""
+        out = set()
+        for c in ast.walk(fn):
+            if not (isinstance(c, ast.Constant) and isinstance(c.value, str)
+                    and c.value.endswith(".py")):
+                continue
+            script = check_dir / Path(c.value).name
+            if not script.exists() or script.resolve() == Path(a.check).resolve():
+                continue
+            try:
+                out |= _imports(ast.parse(script.read_text()), names)
+            except SyntaxError:
+                continue
+        return out
+
     for key in sorted(claims):
         fn = funcs[claims[key]]
         pref = _dir_consts(relpath, fn.body, mod_pref)   # extend with the witness's function-local ones
@@ -264,17 +307,18 @@ def main(argv):
             ci, cr = _resolved_roots(ck, {key})
             wi |= ci
             wr |= cr
+        wi |= _script_roots(fn)                          # Ξ·dag·script — a sibling generator's imports
         cone = _cone(base_i | wi)
         for stem in sorted(cone):
-            print("{}\t{}".format(key, names[stem]))
+            print(f"{key}\t{names[stem]}")
         # pure-READ roots — staged FLAT (.py, no cone), own def-sites only; import wins on overlap.
         for stem in sorted((base_r | wr) - cone):
-            print("{}\tread:{}".format(key, names[stem]))
+            print(f"{key}\tread:{names[stem]}")
         for path in sorted(_exists_paths(fn, pref, parts)):
             if Path(path).is_dir():
                 continue                                 # a dir-existence is not a single-artifact toggle
             op = "file-" if Path(path).exists() else "file+"
-            print("{}\t{}:{}".format(key, op, path))
+            print(f"{key}\t{op}:{path}")
         # Ζ·mutant·struct·node-kinds (BIB/content) — a CONTENT edge, emitted as `claim<TAB>op<TAB>path
         # <TAB>substring` (4 fields; op = content- drop / content+ inject).  Polarity = the TOGGLE of
         # the substring's CURRENT presence (checked here, cwd = repo root): present → drop it, absent →
@@ -282,7 +326,7 @@ def main(argv):
         for path, sub in sorted(_content_edges(fn, pref, parts)):
             here = Path(path).read_text() if Path(path).exists() else ""
             op = "content-" if sub in here else "content+"
-            print("{}\t{}\t{}\t{}".format(key, op, path, sub))
+            print(f"{key}\t{op}\t{path}\t{sub}")
     return 0
 
 

@@ -5,7 +5,8 @@ Compilation is a build step, not an import-time side effect.  The .pyc is writte
 UNCHECKED_HASH invalidation: it records a CONTENT hash of the source (not its mtime) and the runtime
 NEVER rechecks the source — so the artifact is reproducible (no mtime ⇒ byte-deterministic, cacheable)
 and authoritative (the build graph owns compilation; a mutated .pyc over an unchanged .py runs the
-mutation).  Usage: pyc.py <src.py> <out.pyc>."""
+mutation).  Usage: pyc.py <src.py> <out.pyc>.
+"""
 import py_compile
 import sys
 

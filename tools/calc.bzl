@@ -330,7 +330,7 @@ def _eval_impl(ctx):
     # Ζ·mutant·struct·node-kinds — a FILE cell (site = file+:/file-:) mutates no module: it toggles a
     # path in the sandbox, so it stages no mutant .py/.pyc and passes no --module/--mutant (eval.py
     # branches on the site prefix).  A .py cell passes them as before.
-    mut = [ctx.file._tool] + ([mpy, mpyc] if mpy else [])
+    mut = ([mpy, mpyc] if mpy else [])
     marg = (" --module " + ctx.attr.module + " --mutant-py " + mpy.path +
             " --mutant-pyc " + mpyc.path) if mpy else ""
     # A CONTENT cell (site = content-:/content+:) toggles a substring in the staged file at
@@ -344,13 +344,31 @@ def _eval_impl(ctx):
         carg = " --content-path " + ctx.attr.content_path + " --content-textfile " + cf.path
     ctx.actions.run_shell(
         outputs = [o, pk],
-        inputs = depset(mut + [ctx.file._cap] + ctx.files.project, transitive = [closure_pyc, closure_py]),
+        inputs = depset(mut + [ctx.file._cap] + ctx.files.project,
+                        transitive = [closure_pyc, closure_py]),
+        # ⚑ Ζ·cell·wire — `tools`, NOT `inputs`, AND THE DIFFERENCE IS THE RUNFILES TREE.
+        # A first cut staged the launcher and its runfiles FILES through `inputs` and the cell
+        # died with `AssertionError: Cannot find .runfiles directory` — a py_binary launcher does
+        # not want its dependencies as loose files, it wants the `.runfiles` SYMLINK TREE beside
+        # it, which is what makes `from tools import cellargs` resolve by layout.  `tools =`
+        # declares an executable dependency and Bazel materialises that tree; `inputs =` declares
+        # data and does not.  The same distinction the operator named one layer up: staging is a
+        # property the ACTION declares, and declaring it in the wrong field is still not
+        # declaring it.
+        tools = [ctx.attr._tool[DefaultInfo].files_to_run],
         # Ζ·sched-batch·phase2 — each grid cell self-tunes at exec (SCHED_BATCH + nice 19 + 100ms
         # slice), so concurrent cells run long uninterrupted stretches instead of preempting each
         # other every ~2.8ms (kills ctx-switch AND, under zswap, the refault codec-CPU thrash).
         # Per-cell = thread-independent (the durable fix Phase 1's server-tune could not reach).
+        # Ζ·cell·wire — the LAUNCHER is invoked directly.  It was
+        # `"$(command -v python3)" tools/eval.py`, which found an interpreter by hand precisely
+        # because a bare script has no launcher; a py_binary ships one that sets the interpreter
+        # AND the import layout together.  The `sys.executable` requirement the old comment
+        # records (the check re-spawns the projector as [sys.executable, …], and bare `python3`
+        # left it '' — a spurious flip) is satisfied more strongly: the launcher execs a real
+        # absolute interpreter, so there is no `command -v` to resolve differently under OCI.
         command = _cap_prefix(ctx.file._cap.path, ctx.attr.mem if ctx.attr.mem else 4) +
-                  '"$(command -v python3)" ' + ctx.file._tool.path +
+                  ctx.executable._tool.path +
                   " --engine-dir paperkit" + marg + carg +
                   " --check " + ctx.attr.check + " --claim " + ctx.attr.claim +
                   " --site '" + ctx.attr.site + "' --out " + o.path +
@@ -388,7 +406,24 @@ pk_eval = rule(
         "project": attr.label_list(allow_files = True, doc = "the paper project files"),
         "content_path": attr.string(default = "", doc = "a content cell's target file (its substring toggled in the sandbox); empty for a .py/file cell"),
         "content_text": attr.string(default = "", doc = "the substring a content cell drops/injects — delivered via ctx.actions.write, so any chars are safe"),
-        "_tool": attr.label(default = "//tools:eval.py", allow_single_file = True),
+        # ⚑ Ζ·cell·wire — THE TOOL IS A py_binary, NOT A FILE, BECAUSE A FILE HAS NO SIBLINGS.
+        #
+        # This was `//tools:eval.py` with allow_single_file, and MEASURED that is exactly one file:
+        #
+        #     bazel query 'kind("source file", deps(//tools:eval.py))'   ->   //tools:eval.py
+        #
+        # So when Ζ·eval·split cut eval.py into cellargs/cellstage/cellcgroup, the sandbox had
+        # nothing to import from and every cell would have died at `ModuleNotFoundError: No module
+        # named 'tools'`.  The operator named the layer: *the code isn't getting properly staged
+        # into the per-cell/action venv* — WHAT A CELL CAN IMPORT IS THE ACTION'S PROPERTY,
+        # declared here, not something the script arranges for itself with sys.path at runtime.
+        #
+        # `py_binary` builds a runfiles tree carrying srcs at their real package paths, so
+        # `from tools import cellargs` resolves BY LAYOUT.  `cfg = "exec"` because this runs as a
+        # build tool; `executable = True` so ctx.executable._tool is the launcher, which sets up
+        # the interpreter and PYTHONPATH itself — which is why the command below no longer needs
+        # `"$(command -v python3)"` to find an interpreter by hand.
+        "_tool": attr.label(default = "//tools:eval", executable = True, cfg = "exec"),
     },
 )
 

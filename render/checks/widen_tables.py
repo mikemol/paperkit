@@ -33,10 +33,10 @@ work here — LibreOffice clips an over-wide run AT the text margin, so a clippe
 and a fitting cell end at the same x; the only reliable signal is per-cell fit.  Run
 inside mkdocx.sh (build refuses to emit a clipping docx) and in the JI gate.
 """
-import sys
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -84,7 +84,8 @@ def build_probe(doc, cells):
     ever reaches the rule's near-full-page width, so segmentation is exact even when
     tall math opens vertical gaps inside a cell (the old gap heuristic mistook those for
     breaks).  Each cell's width is then its true single-line width — which, for an
-    un-wrappable math run, IS the width it will demand in the real table."""
+    un-wrappable math run, IS the width it will demand in the real table.
+    """
     body = re.search(r"<w:body>(.*)</w:body>", doc, re.S).group(1)
     sect = re.search(r"<w:sectPr\b.*?</w:sectPr>", body, re.S)
     sect_xml = sect.group(0) if sect else "<w:sectPr></w:sectPr>"
@@ -94,8 +95,8 @@ def build_probe(doc, cells):
     pg = ('<w:pgSz w:w="57600" w:h="15840" />'
           '<w:pgMar w:top="720" w:right="360" w:bottom="720" w:left="360" '
           'w:header="0" w:footer="0" w:gutter="0" />')
-    sect_xml = re.sub(r'<w:pg(Sz|Mar)\b[^>]*/?>', '', sect_xml)
-    sect_xml = re.sub(r'(<w:sectPr\b[^>]*>)', r'\1' + pg, sect_xml, count=1)
+    sect_xml = re.sub(r"<w:pg(Sz|Mar)\b[^>]*/?>", "", sect_xml)
+    sect_xml = re.sub(r"(<w:sectPr\b[^>]*>)", r"\1" + pg, sect_xml, count=1)
     # RULE = an empty paragraph with a bottom border → a solid line at the text width
     # (~39.5in on the 40in page).  One after every cell; the count of rules == the count
     # of cells, so measurement can never miscount.
@@ -124,7 +125,8 @@ def measure_cells(pngs):
     stroke, biasing columns too narrow (measured).  Cross-page accumulation (left/right/have/
     in_rule initialized ONCE before the png loop) is preserved exactly — a cell split by a page
     break is measured whole, and `margin` is recomputed per page (relative rule detection, so a
-    page whose rule is not full-width still segments)."""
+    page whose rule is not full-width still segments).
+    """
     from PIL import Image
     Image.MAX_IMAGE_PIXELS = None            # the probe page is intentionally huge
     widths = []
@@ -187,7 +189,8 @@ def _unwrappable(xml):
     'ChaCha20').  A cell that mixes prose with inline math (crypto's witness columns)
     wraps at the prose spaces: its widest unbreakable atom is a word or the small inline
     math, NOT the 30-inch single-line render — so it is NOT rigid, and its full width is
-    only a preferred hint."""
+    only a preferred hint.
+    """
     prose = re.sub(r"<m:oMath\b.*?</m:oMath>", "", xml, flags=re.S)        # strip math objects
     prose_txt = "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", prose)).strip()
     if "<m:oMath" in xml:
@@ -265,7 +268,7 @@ def _deps_absent():
     if not (_have("libreoffice") and _have("pdftoppm")):
         return "libreoffice/poppler"
     try:
-        import PIL  # noqa: F401
+        import PIL
     except ImportError:
         return "Pillow"
     return None
@@ -285,7 +288,8 @@ def _measure(src):
 def check(src):
     """G9 guard: assert every cell fits its column, so the R-1 clip can't recur.
     A pure margin guard misses this — LibreOffice clips the overflow AT the margin,
-    so broken and fixed both stop at the same x; the real signal is per-cell fit."""
+    so broken and fixed both stop at the same x; the real signal is per-cell fit.
+    """
     # Ζ·degrade positive-control: a check that CANNOT MEASURE must NOT read as a green pass (that
     # is a false verification — the R-1 clip could recur unseen).  Exit 2 = CANNOT-RUN (the engine's
     # typed-exit alphabet: 0 pass, 1 ran-and-failed, 2 could-not-run), distinct from the fit verdict.
@@ -335,7 +339,8 @@ def _selftest():
       P: after widen() sizes the columns to measured ink, --check finds every cell fits (rc 0).
       δ: the column sizing — the tblGrid/tcW twips widen() writes; a pure margin guard cannot tell P
          from F (LibreOffice clips AT the margin, so both end at the same x — per-cell fit is the signal).
-    SKIPS LOUD (never green) if the render deps are absent — the same degrade discipline as --check."""
+    SKIPS LOUD (never green) if the render deps are absent — the same degrade discipline as --check.
+    """
     absent = _deps_absent()
     if absent:
         print(f"  -- {absent} absent; the measurement cannot run here.\n"
@@ -454,7 +459,8 @@ def widen(src_docx, dst_docx, text_w=9360):
     and write to `dst_docx` (the main() body minus argv).  Copies through unchanged if deps are
     absent, there are no tables, or the probe render fails — so the deliverable NEVER breaks on a
     missing dependency (the loud-absence doctrine of lo.py).  text_w = the page's text width in
-    twips (9360 = US-Letter, 1in margins)."""
+    twips (9360 = US-Letter, 1in margins).
+    """
     if _deps_absent() or not (doc_cells := _measure(src_docx))[1]:
         shutil.copy(src_docx, dst_docx)
         return dst_docx
@@ -476,7 +482,8 @@ def _deliverable(paper_md="../paper/paper.md"):
     cell FITS.  The selftest proves the METHOD on a fixture; this proves the DELIVERABLE, which is
     what the warrant claims.  An unmeasurable verdict is reported and REFUSED as a pass: with the
     render deps absent widen copies through by design, and reading that skip as a fit would be the
-    silent-degradation this module's own loud-absence doctrine forbids."""
+    silent-degradation this module's own loud-absence doctrine forbids.
+    """
     import tempfile
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import docx as _d

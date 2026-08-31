@@ -28,7 +28,7 @@ Scope: measured against linux-source 7.0.0-30.30.  These are claims about THIS p
     nothing would notice it breaking.  Re-verify its output at each use rather than
     trusting a past reading; an instrument earns trust per-use, a gate by proven
     soundness in both directions, and this has only ever been the former.
-    """
+"""
 import json
 import sys
 from pathlib import Path
@@ -53,7 +53,7 @@ def read(d: Path, name: str):
 def stat_keys(d: Path, keys):
     raw = read(d, "memory.stat")
     if isinstance(raw, dict):
-        return {k: raw for k in keys}
+        return dict.fromkeys(keys, raw)
     got = dict(l.split(" ", 1) for l in raw.splitlines() if " " in l)
     return {k: (int(got[k]) if k in got else {"unavailable": "key-absent"}) for k in keys}
 

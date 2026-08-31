@@ -31,7 +31,7 @@ import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import a11y            # the measurement owner — import, never re-implement
+import a11y  # the measurement owner — import, never re-implement
 import linkalt
 import lo
 import mathalt
@@ -50,7 +50,8 @@ lo_export = _load("lo_export", "lo-export.py")
 
 def _build_deliverable(d: Path) -> Path:
     """Reproduce pdf.py's deliverable pipeline (pandoc-title → UA export → linkalt), returning the
-    PDF path.  The same right-layer chain — kept in step with pdf.py."""
+    PDF path.  The same right-layer chain — kept in step with pdf.py.
+    """
     _bibtext = "".join(p.read_text() for p in sorted(Path("../paper").glob("*.bib")))
     mark = {"file": "(present)", "result": "(verdict imported)"}
     mk = {}

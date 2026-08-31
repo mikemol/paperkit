@@ -31,8 +31,8 @@ from pathlib import Path
 ENGINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 
-import grade  # noqa: E402
-import grader  # noqa: E402
+import grade
+import grader
 
 _MOD = (
     "def classify(x):\n"
@@ -66,7 +66,7 @@ def main() -> int:
     # ── (c) the structural bar ───────────────────────────────────────────────────────────────────
     fs = grader.FlipSite(file=Path("x.py"), qualname="f", n=0, label="x.py::flip:f#0")
     try:
-        grader._apply("cmd:x", Path("."), {}, [fs])
+        grader._apply("cmd:x", Path(), {}, [fs])
         barred = False
     except (ValueError, TypeError):
         barred = True                                    # the sweep's `f, node, _ = …` cannot unpack it

@@ -38,7 +38,8 @@ _TABLE = re.compile(r"(?:" + re.escape(_OFF) + r"[^\n]*\n\s*)?\\begin\{longtable
 
 def _inject_one(table: str) -> tuple[str, int, bool]:
     """Rule one longtable.  Returns (rendered, n_data_rows, excepted).  Excepted iff the table
-    carries the %ruler:off marker — then it is returned unchanged (pandoc's plain rules)."""
+    carries the %ruler:off marker — then it is returned unchanged (pandoc's plain rules).
+    """
     excepted = _OFF in table
     # the DATA region is after \endlastfoot (or \midrule…\endhead if no foot) up to \end{longtable}.
     m = re.search(r"(\\endlastfoot|\\endhead)(.*?)(\\end\{longtable\})", table, re.S)
@@ -62,7 +63,8 @@ def _inject_one(table: str) -> tuple[str, int, bool]:
 
 def inject(latex_body: str) -> tuple[str, list[dict]]:
     """Rule every longtable in `latex_body` by construction.  Returns the body and a per-table
-    report [{rows, excepted}], so a witness can gate that every table is ruled or named-excepted."""
+    report [{rows, excepted}], so a witness can gate that every table is ruled or named-excepted.
+    """
     report = []
 
     def _sub(mt):
@@ -76,13 +78,15 @@ def inject(latex_body: str) -> tuple[str, list[dict]]:
 def preamble_defs(max_order: int) -> str:
     """The nicematrix package + one `\\Rule<k>` custom-line per cycle order the document's tables use.
     max_order is the largest cycle order any table reaches (derived from the widest table's row
-    count), so the definitions are exactly what the document needs, uncapped."""
+    count), so the definitions are exactly what the document needs, uncapped.
+    """
     return "\n".join([r"\usepackage{nicematrix}", rulerseq.nicematrix_defs(max_order + 1)])
 
 
 def max_order_of(report: list[dict]) -> int:
     """The largest cycle order the report's ruled tables reach (for preamble_defs).  A table of n
-    rows has boundaries up to order floor(log2(n-1))."""
+    rows has boundaries up to order floor(log2(n-1)).
+    """
     orders = [rulerseq.cycle_order(i)
               for t in report if not t["excepted"] and t["rows"] >= 2
               for i in range(1, t["rows"])]

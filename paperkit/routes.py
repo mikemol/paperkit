@@ -52,7 +52,8 @@ def walk(routes: dict, key: str):
 
     Depth-agnostic: segments are consumed until a non-dict is reached.  A leftover segment (the key
     is longer than the table is deep) and a non-tuple leaf both resolve to None — "not mine", not an
-    error, because a longer key may well belong to a different library."""
+    error, because a longer key may well belong to a different library.
+    """
     node, rest = routes, key
     while isinstance(node, dict):
         head, _, rest = rest.partition("/")
@@ -73,7 +74,8 @@ def leaves(routes: dict):
     enumerate a table, and a prototype of this had two implementations of the contract — the walk was
     depth-agnostic while the cache's was hard-coded to two levels, so a grade-3 family would be
     served by one and silently DROPPED by the other (dropped from the cache's driver loop, hence
-    never run at all).  One function, one contract."""
+    never run at all).  One function, one contract.
+    """
     out = []
 
     def rec(node, path):
@@ -96,7 +98,8 @@ def dispatch(routes: dict, key: str, name: str = "concept", report: bool = True)
 
     REPORT=False returns the code SILENTLY, for callers that consume the verdict rather than
     display it: a check cache recording it, or a witness asserting over the protocol itself (whose
-    own probe lines would otherwise land on the real streams and read as the caller's output)."""
+    own probe lines would otherwise land on the real streams and read as the caller's output).
+    """
     node = walk(routes, key)
     if node is None:
         return 2                                    # not mine — fall through
@@ -128,7 +131,8 @@ def meta_family(routes: dict):
                          rather than of the cited claims
 
     ROUTES is INJECTED, not read from a module global: that is what makes this reusable across
-    libraries (an earlier version closed over its own `ROUTES` at module scope)."""
+    libraries (an earlier version closed over its own `ROUTES` at module scope).
+    """
 
     def meta(which_and_target):
         if "/" not in which_and_target:
@@ -177,7 +181,8 @@ def register_meta(routes: dict, ops=("total", "occupancy", "distinct")) -> dict:
     that construction reads `for fam in ROUTES` and so silently snapshots whatever the table held at
     whatever line it happened to sit on, making "the table is now closed" a line-number accident.
     Naming it makes the moment explicit — and makes it an error to add a family afterwards and
-    expect `meta/` to see it.  Mutates and returns ROUTES."""
+    expect `meta/` to see it.  Mutates and returns ROUTES.
+    """
     meta = meta_family(routes)
     routes["meta"] = {op: {fam: (meta, f"{op}/{fam}") for fam in routes if fam != "meta"}
                       for op in ops}

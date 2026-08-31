@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import project as Pr  # noqa: E402
+import project as Pr
 
 R, TR = Pr.references, Pr.transitive_reduction
 

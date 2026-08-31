@@ -44,7 +44,40 @@ test --test_output=errors --test_summary=terse
 # done, which is what `Build completed successfully` above the OOM had been saying all along.
 # The instrument built for the failure caught the failure on its first occurrence, before it was
 # even committed.
-startup --host_jvm_args=-Xmx8g
+#
+# ⚑ RUNG 3 (Ζ·jvm·12g), 2026-08-31.  8G OOM'd — same signature, `Build completed successfully,
+# 26045 total actions` printed immediately above `java.lang.OutOfMemoryError: Java heap space`,
+# with every action and all 23 test targets done and the JVM dying while writing up the result.
+#
+# ⚑⚑ AND THE GRID GREW, WHICH IS THE ACTUAL REASON THE RUNG MOVED.  The 8G rung was measured
+# against 125,471 actions; this run configured 152,367 — 21% more, from one arc: bibparse +
+# bibfidelity + rematch entered the partition, paperkit/tools/ became a subpackage, and
+# Ξ·dag·script widened edge-formulas's closure to bib + bibparse (its grid re-ran, 26,013 fresh
+# cells against 126,347 cache hits).  A heap sized for the old graph does not fit the new one.
+# So this is not "8G was wrong"; it is that the ceiling tracks GRAPH SIZE and nobody re-derived
+# it when the graph moved.  The next arc that adds modules moves it again.
+#
+# ⚑⚑⚑ 16G ON A 15.6 GB BOX, AND THAT IS NOT THE CONTRADICTION IT LOOKS LIKE.  A first cut of
+# this rung stopped at 12G reasoning that -Xmx above physical RAM removes the collector's
+# back-pressure and lets the server "grow into swap and drag the machine".  That argument was
+# built on a wrong model of THIS machine (operator's correction: *this machine leverages zram and
+# zswap; it's not what you assume*), and it also mis-cited the note above.
+#
+#   * MEASURED: zram0 is a 9.2G zstd-compressed RAM block device holding 7.6G of data in 2G —
+#     a 3.9x ratio — with zswap (lz4, max_pool_percent=20) in front of it.  Paging here is a
+#     compressor, not a platter; the cost is CPU on cold pages, not seek latency.  So `free -m`
+#     reporting 928 MB free is not the number it looks like either.
+#   * AND THE NOTE ABOVE MAKES A NARROWER CLAIM THAN I BORROWED IT FOR.  "Swap is not the answer"
+#     is true because `OutOfMemoryError: Java heap space` is the collector refusing to grow past
+#     -Xmx: the allocation never reaches the kernel, so NO swap tier — compressed or otherwise —
+#     is ever consulted.  That says swap cannot SUBSTITUTE for raising the ceiling.  It does not
+#     say a raised ceiling is dangerous, which is the step I added.
+#
+# So the ladder's own discipline applies unmodified: it OOM'd at 8G, so take 16G.  The JVM maps
+# what it touches rather than reserving the ceiling, and the pages it does touch and then abandon
+# are exactly the compressible kind.  If 16G OOMs, that is the measurement saying this graph no
+# longer fits this box, and the answer becomes splitting //:hook — not another gigabyte.
+startup --host_jvm_args=-Xmx16g
 
 build --stamp --workspace_status_command=tools/toolchain_status.sh
 # Ζ·tier·toolchain — a toolchain-tier check runs under the HOST toolchain unsandboxed (verb.bzl:
@@ -89,3 +122,51 @@ build:mutant-oci --experimental_enable_docker_sandbox
 build:mutant-oci --experimental_docker_image=localhost/paperkit-base:proof
 build:mutant-oci --experimental_docker_use_customized_images=false
 build:mutant-oci --strategy=PkEval=docker --strategy=PkMutate=docker
+
+# ═══ Ζ·cas — THE REMOTE ACTION CACHE, AND WHY IT REPLACES A PLANNED CONTAINER ═══════════════
+#
+# ⚑ THE DEFECT IT FIXES: THE EXECROOT PATH IS A HIDDEN INPUT TO EVERY ACTION KEY.
+# Bazel derives its output base from an md5 of the WORKSPACE PATH, so the same tree at two paths
+# is two caches that share nothing.  MEASURED 2026-08-29, before the wipe: seven output bases
+# under ~/.cache/bazel/_bazel_mikemol, of which two were 1.8G and 1.9G for THIS repo at two paths
+# — 3.7 GB of near-duplicate cache — and a worktree build ran 129,577 actions against 4,631 cache
+# hits while an identical tree sat fully built beside it.  That is [[bazel-action-idempotency]]
+# violated at the harness level: an action must be f(inputs) alone, and here the PATH was an input.
+#
+# ⚑ WHY A CACHE AND NOT A CONTAINER.  The plan was to bind-mount every repo to a fixed path
+# (/work) so the execroot would be constant.  That works, and it is the WEAKER construction: it
+# makes paths agree BY CONVENTION, so every future worktree, repo and machine must adopt the same
+# mount to benefit, and a single divergent invocation silently re-forks the cache.  A remote action
+# cache is content-addressed and path-independent BY PROTOCOL — the CAS has no concept of a
+# worktree — so the property holds without anyone remembering to mount anything.  The container was
+# the intermediate rung; this is the terminus.  (The mutant-oci sandbox above stays, for a DIFFERENT
+# property: hermeticity, no host /usr.  Containerising the ACTION was never the same as
+# containerising the PATH, and conflating them is what made the container look sufficient.)
+#
+# THE ENDPOINT.  buildbuddy-app-onprem, already running on this box as the podman container
+# `cassian-buildbuddy` (gRPC 1985, web 8080).  ⚑ It is NOT in the k3s cluster that manages
+# everything else here — it is the same bespoke shape as the builds it serves, and moving it in is
+# its own arc.  Pointing Bazel at it WHERE IT IS first is deliberate: if remote caching misbehaves,
+# the diagnosis is the caching and not a concurrent migration.
+#
+# ⚑ OPT-IN, NOT DEFAULT, AND THAT IS THE POINT.  An unproven cache that silently serves a wrong
+# artifact is strictly worse than no cache — it converts a build failure into a false GREEN, which
+# is the one outcome this engine exists to refuse.  [[instrument-vs-gate]]: an instrument earns
+# trust per-use, a GATE earns it by proven soundness in both directions.  This has neither yet.
+# It becomes a default only after the CAS is shown to (a) hit across two distinct worktree paths
+# and (b) produce byte-identical outputs to a cold local build.  Until then: `--config=cas`.
+#
+# --remote_upload_local_results: WRITE as well as read.  A read-only cache on a single machine is
+# a no-op — nothing else populates it.
+# --remote_local_fallback: a cache that is DOWN must not fail the build.  buildbuddy is a podman
+# container with no restart policy (that is the k8s arc); an unreachable endpoint degrades to a
+# local build rather than reporting a red gate for an infrastructure reason.
+# --experimental_remote_cache_async: do not block the critical path on uploads.
+build:cas --remote_cache=grpc://127.0.0.1:1985
+build:cas --remote_upload_local_results=true
+build:cas --remote_local_fallback=true
+build:cas --experimental_remote_cache_async=true
+# Name the run in buildbuddy's UI, so a CAS question can be answered from the artifact rather than
+# from a guess about which invocation wrote what.
+build:cas --bes_results_url=http://127.0.0.1:8080/invocation/
+build:cas --bes_backend=grpc://127.0.0.1:1985

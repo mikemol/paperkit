@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import resolver  # noqa: E402  (the agree verb lives in the resolver core — small blast radius)
+import resolver
 
 ENG = Path(resolver.__file__).resolve().parent
 
@@ -47,6 +47,22 @@ def main() -> int:
     check("a lone producer (no independence) flags", not ag("printf 42").passed)
     check("a producer that FAILS cannot concur", not ag("printf 42 ||| false").passed)
     check("agreement is on OUTPUT, not exit code alone", not ag("printf A ||| printf B").passed)
+    # ⚑ Ε·fold — A PRODUCER THAT COULD NOT RUN HAS NOT DISSENTED.  `agree:` folded every nonzero
+    # onto FAIL, so a producer whose TOOLCHAIN IS ABSENT (rc 3, the engine's cannot-run code —
+    # what the render checks return with no veraPDF/pandoc) was reported as DISAGREEING with its
+    # peers.  A false red in the verb whose whole purpose is evidential strength, and the exact
+    # fold `run_ok` closed for cmd: during the tier work ("ONE check answered two different
+    # verdicts depending on which path ran it") — this was the path that never got the arm.
+    #
+    # ⚑ NO ARM COVERED rc 3 HERE, which is why it survived: the suite tested `false` (rc 1) and
+    # generalised.  The three states need three arms, and the contrast below is what makes this
+    # one falsifiable rather than a restatement.
+    _cr = ag("printf 42 ||| exit 3")
+    check("a producer that CANNOT RUN (rc 3) is cannot-run, NOT a dissent",
+          _cr.is_unavailable())
+    check("...and it carries which producer could not run", "exit 3" in (_cr.owner or ""))
+    check("δ: the same shape at rc 1 is a real FAIL — the codes are not interchangeable",
+          not ag("printf 42 ||| exit 1").passed and not ag("printf 42 ||| exit 1").is_unavailable())
     # Ζ·tier·agree — a producer output is a whole DOCUMENT, not one line: two byte-identical MULTI-LINE
     # producers must concur (the render `agree:` producers are 19k-byte rendered documents).  This pins
     # BOTH agree implementations — the resolver CLI (here) and the bazel pk_agree/verdict.py path (below)
@@ -57,7 +73,9 @@ def main() -> int:
     # The bazel path is a SECOND implementation (tools/verdict.py agree) — gate it directly on the same
     # multi-line property, so the two agree oracles cannot diverge (they did: the CLI compared full text
     # while verdict.py collapsed to distinct LINES and red two identical multi-line documents).
-    import subprocess, tempfile, json
+    import json
+    import subprocess
+    import tempfile
     VER = str(ENG.parent / "tools" / "verdict.py")
     def vagree(*texts):
         with tempfile.TemporaryDirectory() as d:

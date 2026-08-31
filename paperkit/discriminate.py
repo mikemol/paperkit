@@ -80,26 +80,45 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
-import bib  # noqa: E402  (the parser/data-model leaf — discriminate needs only the bib, not the projector)
-import gate as G  # noqa: E402  (cited_keys + footprint, re-exported from resolver)
-import driver as D  # noqa: E402  (pump/parse liveness driver — resumable grading)
+import bib
+import driver as D
+import gate as G
+
+# The MODULE bindings whose Ω·config Params join the composed registry below (grader/layout/
+# resolver edges already in the cone; project is a NEW direct edge, DEPS-legal delta→project,
+# closure-neutral — it was already transitively staged via gate).
+import grader
+import layout
+import project
+import resolver
 
 # This file is the Δ CLI + report.  The grade CACHE, project TOPOLOGY, and the GRADER (the
 # mutation sweep + the grade ladder) are their own modules now; imported under the names the
 # CLI uses, and re-exported so discriminate.content_key / .grade_check callers keep working.
-from cache import (content_key, engine_hash as _engine_hash,  # noqa: E402,F401
-                   footprint_hash as _footprint_hash, load as _load_cache, save as _save_cache)
-from grader import (presupposed_inputs, sensitivity, grade_check, GradeWitness,  # noqa: E402,F401
-                    _grade_parallel, _sandbox_root, mutate_one)
-from grade import STRENGTH, ORDER, RANK_C, CORRO_C, clamp, mark_content_sensitive  # noqa: E402,F401  (Μ·grade — the ladder + interpretation leaf)
-# The MODULE bindings whose Ω·config Params join the composed registry below (grader/layout/
-# resolver edges already in the cone; project is a NEW direct edge, DEPS-legal delta→project,
-# closure-neutral — it was already transitively staged via gate).
-import grader  # noqa: E402
-import layout  # noqa: E402
-import project  # noqa: E402
-import resolver  # noqa: E402
+from cache import content_key
+from cache import engine_hash as _engine_hash
+from cache import footprint_hash as _footprint_hash
+from cache import load as _load_cache
+from cache import save as _save_cache
+from grade import (
+    CORRO_C,
+    ORDER,
+    RANK_C,
+    STRENGTH,
+    clamp,
+    mark_content_sensitive,
+)
+from grader import (
+    GradeWitness,
+    _grade_parallel,
+    _sandbox_root,
+    grade_check,
+    mutate_one,
+    presupposed_inputs,
+    sensitivity,
+)
+
+import config
 
 # Ζ·ladder·sentinel (exit alphabet) — main()'s returns are TYPED so a caller can tell "call me
 # again" from "you asked wrong".  0 done · 1 an adequacy FLOOR was not met · 2 INCOMPLETE, resume
@@ -143,7 +162,8 @@ REGISTRY = [MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE, BUDGET, ALL, FOOTPRINT, 
 def _fine(rec: dict) -> list:
     """Δ·grain — the sensitivity set to key on, or [] when there is none to trust.  Only a
     BEHAVIORAL grade has a measured surface: an indeterminate one was flipped by nothing, so it
-    has no definitions to key on and must keep the whole-file key."""
+    has no definitions to key on and must keep the whole-file key.
+    """
     return list(rec.get("tests") or []) if rec.get("grade") == "behavioral" else []
 
 

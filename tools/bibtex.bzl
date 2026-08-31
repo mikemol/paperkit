@@ -508,6 +508,34 @@ def _bib_repo_impl(repository_ctx):
             #       consumer's label from the emitter's target name and break the import — the
             #       flatteners exist for mutation SITES, which have no such counterpart to match.
             key = check[len("concept:"):]
+            # Ζ·grid·dangling — A LIBRARY MAY NOT `concept:` ITS OWN KEY.  `concept:` is the IMPORT
+            # verb: it names a certificate the CONCEPT LIBRARY authors, and the two labels below are
+            # asserted to exist in another repo without anything here checking that they do.  From
+            # inside the library that assertion is self-referential and always false — the library
+            # AUTHORS its concepts (every one of its own entries is `claim:`, resolved by its
+            # declared witness), so it emits no `@paperkit_library//:<key>__dcalc` for a key it is
+            # currently defining, and the `__grade` rule below then consumes a label NOTHING
+            # produces.
+            #
+            # ⚑ MEASURED 2026-08-28, and the cost is the point: an entry added to concepts.bib with
+            # `check = {concept:...}` instead of `{claim:...}` resolved GREEN standalone (the CLI
+            # runs the witness directly and never reads this bib's check field), passed the
+            # project gate at 43/43, and died ~5,000 lines into a two-hour //:hook as `missing
+            # input file '@@+bib+paperkit_library//:degeneracy-has-kinds__dcalc'` — a name that
+            # points at the symptom and not at the one-word cause.  The information needed to
+            # refuse was present HERE, at generation, before any action ran.
+            #
+            # This is the same fold paperkit's tristate exists to refuse, in the generator: an
+            # unsatisfiable REQUEST recorded as if it were a satisfiable one.  Fail at the layer
+            # that knows, naming the verb to use instead.
+            if repository_ctx.attr.owns_concepts:
+                fail(("bibtex: %s: `check = {concept:%s}` in the CONCEPT LIBRARY itself.  " +
+                      "`concept:` IMPORTS a certificate this library authors, so from inside it " +
+                      "the import is self-referential: no `@paperkit_library//:%s__dcalc` is " +
+                      "emitted for a key defined here, and the generated grade rule would consume " +
+                      "a label nothing produces (surfacing hours later as `missing input file`).  " +
+                      "Use `check = {claim:%s}` — the library's own witness verb, declared in its " +
+                      "paper.toml `[checks.claim]`.") % (k, key, key, key))
             out.append("pk_result(name = " + _lit(k) + ', sibling_verdict = "@paperkit_library//:' + key + '")')
             imported_cert[k] = "@paperkit_library//:" + key + "__dcalc"
             recs.append('":%s"' % k)

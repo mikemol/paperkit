@@ -48,7 +48,8 @@ def _wcag_row(sc: str, route: str) -> str:
 
 def _wcag_tables(route: str) -> list:
     """WCAG 2.2 report — one table per conformance level (VPAT Tables 1/2/3), tracking the A/AA/AAA
-    gradation.  Each row is the SC, its entailment verdict, and the attesting remark."""
+    gradation.  Each row is the SC, its entailment verdict, and the attesting remark.
+    """
     out = []
     for level, title in (("A", "Table 1: Success Criteria, Level A"),
                          ("AA", "Table 2: Success Criteria, Level AA"),
@@ -65,7 +66,8 @@ def _wcag_tables(route: str) -> list:
 def _section_508(route: str) -> list:
     """Revised Section 508 (WCAG 2.0 A+AA by incorporation).  The 508 report reads the WCAG verdicts
     for the criteria 508 incorporates; a WCAG-2.1-or-2.2-new criterion is OUT OF 508 SCOPE by version
-    and disclosed as such, never given a 508 verdict it cannot bear."""
+    and disclosed as such, never given a 508 verdict it cannot bear.
+    """
     out = ["## Revised Section 508 Report\n",
            "Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduced after "
            "WCAG 2.0 are outside 508 scope by version (disclosed below, not scored as 508).\n",
@@ -82,7 +84,8 @@ def _section_508(route: str) -> list:
 def _en_301_549(route: str) -> list:
     """EN 301 549 V3.2.1, Chapter 10 (Non-web documents).  Each adopted clause is 10.<SC>; a Void row
     is disclosed as Void (the standard adopts it Not Applicable to documents); a WCAG-2.2-new criterion
-    has no clause in V3.2.1 and is disclosed as out of scope by version."""
+    has no clause in V3.2.1 and is disclosed as out of scope by version.
+    """
     out = ["## EN 301 549 V3.2.1 Report (Chapter 10, Non-web Documents)\n",
            "EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to clause "
            "10.x; criteria new in WCAG 2.2 have no clause in this version (out of scope by version).\n",
@@ -152,7 +155,8 @@ def check() -> tuple[bool, list[str], list[str]]:
     """The emitted VPAT is the FRESH projection (project-don't-author, so it cannot drift), and the
     entailment gate underneath it holds (so no Supports is unproven).  Ζ·tier·exit — a farm F-arm that
     CANNOT RUN here (toolchain absent) is surfaced separately: the VPAT freshness + registry soundness
-    still gate (they are pure), but the un-runnable F-arms yield cannot-run (exit 3), not a failure."""
+    still gate (they are pure), but the un-runnable F-arms yield cannot-run (exit 3), not a failure.
+    """
     problems = []
     ok_e, probs_e, cannot_e = we.check()
     if not ok_e:

@@ -133,7 +133,8 @@ class _ScopeC(dict):
 
     A dict subclass rather than a function so every consumer keeps reading `SCOPE_C` as the mapping
     it already is (`in`, `sorted`, indexing) — the derivation is invisible at the use site, and a
-    module that only imports `grade` never pays for `bib`."""
+    module that only imports `grade` never pays for `bib`.
+    """
 
     _loaded = False
 
@@ -171,7 +172,8 @@ SCOPE_C = _ScopeC()
 
 def rungs(descending: bool = True) -> list:
     """Every grade the ladder defines, in rank order — the display order for any summary.  Listing
-    rungs by hand is how a report comes to omit one and quietly under-count its own population."""
+    rungs by hand is how a report comes to omit one and quietly under-count its own population.
+    """
     return sorted(RANK_C, key=lambda g: RANK_C[g], reverse=descending)
 
 
@@ -179,7 +181,8 @@ def below(floor: str) -> list:
     """The grades that FAIL a `floor` — derived, so the adequacy gate fails CLOSED.  Stated as a
     blacklist it would admit every future rung by default; stated as `rank < rank(floor)` a new
     rung is judged the moment it exists.  `floor` must be a defined rung (KeyError if it is not —
-    a typo'd floor must not silently grade everything green)."""
+    a typo'd floor must not silently grade everything green).
+    """
     return [g for g in rungs(descending=False) if RANK_C[g] < RANK_C[floor]]
 
 
@@ -191,7 +194,8 @@ def _grade_from_sens(baseline: bool, sens: list, reachable: bool = True) -> dict
     reads `.passed` collapses UNAVAILABLE onto FAIL and both arrive here as `baseline=False`;
     passing `reachable=False` says WHICH, so the record stops asserting "repo is not green"
     about a repo whose check merely could not run.  The GRADE is unchanged either way — the
-    axis names the gap, it does not move the rung (see BASELINE_C)."""
+    axis names the gap, it does not move the rung (see BASELINE_C).
+    """
     if not baseline:
         return {"grade": "broken", "tests": [],
                 "baseline": "unreachable" if not reachable else "refuted",
@@ -216,7 +220,8 @@ def mark_content_sensitive(records: list, content: set) -> list:
     """Mark each behavioral check content_sensitive iff a flipped test file is the document's
     OWN content (bib/rubric/out), not merely config/engine: a behavioral check sensitive only
     to config or the engine can-fail by CRASH but does not test the document's content.  A pure
-    reading over the grade records + the document's content-file names."""
+    reading over the grade records + the document's content-file names.
+    """
     for r in records:
         if r["grade"] == "behavioral":
             r["content_sensitive"] = any(Path(t).name in content for t in r["tests"])
@@ -241,7 +246,8 @@ def clamp(records: list, owner_grades: dict | None = None,
     is structurally blind besides (the owner's witness is outside this project's mutation
     surface).  So the caller supplies what it holds; absent it, the ladder behaves exactly as
     before and `imported` stays at the top.  The rank is the DEFAULT for an unresolved edge,
-    never a claim about delegated strength."""
+    never a claim about delegated strength.
+    """
     rby = {r["key"]: r for r in records}
     og = owner_grades or {}
     effc: dict = {}
@@ -262,7 +268,8 @@ def clamp(records: list, owner_grades: dict | None = None,
         reading an EMPTY baseline as ABSENT).  Paperkit's own tristate verdict exists for the
         same reason: a check that cannot be evaluated returns 2, never 0 and never 1, because a
         finding nobody can check must not read as either closed or open.  The same argument
-        applies one level up, to an unfold that stopped early."""
+        applies one level up, to an unfold that stopped early.
+        """
         d = r.get("delegates_to")
         if not d:
             return None
@@ -284,7 +291,8 @@ def clamp(records: list, owner_grades: dict | None = None,
         Λ·pi·path — the pin alone is the LAST step; the path is the prefix.  An importer asking
         "do I distrust this witness or chase its premise" is answerable from the chain and only
         sometimes from the final name (substrate's `take n` vs its last CF digit).  Carrying it
-        costs one list per claim and turns a dead-end pin into a followable trace."""
+        costs one list per claim and turns a dead-end pin into a followable trace.
+        """
         if k in effc:
             return effc[k]
         r = rby.get(k)
@@ -363,7 +371,8 @@ def clamp(records: list, owner_grades: dict | None = None,
 
         Walked over rests-on rather than read off `clamp_path`: the path records what CLAMPED,
         and a truncated premise that clamps nothing leaves it empty — precisely the case this
-        must catch."""
+        must catch.
+        """
         r = rby.get(k)
         if r is None or k in stack:
             return False
@@ -396,7 +405,8 @@ def verify_hop(record: dict, premises: dict, owner_grades: dict | None = None) -
     and the chain records without certifying.  The analogue here is that the clamp is a MIN, so
     `eff(k) <= eff(d)` for every premise d: a hop can only ever LOWER, never raise, and by no
     more than its weakest premise.  A recorded hop violating that monotonicity is detectable
-    locally, with no reference to the rest of the chain."""
+    locally, with no reference to the rest of the chain.
+    """
     self_rank = RANK_C.get(record.get("grade"), 0)
     best, why = self_rank, "self"
     og = owner_grades or {}
@@ -444,7 +454,8 @@ def _bracket(records: list, rby: dict, og: dict) -> list:
 
     It also separates the two owner shapes a single number cannot: an owner whose WITNESS is weak
     has both endpoints low; an owner whose PREMISE is unresolved has a WIDE interval.  Different
-    shapes, not one collapsed scalar."""
+    shapes, not one collapsed scalar.
+    """
     FLOOR = min(RANK_C.values())
     pess: dict = {}
 

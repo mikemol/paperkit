@@ -20,12 +20,13 @@ from contextlib import redirect_stderr
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import bib  # noqa: E402
+import bib
 
 
 def _warns(body: str, consumer_fields: tuple = ()) -> str:
     """Parse a one-entry bib with this body (and optional declared consumer fields); return the
-    parser's stderr and the parsed record."""
+    parser's stderr and the parsed record.
+    """
     bib._WARNED.clear()                          # the dedup is per build, not per probe
     p = Path(tempfile.mkdtemp()) / "t.bib"
     p.write_text("@misc{k,\n" + body + "\n}\n")
@@ -64,9 +65,24 @@ def main() -> int:
           "points" in pts_err and "DROPPED" in pts_err)
     check("the unknown field is still absent from the parsed record (dropped, as said)",
           "points" not in pts)
-    bibtex_err, _ = _warns("  title = {T},\n  author = {A},\n  journal = {J},\n  year = {2020}")
-    check("standard BibTeX metadata a reference carries is tolerated — no warning",
-          bibtex_err == "")
+    # Ζ·bib·declare — STANDARD BIBTEX METADATA TAKES THE SAME ROUTE AS EVERY OTHER NON-ENGINE
+    # FIELD.  A 24-name `_BIBTEX` roster used to exempt `journal`/`doi`/`publisher` from the
+    # warning while the extraction loop still never read them, so they were SILENT AND DROPPED —
+    # the engine claiming to know a field and discarding it.  Both halves are asserted here,
+    # because the old design passed the first and failed the second.
+    bibtex_err, bibtex_rec = _warns("  title = {T},\n  author = {A},\n  journal = {J},\n  year = {2020}")
+    check("UNDECLARED BibTeX metadata is NAMED, not silently swallowed by an engine roster",
+          "journal" in bibtex_err and "DROPPED" in bibtex_err)
+    check("...and the warning names consumer_fields as the remedy (not just 'remove it')",
+          "consumer_fields" in bibtex_err)
+    check("an undeclared BibTeX field is absent from the record — silence never implied carriage",
+          "journal" not in bibtex_rec)
+    # And DECLARING it is what carries it: the access the old roster never granted.
+    dec_err, dec_rec = _warns("  title = {T},\n  author = {A},\n  journal = {J},\n  doi = {10.1/x}",
+                              ("journal", "doi"))
+    check("a DECLARED BibTeX field is carried on the record (engine-inert, like `note`)",
+          dec_rec.get("journal") == "J" and dec_rec.get("doi") == "10.1/x")
+    check("...and declaring it is quiet", dec_err == "")
     # A claim carrying inline math extracts INTACT: the value is brace-counted to arbitrary depth
     # (a set-builder \min\{ … \mathrm{eff}(d) : … \} nests deeper than one level) and LaTeX-escaped
     # braces \{ \} are literal CONTENT, not structure — the one-level regex this replaced stopped
@@ -118,14 +134,65 @@ def main() -> int:
     lb_err, lb = _load_bib_from_toml('consumer_fields=["provenance"]\n')
     check("load_bib resolves consumer_fields from paper.toml on disk — a DECLARED field carried + quiet",
           lb.get("provenance") == "p" and lb_err == "")
+
+    # Ζ·bib·parser — AN ENTRY IS BRACE-COUNTED, NOT MATCHED TO THE FIRST LINE-INITIAL `}`.
+    # The scanner this replaces was `re.finditer(r"@\w+\{...(.*?)\n\}")`: non-greedy to the first
+    # `\n}`, so a value holding a brace at column 0 ended the entry early.  MEASURED before the
+    # fix: the entry below parsed with ZERO FIELDS while a reader reported `2 of 2 entries` — an
+    # honest count over empty content.  And a claim with no `check` is excluded from gate.py's
+    # `warrants` set, so the truncation DISARMS a claim while the gate stays green.
+    # ⚑ The brace pair inside the value is BALANCED and its closer sits at column 0 — which is
+    # what a code block, a JSON fragment or a set-builder broken across lines looks like.  The old
+    # non-greedy `(.*?)\n\}` ended the entry THERE; brace-counting carries through it.
+    _brace = _warns("  claim = {a block: {\nnested\n} and the tail},\n  check = {cmd:true}")[1]
+    check("an entry survives a line-initial `}` inside a value (was: silently emptied)",
+          _brace.get("check") == "cmd:true")
+    check("...and the value itself is intact, not truncated at the bare brace",
+          "the tail" in (_brace.get("claim") or ""))
+    # The entry TYPE is carried.  `@\w+` matched and discarded it, so @book and @misc were
+    # indistinguishable to the engine and no reader could answer what types a file uses.
+    check("the entry type is captured, not discarded", _brace.get("_type") == "misc")
+
+    # Ζ·bib·shadow — a key defined in TWO of a project's composed bibs is REFUSED, not merged.
+    # The dangerous direction is asserted directly: the second entry carries NO `check`, so under
+    # the old bare `F.update` it replaced a checked warrant with an unchecked one — gate.py's
+    # `warrants = {k for k, f in F.items() if f.get("check")}` then dropped the key entirely and
+    # the claim stayed cited, unverified, green.
+    def _two_bibs(second_body: str) -> tuple:
+        d = Path(tempfile.mkdtemp())
+        (d / "paper.toml").write_text(
+            '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["a.bib","b.bib"]\nout="o.md"\n')
+        (d / "a.bib").write_text("@misc{dup,\n  claim = {first},\n  check = {cmd:true}\n}\n")
+        (d / "b.bib").write_text(second_body)
+        bib._WARNED.clear()
+        try:
+            return True, bib.parse_project(d)
+        except SystemExit as e:
+            return False, str(e)
+    ok_dup, dup_msg = _two_bibs("@misc{dup,\n  claim = {second}\n}\n")
+    check("a key defined in TWO composed bibs REFUSES (the silent last-wins is unrepresentable)",
+          not ok_dup)
+    check("...and the refusal names BOTH files, which is the whole diagnosis",
+          "a.bib" in dup_msg and "b.bib" in dup_msg)
+    ok_uniq, uniq_recs = _two_bibs("@misc{other,\n  claim = {second},\n  check = {cmd:true}\n}\n")
+    check("δ: the same two bibs with DISTINCT keys compose normally",
+          ok_uniq and sorted(uniq_recs) == ["dup", "other"])
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
     pairs = [
-        ("the parser names a dropped field only when it is not a paperkit or BibTeX field",
-         "the field NAME on the entry (`journal` → tolerated, `points` → named)",
-         "BibTeX metadata → silent", _warns("  journal = {J}")[0] == "",
-         "unknown field  → named", "points" in _warns("  points = {q}")[0]),
+        # Ζ·bib·declare — THE DELTA IS THE DECLARATION, NOT THE FIELD'S NAME.  This pair used to
+        # read `journal → tolerated, points → named`, making the engine's opinion about which
+        # names are "real bibliography" the discriminator — a roster that drifted from actual
+        # BibTeX (`type = {RFC}` was absent from it) and that bought silence without carriage.
+        # One field, two projects: the SAME `journal` is quiet-and-carried where declared and
+        # named where not, so nothing about the name itself decides.
+        ("a BibTeX field is carried-and-quiet iff the PROJECT declared it — the engine holds no roster",
+         "whether this project declared the field, NOT whether the engine considers the name bibliographic",
+         "declared → carried + quiet",
+         _warns("  journal = {J}", ("journal",))[1].get("journal") == "J"
+         and _warns("  journal = {J}", ("journal",))[0] == "",
+         "undeclared → dropped + named", "journal" in _warns("  journal = {J}")[0]),
         ("a top-level field is named, an `=` inside a value is not (brace depth)",
          "whether the `= {` sits at brace depth 0 or inside a value",
          "top level → a field", bib._top_fields("points = {q}") == ["points"],
@@ -207,7 +274,7 @@ def main() -> int:
               f"top level is a table too, and the engine reads none of it")
         ran.append(ok)
         # δ: the SAME line, one header later.  Same three characters, opposite effect.
-        (d3 / "paper.toml").write_text('[paper]\n' + body + 'root="."\n')
+        (d3 / "paper.toml").write_text("[paper]\n" + body + 'root="."\n')
         ok2 = bib.load_config(d3) is not None
         print(f"  {'ok' if ok2 else 'XX'} δ: the same line BELOW the header is accepted — "
               f"placement is the whole difference, and it is invisible by eye")

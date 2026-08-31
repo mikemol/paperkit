@@ -1,0 +1,111 @@
+{
+  "_comment": [
+    "⚑ THE PreToolUse HOOKS ARE ARMED, AND THE ARMING IS ON THE COMMAND LINE.",
+    "An env block alone is correct and INSUFFICIENT: a session already running when this",
+    "file changes never picks it up, so the hooks keep exiting 0 — detecting every violation",
+    "and reporting none. That is the worst pairing, a guard that reads as armed in review and",
+    "is off in fact (measured in el-openglo, reported as armed for several commits).",
+    "",
+    "ADVISORY MODE IS SILENT TO THE AGENT, not merely non-blocking: unarmed, a hook prints its",
+    "advisory and exits 0 with no permissionDecision, which the harness reads as 'allow,",
+    "nothing to report' — the text reaches nobody. So the choice is guard or no guard.",
+    "",
+    "ADOPTED, NOT INVENTED. hook_structural_query / hook_no_chaining / hook_cmdparse are",
+    "SYMLINKS into ../substrate/scripts/ (the route linux-sources, summit, freecell and gabion",
+    "took). hook_gate_running.py is linux-sources' and is held as a real file. Ownership is",
+    "not claimed for any of them. They read THIS repo's routing table at",
+    ".claude/skills/struct-tools/SKILL.md, which must stay a REAL LOCAL FILE.",
+    "",
+    "WHY THIS REPO NEEDS hook_gate_running PARTICULARLY: //:hook is a 126k-action sweep that",
+    "runs up to ~2h on an engine-source change. A tracked-tree edit mid-run reds sandboxed",
+    "cells with 'input dependency modified during execution', which reads as an engine defect",
+    "and costs the whole sweep. Recorded as Λ·quiesce after ~7 occurrences; a memory is a",
+    "stamp, and a stamp only tells you the run was worthless once it finishes.",
+    "",
+    "⚑ THE FIFTH HOOK IS hook_shellcheck (Ζ·hook·shellcheck, armed 2026-08-30), adopted by",
+    "symlink from substrate — the same file linux-sources and cassian-observability run. It",
+    "matches BOTH Bash and Edit|Write|NotebookEdit, because shell reaches this repo by two",
+    "routes: a command the agent runs, and a script the agent WRITES.",
+    "",
+    "IT GATES MEANING, WHICH THE OTHER FOUR DO NOT. structural-query and no-chaining refuse a",
+    "textual query over a structured artifact and a composed command — both about SHAPE.",
+    "Neither reads what the shell DOES. Cassian's line for the class: `[ $x = y ]` with an",
+    "empty x and `rm -rf $TARGET/*` with TARGET unset passed both.",
+    "",
+    "THE TREE WAS CLEANED TO 0 BEFORE ARMING, per cassian's rule — arming first would make the",
+    "shell un-editable by the session that has to clean it. 15 files, 10 findings, all resolved",
+    "and NONE excluded: one genuine fix (tools/toolchain_status.sh parsed `ls` output for the",
+    "veraPDF JAR; a shell glob needs no subprocess and tests absence rather than inferring it",
+    "from a swallowed error), two intentional word-splits carrying disable directives that state",
+    "the mechanism ($PK_BES is empty-or-two-flags; $_pk_extra is a path LIST, and quoting it",
+    "would reintroduce the very leak its trap prevents), two SC2329 false positives (functions",
+    "invoked indirectly through `declare -f` into a flock subshell — shellcheck says so itself),",
+    "and one REAL portability finding kept as a finding: /dev/tcp is bash and .githooks/pre-commit",
+    "is #!/bin/sh, so under dash the telemetry probe reports DOES NOT ANSWER for LIVE endpoints.",
+    "Filed Ζ·probe·portable. A disable directive records that a limit is known; it does not make",
+    "the code portable.",
+    "",
+    "⚑ AND THE THREE assets/*.sh CARRY SHEBANGS RATHER THAN AN EXCLUSION (operator ruling,",
+    "2026-08-30: *above anything else, our examples and recommendations ought to be",
+    "well-formed*). They are emit: fragments projected into README.md — two-line command",
+    "examples a reader COPIES. Excluding them as documentation was the easy call and the wrong",
+    "one: an unverified example in a published document is the same defect this engine refuses",
+    "one layer up, and the shebang also tells the reader which shell the commands are valid in.",
+    "",
+    "⚑ THE SIXTH HOOK IS hook_pycheck (ruff AND mypy in ONE hook, armed 2026-08-30), adopted by",
+    "symlink. It matches Edit|Write|NotebookEdit only — Python is never a Bash-command concern.",
+    "",
+    "IT IS ARMED AGAINST AN UNCLEAN TREE, DELIBERATELY, AND THAT IS NOT CASSIAN'S RULE BROKEN.",
+    "Their clean-then-arm rule is right for a WHOLE-TREE gate; this one is PER-FILE-ON-EDIT, and",
+    "the difference is load-bearing. MEASURED BEFORE ARMING: with 6,955 findings in the backlog, a",
+    "CLEAN file is allowed and a DIRTY one is refused. So the backlog and the gate never meet until",
+    "you open a file — at which point the refusal IS the work. linux-sources named the method:",
+    "*the gate doesn't tell you to clean the monolith, it tells you the monolith is too big to",
+    "touch; the only move is to decompose*. They dissolved two monoliths (910 and 1315 lines) into",
+    "~10 small one-concern modules each, every one written clean in one pass. The big number is",
+    "never eaten because it is never confronted as a number.",
+    "",
+    "⚑ IT CRASHED ON FIRST ADOPTION, AND THE FIX CAME FROM UPSTREAM WHILE THIS WAS BEING WRITTEN.",
+    "`from scripts import hook_shellcheck` raised ModuleNotFoundError at MODULE LOAD in a repo",
+    "whose scripts/ is a bare symlink directory — and empty stdout is read by the harness as ALLOW,",
+    "so the hook denied NOTHING while reading as armed. Reported to substrate with the traceback;",
+    "they added a _ROOT prelude plus a loud ImportError arm, and found the sharper thing: three",
+    "sibling hooks ALREADY carried that prelude and this one was the MISSED MEMBER OF A SET.",
+    "",
+    "⚑⚑ WHICH IS WHY THESE STAY SYMLINKS AND WERE NOT VENDORED. Vendoring was considered and",
+    "rejected ON MEASUREMENT: the crash was the only reason to fork, and the symlink is what",
+    "delivered the repair with zero action here. A vendored copy would still be broken. The cost is",
+    "real and accepted — a symlink adopter inherits upstream's bugs as well as its fixes, and",
+    "substrate's tree is red and uncommitted as this lands.",
+    "",
+    "VERIFY BY MAKING IT FIRE, NEVER BY READING THIS FILE."
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {"type": "command", "command": "STRUCT_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_structural_query.py\""},
+          {"type": "command", "command": "NOCHAIN_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_no_chaining.py\""},
+          {"type": "command", "command": "SHELLCHECK_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_shellcheck.py\""}
+        ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {"type": "command", "command": "GATE_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_gate_running.py\""},
+          {"type": "command", "command": "SHELLCHECK_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_shellcheck.py\""},
+          {"type": "command", "command": "PYCHECK_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_pycheck.py\""}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/absence_audit.py\""},
+          {"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/regen_if_stale.sh\""}
+        ]
+      }
+    ]
+  }
+}

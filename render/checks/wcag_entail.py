@@ -43,7 +43,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import matrix
 import wcag_model as wm
 
-
 # Ρ·wcag·oracle-edge — the oracle warrants' verdict records, consumed as records-as-deps (memoized):
 # PAPERKIT_CONSUMED_RECORDS is set by the pk_cmd rule to space-separated `key=abspath` pairs (the
 # sibling warrant ran ONCE under bazel; its verdict.json is a declared input here).  So the oracle
@@ -58,7 +57,8 @@ for _pair in os.environ.get("PAPERKIT_CONSUMED_RECORDS", "").split():
 
 def _consumed_verdict(warrant: str) -> str | None:
     """The pass/fail/cannot-run verdict of a consumed sibling record, or None if not staged here (the
-    check was run standalone, outside bazel — the record dep is only present in the //:hook action)."""
+    check was run standalone, outside bazel — the record dep is only present in the //:hook action).
+    """
     path = _CONSUMED.get(warrant)
     if not path or not Path(path).exists():
         return None
@@ -214,7 +214,8 @@ SCOPE_EMIT = {
 def _warrants_tagging(sc: str, fmt: str) -> list:
     """Warrants whose matrix cell (afforded native/post on `fmt`) tags this SC — directly via the
     capability's wcag clause, via a PDF/UA clause (CLAUSE_TO_WCAG), or via the UA oracle
-    (PDFUA_TO_WCAG when the capability is pdf-ua)."""
+    (PDFUA_TO_WCAG when the capability is pdf-ua).
+    """
     out = []
     for cap, spec in matrix.CAPABILITIES.items():
         st, warrant = spec["cells"].get(fmt, (None, None))
@@ -248,7 +249,8 @@ def _proven(warrant: str, run_farm: bool) -> str | None:
                a Supports — the false-green the adversary found, closed), "cannot-run"/absent →
                cannot-run (the record was not staged — standalone run, or the oracle's toolchain absent).
     run_farm=False (report projection) returns the form unverified — the report SHOWS the verdict; check()
-    is what VERIFIES it (run_farm=True), exactly as the farm SCs work."""
+    is what VERIFIES it (run_farm=True), exactly as the farm SCs work.
+    """
     form = ENTAILMENT.get(warrant)
     if form is None:
         return None
@@ -277,7 +279,8 @@ def entail(sc: str, route: str, run_farm: bool = False) -> dict:
     """The entailment verdict for one SC on one route.  Conservative: Supports only when a proven
     warrant entails the WHOLE criterion; a warrant that proves only a FRAGMENT of the criterion yields
     Partially Supports, never Supports (proving a sub-part does not entail the SC).  Else Partially /
-    Does Not Support / Not Applicable."""
+    Does Not Support / Not Applicable.
+    """
     fmt, _ua = ROUTE_FINAL[route]
     if sc in NOT_APPLICABLE:
         return {"verdict": "Not Applicable", "warrant": None, "form": None,
@@ -287,7 +290,8 @@ def entail(sc: str, route: str, run_farm: bool = False) -> dict:
     def _eff_scope(w: str) -> tuple:
         """The EFFECTIVE scope of warrant w for THIS sc, and the attesting remark.  For the veraPDF
         oracle on a UA-bridge SC, the scope is the bridge's PER-SC scope (some UA correspondences are
-        full, some fragment); otherwise the warrant's own scope."""
+        full, some fragment); otherwise the warrant's own scope.
+        """
         if w in ("rnd-a11y", "rnd-a11y-latex") and sc in PDFUA_TO_WCAG:
             sc_scope, why = PDFUA_TO_WCAG[sc]
             # a route-dependent SC (1.1.1) carries a {route: scope} dict; resolve it for THIS route.
@@ -338,7 +342,8 @@ def check() -> tuple[bool, list[str], list[str]]:
     gate: no Supports without proof.  Returns (ok, problems, cannot_run): Ζ·tier·exit — a validator that
     could not run here (a farm selftest exiting 3, or an oracle record that is fail-absent/cannot-run) is
     NOT a problem — it is recorded separately so the gate reports CANNOT-RUN (exit 3), not a false
-    failure, on a toolchain-less box or a standalone (out-of-bazel) run."""
+    failure, on a toolchain-less box or a standalone (out-of-bazel) run.
+    """
     problems, cannot_run = [], []
     # the entailment registry must name real warrants (in warrants.bib) and real check commands.
     # (this half is PURE — no toolchain — the sandbox-gradeable core; see Ρ·wcag·entail-sweep.)
@@ -380,7 +385,8 @@ def _selftest() -> int:
     """⟨P, F, δ⟩ for Ρ·wcag·oracle-edge — the oracle Supports is admissible ONLY when the CONSUMED
     veraPDF record reads pass; a fail record drops it (the false-green the adversary found, closed).
     Stubs _CONSUMED in-memory (no bazel, no 37s veraPDF), so it gates the record-consumption logic
-    cheaply.  δ = the consumed record's verdict (pass vs fail) flips 3.1.1 (a full UA-bridge SC — /Lang presence IS its bar) between Supports and not."""
+    cheaply.  δ = the consumed record's verdict (pass vs fail) flips 3.1.1 (a full UA-bridge SC — /Lang presence IS its bar) between Supports and not.
+    """
     import tempfile
     fails = []
 

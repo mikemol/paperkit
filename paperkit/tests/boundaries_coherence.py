@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import coherence as C  # noqa: E402
+import coherence as C
 
 
 def rec(key, frm=(), rests=(), grade="behavioral", tests=(), section=None):

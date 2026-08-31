@@ -30,9 +30,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import docx as docx_node
 import graph
 import latex as latex_node
-import linkalt      # 7.18 link descriptions (office routes)
-import lo           # office convert: isolated profile + unlink-first
-import mathalt      # 7.7 equation alternatives (office routes)
+import linkalt  # 7.18 link descriptions (office routes)
+import lo  # office convert: isolated profile + unlink-first
+import mathalt  # 7.7 equation alternatives (office routes)
 import odf as odf_node
 import source
 import widen_tables  # size table columns to measured ink so a wide math cell can't clip
@@ -51,7 +51,8 @@ lo_export = _load("lo_export", "lo-export.py")   # docx/odt → tagged PDF/UA ov
 def _office_pdf(intermediate: Path, out_pdf: Path, work: Path) -> Path | None:
     """The office pdf-producing morphism (soffice) + its "post" a11y: UA export → linkalt → mathalt.
     Table columns are sized to measured ink BEFORE the export (a wide oMath run cannot wrap).  Falls
-    back to a plain convert if no uno-capable python is present, so the deliverable still renders."""
+    back to a plain convert if no uno-capable python is present, so the deliverable still renders.
+    """
     sized = work / ("sized" + intermediate.suffix)
     widen_tables.widen(intermediate, sized)
     pdf = lo_export.export_pdfua(sized, out_pdf) or lo.convert(sized, "pdf", work)
@@ -66,7 +67,8 @@ def _office_pdf(intermediate: Path, out_pdf: Path, work: Path) -> Path | None:
 
 def render(paper_md: Path, out_pdf: Path, via: str, work: Path) -> Path | None:
     """Produce `paper_md` as a PDF via route `via`, composing the graph's morphisms.  None if the
-    route's toolchain is unavailable (loud) — so a box lacking one route's tools still serves another."""
+    route's toolchain is unavailable (loud) — so a box lacking one route's tools still serves another.
+    """
     path = graph.ROUTES[via]                                    # e.g. ["md","docx","pdf"]
     a11y = graph.route_a11y(via)                                # "post" (office) | "native" (latex)
     if a11y == "native":                                        # the latex route: tagging is in source
@@ -81,7 +83,8 @@ def render(paper_md: Path, out_pdf: Path, via: str, work: Path) -> Path | None:
 def _formula_alts(pdf: Path) -> tuple[int, int]:
     """(formula count, how many carry an EMPTY /Alt) in the deliverable's structure tree — the
     office route's math alternative, read from the shipped artifact rather than trusted from the
-    step that wrote it."""
+    step that wrote it.
+    """
     try:
         import pikepdf
     except ImportError:
@@ -106,7 +109,8 @@ def _formula_alts(pdf: Path) -> tuple[int, int]:
 
 def _link_count(pdf: Path) -> int:
     """Every /Link annotation in the deliverable — the denominator the informative-description
-    ratio is stated over, read from the PDF rather than assumed from the source."""
+    ratio is stated over, read from the PDF rather than assumed from the source.
+    """
     try:
         import pikepdf
     except ImportError:

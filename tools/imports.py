@@ -7,7 +7,8 @@ project↔rhetoric "cycle" was such a phantom).
 
 The build DAG is a PROJECTION of this: each module's .pyc is a target whose deps are its imports, so
 a consumer stages a module's transitive closure, not the flat engine — the incrementality is exact
-by construction (Ξ·dag·build).  Usage: imports.py <module.py>… → the edges over that module set."""
+by construction (Ξ·dag·build).  Usage: imports.py <module.py>… → the edges over that module set.
+"""
 import ast
 import sys
 from pathlib import Path
@@ -42,7 +43,8 @@ def engine_srcs(eng):
     same set.  Reading COMPONENTS here keeps the generator's input equal to the build's by
     construction rather than by a second enumeration that agrees today.  boundaries_components.py
     separately checks that partition against the real tree, which is where a NEW file that nobody
-    placed gets caught — a job this function must not also try to do."""
+    placed gets caught — a job this function must not also try to do.
+    """
     return sorted(f for fs in _literal(eng / "components.bzl", "COMPONENTS").values() for f in fs)
 
 
@@ -124,4 +126,4 @@ if __name__ == "__main__":
     for p in paths:
         stem = Path(p).stem
         for imp in sorted(imports(Path(p).read_text(), names) - {stem}):
-            print("{}\t{}".format(p, imp))
+            print(f"{p}\t{imp}")

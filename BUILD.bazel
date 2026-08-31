@@ -49,6 +49,33 @@ filegroup(name = "files", srcs = [
         # Ζ·hook·index — bnd-hook-index gates the equivalence predicate's pure core.
         "//tools:hook_index.py",
         "//tools:otlp_push.py",
+        # ⚑ Ζ·pyc·package — `tools` IS A PACKAGE IN THE SANDBOX ONLY IF ITS MARKER IS STAGED.
+        # This manifest listed individual `tools/*.py` files and no `__init__.py`, which was
+        # sufficient while every consumer reached them by `sys.path.insert` + a flat import.  A
+        # suite that names the edge honestly (`from tools import dagderive`) then fails with
+        # ModuleNotFoundError inside a cell while passing on the host, where the editable install
+        # supplies the package — five boundary suites reddened exactly that way.
+        #
+        # ⚑⚑ AND THE THREE MODULES BELOW WERE NEVER DECLARED AT ALL.  Same class as the
+        # `bibparse.py` omission components.bzl records costing four batch runs: a file on disk
+        # that no manifest names is invisible to the build, and the failure surfaces far from the
+        # cause.  Ξ·dag·dotted split the DAG derivation out of imports.py into dagderive+dagbzl,
+        # and Ζ·hook·index split the pure predicate into indexdiverge — each a new file the
+        # consuming suites now import BY NAME.
+        "//tools:__init__.py",
+        "//tools:dagderive.py",
+        "//tools:dagbzl.py",
+        # Ξ·dag·dotted — the PATH→module-name translation, imported by bnd-config.  Undeclared, a
+        # sandboxed cell raises ModuleNotFoundError while the host passes (the editable install
+        # supplies it) — AND the action cache never invalidates, so the check reports a STALE
+        # verdict rather than a red: measured, bnd-config kept serving its pre-fix failure across
+        # three gate runs with "48 action cache hit" and no re-execution.
+        "//tools:dagnames.py",
+        # Ξ·dag·script — the closure census: which witnesses shell out to a sibling generator whose
+        # engine cone their declared closure does not cover.  It reads closure.py's OWN output
+        # (never a re-derivation), so it is staged beside the tool it audits.
+        "//tools:closure_census.py",
+        "//tools:indexdiverge.py",
     ], visibility = ["//visibility:public"])
 
 # The local CI: `bazel test //:hook` IS the pre-commit (Ζ·hook / Ζ·foot·hook) — it gates AND grades

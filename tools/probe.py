@@ -44,7 +44,8 @@ def _hook(label):
 
 def _executed(line):
     """The EXECUTED action count from bazel's process line (everything that is not a cache
-    hit and not internal — the number every measured payoff in the plan is quoted in)."""
+    hit and not internal — the number every measured payoff in the plan is quoted in).
+    """
     m = _LINE.search(line or "")
     if not m:
         return None

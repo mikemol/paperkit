@@ -15,7 +15,8 @@ Output (stdout) is the project's manifest, DELTA-ENCODED against the next-coarse
     default (so ~0 intra-resolution variance ⇒ "claims" is empty, as the territory showed).
 
 Buckets are clamped to the pow2 levels the resource_set map (calc.bzl _RS) provides.  A peak of 0
-(observe ran without per-action cgroup isolation) is dropped — it carries no measurement."""
+(observe ran without per-action cgroup isolation) is dropped — it carries no measurement.
+"""
 import json
 import sys
 from pathlib import Path
@@ -42,7 +43,8 @@ def resolution(stem):
 
     A cell's peak is charged to the DEF resolution and to its claim, so the per-claim maximum over
     a claim's grid is that claim's def cost — which is the number a reservation needs, since the
-    grid's cells run concurrently and each must fit."""
+    grid's cells run concurrently and each must fit.
+    """
     if stem.endswith("__dcalc"):
         return "def", stem[: -len("__dcalc")]
     if stem.endswith("__calc"):
@@ -56,7 +58,8 @@ def main() -> int:
     """Ζ·mem·wire — the script body, guarded.  This module is imported for `pow2`/`resolution` by
     mem_db/mem_harvest/mem_project, and at module level it ran the whole aggregation and PRINTED a
     manifest — so importing a helper emitted JSON onto the importer's stdout.  A library and a
-    script in one file need the guard; without it the library half is unusable."""
+    script in one file need the guard; without it the library half is unusable.
+    """
     peaks = {}
 
 

@@ -61,7 +61,7 @@ DELTA = {"PkCalc", "PkEval", "PkMutant", "PkSens", "PkMutate", "PkPyc"}
 
 
 class Spawn:
-    __slots__ = ("mnemonic", "label", "wall")
+    __slots__ = ("label", "mnemonic", "wall")
 
     def __init__(self, mnemonic, label, wall):
         self.mnemonic = mnemonic
@@ -79,7 +79,8 @@ class Spawn:
 
 def duration_seconds(s):
     """Parse a protobuf Duration JSON string ('6.904s', '0.005s') to float seconds.
-    Duration JSON is always seconds with a trailing 's'; guard other shapes defensively."""
+    Duration JSON is always seconds with a trailing 's'; guard other shapes defensively.
+    """
     if s is None:
         return 0.0
     if isinstance(s, (int, float)):
@@ -87,8 +88,7 @@ def duration_seconds(s):
     s = str(s).strip()
     if s.endswith("ms"):
         return float(s[:-2]) / 1000.0
-    if s.endswith("s"):
-        s = s[:-1]
+    s = s.removesuffix("s")
     try:
         return float(s)
     except ValueError:
@@ -116,7 +116,8 @@ def target_of(label):
 
 def parse_execlog(text):
     """The execution log is CONCATENATED JSON objects (one SpawnExec each), NOT an array.
-    Only EXECUTED spawns are present — cache hits are absent (so this is 'what re-ran')."""
+    Only EXECUTED spawns are present — cache hits are absent (so this is 'what re-ran').
+    """
     dec = json.JSONDecoder()
     spawns = []
     i, n = 0, len(text)
@@ -136,14 +137,15 @@ def parse_execlog(text):
 
 
 def _family(name, points):
-    """points = list of (value, {label:val}).  A gauge family (a per-run snapshot)."""
+    """Points = list of (value, {label:val}).  A gauge family (a per-run snapshot)."""
     return {"name": name, "unit": "s", "points": points}
 
 
 def metric_families(spawns, build_seconds=None):
     """Aggregate spawns into the cassian schema.  check_seconds is summed per
     (project,check_type,target) so a target is ONE point (bazel may split a test into
-    execute+xml spawns — summing their wall is the honest total for that target)."""
+    execute+xml spawns — summing their wall is the honest total for that target).
+    """
     check = defaultdict(float)   # (project, check_type, target) -> wall
     gate = defaultdict(float)    # project -> wall
     disc = defaultdict(float)    # project -> wall
@@ -177,12 +179,19 @@ def _point_count(fams):
 
 def _build_request(fams, now_ns):
     """Build an ExportMetricsServiceRequest with the opentelemetry-proto classes.
-    Raises ImportError if the lib is absent (caller falls back to a warned no-op)."""
+    Raises ImportError if the lib is absent (caller falls back to a warned no-op).
+    """
     from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (
-        ExportMetricsServiceRequest)
+        ExportMetricsServiceRequest,
+    )
+    from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
     from opentelemetry.proto.metrics.v1.metrics_pb2 import (
-        ResourceMetrics, ScopeMetrics, Metric, Gauge, NumberDataPoint)
-    from opentelemetry.proto.common.v1.common_pb2 import KeyValue, AnyValue
+        Gauge,
+        Metric,
+        NumberDataPoint,
+        ResourceMetrics,
+        ScopeMetrics,
+    )
 
     def kv(k, v):
         return KeyValue(key=k, value=AnyValue(string_value=str(v)))
@@ -217,7 +226,8 @@ EMIT_METRIC = "paperkit_emit_unixtime"  # the read-your-write heartbeat (value =
 def _extract_values(query_json_text):
     """PURE: pull the sample VALUES out of a VM /api/v1/query JSON response — the read-your-write
     oracle's parse.  Returns a list of floats (one per result series), [] on empty/garbage (so a
-    malformed response can never false-verify)."""
+    malformed response can never false-verify).
+    """
     try:
         data = json.loads(query_json_text)
     except (ValueError, TypeError):
@@ -235,12 +245,13 @@ def _extract_values(query_json_text):
 
 def query_values(query_url, metric):
     """GET /api/v1/query?query=<metric> and return the queried sample values (best-effort, []
-    on failure).  Its own filehandle; the parse is the pure _extract_values."""
+    on failure).  Its own filehandle; the parse is the pure _extract_values.
+    """
     try:
         url = query_url + "?query=" + urllib.parse.quote(metric)
         with urllib.request.urlopen(url, timeout=10) as r:
             return _extract_values(r.read().decode("utf-8", "replace"))
-    except Exception as e:  # noqa: BLE001 — best-effort probe
+    except Exception as e:
         print(f"otlp: /api/v1/query GET failed ({e})", file=sys.stderr)
         return []
 
@@ -257,7 +268,8 @@ def push(fams, endpoint, query_url, token, deadline=45.0, verify=False):
     confirm until the store's search.latencyOffset (~30s default) passes and blocking on it would
     tax the very cycle time we measure.  verify=True (--strict / the proof) polls /api/v1/query
     until OUR EXACT token value queries back — ingestion AND queryability of our own data, never
-    the shared vm_rows_inserted_total counter (which a concurrent producer can false-pass)."""
+    the shared vm_rows_inserted_total counter (which a concurrent producer can false-pass).
+    """
     expected = _point_count(fams)
     try:
         payload = _build_request(fams, time.time_ns()).SerializeToString()
@@ -267,7 +279,7 @@ def push(fams, endpoint, query_url, token, deadline=45.0, verify=False):
         return False
     try:
         status = _post_protobuf(endpoint, payload)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"otlp: POST to {endpoint} failed ({e})", file=sys.stderr)
         return False
     print(f"otlp: POST {endpoint} -> {status}; {expected} data points; "

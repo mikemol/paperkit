@@ -61,7 +61,8 @@ _REFUSE = 3
 
 def _atomic(groups, records):
     """One unit per claim — the teaching cut (slides.bib: cluster → slide-per-claim).  The
-    grouping's ORDER is preserved; only its bracketing is discarded."""
+    grouping's ORDER is preserved; only its bracketing is discarded.
+    """
     return [[k] for g in groups for k in g]
 
 
@@ -69,7 +70,8 @@ def _staged(groups, records):
     """One unit per cluster — the talk cut: a cohering group stages onto one slide.  This is the
     identity on the grouping, which is the point: the grouping ALREADY is the talk's pagination,
     so `staged` is what makes "the cut is the grouping" a nameable choice rather than an
-    unstated default."""
+    unstated default.
+    """
     return [list(g) for g in groups]
 
 
@@ -206,7 +208,15 @@ def partition(records, gamma: float = 1.0) -> dict:
                 adj[y].add(r["key"])
     edges = sum(len(v) for v in adj.values()) // 2
     if not edges:
-        return {"part": dict(sec), "edges": 0, "degenerate": True, "within": 0}
+        # Δ·degeneracy·kinds — a document with no grounding graph is degenerate for TWO different
+        # reasons, and reporting one verdict for both hides the actionable case.  UNDECLARED: no
+        # record carries a `rests-on` field at all — the document may well HAVE an argument and
+        # simply has not declared it, which an author can fix.  UNGROUNDED: the field is declared
+        # but names nothing reachable in this record set — there is no argument here to ground, so
+        # the section cut is the honest answer and nothing is owed.  The bit stays `degenerate`
+        # for every existing consumer; `kind` is the second field that tells them apart.
+        kind = "undeclared" if not any("rests-on" in r for r in records) else "ungrounded"
+        return {"part": dict(sec), "edges": 0, "degenerate": True, "within": 0, "kind": kind}
 
     within = sum(1 for r in records for y in r.get("rests-on", [])
                  if y in idx and sec.get(y) == r.get("section"))
@@ -340,7 +350,8 @@ def resolve(name: str, project_dir: Path | None = None) -> dict:
     """The RESOLVES + LOUD invariants at one seam: a registered genre returns its entry; an
     unregistered one RAISES rather than falling back to a default.  Silent fallback is the failure
     an open registry makes possible — a project would render under a genre it did not ask for and
-    nothing would say so."""
+    nothing would say so.
+    """
     reg = registry(project_dir)
     if name not in reg:
         raise Unregistered(
@@ -354,7 +365,8 @@ def resolve(name: str, project_dir: Path | None = None) -> dict:
 def is_total(objective, groups, records=()) -> tuple[bool, str]:
     """The TOTAL invariant: an objective must be a real FUNCTION of the grouping — every input key
     lands in exactly one output unit.  Returns (ok, why).  A pagination that drops a claim silently
-    truncates the document; one that duplicates a claim double-counts it.  Neither is a cut."""
+    truncates the document; one that duplicates a claim double-counts it.  Neither is a cut.
+    """
     src = [k for g in groups for k in g]
     try:
         units = objective(groups, records)

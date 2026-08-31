@@ -39,7 +39,8 @@ from pathlib import Path
 
 def census(text: str, pattern: str, as_set: bool):
     """The census of `text` under `pattern`: the SET of group-1 captures (as_set) or the multiset
-    COUNT of matches.  Returns (kind, value) — ("set", frozenset) or ("count", int)."""
+    COUNT of matches.  Returns (kind, value) — ("set", frozenset) or ("count", int).
+    """
     rx = re.compile(pattern, re.M)
     if as_set:
         return "set", frozenset(rx.findall(text))
@@ -49,7 +50,8 @@ def census(text: str, pattern: str, as_set: bool):
 def regressed(base, cur, grow: bool):
     """The regression, if any, of `cur`'s census vs `base`'s under the ratchet direction.  For a SET
     census: (shrink) the keys ADDED, or (grow) the keys REMOVED.  For a COUNT: the signed overage.
-    Returns a truthy description of the regression, or a falsey empty value if the ratchet holds."""
+    Returns a truthy description of the regression, or a falsey empty value if the ratchet holds.
+    """
     bkind, bval = base
     ckind, cval = cur
     assert bkind == ckind, "baseline and current census kinds differ"
@@ -58,7 +60,7 @@ def regressed(base, cur, grow: bool):
         return sorted(cval - bval) if not grow else sorted(bval - cval)
     # count: shrink ⇒ cur may not exceed base; grow ⇒ cur may not fall below base.
     over = (cval - bval) if not grow else (bval - cval)
-    return over if over > 0 else 0
+    return max(0, over)
 
 
 def _fmt(kind, val) -> str:
@@ -67,7 +69,8 @@ def _fmt(kind, val) -> str:
 
 def check(base_text: str, cur_text: str, pattern: str, as_set: bool, grow: bool):
     """(ok, message) for the ratchet, with the n-of-m verdict and the F-arm self-proof.  ok is False
-    on a real regression OR on a failed self-proof (an unsound ratchet must not pass)."""
+    on a real regression OR on a failed self-proof (an unsound ratchet must not pass).
+    """
     base = census(base_text, pattern, as_set)
     cur = census(cur_text, pattern, as_set)
     direction = "grow" if grow else "shrink"

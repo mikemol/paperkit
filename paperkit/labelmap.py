@@ -51,7 +51,8 @@ class LabelMap:
 
     def add(self, label: str, concept: str, carrier: str) -> None:
         """Grow the map.  The index is designed to GROW — this is the normal operation, not a
-        repair, which is why the structure is mutable."""
+        repair, which is why the structure is mutable.
+        """
         self.concepts.setdefault(concept, {})[carrier] = label
         self.index[norm(label)] = (concept, carrier)
 
@@ -60,7 +61,8 @@ class LabelMap:
 
         The match is on WHOLE WORDS, not substrings.  A substring rule matched `ratio` inside
         `bifibrational` and produced a hundred false hits — the instrument's own resolution limit,
-        and the reason its first numbers were worthless.  Keep the rule."""
+        and the reason its first numbers were worthless.  Keep the rule.
+        """
         t = norm(term)
         if t in self.index:
             c, carrier = self.index[t]
@@ -88,7 +90,8 @@ class LabelMap:
         not yet fine enough to separate them.  Which of the two holds is not declared; it is DERIVED,
         by running the witness families the labels point at and comparing what they compute (see
         discriminate).  A "meaning" field here would be a scalar tag standing in for that
-        computation — the thing this design refuses."""
+        computation — the thing this design refuses.
+        """
         slots = {}
         for label, slot in self.index.items():
             slots.setdefault(slot, []).append(label)
@@ -103,7 +106,8 @@ class LabelMap:
         not-runnable-here case and emphatically NOT a merge.
 
         `run` is injected, which is what keeps this module independent of any resolver: the natural
-        wiring is `routes.dispatch`, but a caller may pass anything that maps a route to a value."""
+        wiring is `routes.dispatch`, but a caller may pass anything that maps a route to a value.
+        """
         ha, hb = self.lookup(label_a), self.lookup(label_b)
         if not ha or not hb:
             return "unresolved", None, None

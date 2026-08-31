@@ -7,6 +7,19 @@ load("//tools:calc.bzl", "observe_setting")
 # @proj//:{gate,adequacy}), which also projects its prose.  Not a bolted-on py_test.
 exports_files(["assert_pass.sh", "cgroup-scope", "mem_db.py", "mem_harvest.py", "mem_project.py", "read_grade.py", "mem_learn.py", "sens.py", "decisions.py", "eval.py", "verdict.py", "lint_bzl.py", "pyc.py", "imports.py", "closure.py", "hook_index.py", "otlp_push.py", "ratchet.py"])
 
+# ⚑ Ζ·pyc·package — `tools` REACHED AS A PACKAGE, not as loose files.  A boundary suite that names
+# its dependency honestly (`from tools import dagderive`) needs the package MARKER staged beside
+# the module; a manifest listing individual `tools/*.py` and no `__init__.py` gave five suites a
+# ModuleNotFoundError inside a cell while they passed on the host, where the editable install
+# supplies the package.
+#
+# ⚑⚑ THE py_binary BELOW RECORDS THE SAME LESSON FROM Ζ·cell·venv, and it is the STRONGER form:
+# rules_python builds a runfiles tree at real package paths, so the import resolves BY LAYOUT.
+# These three are consumed by a `cmd:` check through the //:files FILEGROUP, which has no runfiles
+# tree — so they are exported and the marker travels with them.  When Ζ·engine·flat lands and the
+# suites become py_binary-shaped, this export retires in favour of that mechanism.
+exports_files(["__init__.py", "dagderive.py", "dagbzl.py", "dagnames.py", "closure_census.py", "indexdiverge.py", "witness_reach.py", "vendor_hooks.py"])
+
 # Ξ·lint·wire — the .bzl files exported so the boundaries bnd-lint check (a data dep via //:files) can
 # lint them.  Explicit set (no globs); KEEP in sync with the lint's arg list + //:files.
 exports_files(["calc.bzl", "verb.bzl", "grade.bzl", "bibtex.bzl", "witness.bzl"])
@@ -15,4 +28,34 @@ exports_files(["calc.bzl", "verb.bzl", "grade.bzl", "bibtex.bzl", "witness.bzl"]
 observe_setting(name = "observe", build_setting_default = False)
 
 py_binary(name = "pyinfo", srcs = ["pyinfo.py"], main = "pyinfo.py")
+
+# ⚑ Ζ·cell·venv — THE SWEEP CELL IS A py_binary, BECAUSE A FILE STAGED ALONE HAS NO SIBLINGS.
+#
+# `eval.py` was in `exports_files` above and reached each cell as a BARE FILE.  Measured:
+#
+#     bazel query 'kind("source file", deps(//tools:eval.py))'   ->   //tools:eval.py
+#
+# One file.  So when Ζ·eval·split cut it into `cellargs`/`cellstage`/`cellcgroup`, the sandbox had
+# nothing to import from — `python3 tools/eval.py` raised `ModuleNotFoundError: No module named
+# 'tools'`, and every one of 137,553 cells would have died at import.
+#
+# ⚑⚑ AND THE FIX IS NOT IN THE SOURCE.  I first added a `sys.path` prelude to eval.py and argued
+# it was safe because the IMPORT stayed declared (a peer's distinction, and a real one).  The
+# operator's correction: *stop modifying os.path* — path injection is being retired
+# ecosystem-wide, and a prelude is still a runtime mutation of global interpreter state.  Then:
+# *the code isn't getting properly staged into the per-cell/action venv*.  Which relocates the
+# whole problem: WHAT A CELL CAN IMPORT IS THE ACTION'S PROPERTY, declared here, not something a
+# script arranges for itself at runtime.  place-by-ownership-not-need, one layer out from where I
+# was looking.
+#
+# `py_binary` is what declares it.  rules_python builds a runfiles tree carrying `srcs` + `deps`
+# at their real package paths, so `from tools import cellargs` resolves BY LAYOUT — the same
+# property Ζ·tools·package bought the checker, now given to the sandbox.  Not a new mechanism:
+# `pyinfo` above is already one, so this is the existing shape applied to the file that needed it.
+py_binary(
+    name = "eval",
+    srcs = ["eval.py", "cellargs.py", "cellcgroup.py", "cellstage.py", "__init__.py"],
+    main = "eval.py",
+    visibility = ["//visibility:public"],
+)
 

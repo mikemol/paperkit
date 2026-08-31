@@ -25,7 +25,8 @@ import source
 
 def odt(paper_md: Path, out_odt: Path) -> Path:
     """The md→odt morphism (graph.tool_for('md','odt') = pandoc): cite_split the source, then pandoc
-    it to a .odt (OpenDocument)."""
+    it to a .odt (OpenDocument).
+    """
     assert graph.tool_for("md", "odt") == "pandoc"
     with tempfile.TemporaryDirectory() as t:
         md = Path(t) / "p.md"

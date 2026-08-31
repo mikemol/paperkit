@@ -37,7 +37,8 @@ def hook_tests(build: str) -> set:
 
 def projects(module: str) -> dict:
     """{repo name: {graded, emerge}} — every bib.project tag, and whether it declares adequacy = True
-    (hook-graded) and/or emerge = True (contributes the ∂² coherence gate over the def-sweep grid)."""
+    (hook-graded) and/or emerge = True (contributes the ∂² coherence gate over the def-sweep grid).
+    """
     out = {}
     for line in module.splitlines():
         if "bib.project(" in line:
@@ -49,7 +50,8 @@ def projects(module: str) -> dict:
 
 def incomplete(build: str, module: str) -> list:
     """The targets a project is MISSING from //:hook (empty = complete): a GRADED project owes its
-    gate AND adequacy; an EMERGE project owes its cohere (the def-sweep coherence gate)."""
+    gate AND adequacy; an EMERGE project owes its cohere (the def-sweep coherence gate).
+    """
     hook = hook_tests(build)
     miss = []
     for name, p in projects(module).items():
@@ -107,9 +109,9 @@ def main() -> int:
     ok = (not incomplete(BUILD, MODULE)) and (victim in incomplete(f_build, MODULE))
     fails.append("hook-delta") if not ok else None
     print(f"  {'ok ' if ok else 'XX '}dropping {victim} from //:hook is CAUGHT as an incomplete local CI")
-    print(f"      P (intact):  //:hook lists every graded project's gate + adequacy → complete")
+    print("      P (intact):  //:hook lists every graded project's gate + adequacy → complete")
     print(f"      F (dropped): {victim} removed → completeness flags the gap")
-    print(f"      δ (min delta): one adequacy target in the //:hook test_suite\n")
+    print("      δ (min delta): one adequacy target in the //:hook test_suite\n")
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")

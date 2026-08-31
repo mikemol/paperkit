@@ -66,7 +66,8 @@ def module_index(src: str):
 
     The returned `bodies` map holds BOTH functions and assignments, keyed by the name they bind:
     the walk in `slice_of` traverses through either, because a constant that names other
-    definitions is an edge in the dependency graph exactly as a call is."""
+    definitions is an edge in the dependency graph exactly as a call is.
+    """
     tree = ast.parse(src)
     fns, names, segs, imports = {}, set(), {}, {}
     for node in tree.body:
@@ -101,7 +102,8 @@ def _local_imports(node) -> dict:
     """Import bindings made INSIDE a function body — the edge a name-only slice cannot see.
 
     This is the fail-open closer.  `import labelmap as LM` inside a witness binds a LOCAL name, so
-    it never appears in the module-level name set, and the module it names never enters the hash."""
+    it never appears in the module-level name set, and the module it names never enters the hash.
+    """
     out = {}
     for n in ast.walk(node):
         if isinstance(n, ast.Import):
@@ -122,7 +124,8 @@ def slice_of(fn: str, fns, names, imports):
     a name reached only via a literal (a dispatch table, an operator registry) is still reached.
     Stopping at the constant's own name is a FAIL-OPEN: its contents change, the hash does not.
 
-    Returns None when FN is not a module-level definition; the caller must then RUN the check."""
+    Returns None when FN is not a module-level definition; the caller must then RUN the check.
+    """
     if fn not in fns:
         return None
     seen, mods, frontier = {fn}, set(), {fn}
@@ -159,7 +162,8 @@ def _module_file(mod: str, search: list[Path]) -> Path | None:
 
 def _owned(f: Path) -> bool:
     """Is this file the PROJECT's own source, rather than the interpreter's or a dependency's?
-    Anything under a stdlib/site-packages/venv directory is somebody else's to version."""
+    Anything under a stdlib/site-packages/venv directory is somebody else's to version.
+    """
     s = str(f)
     return not any(seg in s for seg in ("/site-packages/", "/dist-packages/",
                                         "/lib/python", "/.venv/", "/installs/python/"))
@@ -175,7 +179,8 @@ def search_path(src_path: Path) -> list[Path]:
     UNRESOLVED, and an unresolved module degrades to name-only: the local-import edge is detected
     but its CONTENT never enters the key, so the fail-open reopens one level out.  Importing the
     module and reading the sys.path it established is what makes the file set real rather than
-    nominal."""
+    nominal.
+    """
     out, seen = [src_path.parent], {str(src_path.parent)}
     before = list(sys.path)
     try:
@@ -206,7 +211,8 @@ def slice_key(fn: str, route: str, fns, names, segs, imports, search: list[Path]
 
     Third-party and stdlib modules are recorded BY NAME only (they are not resolved under `search`),
     so upgrading a dependency does not invalidate — that is a declared bound, not an oversight: this
-    cache's unit is the library's own source."""
+    cache's unit is the library's own source.
+    """
     sl = slice_of(fn, fns, names, imports)
     if sl is None:
         return None
@@ -236,7 +242,8 @@ def routes_and_owners(src_path: Path) -> dict[str, str]:
     routes.leaves() — the ONE recursive leaf-walk — rather than a hand-rolled loop, so this cannot
     disagree with the resolver about how deep a table goes.  (Upstream had a 2-level loop here
     beside a depth-agnostic resolver: a grade-3 family would resolve for the gate and VANISH from
-    the cache's driver, so those checks silently stopped running.)"""
+    the cache's driver, so those checks silently stopped running.)
+    """
     import importlib.util
     sys.path.insert(0, str(src_path.parent))
     import routes as R
@@ -267,7 +274,8 @@ def run_check(route: str, src_path: Path) -> bool | None:
     """True = certified, False = FAILED, None = exit 2 'not mine'.
 
     The three-way return is the exit-code protocol (routes.py), and collapsing it is a real bug:
-    reading exit 2 as failure reports a route that merely fell through as a broken check."""
+    reading exit 2 as failure reports a route that merely fell through as a broken check.
+    """
     r = subprocess.run([sys.executable, src_path.name, route], cwd=src_path.parent,
                        capture_output=True, text=True, timeout=900)
     if r.returncode == 2:

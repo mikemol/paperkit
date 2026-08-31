@@ -41,15 +41,29 @@ exports_files(["components.bzl", "dag.bzl"])
 #
 # Ξ·dag·build — each pk_pyc's deps ARE its imports (paperkit/dag.bzl, AST-derived): the build DAG is a
 # projection of the engine import DAG, so a consumer stages a module's transitive .pyc CLOSURE (its
-# dependency cone), not the flat engine.  IMPORTS keys stems by bare name; a tests/ module's target is
-# tests/<stem>, so map every imported stem back to its owning pk_pyc target name.
-_STEM_TO_TARGET = {m.rsplit("/", 1)[-1][:-len(".py")]: m[:-len(".py")] for m in ENGINE_SRCS}
-
+# dependency cone), not the flat engine.
+#
+# ⚑ Ξ·dag·dotted — THE STEM→TARGET MAP IS GONE, BECAUSE BOTH SIDES OF AN EDGE NOW NAME ONE NAMESPACE.
+# IMPORTS used to record a path-shaped KEY against a bare-stem VALUE, so this file translated:
+#
+#     _STEM_TO_TARGET = {m.rsplit("/", 1)[-1][:-len(".py")]: m[:-len(".py")] for m in ENGINE_SRCS}
+#
+# A dict comprehension keyed on bare stem is silently LAST-WINS, and the engine spans three
+# directories (., tests, tools) flattened into that one key space — measured, 79 sources and 79
+# distinct stems, so no collision TODAY and nothing that would refuse one.  A second `bib.py` under
+# tests/ would collapse onto paperkit/bib.py's key and the loser's .pyc would never be staged for
+# anything importing it: a ModuleNotFoundError inside a sandboxed cell, the shape components.bzl
+# records costing four batch runs.  A naming convention with no owner is guard-must-not-copy at the
+# build layer.
+#
+# tools/dagderive.py now records the imported module's PATH — already the shape of a target — and
+# REFUSES an ambiguous stem rather than picking one.  Verified a pure rename before landing: 114
+# edges before, 114 after, identical once the value spelling is normalised.
 [
     pk_pyc(
         name = m[:-len(".py")],
         src = m,
-        deps = [":" + _STEM_TO_TARGET[s] for s in IMPORTS.get(m, [])],
+        deps = [":" + s[:-len(".py")] for s in IMPORTS.get(m, [])],
         # Ξ·dag·eval — public: a cell's `closure` references these pk_pyc targets directly (not the
         # flat //paperkit:pyc), and the emerge grid lives in a separate repo.
         visibility = ["//visibility:public"],

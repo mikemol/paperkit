@@ -638,8 +638,22 @@ def concept_resolves_consumer_first():
     d = Path(tempfile.mkdtemp())
     try:
         # a consumer with its own library, owning one key and disclaiming the rest (exit 2).
+        #
+        # ⚑ Ζ·lib·contract — THE FIXTURE DECLARES ITSELF A PROJECT.  It used to write only
+        # `concepts.py`, which passed the old directory test (`concepts.py`.is_file()) — a
+        # predicate WEAKER than the contract, and the ecosystem populated the gap: two repos ship
+        # a concepts.py-only `library/` that satisfies the test and cannot answer, and one ships a
+        # `library/` with no concepts.py at all that silently fell through to THIS engine's
+        # library.  A library is a PROJECT now, so the fixture carries the paper.toml that says
+        # so — and the `[checks.claim] cmd` below is READ by _library_cmd rather than reconstructed,
+        # which is why the witness module may be named anything (it is `witness.py` here on
+        # purpose: a fixture named concepts.py could pass against a resolver that still hardcoded
+        # the name, and would prove nothing about the declaration being read).
         (d / "library").mkdir()
-        (d / "library" / "concepts.py").write_text(
+        (d / "library" / "paper.toml").write_text(
+            '[paper]\ntitle="c"\nrubric="r.tsv"\nwarrants=["concepts.bib"]\nout="l.md"\n'
+            '\n[checks.claim]\ncmd = "python3 witness.py {target}"\n')
+        (d / "library" / "witness.py").write_text(
             "import sys\n"
             "sys.exit(0 if sys.argv[1:2] == ['mine'] else 2)\n")
         # SELECTION is pure — no spawn needed to witness that the consumer's library is chosen.
@@ -663,8 +677,43 @@ def concept_resolves_consumer_first():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def degeneracy_has_kinds():
+    """Δ·degeneracy·kinds — a degenerate report distinguishes WHY it is degenerate.
+
+    A document with no grounding graph is degenerate for two different reasons, and one verdict
+    for both hides the actionable case: UNDECLARED (no record carries `rests-on` — the document
+    may have an argument and simply has not declared it, which an author can fix) versus
+    UNGROUNDED (the field is declared but names nothing reachable — there is no argument here to
+    ground, so the section cut is the honest answer and nothing is owed).
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "paperkit"))
+    import genre
+
+    undeclared = [{"key": "a", "section": "S"}, {"key": "b", "section": "S"}]
+    declared_empty = [{"key": "a", "section": "S", "rests-on": []},
+                      {"key": "b", "section": "S", "rests-on": []}]
+
+    u, d = genre.partition(undeclared), genre.partition(declared_empty)
+    assert u["degenerate"] and d["degenerate"], "both fixtures must still report degenerate"
+    assert u["edges"] == 0 and d["edges"] == 0, "neither fixture has a grounding edge"
+    # The load-bearing arm: the two must be DISTINGUISHABLE in the record alone.
+    assert u.get("kind") != d.get("kind"), (
+        "a degenerate report must say WHICH degeneracy — never-declared and declared-but-empty "
+        f"are different actionable states (both reported {u.get('kind')!r})")
+    assert u.get("kind") == "undeclared", f"no rests-on anywhere is `undeclared` (got {u.get('kind')!r})"
+    assert d.get("kind") == "ungrounded", f"declared-but-empty is `ungrounded` (got {d.get('kind')!r})"
+    # A grounded document is not degenerate at all, and carries no kind.
+    grounded = [{"key": "a", "section": "S", "rests-on": ["b"]},
+                {"key": "b", "section": "S", "rests-on": ["a"]}]
+    assert not genre.partition(grounded)["degenerate"], "a grounded document must not be degenerate"
+
+
 CONCEPTS = {
     # resolver component — the concept verb and the library seam (Ρ·paper·concept).
+    # project component — what a derived grouping may honestly claim (Δ·degeneracy·kinds).
+    "degeneracy-has-kinds": degeneracy_has_kinds,
     "concept-builtin": concept_imports_a_certificate,
     "concept-interned": concept_interns_to_one_node,
     "concept-views": concept_carries_several_views,

@@ -27,8 +27,8 @@ ENGINE = Path(__file__).resolve().parents[1]
 ROOT = ENGINE.parent
 sys.path.insert(0, str(ENGINE))
 
-import grader  # noqa: E402
-import resolver  # noqa: E402
+import grader
+import resolver
 
 BIBTEX_SRC = (ROOT / "tools" / "bibtex.bzl").read_text()
 FOOTDEPS_SRC = (ENGINE / "footdeps.py").read_text()
@@ -115,7 +115,21 @@ def main() -> int:
         # A runnable downstream library honouring the exit-2 "not mine" sentinel contract:
         # owns exactly one key.  (The fallthrough dispatches on that contract, so the fixture
         # must SPEAK it — a bare data file would test directory pick, not key ownership.)
-        (far / "library" / "concepts.py").write_text(
+        #
+        # ⚑ Ζ·lib·contract — IT DECLARES ITSELF A PROJECT.  This wrote `concepts.py` alone, which
+        # satisfied the old directory test; the predicate is now `(cand / "paper.toml").is_file()`
+        # because concepts.py-only directories exist in the wild (`gcalculus/library/`,
+        # `summit/library/`) and answer nothing.  ⚑ THE THIRD FIXTURE OF THIS SHAPE — the same
+        # repair landed in library/concepts.py and boundaries_concept_route.py, which is the tell
+        # that the fixture form itself wants an owner rather than three copies.
+        #
+        # ⚑ AND THE WITNESS IS NOT NAMED `concepts.py`, DELIBERATELY.  `_library_cmd` reads the
+        # module from this paper.toml's `[checks.claim] cmd`; a fixture named concepts.py would
+        # pass equally against a resolver that still hardcoded the name and prove nothing.
+        (far / "library" / "paper.toml").write_text(
+            '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["concepts.bib"]\nout="l.md"\n'
+            '\n[checks.claim]\ncmd = "python3 witness.py {target}"\n')
+        (far / "library" / "witness.py").write_text(
             "import sys\nsys.exit(0 if sys.argv[1:2] == ['mine'] else 2)\n")
         (far / "doc").mkdir()
         check("a project outside this repo resolves concept: to ITS OWN library, not the engine's",

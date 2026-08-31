@@ -23,7 +23,8 @@ def cite_split(paper_md: Path) -> str:
     """The paper's prose with every internal `[@warrant]` inlined as its verification marker (the
     marker its check TYPE earns), so an internal warrant reads as a machine-checked claim and never
     a bare citation.  External `[@source]` citations (references.bib, no `check`) are left for the
-    format's own bibliography step."""
+    format's own bibliography step.
+    """
     mk = {}
     bibtext = "".join(p.read_text() for p in sorted(paper_md.parent.glob("*.bib")))
     for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", bibtext, re.S):

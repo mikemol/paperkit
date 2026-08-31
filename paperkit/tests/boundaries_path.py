@@ -16,8 +16,9 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import resolver  # noqa: E402
-import config as C  # noqa: E402
+import resolver
+
+import config as C
 
 SEP = os.pathsep
 
@@ -63,7 +64,7 @@ def main() -> int:
             host = SEP.join(["/usr/bin", "/bin"])
             os.environ.pop("PAPERKIT_PATH", None); F = resolver.clean_env({"PATH": host})["PATH"]
             os.environ["PAPERKIT_PATH"] = t; P = resolver.clean_env({"PATH": host})["PATH"]
-            ok = F.split(SEP) == ["/usr/bin", "/bin"] and P == t
+            ok = F.split(SEP) == ["/usr/bin", "/bin"] and t == P
             fails.append("pin-delta") if not ok else None
             print(f"  {'ok ' if ok else 'XX '}declaring PAPERKIT_PATH flips resolution from the host PATH to the pinned set")
             print(f"      P (pinned):  {t}  — exactly the declared dir")

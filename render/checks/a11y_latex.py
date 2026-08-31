@@ -30,13 +30,14 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import a11y            # the veraPDF measurement owner — import, never re-implement
-import latex           # the LaTeX deliverable builder (Ρ·render·latex)
+import a11y  # the veraPDF measurement owner — import, never re-implement
+import latex  # the LaTeX deliverable builder (Ρ·render·latex)
 
 
 def _missing_glyphs(work: Path) -> list[str]:
     """The lualatex log's 'Missing character' warnings — names the exact codepoints a .notdef came
-    from, so a UA-2 8.4.5.9 failure is actionable (extend the font fallback)."""
+    from, so a UA-2 8.4.5.9 failure is actionable (extend the font fallback).
+    """
     log = work / "p.log"
     if not log.exists():
         return []

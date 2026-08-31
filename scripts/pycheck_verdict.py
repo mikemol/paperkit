@@ -1,0 +1,1 @@
+../../substrate/scripts/pycheck_verdict.py

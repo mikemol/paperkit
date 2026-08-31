@@ -34,7 +34,8 @@ from pathlib import Path
 def drive(w, state_path: str | None = None, budget: float = 0.0):
     """Advance witness `w` to done or budget.  Returns (meaning, steps, done).
     Persists the opaque resumption token to state_path between increments.
-    budget <= 0 means run to completion (one blocking call — the cold fallback)."""
+    budget <= 0 means run to completion (one blocking call — the cold fallback).
+    """
     if state_path and Path(state_path).exists():
         state = w.deserialize(Path(state_path).read_text())
     else:

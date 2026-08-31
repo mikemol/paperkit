@@ -44,3 +44,18 @@ talk/talk.pptx
 
 # Agda build artifacts (Ζ·pyc: a .agdai is derived, like a .pyc or a .o)
 *.agdai
+
+# Ζ·bibstruct·root — edit_snapshot's write journal + snapshot store, runtime artifacts of the
+# vendored write-guard (paperkit/tools/edit_snapshot.py).  Written beside the tool whenever a
+# `bibstruct --add/--set/--addfield --apply` runs, including in its own selftest; a record of
+# what a mutation touched, not a source the engine reads.
+paperkit/scratch/
+.edit-snapshots/
+
+# Ζ·hook·regen — the regen hook's flock file (single-instance guard, runtime state).
+.regen.lock
+
+# Ζ·execlog·leak — the repo-local scratch dir.  `.githooks/pre-commit` exports TMPDIR here (off
+# tmpfs, deliberately: a 4.45 GB execution log in RAM leaked across days), and bibstruct's
+# selftest leaves a mkdtemp per run.  Build residue by construction — never a source.
+.tmp/

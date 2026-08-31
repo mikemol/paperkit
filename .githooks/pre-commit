@@ -12,6 +12,8 @@ cd "$(git rev-parse --show-toplevel)"
 # Ρ·telemetry — optional per-clone local config (gitignored): a machine's OTLP endpoint etc.  The
 # endpoint is a POINTER a machine sets at another machine's store; it is NOT tracked (each clone's
 # operator points at their own), so it lives here, sourced if present, absent by default.
+# shellcheck source=/dev/null  # per-clone, gitignored, absent by default — there is no file to
+# follow at analysis time, and pointing at an example would check the wrong content.
 [ -f .githooks/local.env ] && . .githooks/local.env
 # Ρ·telemetry·share — NAME a configured endpoint that does not answer.  These are per-clone
 # pointers and they go stale silently: VM/VLogs moved to k8s NodePorts and this clone pushed at
@@ -23,6 +25,13 @@ for _pk_ep in "${PAPERKIT_OTLP_METRICS:-}" "${PAPERKIT_LOGS_URL:-}" "${PAPERKIT_
   [ -n "$_pk_ep" ] || continue
   _pk_hp=$(printf '%s' "$_pk_ep" | sed -e 's|^[a-z+]*://||' -e 's|/.*$||')
   case "$_pk_hp" in *:*) : ;; *) continue ;; esac
+  # ⚑ SC3025 ACKNOWLEDGED, NOT DISMISSED: /dev/tcp is a BASH feature and this file is #!/bin/sh.
+  # Where /bin/sh is dash the redirect fails, and the probe then reports DOES NOT ANSWER for a
+  # LIVE endpoint — a false alarm in the very warning that exists to catch a stale pointer.
+  # It is tolerated because the arm is advisory-only (never fatal, per the comment above) and
+  # /bin/sh is bash on this box; the honest fix is a portable probe, filed as Ζ·probe·portable.
+  # A disable directive does not make it portable — it records that the limit is known.
+  # shellcheck disable=SC3025
   (exec 9<>"/dev/tcp/${_pk_hp%%:*}/${_pk_hp##*:}") 2>/dev/null \
     || echo "[pre-commit] telemetry endpoint DOES NOT ANSWER: $_pk_ep (stale pointer? see .githooks/local.env.example)" >&2
 done
@@ -71,7 +80,74 @@ run "hook-index (worktree ≡ index)"   mise exec -- python3 tools/hook_index.py
 # gate: it runs only on a GREEN hook (run() aborts the commit on red), only when the endpoint
 # env is set (default OFF ⇒ no uv fetch, no cost), and can never block a commit (|| true + the
 # tool's own best-effort no-op).  It parses the log — a hermetic cell has no network to emit.
-PK_EXECLOG=$(mktemp)
+# ⚑ Ζ·execlog·leak — THE EXECUTION LOG IS GIGABYTES AND `mktemp` PUTS IT IN RAM.
+#
+# /tmp here is TMPFS.  A //:hook run is ~137,000 actions and the execution log carries one JSON
+# record per spawn, so the file MEASURED 4,446,164,310 bytes — 4.45 GB of RAM, not disk.  The only
+# cleanup was the `rm -f` on the normal exit path near the end of this script, so every run that
+# was interrupted, killed, or crashed left the whole thing resident, forever, and they ACCUMULATED
+# ACROSS DAYS: three orphans totalling 4.97 GB were found on 2026-08-29 (dated Aug 26 and Aug 28),
+# with tmpfs at 79% and MemAvailable at 265 MB on a 15.6 GB box.  Deleting them took available
+# memory 265 MB → 6,029 MB and swap 17.7 GB → 13.2 GB.
+#
+# ⚑ AND THIS SCRIPT ALREADY KNEW THE LESSON.  Ζ·delta·leak, ~60 lines below, exists because
+# "_grade_one rmtrees its copy in a `finally`, which is correct and does not run on SIGKILL;
+# three interrupted hooks in one session left 42 husks."  Identical shape, identical cause,
+# solved for the sweep sandboxes and not for the logs beside them.
+#
+# ⚑ AND AN INSTRUMENT HERE MISREAD IT.  The Ρ·telemetry·red comment below records "the server died
+# twice with `Build completed successfully` above `OutOfMemoryError`" and concludes "memory PSI
+# peaked near 4% across that window — nothing was starved".  PSI was measured while tmpfs already
+# held gigabytes of leaked logs; the JVM's heap was competing with them.  A box with 5 GB of RAM
+# held by dead files is starved in a way PSI at that moment did not show.
+#
+# TWO INDEPENDENT FAULTS, TWO FIXES:
+#   1. WRONG FILESYSTEM — a multi-GB build log has no business in tmpfs.  Everything this script
+#      writes goes under ~/.tmp (real disk), and TMPDIR is EXPORTED so bazel and every tool it
+#      spawns inherit it: the leak class is not specific to these three files, and a fix that only
+#      moved the ones I happened to name would leave the next one to be found the same way.
+#   2. CLEANUP ONLY ON SUCCESS — a `trap ... EXIT` releases the temp files on interrupt, on error
+#      (this script is `set -e`, so any later `run()` failure exits immediately) and on the normal
+#      path.  POSIX sh has no ERR/RETURN traps, but EXIT plus the signals covers every route out
+#      that can still run code.  A SIGKILL cannot, which is exactly why the file must not be in RAM.
+#
+# ⚑ TMPDIR IS EXPORTED, NOT JUST USED.  The operator's call, and it is the stronger fix: bazel
+# itself, the JVM, the sandbox and every spawned tool honour TMPDIR, so pointing it at real disk
+# takes the WHOLE process tree off tmpfs rather than the files this script names.  ~/.tmp persists
+# between runs (it is not cleared at boot the way /tmp is), so a crashed run's log survives for
+# diagnosis instead of being both un-freed AND un-inspectable.
+# ⚑ THE OPERATOR'S SETTING WINS, AND THE FALLBACK IS LAST.  Measured on this machine: TMP is set
+# to ~/.tmp and TMPDIR is UNSET.  A first cut read only `${PAPERKIT_TMPDIR:-$HOME/.tmp}` and so
+# arrived at the right directory BY COINCIDENCE rather than by deference — it would have ignored
+# an operator who pointed TMP or TMPDIR somewhere else entirely.  Read what is declared, in
+# specificity order, and only then fall back.  (TMP is the variable set here; TMPDIR is the one
+# mktemp/python/the JVM actually READ — so this also repairs the asymmetry, exporting both.)
+PK_TMPDIR="${PAPERKIT_TMPDIR:-${TMPDIR:-${TMP:-$HOME/.tmp}}}"
+mkdir -p "$PK_TMPDIR"
+TMPDIR="$PK_TMPDIR"
+TMP="$PK_TMPDIR"
+export TMPDIR TMP
+PK_EXECLOG=$(mktemp -p "$PK_TMPDIR" execlog.XXXXXX)
+# The trap owns EVERY temp artifact this script makes, named in one place.  PK_HOOKLOG and
+# PK_COORDLOG are assigned later; the trap reads them at fire time, so an early exit that never
+# reached their assignment simply removes nothing (unset ⇒ empty ⇒ `rm -f ""`, harmless under
+# `set -u` because they are defaulted here).  PK_COORDLOG was NEVER removed on any path at all.
+PK_HOOKLOG=""
+PK_COORDLOG=""
+_pk_extra=""          # late, short-lived temps (the cotype pair) — registered while they exist
+_pk_cleanup() {
+    # kill the background samplers before removing what they write into.  `|| true` on each arm:
+    # this runs under `set -e` from an EXIT trap, and a failed kill must not abort the cleanup
+    # half-done — that would leave exactly the residue the trap exists to remove.
+    [ -n "$PK_HOOKLOG" ] && kill "$(cat "$PK_HOOKLOG.tailpid" 2>/dev/null)" 2>/dev/null || true
+    [ -n "$PK_COORDLOG" ] && kill "$(cat "$PK_COORDLOG.pid" 2>/dev/null)" 2>/dev/null || true
+    # shellcheck disable=SC2086  # $_pk_extra holds a SPACE-SEPARATED PATH LIST (the cotype pair);
+    # word-splitting is the mechanism, and quoting it would pass "a b" as ONE filename that does
+    # not exist — the leak this trap exists to prevent, reintroduced by a quote.
+    rm -f "$PK_EXECLOG" "$PK_HOOKLOG" "$PK_HOOKLOG.tailpid" \
+          "$PK_COORDLOG" "$PK_COORDLOG.pid" $_pk_extra 2>/dev/null || true
+}
+trap _pk_cleanup EXIT HUP INT TERM
 PK_T0=$(date +%s)
 # Ζ·sweep·budget — bound the sweep's concurrent def-cells against a RAM budget (~2GB/cell), so the
 # hermetic grid does not oversubscribe memory and OOM under load.  The budget is a topology-derived
@@ -118,7 +194,7 @@ PK_SWEEP_RAM=$(python3 tools/sweep_budget.py)
 # (a coherence GROUNDING line, a gate UNRESOLVABLE, a JVM OOM) lives in that stream and used to
 # survive only in whatever /tmp file the next run overwrote.  Measured this session: a 4-hour red
 # hook's entire diagnosis existed in one such file.
-PK_HOOKLOG=$(mktemp)
+PK_HOOKLOG=$(mktemp -p "$PK_TMPDIR" hooklog.XXXXXX)   # Ζ·execlog·leak — off tmpfs, trap-owned
 # Ρ·telemetry·bes — Bazel's FIRST-PARTY event stream, when a machine points at one.  Per-target
 # results and per-action timing straight from bazel, so it cannot drift from a text format.
 PK_BES=""
@@ -136,18 +212,28 @@ set +e
 # nothing.  A peer's host collectors already cover the BOX (memory PSI peaked near 4% across that
 # window — nothing was starved); what nothing sampled was the bazel server itself, the one process
 # outside our per-action cgroup budget.  Best-effort in every arm, like the pushers.
-PK_COORDLOG="${TMPDIR:-/tmp}/pk-coord-$$.jsonl"
+PK_COORDLOG="$PK_TMPDIR/pk-coord-$$.jsonl"   # Ζ·execlog·leak — was ${TMPDIR:-/tmp}, i.e. tmpfs,
+                                             # and was removed by NO path at all (not even the
+                                             # happy one); the trap owns it now.
 ( _cpid=$(mise exec -- bazel info server_pid 2>/dev/null | tail -1)
   case "$_cpid" in ''|*[!0-9]*) : ;; *)
     python3 tools/coord_sample.py "$_cpid" "$PK_COORDLOG" --interval=1 >/dev/null 2>&1 &
     echo $! > "$PK_COORDLOG.pid" ;; esac ) || true
+# shellcheck disable=SC2086  # $PK_BES is EITHER empty OR two flags (--bes_backend=… and
+# --bes_upload_mode=…); word-splitting is how it expands to two arguments.  Quoted, an unset
+# endpoint would pass "" as a bazel argument and a set one would pass both flags as a single
+# malformed token.  The empty-by-default case is the common one, which is why this is unquoted.
 python3 tools/cpuweight.py --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
     --exec mise exec -- bazel test //:hook --config=mutant \
     --local_resources=memory="$PK_SWEEP_RAM" --execution_log_json_file="$PK_EXECLOG" \
     $PK_BES > "$PK_HOOKLOG" 2>&1
 PK_HOOK_RC=$?
-kill "$(cat "$PK_HOOKLOG.tailpid" 2>/dev/null)" 2>/dev/null; rm -f "$PK_HOOKLOG.tailpid"
-kill "$(cat "$PK_COORDLOG.pid" 2>/dev/null)" 2>/dev/null; rm -f "$PK_COORDLOG.pid"
+# Ζ·execlog·leak — the samplers are stopped HERE so their output is complete before the pushers
+# read it; the trap repeats these kills for the paths that never reach this line (a `kill` on an
+# already-dead pid is a harmless no-op).  The `rm`s that used to be here now belong to the trap
+# alone, so there is ONE owner of what gets removed.
+kill "$(cat "$PK_HOOKLOG.tailpid" 2>/dev/null)" 2>/dev/null || true
+kill "$(cat "$PK_COORDLOG.pid" 2>/dev/null)" 2>/dev/null || true
 set -e
 PK_SECS=$(( $(date +%s) - PK_T0 ))
 if [ -n "${PAPERKIT_OTLP_METRICS:-}" ]; then
@@ -171,7 +257,9 @@ if [ -n "${PAPERKIT_LOGS_URL:-}" ]; then
   python3 tools/logs_push.py "$PK_HOOKLOG" --rc "$PK_HOOK_RC" --seconds "$PK_SECS" \
       --execlog "$PK_EXECLOG" --run-id "${PK_T0}-$$" || true
 fi
-rm -f "$PK_EXECLOG" "$PK_HOOKLOG"
+# Ζ·execlog·leak — the `rm -f "$PK_EXECLOG" "$PK_HOOKLOG"` that stood here is GONE, and its
+# absence is the fix: it ran only when control reached this line, which a killed or crashed run
+# never does.  The trap installed at the top removes them on every route out that can run code.
 if [ "$PK_HOOK_RC" -ne 0 ]; then
   echo "[pre-commit] FAIL: bazel test //:hook" >&2
   exit 1
@@ -193,10 +281,15 @@ run "footprint audit (reads ⊇ Φ)"   mise exec -- python3 paperkit/footdeps.py
 # hook can see (the hermetic //:hook sandbox has no git) — so the one non-bazel check lives
 # here, at the layer that owns the delta, invoked as a real tool (cotype/check.py).
 if git rev-parse -q --verify HEAD:cotype/ledger.md >/dev/null 2>&1; then
+  # Ζ·execlog·leak — these inherit the exported TMPDIR (~/.tmp), so they are off tmpfs like
+  # everything else.  They are small, but `run()` EXITS on failure under `set -e`, so the `rm`
+  # below is on the success path only — the same shape as the execution log, three orders of
+  # magnitude smaller.  Registered with the trap rather than trusted to reach the next line.
   old=$(mktemp); new=$(mktemp)
+  _pk_extra="$old $new"
   git show HEAD:cotype/ledger.md > "$old"
   git show :cotype/ledger.md > "$new"
   run "cotype-monotone"    mise exec -- python3 cotype/check.py "$old" "$new"
-  rm -f "$old" "$new"
+  rm -f "$old" "$new"; _pk_extra=""
 fi
 echo "[pre-commit] all checks passed"

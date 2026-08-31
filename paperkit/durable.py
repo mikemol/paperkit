@@ -9,7 +9,8 @@ rightly: a projection must not depend on the mutation machinery to write its own
 
 So it sits beside bib/rhetoric in `model`, depending on nothing but the standard library.  Placed
 where it is OWNED rather than where it was first needed (the boundary check named the breach; the
-first draft put it on layout because that is where the caller happened to be)."""
+first draft put it on layout because that is where the caller happened to be).
+"""
 from __future__ import annotations
 
 import os
@@ -46,7 +47,8 @@ def write_atomic(path: Path, data: str | bytes) -> None:
     NOT for the mutation writers.  The grader and probe.py write THROUGH a path deliberately: the
     check under test reads that exact file, and a replace would hand it a different inode from the
     one it opened.  Their in-place write is the mechanism, not an oversight (and their sandbox is
-    a fresh copytree, so no twin exists to protect)."""
+    a fresh copytree, so no twin exists to protect).
+    """
     mode = "wb" if isinstance(data, bytes) else "w"
     # PRESERVE the target's permissions.  mkstemp creates at 0600 by design (it is built for secrets),
     # so a replace-based write silently NARROWS every file it touches -- measured the hard way: 35

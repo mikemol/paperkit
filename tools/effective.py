@@ -29,15 +29,16 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "paperkit"))
-import bib      # noqa: E402
-import grade    # noqa: E402
+import bib
+import grade
 
 
 def _delegation(check: str) -> dict | None:
     """The delegation edge a crossing check names, as (owner, claim) — or None.
 
     Mirrors grader.grade_check's `delegates_to`, derived from the SAME check string, so the two
-    cannot drift apart on what an edge points at."""
+    cannot drift apart on what an edge points at.
+    """
     typ, _, target = check.partition(":")
     if typ == "concept":
         return {"owner": "library", "claim": target, "verb": "concept"}
@@ -49,7 +50,8 @@ def _delegation(check: str) -> dict | None:
 
 def records(project_dir: Path, grade_files: list) -> list:
     """Assemble {key, grade, rests-on, delegates_to} — the grade records joined to the bib's
-    edges.  The grade files carry the measurement; the bib carries the structure."""
+    edges.  The grade files carry the measurement; the bib carries the structure.
+    """
     F = bib.parse_project(project_dir)
     out = []
     for gf in grade_files:
@@ -80,7 +82,8 @@ def owner_grades(specs: list) -> dict:
     with it, since a clamp that names nothing on the far side is a dead end for the reader.
 
     Clamping uses the effective component (it is the bound); the self component travels for the
-    reader, and so that a later reading can distinguish the two shapes above without re-crossing."""
+    reader, and so that a later reading can distinguish the two shapes above without re-crossing.
+    """
     og = {}
     for spec in specs:
         proj, _, path = spec.partition("=")

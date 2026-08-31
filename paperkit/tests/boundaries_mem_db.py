@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent / "tools"))
-import mem_db as D  # noqa: E402
+import mem_db as D
 
 _fails = []
 MB = 1048576

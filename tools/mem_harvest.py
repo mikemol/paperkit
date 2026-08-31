@@ -33,14 +33,16 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mem_learn import pow2 as pow2_bucket, resolution  # noqa: E402
+from mem_learn import pow2 as pow2_bucket
+from mem_learn import resolution
 
 
 def peaks_for(project: str, tree: Path) -> dict:
     """{(resolution, claim): max_mb} over every readable .peak under `tree` for this project.
 
     MAX, not mean: a grid's cells run concurrently and each must fit, so the reservation a claim
-    needs is its worst cell, not its typical one."""
+    needs is its worst cell, not its typical one.
+    """
     out: dict = {}
     for f in tree.rglob("*.peak"):
         if f"paperkit_{project}" not in str(f) and f"/{project}/" not in str(f):
@@ -70,7 +72,8 @@ def deposit(db: Path, project: str, measured: dict, run: str = "") -> int:
     a harvest sees only the cells that happened to run, and taking max over THAT harvest lowered
     library's manifest from 512/41-overrides to 256/2 on a narrow pass.  `ON CONFLICT ... SET
     bytes = max(bytes, excluded.bytes)` is the same rule as one clause the database enforces, and
-    it cannot be got wrong the way the merge was."""
+    it cannot be got wrong the way the merge was.
+    """
     import mem_db as D
     c = D.connect(db)
     rows = [(project, res, claim, cell, int(mb * 1024 * 1024))

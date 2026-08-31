@@ -64,7 +64,8 @@ def _run(cmd: list[str]) -> tuple[int, str]:
 def _find_verapdf(explicit: str | None) -> Path | None:
     """Resolve the veraPDF binary.  An EXPLICIT --verapdf is authoritative: if it does not exist we
     return None (fail loud — do NOT silently hunt elsewhere for a binary the caller did not name).
-    Otherwise try `verapdf` on PATH, then the conventional ~/.local/bin/verapdf.  None if unresolved."""
+    Otherwise try `verapdf` on PATH, then the conventional ~/.local/bin/verapdf.  None if unresolved.
+    """
     if explicit is not None:
         return Path(explicit) if Path(explicit).exists() else None
     for cand in (shutil.which("verapdf"), str(Path.home() / ".local" / "bin" / "verapdf")):
@@ -132,7 +133,8 @@ def check_measure(r: Result, pdf: Path, median_max: int, p90_max: int) -> None:
 # ── (4) Not justified — measured modal-right-edge flush fraction ────────────────────────────────────
 def _flush_fraction(pdf: Path) -> tuple[float, int]:
     """Fraction of text lines whose right edge sits within 5pt of the modal right margin.
-    Real glyph coordinates (pdftotext -bbox) — grid-snapped -layout columns are unreliable here."""
+    Real glyph coordinates (pdftotext -bbox) — grid-snapped -layout columns are unreliable here.
+    """
     _, xml = _run(["pdftotext", "-bbox", str(pdf), "-"])
     lines: dict[tuple[int, int], list[float]] = defaultdict(lambda: [1e9, -1e9])
     pg = 0

@@ -30,7 +30,8 @@ def certificate(key: str) -> dict:
     """This witness's ADEQUACY CERTIFICATE.  The def-resolution sweep mutates ENGINE def-sites and
     re-runs the witness; the sites whose mutation flips it are its sensitivity fingerprint — which, for
     a witness that exercises the grader, IS the engine.  That is what makes the certificate worth
-    importing: it carries the measured ground of the claim, not a bare verdict."""
+    importing: it carries the measured ground of the claim, not a bare verdict.
+    """
     # Λ·prove·resolution — the fingerprint's GROUND is the resolution that measured it, so the
     # certificate must carry it.  Def-resolution is structurally unavailable to a downstream consumer
     # (the engine is a compiler on the box, not a directory in their repo, so _sandbox_setup's Ν·loud
@@ -46,7 +47,7 @@ def certificate(key: str) -> dict:
     calc = json.loads(r.stdout)
     baseline, sens = bool(calc.get("baseline")), calc.get("sens", [])
     sys.path.insert(0, str(ENGINE))
-    from grade import _grade_from_sens      # the ONE ladder — derived, never re-declared here
+    from grade import _grade_from_sens  # the ONE ladder — derived, never re-declared here
     return {
         "concept": key,
         "owner": OWNER.name,

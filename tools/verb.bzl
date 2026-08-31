@@ -35,6 +35,30 @@ def _pypath(py):
     # sys.executable is populated for any subprocess the tool spawns — see tools/eval.py).
     return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
+def _engine_importable():
+    """Ζ·env·bootstrap — make the staged engine importable AS A PACKAGE, from any cwd.
+
+    ⚑ THE SANDBOX HAS A COMPLETE INTERPRETER AND NO WAY TO NAME THE ENGINE.  `aquery` on a PkCmd
+    action shows a full rules_python CPython 3.13 staged, with its own site-packages — so the
+    interpreter was never the gap.  What was missing is that `paperkit/*.pyc` sits in the execroot
+    as loose files with nothing telling python where to look, so `from paperkit import bib`
+    raises ModuleNotFoundError while a flat `import bib` (behind a sys.path.insert) resolves.
+
+    ⚑⚑ AND THE VENV CANNOT SUPPLY IT.  `.venv` is a directory of POINTERS at host absolute paths:
+    `pyvenv.cfg` names the mise interpreter, `bin/python` symlinks out of the tree, and the
+    editable install's finder carries `MAPPING = {'paperkit': '/home/…/paperkit/paperkit'}`.
+    Staged into a sandbox that would not dangle — it would RESOLVE, out of the sandbox, to the
+    live working tree, and every check would read unstaged sources and report green.  A sandbox
+    escape that passes is worse than one that fails, and is what `canary` exists to catch.
+
+    ⚑ SO THE EXECROOT IS THE PACKAGE ROOT, captured as an ABSOLUTE path BEFORE the `cd` into the
+    project dir (the same `$PWD` idiom PAPERKIT_CONSUMED_RECORDS uses two lines down, and for the
+    same reason: a check runs with cwd=project, so a relative entry would resolve wrong).
+    Appended to any inherited PYTHONPATH rather than replacing it — a `toolchain`-tier check
+    inherits the host env deliberately.
+    """
+    return 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"; '
+
 def _verdict_tool(py, tool):
     return _pypath(py) + '"$(command -v python3)" ' + tool.path + " "
 
@@ -100,7 +124,7 @@ def _cmd_impl(ctx):
         # NOT `fail`.  rc 0 → pass · rc 3 → cannot-run (not verified here, but not a failure — the gate's
         # bad-set is {fail}, so it does not red the commit) · any other nonzero → fail (ran-and-failed).
         # Closes the false-red: on a toolchain-less box an honest "cannot verify" no longer blocks commits.
-        command = pyprefix + consume_prefix + '' +
+        command = pyprefix + _engine_importable() + consume_prefix + '' +
                   "( " + inner + " ) >/dev/null 2>&1; rc=$?; " +
                   'if [ "$rc" = 0 ]; then V=pass; elif [ "$rc" = 3 ]; then V=cannot-run; else V=fail; fi; ' +
                   '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path,

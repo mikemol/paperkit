@@ -20,9 +20,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_delta import discriminate, discriminate_stderr  # noqa: E402
-from _fixture_model import entry  # noqa: E402
-from _fixture_project import project_text  # noqa: E402
+from _fixture_delta import discriminate, discriminate_stderr
+from _fixture_model import entry
+from _fixture_project import project_text
 
 TOKEN = "WARRANT-TOKEN-A1B2"
 
@@ -254,7 +254,7 @@ def main() -> int:
     print(f"  {'ok ' if compose_ok else 'XX '}--min-strength behavioral: imported PASSES, vacuous FAILS")
     print(f"      P (pass side): result:g (imported) → exit {imp_rc}")
     print(f"      F (flag side): file:w.bib (vacuous) → exit {vac_rc}")
-    print(f"      δ (min delta): the check's grade meets the behavioral floor by DELEGATION, not derivation\n")
+    print("      δ (min delta): the check's grade meets the behavioral floor by DELEGATION, not derivation\n")
 
     # ── Ν·loud: a def-resolution sweep with no engine in its sandbox FAILS rather than silently
     # degrading to file resolution (the degeneracy that once shipped a vacuous emergence gate).
@@ -269,7 +269,7 @@ def main() -> int:
     print(f"  {'ok ' if loud_ok else 'XX '}def with no engine in the sandbox FAILS; file resolution passes")
     print(f"      P (pass side): --resolution file → exit {file_rc} (no engine in the surface)")
     print(f"      F (flag side): --resolution def  → exit {def_rc} (engine absent → loud, not silent degrade)")
-    print(f"      δ (min delta): the --resolution flag (file → def)\n")
+    print("      δ (min delta): the --resolution flag (file → def)\n")
 
     # ── Ζ·ladder floor-refusal: a floor the ladder cannot rank is REFUSED loud with the
     # must-be-one-of contract (owned by config.resolve's choices= until Μ·kernel·shrink·grade-edge
@@ -282,9 +282,9 @@ def main() -> int:
     if not floor_ok:
         fails.append(("floor-refusal", bogus_rc, bogus_msg))
     print(f"  {'ok ' if floor_ok else 'XX '}--min-strength bogus is refused, message names the valid set")
-    print(f"      P (pass side): --min-strength behavioral → gates (adequacy-composes above)")
+    print("      P (pass side): --min-strength behavioral → gates (adequacy-composes above)")
     print(f"      F (flag side): --min-strength bogus → exit {bogus_rc}, 'must be one of' on stderr")
-    print(f"      δ (min delta): one membership test against the ladder (bogus ∉ grade.ORDER)\n")
+    print("      δ (min delta): one membership test against the ladder (bogus ∉ grade.ORDER)\n")
 
     # ── Ζ·ladder·sentinel (finding A): the exit alphabet is TYPED so a resume loop can tell
     # "call me again" (2) from "you asked wrong" (3).  An --only key that names no check is a
@@ -300,7 +300,7 @@ def main() -> int:
     print(f"  {'ok ' if refuse_ok else 'XX '}an unknown --only key REFUSES with 3 (≠ 2 resume); a real key exits 0")
     print(f"      P (pass side): --only w          → exit {ok_rc} (grades the named check)")
     print(f"      F (flag side): --only no-such-key → exit {refuse_rc} (refuse: a key naming nothing)")
-    print(f"      δ (min delta): whether the --only key names a check (present → grade; absent → refuse)\n")
+    print("      δ (min delta): whether the --only key names a check (present → grade; absent → refuse)\n")
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} case(s) drifted)")

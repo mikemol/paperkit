@@ -36,8 +36,9 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bib  # noqa: E402  (the parser/data-model leaf — footdeps needs only the bib, not the projector)
-import resolver  # noqa: E402
+import bib
+import resolver
+
 
 def _wired(repo_root: Path) -> list:
     """The projects the footprint audit gates — DERIVED, never hardcoded (guard-must-not-copy: a hand-
@@ -45,10 +46,11 @@ def _wired(repo_root: Path) -> list:
     warrants (bibtex.bzl: only sandbox is swept and footprint-audited), so WIRED = the bib.project set
     (MODULE.bazel — the ONE registry that maps project→its bib file; on-demand projects like report/image
     are not bib.projects, correctly excluded) that has at least one sandbox-tier check.  Single source:
-    the tier declarations in each project's own bib."""
+    the tier declarations in each project's own bib.
+    """
     module = (repo_root / "MODULE.bazel").read_text()
     out = []
-    for m in re.finditer(r'bib\.project\([^)]*\)', module, re.S):
+    for m in re.finditer(r"bib\.project\([^)]*\)", module, re.S):
         proj = re.search(r'project = "([^"]+)"', m.group(0))
         bib_lbl = re.search(r'bib = "([^"]+)"', m.group(0))
         if not (proj and bib_lbl):
@@ -82,7 +84,8 @@ def _root_files(repo_root: Path) -> set:
     token).  DERIVED from BUILD.bazel (the owner, never a hardcoded copy) because //:files curates
     a CROSS-DIRECTORY set — it lists //report:gen.py, //tools:*.py, //paperkit:components.bzl, … —
     so which reads token stages a file is decided by its OWNING FILEGROUP, not its directory.  The
-    project :files filegroups are own-directory-only, so //:files is the only cross-dir case."""
+    project :files filegroups are own-directory-only, so //:files is the only cross-dir case.
+    """
     m = _FILEGROUP_RE.search((repo_root / "BUILD.bazel").read_text())
     if not m:
         return set()
@@ -93,8 +96,9 @@ def _root_files(repo_root: Path) -> set:
 def _covering(f: str, projects: set, root_files: set) -> set:
     """Ξ·dag·reads — the reads tokens that STAGE file f; ANY ONE suffices.  A file can be staged by
     SEVERAL sources, so this is a SET, not a single token: report/gen.py is in BOTH //report:files
-    (`report`) and //:files (`.`), so a check declaring EITHER covers it."""
-    top = f.split("/")[0]
+    (`report`) and //:files (`.`), so a check declaring EITHER covers it.
+    """
+    top = f.split("/", maxsplit=1)[0]
     if top == "paperkit":
         # engine-adjacent — the .py modules AND the .bzl the build reads (components.bzl, dag.bzl),
         # incidentally opened by every engine-importing check; excluded like the engine (a genuine
@@ -111,7 +115,8 @@ def _covering(f: str, projects: set, root_files: set) -> set:
 def _imported(project_dir: Path, repo_root: Path) -> set:
     """Repo-relative paths of the warrant bibs COMPOSED into a project from OTHER packages (root
     imports //paper:adequacy_pitch.bib).  Staged by the bib COMPOSITION, not a reads token, so a
-    footprint read of one is already covered — derived from the same load_config the build uses."""
+    footprint read of one is already covered — derived from the same load_config the build uses.
+    """
     out = set()
     for b in bib.load_config(project_dir)["bibs"]:
         try:
@@ -124,7 +129,8 @@ def _imported(project_dir: Path, repo_root: Path) -> set:
 def _missing(fp: list, declared: set, projects: set, root_files: set, name: str, imported: set) -> list:
     """The reads tokens a check is MISSING: for each footprint file NOT already staged — by its own
     project, the engine, an imported warrant bib, or a DECLARED token's filegroup — the tokens that
-    WOULD stage it (any one suffices).  [] iff every read is staged (the audit's soundness core)."""
+    WOULD stage it (any one suffices).  [] iff every read is staged (the audit's soundness core).
+    """
     have = set(declared) | {name, "paperkit"}
     miss = set()
     for f in fp:
@@ -143,7 +149,8 @@ def _engine(reads: list) -> list:
     pk_eval fanout.  CRITICAL for soundness: a check's subprocess imports modules from the BYTECODE
     cache, so strace sees `paperkit/__pycache__/bib.cpython-NN.pyc`, not `paperkit/bib.py` — map each
     such .pyc back to its source .py, else the scope silently OMITS a sensitive module (bib/config for
-    `deterministic`) and sens ⊄ footprint."""
+    `deterministic`) and sens ⊄ footprint.
+    """
     mods = set()
     for r in reads:
         if not r.startswith("paperkit/"):
@@ -191,7 +198,8 @@ def build(repo_root: Path, names: list) -> dict:
 def _declared(pdir: Path) -> dict:
     """{claim: set(declared read tokens)} from each claim's `reads` field (the declare+audit
     source).  Routed through the canonical parser (paperkit.bib, via bib.parse) — `reads` is now
-    a first-class field there, so no separate line scanner / no disagreement with the build."""
+    a first-class field there, so no separate line scanner / no disagreement with the build.
+    """
     F = bib.parse_project(pdir)
     return {k: set(f.get("reads", [])) for k, f in F.items()}
 
@@ -199,7 +207,8 @@ def _declared(pdir: Path) -> dict:
 def audit(repo_root: Path, names: list) -> list:
     """The AUDIT: each claim's live Φ·footprint (repo-scoped) must be COVERED by its declared
     `reads` (plus its own project + the engine).  Returns the under-declared [(proj, claim,
-    missing, declared)] — an empty list means every declaration is sound."""
+    missing, declared)] — an empty list means every declaration is sound.
+    """
     live = build(repo_root, names)
     projects = {p.name for p in repo_root.iterdir() if (p / "paper.toml").is_file()}
     root_files = _root_files(repo_root)
@@ -221,7 +230,8 @@ def audit_one(proj: str, claim: str) -> dict:
     """Ζ·foot·act — the PER-CLAIM footprint-audit ORACLE: strace this one claim's check and report
     whether its live Φ·footprint is covered by its declared `reads` (+ own project + engine).  Bazel
     nests one of these per claim and pk_footaudit aggregates them — so the audit SWEEP is the build
-    graph, not footdeps' ThreadPool loop (which stays for direct/on-demand use)."""
+    graph, not footdeps' ThreadPool loop (which stays for direct/on-demand use).
+    """
     project_dir = Path(proj).resolve()
     name = "." if proj == "." else project_dir.name
     repo_root = project_dir if proj == "." else project_dir.parent
@@ -249,7 +259,8 @@ def _strace_works() -> bool:
     returns None, every claim over-declares to ["*"], the audit finds nothing to flag, and main()
     prints a GREEN 'every declared reads ⊇ footprint' — a plausible-but-WRONG pass.  So trace a check
     with a KNOWN small footprint first; if it comes back empty, strace is degraded and the audit is
-    not trustworthy (mirrors bnd-footprint, which guards the SANDBOX strace in //:hook)."""
+    not trustworthy (mirrors bnd-footprint, which guards the SANDBOX strace in //:hook).
+    """
     with tempfile.TemporaryDirectory() as d:
         p = Path(d)
         (p / "probe.txt").write_text("PK_PROBE\n")

@@ -34,7 +34,8 @@ ALLOW = ("cotype/",)
 def divergent(porcelain, allow=ALLOW):
     """The paths where worktree ≠ index (unstaged edits, `??` untracked), outside `allow` —
     parsed from `git status --porcelain=v1 -z` output (NUL-separated; a rename entry carries
-    a second NUL-terminated origin path, consumed and ignored — the NEW path is what lands)."""
+    a second NUL-terminated origin path, consumed and ignored — the NEW path is what lands).
+    """
     out = []
     fields = porcelain.split("\0")
     i = 0

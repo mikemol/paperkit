@@ -14,7 +14,8 @@ if any .bzl (passed as args) contains a forbidden pattern:
 The build-time pair of the runtime ∅-baseline witness (tools/sens.py): together they make "a verdict
 is entailed by its inputs and witnesses its own validity" correct-by-construction.  Legit inline
 shell stays — env exports, /sys reads, `[ -f ]`, and running an ARBITRARY command (pk_cmd's `sh -c`).
-`command -v python3 …` is the sanctioned resolution and is NOT flagged."""
+`command -v python3 …` is the sanctioned resolution and is NOT flagged.
+"""
 import re
 import sys
 
@@ -36,11 +37,11 @@ def main(argv):
                     if rx.search(line):
                         bad.append((path, n, name, line.strip()))
     for path, n, name, text in bad:
-        sys.stderr.write("{}:{}: Ξ·lint [{}] {}\n".format(path, n, name, text))
+        sys.stderr.write(f"{path}:{n}: Ξ·lint [{name}] {text}\n")
     if bad:
-        sys.stderr.write("\nΞ·lint: {} forbidden pattern(s) — lift logic/JSON into a tool "
+        sys.stderr.write(f"\nΞ·lint: {len(bad)} forbidden pattern(s) — lift logic/JSON into a tool "
                          "(tools/verdict.py owns the verdict record), resolve python via "
-                         "`command -v`.\n".format(len(bad)))
+                         "`command -v`.\n")
         return 1
     return 0
 

@@ -30,7 +30,8 @@ _MEANING_FREE = {"black"}
 def use_of_colour(tex: str) -> tuple[bool, list[str]]:
     """Every `\\`-delimited row that uses a MEANING colour must also carry a WEIGHT cue in that same
     row, so colour is never the sole cue (WCAG 1.4.1).  Sufficient condition (a row with a weight cue
-    passes even if the colour also happens to be decorative)."""
+    passes even if the colour also happens to be decorative).
+    """
     bad = 0
     for row in re.split(r"\\\\", tex):
         colours = re.findall(r"\\textcolor\{([^}]+)\}", row)

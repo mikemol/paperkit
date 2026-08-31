@@ -1,10 +1,33 @@
 % warrants.bib — the claims of paperkit's front-door doc.  This README is itself
 % a paperkit projection of THIS file (root paper.toml: out = README.md).  Every
 % example is a CITED claim that also emits its on-disk asset (emit = …): the prose
-% introduces and cites it [@key], the block renders below it.  An emit with no
-% claim would be an UNCITED placement — a postulate — so there are none here.
+% introduces and cites it by key in square brackets, the block renders below it.
+% An emit with no claim would be an UNCITED placement — a postulate — so there are
+% none here.
+%
+% Ζ·bib·strict — NO BARE AT-SIGN OUTSIDE AN ENTRY, not even inside a comment.
+% The percent sign is a TeX convention paperkit adopted; real BibTeX has no comment
+% syntax at all — text between entries is simply ignored.  But an at-sign in that
+% text STARTS an entry, and a conforming parser then demands a brace or paren.
+% Measured against two independent oracles: pybtex REFUSES this entire file over a
+% single bracketed citation written up here, while bibtexparser accepts it — the
+% divergence is real, and only the SECOND oracle found it.
+%
+% ⚑ THE PERCENT SIGN IS NOT THE DEFECT.  Dividers carrying no at-sign parse cleanly
+% in both, and so does an at-sign INSIDE a value (a citation in a claim, an email
+% address).  So the rule is exactly "no bare at-sign outside an entry body" — where
+% "drop the percent sign" would have edited every comment in the corpus and fixed
+% nothing, since unmarked prose refuses identically.
+%
+% ⚑ AND THIS BLOCK CARRIED A COUNT, WHICH WAS WRONG WITHIN THE HOUR.  It said "keeps
+% all 161 comments"; the census found 180, and the divider strip removed 28 of them.
+% A number in prose beside a set nobody counts is the furniture this corpus has an
+% entry about (result-tristate.bib: "a verified claim can carry unverified furniture,
+% and PROSE is where it rides").  The count is gone; the rule does not need one.
+%
+% ⚑ And this comment is its own first test: an earlier draft explained the rule
+% using the character it forbids, taking the file from 2 offending lines to 7.
 
-% ── pitch ────────────────────────────────────────────────────────────────────
 @misc{rm-pitch,
   section = {pitch},
   claim   = {paperkit treats a document as the projection of a verified claim-DAG: you write claims, not prose},
@@ -26,7 +49,6 @@
   check   = {claim:rm-selfhost}
 }
 
-% ── model ────────────────────────────────────────────────────────────────────
 @misc{rm-model,
   section = {model},
   claim   = {a claim is one bibliography entry --- a statement, the rubric section it belongs to, the claims it depends on (which set prose order and connective glue), and its check},
@@ -46,7 +68,6 @@
   reads   = {.}
 }
 
-% ── commands ─────────────────────────────────────────────────────────────────
 @misc{rm-cmds,
   section = {commands},
   claim   = {two commands do the work --- project turns the claims into the document, and gate verifies it},
@@ -64,7 +85,6 @@
   check   = {concept:rm-cmds-inv}
 }
 
-% ── resolver ─────────────────────────────────────────────────────────────────
 @misc{rm-resolver,
   section = {resolver},
   claim   = {a verifier is named type:target, and one type ships built in per verb --- exists, execs, parses, concurs, imports},
@@ -115,7 +135,6 @@
   check   = {concept:boundary-is-a-triple}
 }
 
-% ── layout ───────────────────────────────────────────────────────────────────
 @misc{rm-layout,
   section = {layout},
   claim   = {the repository is the engine, the self-hosting paper, and this generated README},
@@ -123,7 +142,6 @@
   check   = {claim:rm-layout}
 }
 
-% ── ci ───────────────────────────────────────────────────────────────────────
 @misc{rm-ci,
   section = {ci},
   claim   = {checks run locally as a pre-commit githook --- every commit runs bazel test //:hook (gating both documents as per-claim check targets) and the Delta adequacy grade, keeping the tool boundaries intact},
@@ -136,7 +154,6 @@
   check   = {claim:rm-ci-enable}
 }
 
-% ── status ───────────────────────────────────────────────────────────────────
 @misc{rm-status,
   section = {status},
   claim   = {a working spike --- the engine projects and gates, the self-hosting paper is green, discriminate.py grades check adequacy, and this README is itself a projection},

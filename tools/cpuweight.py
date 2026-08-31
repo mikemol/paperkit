@@ -82,7 +82,8 @@ def _writable_weight_file(cg: str) -> Path | None:
 
     `cpu` must be enabled in the parent's subtree_control for the file to exist at all; we test
     for the file rather than parsing subtree_control, since the file's presence IS the
-    delegation (and os.access answers the ownership question directly)."""
+    delegation (and os.access answers the ownership question directly).
+    """
     f = CGROUP_ROOT / cg.lstrip("/") / "cpu.weight"
     return f if f.is_file() and os.access(f, os.W_OK) else None
 
@@ -91,7 +92,8 @@ def _app_slice() -> str:
     """The user's app.slice — the parent under which we create the build's cgroup.
 
     Derived from OUR OWN cgroup rather than hardcoded: everything up to and including
-    `app.slice` is the user's session hierarchy, and that is where transient scopes live."""
+    `app.slice` is the user's session hierarchy, and that is where transient scopes live.
+    """
     cg = _cgroup_of("self") or ""
     marker = "/app.slice"
     i = cg.find(marker)
@@ -113,7 +115,8 @@ def build_cgroup(name: str = "paperkit-build.scope") -> tuple[str | None, str]:
     So: do not inspect a cgroup, MAKE one.  cgroup-v2 is a hierarchy and `cpu` is delegated to
     the user session, so we can mkdir our own node under app.slice and move the build into it.
     Membership is then true by CONSTRUCTION -- only what we put there is there -- and the weight
-    provably applies to the build and nothing else.  No scan, no hints, no ancestry walk."""
+    provably applies to the build and nothing else.  No scan, no hints, no ancestry walk.
+    """
     parent = _app_slice()
     if not parent:
         return None, "no cgroup-v2 hierarchy — unweighted"
@@ -130,7 +133,8 @@ def build_cgroup(name: str = "paperkit-build.scope") -> tuple[str | None, str]:
 
 def join(cg: str, pid: str | int = "self") -> tuple[bool, str]:
     """Move a process into `cg`. Moving a pid moves that process only; its FUTURE children
-    inherit the cgroup."""
+    inherit the cgroup.
+    """
     try:
         (CGROUP_ROOT / cg.lstrip("/") / "cgroup.procs").write_text(
             f"{os.getpid() if pid == 'self' else pid}\n")
@@ -153,7 +157,8 @@ def build_servers() -> list:
     A lever that reports success while doing nothing to the work is strictly worse than no
     lever — the failure this module's own docstring warns about, committed anyway one layer up.
     The check that would have caught it is not "did I create and join a cgroup" but "are the
-    CELLS in it", which is what verify() below asks."""
+    CELLS in it", which is what verify() below asks.
+    """
     out = []
     for d in Path("/proc").iterdir():
         if not d.name.isdigit():
@@ -182,7 +187,8 @@ def is_cell(comm: str) -> bool:
 
 def verify(cg: str) -> tuple[bool, str]:
     """Are this build's CELLS actually in `cg`?  The property that matters, versus the one the
-    earlier version tested (that a cgroup was created and the caller joined it)."""
+    earlier version tested (that a cgroup was created and the caller joined it).
+    """
     inside = outside = 0
     for d in Path("/proc").iterdir():
         if not d.name.isdigit():
@@ -237,7 +243,8 @@ def runnable_ratio() -> tuple[float, int]:
     procs_running counts tasks that want CPU NOW.  It is NOT loadavg: the 1-minute average is
     decayed (it lags a burst and lingers after one) and counts D-state as runnable, so it cannot
     tell a CPU-saturated box from an I/O-wedged one.  procs_blocked carries the I/O half, so the
-    PAIR discriminates: high ratio with blocked≈0 is pure CPU contention."""
+    PAIR discriminates: high ratio with blocked≈0 is pure CPU contention.
+    """
     running = blocked = 0
     for line in Path("/proc/stat").read_text().splitlines():
         if line.startswith("procs_running"):
@@ -249,7 +256,8 @@ def runnable_ratio() -> tuple[float, int]:
 
 def main(argv: list) -> int:
     """`--report` reads the box; `--exec CMD...` puts THIS process in the weighted cgroup and
-    execs CMD (so every child of the build inherits it); bare invocation just creates+weights."""
+    execs CMD (so every child of the build inherits it); bare invocation just creates+weights.
+    """
     weight = DEFAULT_WEIGHT
     for i, a in enumerate(argv):
         if a == "--weight" and i + 1 < len(argv):

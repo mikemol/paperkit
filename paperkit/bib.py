@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """paperkit.bib — the ONE parser + data model for a warrants `.bib` (the claim-DAG).
 
-A `.bib` entry is a claim: `@type{key, field = {value}, ...}`.  This module is the
-single source of truth for that grammar and the small data-model over it (config
-load, rubric, dependency order, placement).  It was previously three parsers —
+A `.bib` entry is a claim: `@type{key, field = {value}, ...}`.  This module owns the
+DATA MODEL over that grammar (config load, rubric, dependency order, placement); the
+GRAMMAR itself now lives in `bibparse` (Ζ·bib·wire), which is a real parser with a
+position-carrying error rather than the regex this module used to hold.  The split
+matters: `parse()` below is a PROJECTION of a parsed record onto the engine's field
+whitelist, and a malformed file now RAISES from the parser instead of arriving here
+half-read.  It was previously three parsers —
 the projector's field-whitelist `entries`, footdeps' line scanner for `reads`,
 and coherence's line scanner for `rests-on` — each re-deriving the format and
 disagreeing on which fields survive (the whitelist dropped `reads`).  Now there is
@@ -16,11 +20,16 @@ render); the edge/token fields (`from`, `rests-on`, `reads`) are lists.
 from __future__ import annotations
 
 import csv
+import re
 import sys
 import tomllib
 from pathlib import Path
 
-import re
+# Ζ·bib·wire — the GRAMMAR's owner.  bib.py is the MODEL layer and bibparse is its front end;
+# the import is one-directional (bibparse knows nothing about _SCALAR, sections or the DAG), so
+# the grammar can be replaced — by the EBNF-driven table this arc is heading for — without the
+# data model noticing.
+import bibparse
 
 # scalar fields carried verbatim (the projector + checks read these).  `tier` is a per-warrant
 # enforcement-tier flag consumed by the GENERATOR (bibtex.bzl), not by any engine code here —
@@ -41,15 +50,28 @@ _LIST = ("from", "rests-on", "reads", "consumes")
 # what must refuse a typo, and the parser may not reach up into the delta layer for a
 # constant.  grade.SCOPE_C ranks these; it does not re-list them.
 _SCOPES = ("fragment", "full")
-# Standard BibTeX reference metadata paperkit TOLERATES on a references.bib citation but does
-# not consume (the projector reads only title/author/year).  Kept so the unknown-field warning
-# below fires on a MEANINGFUL dropped field (a downstream author's `points`, a mistyped `check`)
-# and stays quiet on ordinary bibliography metadata that is expected to be carried and ignored.
-_BIBTEX = frozenset({
-    "journal", "volume", "number", "pages", "booktitle", "doi", "url", "publisher", "editor",
-    "address", "month", "isbn", "issn", "organization", "school", "institution", "series",
-    "chapter", "edition", "howpublished", "eprint", "archiveprefix", "primaryclass", "keywords",
-})
+# Ζ·bib·declare — THERE IS NO BIBTEX ROSTER HERE, AND ITS ABSENCE IS THE DESIGN.
+#
+# A `_BIBTEX` frozenset of 24 standard reference fields used to sit at this line, and it bought
+# SILENCE WITHOUT ACCESS: it suppressed the unknown-field warning below while the extraction loop
+# above never read those names, so `doi`/`journal`/`publisher` were discarded exactly as silently
+# as a typo.  Its own comment said the fields were "expected to be carried and ignored" — they
+# were ignored and NOT carried, which is the worst of the two.  Measured cost, downstream: a
+# consumer's check "read every reference as carrying no url and no doi, and reported all 26
+# groundings red for a reason that was false of every one of them."
+#
+# ⚑ THE FIX IS DELETION, NOT REPAIR, because the roster was the ENGINE holding a PROJECT's policy.
+# Whether `doi` matters is a fact about a document, not about paperkit — and `consumer_fields`
+# already IS the declared, per-project surface for "carry this field, consume nothing."  The
+# consumer bitten by the silent drop had already converged on it (`consumer_fields = [..., "url",
+# "doi"]`), which is the evidence: they had to RE-DECLARE fields the engine claimed to know.
+#
+# So the rule is now uniform, with no second roster to drift: a field is ENGINE-OWNED (_SCALAR /
+# _LIST) or PROJECT-DECLARED (consumer_fields), and anything else is named LOUDLY.  `type = {RFC}`
+# — a legitimate BibTeX field the old roster omitted, loud-dropping on 7 entries of one corpus —
+# stops being a gap the engine must maintain and becomes what it always was: a field its project
+# had not declared.  A guard must not copy the set it guards, and the engine no longer claims to
+# know what standard BibTeX contains.
 _WARNED: set = set()          # (file, key, field) already reported — a build parses each bib many times
 
 
@@ -57,7 +79,8 @@ def _unescaped_braces(s: str):
     """Yield (index, char) for every `{`/`}` in `s` that is NOT LaTeX-escaped (`\\{` `\\}`).
     Inline math in a claim carries literal braces — set notation `\\{ x : … \\}`, `\\mathrm{}` —
     that are CONTENT, not structure; counting them as structural braces miscounts the depth and
-    truncates the field.  A brace is escaped iff preceded by an odd run of backslashes."""
+    truncates the field.  A brace is escaped iff preceded by an odd run of backslashes.
+    """
     for i, ch in enumerate(s):
         if ch in "{}":
             bs = 0
@@ -72,7 +95,8 @@ def _unescaped_braces(s: str):
 def _scalar_value(body: str, name: str) -> str | None:
     """The value of scalar field `name` by TRUE brace-counting from its `name = {` — handles
     arbitrary nesting depth (`\\min\\{ \\mathrm{eff}(d) : … \\}`) and skips LaTeX-escaped braces,
-    where the one-level regex it replaces would stop at the first inner `}`.  None if absent."""
+    where the one-level regex it replaces would stop at the first inner `}`.  None if absent.
+    """
     m = re.search(r"\b" + re.escape(name) + r"\s*=\s*\{", body)
     if not m:
         return None
@@ -85,12 +109,63 @@ def _scalar_value(body: str, name: str) -> str | None:
     return None                                  # unbalanced — no closing brace (caller sees absent)
 
 
+def _entries(text: str):
+    """Ζ·bib·parser — yield (type, key, body) for every entry, by BRACE-COUNTING the entry.
+
+    ⚑ THIS REPLACES `re.finditer(r"@\\w+\\{...(.*?)\\n\\}")`, WHICH TRUNCATED AN ENTRY AT THE FIRST
+    LINE-INITIAL `}`.  The old pattern was non-greedy to the first `\\n}`, so a value containing a
+    brace at column 0 — a code example, a JSON fragment, a set-builder broken across lines — ended
+    the entry early.  MEASURED: an entry whose claim held a line-initial `}` parsed with ZERO
+    FIELDS while the reader reported `2 of 2 entries`.  The count was honest and the content was
+    empty, and a claim with no `check` is EXCLUDED from gate.py's `warrants` set — so the defect
+    DISARMS a claim while the gate stays green, the same false-green as a shadowed key from a
+    different cause.
+
+    ⚑ THE FIELD LAYER WAS ALREADY SOUND, and that is why this is a scanner and not a rewrite:
+    `_scalar_value` and `_top_fields` brace-count with LaTeX-escape handling already.  Only ENTRY
+    extraction was regex, so only it is replaced — the same `_unescaped_braces` primitive, applied
+    one level up.  A smaller change than "write a parser", and it leaves the tested part alone.
+
+    ⚑ THE TYPE IS CAPTURED, NOT DISCARDED.  `@\\w+` matched and threw the type away, so `@book` and
+    `@misc` were indistinguishable to the engine and no reader could answer "what entry types does
+    this file use" (two independent surveys reported that as unanswerable and enumerated by hand).
+    It is yielded here; consumers that do not want it ignore it.
+
+    A `%` comment is NOT input to this grammar — callers strip comments first.
+
+    ⚑ AN UNBALANCED ENTRY IS YIELDED TO THE END OF INPUT, NOT SKIPPED — and the first cut of this
+    function skipped it, which traded a CAUGHT defect for a SILENT one.  A claim whose value
+    loses its closing brace swallows the fields after it; the old regex still ended the entry at
+    the next line-initial `}` and produced a record with a mangled claim and no check, which
+    gate.py REFUSES as a bare-KEY projection (boundaries_grounding's `mute` arms pin exactly
+    that).  Skipping made the entry vanish instead: the gate saw one fewer claim and passed.
+    Measured — those two arms went red, and they are right.  A file whose braces do not balance
+    is broken, and the honest reading is the one that still SURFACES the entry so the gate's own
+    refusal can fire; silently dropping it is the invisible-loss shape this scanner replaced.
+    """
+    for m in re.finditer(r"@(\w+)\s*\{\s*([^,\s}]+)\s*,", text):
+        typ, key = m.group(1), m.group(2)
+        start = m.end()                              # first char after the key's comma
+        depth = 1                                    # the `{` that opened the entry
+        end = None
+        for i, ch in _unescaped_braces(text[start:]):
+            depth += 1 if ch == "{" else -1
+            if depth == 0:
+                end = i
+                break
+        # unbalanced ⇒ the entry runs to the end of input; the caller's field extraction then
+        # sees what the author actually wrote (a swallowed field is ABSENT, which is what the
+        # gate refuses on) rather than nothing at all.
+        yield typ, key, text[start:start + end] if end is not None else text[start:]
+
+
 def _top_fields(body: str) -> list:
     """The TOP-LEVEL `name = {` field names in an entry body, tracking brace depth so an `=`
     inside a value (set notation `x = {1,2}` in a claim) is not mistaken for a field.  Used to
     catch a field the parser does not consume — which it would otherwise drop in silence.  Skips
     LaTeX-escaped braces (`\\{` `\\}`) so inline math does not throw off the depth (same fix as
-    _scalar_value)."""
+    _scalar_value).
+    """
     names, depth = [], 0
     real = dict(_unescaped_braces(body))                 # index → real brace char (escaped skipped)
     for m in re.finditer(r"([A-Za-z][\w-]*)\s*=\s*\{|[{}]", body):
@@ -116,40 +191,65 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
     declared field), the vocabulary is the consumer's (declared per project, not baked into the
     engine — a domain-and-location-free engine must not learn one consumer's field names).  A
     DECLARED field is quiet in the loud-drop below; an UNdeclared unknown field is still named loud,
-    so the declaration is what distinguishes a consumer's field from a typo."""
+    so the declaration is what distinguishes a consumer's field from a typo.
+    """
     out = {}
     path = Path(path)
     scalars = tuple(_SCALAR) + tuple(consumer_fields)
     if path.exists():
-        for m in re.finditer(r"@\w+\{\s*([^,\s]+)\s*,(.*?)\n\}", path.read_text(), re.S):
-            key, body = m.group(1), m.group(2)
-            f = {"_src": path.name}
+        # ⚑ Ζ·bib·wire — THE FRONT END IS A PARSER, and this function no longer re-scans the text.
+        # It used to run three passes over each entry BODY: `_scalar_value` per known field,
+        # a per-list-field regex, and `_top_fields` for the unknown-field warning.  Three readers
+        # of one string, each with its own idea of the grammar — which is how the list regex
+        # `\{([^}]*)\}` came to be unable to hold a nested brace while `_scalar_value` beside it
+        # counted them correctly.  `bibparse.parse` returns the fields already extracted, so the
+        # whitelist below is a PROJECTION of a parsed record rather than a fourth scan.
+        #
+        # ⚑ AND A MALFORMED FILE NOW RAISES INSTEAD OF PARSING PARTLY.  `bibparse` refuses an
+        # unterminated value, a duplicated field, a bare `@` between entries, and every BibTeX
+        # construct absent from this corpus — each naming a line and column.  The scanner it
+        # replaces had no answer for those: a value whose brace never closed either swallowed the
+        # fields after it or vanished, depending on which patch was in the tree that hour.
+        for e in bibparse.parse(path.read_text(), path):
+            key = e.key
+            # `_type` is the BibTeX entry type (@misc/@article/@book) — carried so a reader can
+            # ask what a file uses without parsing the bytes itself.  Engine-inert, like `note`.
+            f = {"_src": path.name, "_type": e.typ}
             for name in scalars:
-                v = _scalar_value(body, name)            # true brace-counting, escaped-brace-safe
-                if v is not None:
-                    f[name] = v
+                if name in e.fields:
+                    f[name] = e.fields[name]
             for name in _LIST:
-                fr = re.search(r"\b" + name + r"\s*=\s*\{([^}]*)\}", body)
-                f[name] = [a for a in re.split(r"[,\s]+", fr.group(1)) if a] if fr else []
+                raw = e.fields.get(name)
+                f[name] = [a for a in re.split(r"[,\s]+", raw) if a] if raw else []
             # Ζ·ladder·sentinel (the parser's face) — a field paperkit does not consume is DROPPED,
             # and a silent drop is a silent failure: a downstream author's `points` (a real grounding
             # relation) vanished on 14 entries with no signal.  Name it LOUD rather than drop it in
-            # silence — but stay quiet on standard BibTeX metadata (_BIBTEX), which references carry
-            # and paperkit is expected to ignore, and on this project's DECLARED consumer fields.  A
-            # warning, not a refusal: the field may be deliberate human documentation, and breaking a
-            # downstream's build is not the point — being SEEN is.  Deduped, since a build parses each
-            # bib many times.
-            unknown = [n for n in _top_fields(body)
-                       if n not in scalars and n not in _LIST and n not in _BIBTEX]
+            # silence.  A warning, not a refusal: the field may be deliberate human documentation,
+            # and breaking a downstream's build is not the point — being SEEN is.  Deduped, since a
+            # build parses each bib many times.
+            #
+            # ⚑ Ζ·bib·declare — THERE IS NO BIBTEX EXEMPTION.  This clause used to also skip a
+            # 24-name `_BIBTEX` roster, which made standard reference metadata quiet AND still
+            # dropped (see the deleted roster's note above).  Every non-engine field now takes the
+            # SAME route: declare it in `consumer_fields` to carry it, or hear about it.
+            unknown = [n for n in e.fields
+                       if n not in scalars and n not in _LIST]
             for n in unknown:
                 if (path.name, key, n) not in _WARNED:
                     _WARNED.add((path.name, key, n))
+                    # ⚑ THE REMEDY IS NAMED, and it is the third option.  Offering only "use an
+                    # engine field, or remove it" pushes a bibliography author toward DELETING real
+                    # reference data — the engine telling a document its own citations are a
+                    # mistake.  `consumer_fields` is what carries them.
                     print(f"paperkit-bib: {path.name} @{key}: field '{n}' is not a paperkit field "
                           f"and was DROPPED (not silently) — paperkit reads "
                           f"{', '.join(list(_SCALAR) + list(_LIST))}"
                           + (f" plus this project's declared {', '.join(consumer_fields)}"
                              if consumer_fields else "")
-                          + "; use one, or remove it", file=sys.stderr)
+                          + f"; declare it in this project's paper.toml "
+                            f"[paper] consumer_fields = [\"{n}\", ...] to CARRY it "
+                            f"(engine-inert, like `note`), or use an engine field, or remove it",
+                          file=sys.stderr)
             # Ξ·entails — REFUSE an unrecognized scope rather than warn.  The drop-warning above is
             # right for an unknown FIELD (it may be deliberate documentation), but `entails` is a
             # known field whose value gates a clamp: a typo'd `entails = {fragmnt}` would read as
@@ -173,7 +273,8 @@ def _bibpath(project: Path, b: str) -> Path:
     """Resolve a warrants token to a path.  A bare basename is relative to the project dir; a Bazel
     LABEL (//pkg:file, //:path/file, @repo//…) is a bib imported from the concept library, resolved
     repo-root-relative — correct when the importer IS the root project (project == repo root, the
-    README-import case).  Mirrors the generator's label branch so ONE warrants list drives both."""
+    README-import case).  Mirrors the generator's label branch so ONE warrants list drives both.
+    """
     if b.startswith("//") or ":" in b or b.startswith("@"):
         pkg, _, name = b.split("//", 1)[1].partition(":")
         return project / (f"{pkg}/{name}" if pkg else name)
@@ -186,7 +287,8 @@ def paper_keys() -> tuple:
     Λ·registry — the set has ONE owner: the `p.get("k", …)` calls in load_config.  A guard that
     kept its own copy would certify a tautology the moment the two drifted, and adding a key
     would then be a two-site edit with no signal when only one site was done.  checks/gen_fields.py
-    derives the documented key table the same way, from the same source."""
+    derives the documented key table the same way, from the same source.
+    """
     import inspect
     import re
     src = inspect.getsource(load_config)
@@ -208,7 +310,8 @@ def _param_config_keys() -> tuple:
 
     ⚑ THE [paper] KEY SET HAS TWO OWNERS.  load_config's `p.get` calls are one; these Params are
     the other, and they are what makes `root` a [paper] key even though load_config never reads
-    it.  A guard over only the first would have missed the very instance that prompted it."""
+    it.  A guard over only the first would have missed the very instance that prompted it.
+    """
     import ast as _ast
     out = []
     for f in sorted(Path(__file__).resolve().parent.glob("*.py")):
@@ -253,7 +356,8 @@ def _misplaced_paper_key(cfg: Path) -> None:
     reported instance actually sat, and the per-key guard did not look there at all.
 
     REFUSES rather than warns: a warning is what the consumer already had, and it did not stop
-    the build."""
+    the build.
+    """
     import tomllib as _t
     keys = set(paper_keys()) | set(_param_config_keys())
     raw = _t.loads(cfg.read_text())
@@ -294,7 +398,8 @@ def _misplaced_consumer_fields(cfg: Path) -> list:
     that degrades the output while the gate stays quiet.
 
     A misplaced key is unambiguous — no other table has any use for it — so this REFUSES rather
-    than warning.  A warning is what they already had, and it did not stop the build."""
+    than warning.  A warning is what they already had, and it did not stop the build.
+    """
     import tomllib as _t
     raw = _t.loads(cfg.read_text())
     for table, body in raw.items():
@@ -362,11 +467,42 @@ def parse_project(project_dir: Path) -> dict:
     """Every entry across a project's warrant bibs, parsed with the project's DECLARED consumer
     fields resolved from its paper.toml — the ONE place that binds "which extra fields this project
     tolerates" to the parse, so no caller re-implements the load-config-then-parse-all loop (and
-    none can forget to pass consumer_fields, silently strict-rejecting a declared field)."""
+    none can forget to pass consumer_fields, silently strict-rejecting a declared field).
+    """
     cfg = load_config(project_dir)
     F = {}
     for b in cfg["bibs"]:
-        F.update(parse(b, cfg["consumer_fields"]))
+        entries = parse(b, cfg["consumer_fields"])
+        # Ζ·bib·shadow — A KEY MAY NOT BE DEFINED TWICE ACROSS A PROJECT'S COMPOSED BIBS.
+        #
+        # This was a bare `F.update(...)`, so the LAST bib in `warrants` silently won.  The
+        # composition is flat and unordered by design (a project may author its claims across
+        # modules), which makes a collision invisible and its effect asymmetric: the surviving
+        # entry brings its OWN `check`, so a REFERENCE shadowing a WARRANT deletes that warrant's
+        # verifier from gate.py's `warrants = {k for k, f in F.items() if f.get("check")}` — the
+        # claim stays cited, stops being checked, and the gate stays GREEN.  A false green in the
+        # composition layer, reachable by adding an entry to a file that never mentions the key
+        # it disarms.
+        #
+        # ⚑ THE HAZARD IS NOT HYPOTHETICAL IN SHAPE.  `references.bib` is LAST in this repo's own
+        # paper (a 12-bib list), and reference keys are authored to read like prose nouns
+        # (`knuth-lit`, `mokhov-build`) — the same namespace warrant keys draw from.  One repo
+        # avoids it by prefixing every reference `r-`; that is a convention, and a convention is
+        # what this refuses to rely on.
+        #
+        # REFUSE rather than warn: unlike an unknown FIELD (which may be deliberate documentation,
+        # so `parse` warns), a duplicate KEY has no reading under which the author meant both
+        # entries to survive — one of them is already gone, and which one is an artifact of list
+        # order.  Naming both files is the whole diagnosis.
+        for k in entries:
+            if k in F:
+                raise SystemExit(
+                    f"paperkit-bib: {project_dir.name}: claim key {k!r} is defined TWICE — in "
+                    f"{Path(F[k].get('_src', '?')).name} and {b.name}.  A project's bibs compose "
+                    f"into ONE flat namespace, so the second definition would REPLACE the first "
+                    f"(silently, with its own `check` — or none, which disarms the claim while "
+                    f"leaving it cited).  Rename one, or remove it.")
+        F.update(entries)
     return F
 
 
@@ -376,7 +512,8 @@ def load_bib(bib_path: Path, project_dir: Path) -> dict:
     MODULE.bazel row's bib; gen_formulas: one of paper/*.bib) rather than a project's full warrant list.
     It still binds the project's DECLARED consumer fields, so such a caller cannot loud-drop a field the
     project carries — the same "none can forget" owner as parse_project, one bib at a time.  load_config
-    exits on a missing paper.toml, so a caller against an unconfigured tree must guard existence first."""
+    exits on a missing paper.toml, so a caller against an unconfigured tree must guard existence first.
+    """
     return parse(bib_path, load_config(project_dir)["consumer_fields"])
 
 
@@ -393,7 +530,8 @@ def rubric_rows(path: Path) -> list:
 
     A row is skipped when blank or comment-led; a data row must carry at least a key and a title,
     and one that does not is REFUSED by name rather than crashing on an index.  Returns the full
-    row so every consumer reads the same parse and takes the columns it owns."""
+    row so every consumer reads the same parse and takes the columns it owns.
+    """
     rows = []
     with path.open(newline="") as fh:
         for n, row in enumerate(csv.reader(fh, delimiter="\t"), 1):
@@ -429,7 +567,8 @@ def dep_order(keys: list, F: dict) -> list:
 
 def is_placed(f: dict) -> bool:
     """A warrant projected as a block (emit:) or a figure — placed verbatim, not
-    woven into prose, and so covered by its placement rather than a citation."""
+    woven into prose, and so covered by its placement rather than a citation.
+    """
     return bool(f.get("emit")) or f.get("check", "").startswith("figure:")
 
 
@@ -448,7 +587,8 @@ def emit_anchors(cfg: dict, emit: str) -> list:
     (629af60 keyed emit: on `project_dir` UNCONDITIONALLY — `cfg.get("project_dir") or out.parent`,
     the `or` dead because load_config always sets project_dir — which fixed the out-outside case
     and broke the mirror layout it did not consider.  The real fallback its message promised is
-    this ordered lookup over both.)"""
+    this ordered lookup over both.)
+    """
     seen, hits = set(), []
     for anchor in (cfg["project_dir"], cfg["out"].parent):
         d = Path(anchor).resolve()
@@ -465,7 +605,8 @@ def emit_path(cfg: dict, emit: str) -> "Path | None":
     """The path a placement asset RESOLVES to for READING — the first anchor that holds it
     (project_dir before out.parent, deterministic so the projection is stable), or None when
     neither does.  The projector reads this; the GATE surfaces the ambiguity when BOTH hold it
-    (emit_anchors, len 2), so a coin-flip the author did not intend never resolves in silence."""
+    (emit_anchors, len 2), so a coin-flip the author did not intend never resolves in silence.
+    """
     hits = emit_anchors(cfg, emit)
     return hits[0] if hits else None
 

@@ -87,7 +87,8 @@ def findings(src: str, markers=MARKERS) -> dict:
     """The verdict as DATA — `{conclusions, assertions, unbacked, ungated}`.
 
     Separated from reporting so a caller can consume the result (a witness asserting over it, a
-    ledger recording it) instead of parsing printed lines."""
+    ledger recording it) instead of parsing printed lines.
+    """
     concl, asserts, names = conclusion_lines(src, markers), assertions(src), bound_names(src)
     out = {"conclusions": concl, "assertions": asserts, "unbacked": [], "ungated": False}
     if not concl:

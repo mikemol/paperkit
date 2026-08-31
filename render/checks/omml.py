@@ -102,7 +102,7 @@ def _rungs(docx: Path) -> list[tuple[str, bool, str]]:
     in_omath = sum(len(_BRK.findall(b)) for b in blocks)
     outside = len(all_brks) - in_omath
     n = len(all_brks)
-    detail = (f"0 of 0 — no <m:brk/> to conform (vacuous on this route; pandoc emits none)"
+    detail = ("0 of 0 — no <m:brk/> to conform (vacuous on this route; pandoc emits none)"
               if n == 0 else f"{n - outside} of {n} <m:brk/> inside oMath")
     rows.append(("R7 breaks inside oMath", outside == 0, detail))
     return rows
@@ -110,7 +110,8 @@ def _rungs(docx: Path) -> list[tuple[str, bool, str]]:
 
 def _canonical(s: str) -> str:
     """Fold the registered cross-path glyph variants to one representative, so two renderings that
-    differ ONLY by a MATH_VARIANTS substitution compare equal — and any OTHER difference does not."""
+    differ ONLY by a MATH_VARIANTS substitution compare equal — and any OTHER difference does not.
+    """
     for a, b in MATH_VARIANTS.items():
         s = s.replace(b, a)
     return s
@@ -122,7 +123,8 @@ def math_agree(paper_md: Path) -> tuple[bool, str]:
     differ ONLY by a registered variant (MATH_VARIANTS).  A difference outside that set is a real
     cross-path divergence (returned False, named).  This REGISTERS the difference rather than
     erasing it: the agree prose check replaces math with a placeholder (it owns prose), and the
-    equations' cross-path behaviour is witnessed HERE, parameterized by the known variant set."""
+    equations' cross-path behaviour is witnessed HERE, parameterized by the known variant set.
+    """
     spans = _MATH_SPANS.findall(paper_md.read_text())
     eqs = [(m[0] or m[1]).strip() for m in spans if (m[0] or m[1]).strip()]
     if not eqs:
@@ -149,7 +151,8 @@ _MATH_SPANS = re.compile(r"\$\$(.+?)\$\$|(?<!\\)\$(?!\$)(.+?)(?<!\\)\$", re.S)
 
 def _paper_docx(d: Path) -> Path:
     """Render the paper to a docx the way pdf.py does (cite_split markers → pandoc), so the OMML
-    gate measures the SAME transport the deliverable uses."""
+    gate measures the SAME transport the deliverable uses.
+    """
     mark = {"file": "(present)", "result": "(verdict imported)"}
     mk = {}
     _bibtext = "".join(p.read_text() for p in sorted(Path("../paper").glob("*.bib")))
@@ -168,9 +171,10 @@ def _paper_docx(d: Path) -> Path:
 
 def _selftest() -> int:
     """⟨P, F, δ⟩ — a docx with math vs one without:
-      P: a doc carrying `$…$` math renders ≥1 native <m:oMath>, no bare `$`, well-formed.
-      F: a doc whose math was force-rasterized (an image where the equation should be) fails R1/R2.
-      δ: whether the math arrived as OMML or as pixels — one equation, two fates."""
+    P: a doc carrying `$…$` math renders ≥1 native <m:oMath>, no bare `$`, well-formed.
+    F: a doc whose math was force-rasterized (an image where the equation should be) fails R1/R2.
+    δ: whether the math arrived as OMML or as pixels — one equation, two fates.
+    """
     fails = []
 
     def check(desc, cond):

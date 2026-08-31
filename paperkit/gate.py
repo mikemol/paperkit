@@ -44,10 +44,10 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
-import bib  # noqa: E402  (the parser/data-model leaf)
-import project as P  # noqa: E402  (the PROJECTOR — gate's only genuine need for project, the PROJECT invariant)
+import bib
+import project as P
 
+import config
 
 # Ζ·gate·exit (exit alphabet) — main()'s returns are TYPED, engine-aligned with discriminate/coherence
 # (_REFUSE = 3), so a caller can tell "you asked wrong / I could not run" from "I ran and it failed":
@@ -66,10 +66,16 @@ _REFUSE = 3
 # no parallel gate loop, no config/CLI) so it can be imported and tested with a small blast
 # radius.  Re-exported here so callers reaching gate.resolves / gate.clean_env / gate.footprint
 # keep working; the gate itself uses resolves below.
-from resolver import (  # noqa: E402,F401
-    clean_env, run_ok, resolves, footprint, _check_cmd,
-    _ENV_KEEP, _ENV_KEEP_PREFIX)
-import resolver  # noqa: E402  (the module binding — resolver.PATH joins the composed registry below)
+import resolver
+from resolver import (
+    _ENV_KEEP,
+    _ENV_KEEP_PREFIX,
+    _check_cmd,
+    clean_env,
+    footprint,
+    resolves,
+    run_ok,
+)
 
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).  JSON and ONLY are also resolved by discriminate — it references

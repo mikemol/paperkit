@@ -15,9 +15,48 @@ COMPONENTS = {
         "__init__.py",
         "config.py",
     ],
+    # ⚑ Ζ·bib·parser — `bibparse.py` is `bib.py`'s GRAMMAR LEAF and belongs to the same component.
+    # It is the recursive-descent parser `bib.parse` projects its records from; the edge is
+    # bib → bibparse and it is INTRA-component, so it adds no DEPS entry.  The parser imports
+    # nothing engine-internal (stdlib only), which is what keeps `model`'s existing
+    # `["kernel"]` honest.
+    #
+    # ⚑ ITS ABSENCE HERE COST FOUR BATCH RUNS, and the failure was silent in exactly the way this
+    # partition exists to prevent.  A new module on disk that nobody DECLARES is invisible all the
+    # way down: `engine_srcs()` reads COMPONENTS, `imports.py` derives edges over that set, dag.bzl
+    # projects those edges, and Bazel stages from dag.bzl.  So `imports.py --check` reported
+    # "dag.bzl is fresh" -- truthfully, since it was consistent with a partition that never
+    # mentioned the file -- while every sandboxed cell died on `ModuleNotFoundError: No module
+    # named 'bibparse'`.  The generator was correct and its INPUT was incomplete.
+    #
+    # place-by-ownership-not-need: writing the file where it was needed (paperkit/) is not the
+    # same act as registering it with the layer that owns WHICH MODULES EXIST.  This is that layer.
+    # ⚑ Ζ·re·any — `rematch.py` is the TYPED SEAM over stdlib `re`, and it is in `model` because
+    # it is a data-reading leaf like `bibparse`: it imports nothing engine-internal (its only
+    # import is `re`, and that for typing alone), so it adds no DEPS edge.  Registered HERE at
+    # the moment it was created rather than after a build failed — the bibparse lesson, which
+    # cost four batch runs because a module on disk that this partition does not name is
+    # invisible to imports.py, to dag.bzl, and therefore to every sandboxed cell.
+    # ⚑ Ζ·bib·nest — `bibfidelity.py` is the SECOND bib grammar and belongs beside the first.
+    # `bibparse` is STRICT (refuses malformed input at a position, so the projector never renders
+    # a half-read record); `bibfidelity` is PERMISSIVE (drops what it cannot read and DECLARES the
+    # drop), which is what a tool answering "what does the FILE say, including what the engine
+    # ignores" requires — it must survive input `bibparse` correctly rejects.  Two grammars, two
+    # jobs, one component: both are data-reading leaves whose only import is `re`, so neither
+    # adds a DEPS edge and `model`'s `["kernel"]` stays honest.
+    #
+    # ⚑⚑ IT EXISTS BECAUSE SEVEN MODULES RE-DERIVED THE FORMAT.  Six render witnesses plus
+    # `paperkit/tools/bibstruct.py` each carry an inline bib regex, four byte-identical, all
+    # counting braces to depth ONE against a corpus that goes to two — measured, that lost three
+    # `claim` fields and invented a phantom field name from the leftover tail.  This is the ONE
+    # place a file-fidelity read is spelled, which is the same consolidation `bib.py`'s own
+    # docstring records having already done once for the engine side (Ζ·re·structural).
     "model": [
         "bib.py",
+        "bibfidelity.py",
+        "bibparse.py",
         "durable.py",
+        "rematch.py",
         "rhetoric.py",
     ],
     "resolver": [
@@ -48,6 +87,23 @@ COMPONENTS = {
         "prove.py",
         "routes.py",
     ],
+    # Κ·bibstruct — VENDORED PEER TOOLS, relocated from substrate/scratch/ 2026-08-28 (transfer
+    # accepted by summit; ownership not yet flipped).  A structural `.bib` reader/writer and the
+    # two modules it composes: `vfs` (the read/write seam whose three-valued Presence keeps
+    # ABSENT distinct from unreadable) and `edit_snapshot` (the --apply XOR --dry-run mutation
+    # contract).  Their OWN component, with NO entry in DEPS, so the DAG guard enforces what
+    # vendoring means: nothing in the engine may import them, and they may not import the
+    # engine.  They are invoked as programs, never as libraries — which is why placing them
+    # anywhere else would have quietly licensed an edge nobody wants.
+    #
+    # ⚑ They were UNPLACED for a while, and the partition-totality arm is what said so: the
+    # boundary suite named all three by path rather than letting a new subdirectory drift in
+    # unowned.  That is the guard working, and the reason a vendored file is not "just a file".
+    "vendored": [
+        "tools/bibstruct.py",
+        "tools/edit_snapshot.py",
+        "tools/vfs.py",
+    ],
     "delta": [
         "cache.py",
         "coherence.py",
@@ -59,7 +115,15 @@ COMPONENTS = {
         "layout.py",
         "mutate.py",
     ],
+    # ⚑ Φ·fixture·path — `tests/__init__.py` MAKES THIS A PACKAGE, and it is placed HERE at the
+    # moment it was created rather than after a build failed.  A module on disk that this
+    # partition does not name is invisible all the way down: engine_srcs() reads COMPONENTS,
+    # dagderive derives over that set, dagbzl projects it, and Bazel stages from dag.bzl — so a
+    # freshness check can truthfully report "fresh" while every sandboxed cell dies on
+    # ModuleNotFoundError.  That cost four batch runs when `bibparse.py` went unplaced.
     "tests": [
+        "tests/__init__.py",
+        "tests/_boundary.py",
         "tests/_fixture_delta.py",
         "tests/_fixture_gate.py",
         "tests/_fixture_model.py",
@@ -68,6 +132,13 @@ COMPONENTS = {
         "tests/boundaries_bib.py",
         "tests/boundaries_check.py",
         "tests/boundaries_clamp.py",
+        # Ξ·dag·script — the closure derivation's subprocess boundary.  Registered HERE at the
+        # moment the file was created, which is the lesson the bibparse comment above records
+        # costing four batch runs: I wrote the suite, wired its bib claim, declared its `reads`,
+        # regenerated the projection — and it still reddened the gate, because a module this
+        # partition does not name is staged by nothing and the cell ran against a file that was
+        # not there.  Three rounds of diagnosis-by-hypothesis before checking the partition.
+        "tests/boundaries_closure_census.py",
         "tests/boundaries_coherence.py",
         "tests/boundaries_components.py",
         "tests/boundaries_concept_route.py",
@@ -120,5 +191,12 @@ DEPS = {
     "gate": ["project", "model", "resolver", "kernel"],
     "library_kernel": ["delta", "gate", "project", "model", "resolver", "kernel"],
     "delta": ["gate", "project", "model", "resolver", "kernel"],
+    # ⚑ Κ·bibstruct — EMPTY, AND THAT IS THE DECLARATION.  A vendored tool imports no engine
+    # component, so the DAG guard turns "vendored" from a description into an enforced property:
+    # the moment one of these files imports `bib` or `resolver`, the edge lands outside DEPS and
+    # boundaries_components reds.  Nothing lists `vendored` as a dependency either, so the engine
+    # cannot start depending on a peer's tool by accident — they compose only with each other
+    # (bibstruct → edit_snapshot, vfs), which is an intra-component edge and therefore allowed.
+    "vendored": [],
     "tests": ["delta", "gate", "project", "model", "resolver", "kernel"],
 }

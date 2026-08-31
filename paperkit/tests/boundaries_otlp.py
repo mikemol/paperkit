@@ -23,9 +23,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
-from otlp_push import (  # noqa: E402  (the OWNER of the parse/attribution/aggregation)
-    DELTA, Spawn, _extract_values, duration_seconds, metric_families, parse_execlog,
-    project_of, target_of)
+from otlp_push import (
+    DELTA,
+    Spawn,
+    _extract_values,
+    duration_seconds,
+    metric_families,
+    parse_execlog,
+    project_of,
+    target_of,
+)
 
 # A concatenated-JSON execlog (NOT a JSON array — bazel writes one SpawnExec object per spawn):
 # one Δ-grid action (PkEval) + one test wrapper (TestRunner) + one cross-project test.
@@ -52,13 +59,15 @@ def _point(fam, **attrs):
 
 
 def main() -> int:
-    fails = []
-
-    def check(desc, cond):
-        fails.append(desc) if not cond else None
-        print(f"  {'ok ' if cond else 'XX '}{desc}")
-
-    print("Ρ·telemetry — the OTLP pusher's pure core\n")
+    # Ζ·suite·count — the SHARED recorder owns the summary (see tests/_boundary.py).  The local
+    # closure appended to `fails` alone, so "13 behaviors, 1 delta" was a literal beside the set
+    # it described.  This file is the one that made the census land on FOUR rather than two: it
+    # was the clearest instance and still survived two rounds of per-file remediation, because
+    # per-file is the wrong grain for a shape every file shares.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _boundary import Suite
+    s = Suite("OTLP-PARSE", "Ρ·telemetry — the OTLP pusher's pure core")
+    check = s.check
 
     spawns = parse_execlog(EXECLOG)
     check("parse_execlog reads CONCATENATED objects (not an array) — 3 spawns",
@@ -98,18 +107,12 @@ def main() -> int:
     p = _point(_fam(metric_families([paper_eval]), "paperkit_discriminate_seconds"), project="paper")
     f = _point(_fam(metric_families([Spawn("TestRunner", "@@+bib+paperkit_paper//:c__eval", 0.4)]),
                     "paperkit_discriminate_seconds"), project="paper")
-    ok = p == 0.4 and f is None
-    fails.append("delta-subset") if not ok else None
-    print(f"  {'ok ' if ok else 'XX '}one spawn's mnemonic flips whether discriminate_seconds sees it")
-    print("      P (PkEval ∈ DELTA):     discriminate_seconds{paper} = 0.4")
-    print("      F (TestRunner ∉ DELTA): discriminate_seconds{paper} absent (gate/check still see it)")
-    print("      δ (min delta): one spawn's mnemonic, DELTA-member vs not\n")
-
-    if fails:
-        print(f"OTLP-PARSE: FAIL ({len(fails)} drifted)")
-        return 1
-    print("OTLP-PARSE: PASS (13 behaviors, 1 delta)")
-    return 0
+    s.delta("one spawn's mnemonic flips whether discriminate_seconds sees it",
+            p == 0.4, f is None,
+            p="PkEval ∈ DELTA:     discriminate_seconds{paper} = 0.4",
+            f="TestRunner ∉ DELTA: discriminate_seconds{paper} absent (gate/check still see it)",
+            d="one spawn's mnemonic, DELTA-member vs not")
+    return s.finish()
 
 
 if __name__ == "__main__":

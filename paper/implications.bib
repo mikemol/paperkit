@@ -148,3 +148,15 @@
   claim   = {the structure residual closes by PROJECTION rather than collapse --- a grounding edge that runs beyond prose adjacency now renders as a transitively-reduced cross-reference, making the grounding DAG visible in the prose and not only in the metadata; its richer materializations, an expounding clause or a figure beyond the bare citation, are the open rhetorical work},
   check   = {claim:forward-direction}
 }
+
+@misc{from-and-rests-on-are-distinct,
+  section = {implications}, from = {forward-direction}, rests-on = {observe-bounded-by-adoption}, join = {. },
+  claim   = {and the two relations the projector reads are DISTINCT rather than two spellings of one edge --- `from` records PROSE CONSEQUENCE, fixing where a claim sits in the linearization, while `rests-on` records what makes the claim TRUE and is the only field the grounding graph is built from; the engine keeps them on disjoint paths, so a prose connective cannot license a grounding edge and a document declaring only prose order is reported DEGENERATE rather than as agreeing, which is the honest form of a measure that would otherwise read fluent writing as argument},
+  check   = {claim:from-and-rests-on-are-distinct}
+}
+
+@misc{depth-annotates-without-reordering,
+  section = {implications}, from = {from-and-rests-on-are-distinct}, rests-on = {ordered-by-deps}, join = {, and },
+  claim   = {`depth` is the precedent for a per-claim RENDERING annotation --- a declared scalar that changes MATERIALIZATION, indenting the claim as a nested proof step, over a derived order it does not disturb; the ordering walk visits `from` alone, so permuting every depth in a document leaves the sequence fixed, which is what makes the field a HINT rather than a second ordering authority competing with the DAG},
+  check   = {claim:depth-annotates-without-reordering}
+}

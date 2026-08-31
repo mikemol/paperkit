@@ -24,18 +24,18 @@ from pathlib import Path
 ENGINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 
-import grader  # noqa: E402
-import layout  # noqa: E402
+import grader
+import layout
 
 
 def main() -> int:
-    fails = []
-
-    def check(desc, cond):
-        fails.append(desc) if not cond else None
-        print(f"  {'ok ' if cond else 'XX '}{desc}")
-
-    print("Ζ·surface·kind — measured vs merely read\n")
+    # Ζ·suite·count — the SHARED recorder owns the summary (see tests/_boundary.py).  The local
+    # closure here appended to `fails` alone, so the count printed below was a literal that no
+    # arm could move: "7 behaviors, 1 delta" tracked when it was typed, not what runs.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _boundary import Suite
+    s = Suite("SURFACE", "Ζ·surface·kind — measured vs merely read")
+    check = s.check
     # The gap-suffix is DELIBERATELY not a real one.  A first version of this check used `.json`
     # — and then `.json` was admitted to MUTABLE_SUFFIXES the next day, so the fixture's premise
     # evaporated and the check went red.  "Synthetic fixture, not the live instance" was the right
@@ -90,18 +90,13 @@ def main() -> int:
         finally:
             layout.MUTABLE_SUFFIXES.clear()
             layout.MUTABLE_SUFFIXES.update(was)
-        ok = un == [f"proj/data{GAP}"] and closed == []
-        fails.append("surface-delta") if not ok else None
-        print(f"  {'ok ' if ok else 'XX '}admitting the suffix CLOSES the gap, and the axis says so")
-        print(f"      P (as shipped): data{GAP} is read, not mutable → reported as unmeasured")
-        print("      F (suffix added): the same file becomes measurable → the gap is empty")
-        print("      δ (min delta): one entry in MUTABLE_SUFFIXES\n")
+        s.delta("admitting the suffix CLOSES the gap, and the axis says so",
+                un == [f"proj/data{GAP}"], closed == [],
+                p=f"as shipped: data{GAP} is read, not mutable → reported as unmeasured",
+                f="suffix added: the same file becomes measurable → the gap is empty",
+                d="one entry in MUTABLE_SUFFIXES")
 
-    if fails:
-        print(f"SURFACE: FAIL ({len(fails)})")
-        return 1
-    print("SURFACE: PASS (7 behaviors, 1 delta)")
-    return 0
+    return s.finish()
 
 
 if __name__ == "__main__":

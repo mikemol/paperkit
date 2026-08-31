@@ -34,15 +34,18 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import config  # noqa: E402  (Ω·config — the one configurable-resolution pipeline)
-import bib  # noqa: E402  (paperkit.bib — the one .bib parser + data model)
-import durable  # noqa: E402  (Ζ·write·atomic — the alias-safe replace)
+import bib
+import durable
+
 # the projector parses then renders, so it uses the bib data model internally (short names).
-from bib import dep_order, emit_path, is_placed, load_config, rubric  # noqa: E402,F401
-from bib import parse as entries  # noqa: E402,F401
+from bib import dep_order, emit_path, is_placed, load_config, rubric
+from bib import parse as entries
+
 # top-level now: after Μ·cycle rhetoric imports bib (a leaf), NOT project, so project→rhetoric is
 # one-way — the project↔rhetoric cycle is gone and this need no longer be a function-local import.
-from rhetoric import MOVES  # noqa: E402
+from rhetoric import MOVES
+
+import config
 
 # Minimal, domain-agnostic LaTeX -> Unicode for claim text (em/en dashes, a few
 # escapes, inline math).  A paper that needs more declares its own; this is the
@@ -94,7 +97,8 @@ def _anchor(key: str, body: str, target: str) -> str:
     """A claim's own citation point: a pandoc [@key] tag (for citeproc), a web ANCHOR that other
     claims link to, or NOTHING for the footnote target (where the marker + its verification note
     are attached by the weaver instead).  The grounding edges are the same `rests-on` DATA either
-    way — only how a citation MATERIALIZES differs by target (the projector's one job)."""
+    way — only how a citation MATERIALIZES differs by target (the projector's one job).
+    """
     if target == "web":
         return f'<a id="{key}"></a>{body}'
     if target in ("footnote", "plain"):
@@ -105,7 +109,8 @@ def _anchor(key: str, body: str, target: str) -> str:
 def _verify_note(check: str) -> str:
     """The footnote target's provenance line: HOW this clause's claim is machine-verified, read
     off its `check`.  A cmd: names the verifier to re-run; a claim:/file: names what is imported/
-    present.  This is the whole point of the footnote target — every clause cites its own proof."""
+    present.  This is the whole point of the footnote target — every clause cites its own proof.
+    """
     kind, _, tgt = check.partition(":")
     if not check:
         return "Asserted without a machine check"
@@ -124,7 +129,8 @@ def _verify_note(check: str) -> str:
 
 def sentence(key: str, f: dict, primary: str, target: str = "pandoc") -> str:
     """A claim sentence carrying its own citation/anchor for `target`.  Prefer an explicit
-    `claim`; else a warrant's `title` (the title IS the claim); else a terse cite."""
+    `claim`; else a warrant's `title` (the title IS the claim); else a terse cite.
+    """
     if f.get("claim"):
         return _anchor(key, clean(f["claim"]), target)
     title = clean(f.get("title", key))
@@ -159,7 +165,8 @@ RAW_OPEN, RAW_CLOSE = "<!-- paperkit:raw -->", "<!-- /paperkit:raw -->"
 
 def _cell(s: str) -> str:
     """One table cell.  The FILE owns data; the ENGINE owns document syntax — so
-    nothing a cell contains may become markup, a citation, or a heading."""
+    nothing a cell contains may become markup, a citation, or a heading.
+    """
     s = " ".join(str(s).split())            # newlines would break the row
     return (s.replace("\\", "\\\\").replace("|", "\\|")
              .replace("[", "\\[").replace("]", "\\]"))   # kills [@key] citations
@@ -239,7 +246,8 @@ def transitive_reduction(rests: dict) -> dict:
     """Drop a grounding edge X→Y when Y is already reachable from X by a LONGER `rests-on`
     path (the reader reaches Y through the intermediate, so re-citing Y is redundant
     clutter, not new grounding).  The `drop` rung — the zero of the reference's
-    materialization ladder (drop < cite < expound < figure), need-proportioned."""
+    materialization ladder (drop < cite < expound < figure), need-proportioned.
+    """
     def reaches(a, b):
         seen, stk = set(), [x for x in rests.get(a, ()) if x != b]
         while stk:
@@ -261,12 +269,13 @@ def references(k: str, targets: list, pos: dict, target: str = "pandoc") -> str:
     already laid, a forward-reference to ground laid below).  Citation is the floor
     materialization; richer forms (expound, figure) are opt-in.  Returns the parenthetical.
     For `target` web a cross-reference is an intra-page hyperlink to the grounded claim's
-    anchor; for pandoc it is a [@key] citation — the SAME edge, materialized per target."""
+    anchor; for pandoc it is a [@key] citation — the SAME edge, materialized per target.
+    """
     if not pos or k not in pos:
         return ""
 
     def tok(y: str) -> str:
-        human = y.replace('-', ' ').replace('_', ' ')
+        human = y.replace("-", " ").replace("_", " ")
         if target == "web":
             return f"[{human}](#{y})"
         if target == "footnote":
@@ -294,7 +303,8 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
     ladder (drop < cite < expound < figure): a footnote marker on the sentence, the
     link explanation + its grounding citations collected into `footnotes` for the
     document end.  Without a link (or no footnotes sink) the grounding is the CITE
-    floor — the inline parenthetical.  `target` selects how citations materialize."""
+    floor — the inline parenthetical.  `target` selects how citations materialize.
+    """
     def clause(k: str) -> str:
         s = sentence(k, F[k], primary, target)
         link = F[k].get("link")
@@ -483,7 +493,7 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
     must not import the grader — the component lattice has delta depending on project.)
     """
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import genre as genre_mod          # the pagination registry (project component; no upward edge)
+    import genre as genre_mod  # the pagination registry (project component; no upward edge)
 
     F = {}
     for b in cfg["bibs"]:

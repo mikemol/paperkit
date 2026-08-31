@@ -33,7 +33,8 @@ _MATH_SPAN = re.compile(r"(?<!\\)\$(?!\$)([^$]+?)\$|\$\$(.+?)\$\$", re.S)
 
 def paper_equations(paper_md: Path) -> list[str]:
     """The inline- and display-math spans of paper.md, in document order, as readable alt text
-    (the LaTeX source with its delimiters stripped and whitespace collapsed)."""
+    (the LaTeX source with its delimiters stripped and whitespace collapsed).
+    """
     text = paper_md.read_text()
     out = []
     for m in _MATH_SPAN.finditer(text):
@@ -69,7 +70,8 @@ def describe_formulas(pdf: Path, alts: list[str]) -> int:
     """Set `/Alt` on each `/Formula` element from `alts` (positional).  Saves in place.  Returns
     the count described.  Raises if the counts disagree — a formula with no alt fails 7.7, and an
     alt with no formula means the positional match slipped, either way a LOUD failure not a silent
-    partial."""
+    partial.
+    """
     doc = pikepdf.open(str(pdf), allow_overwriting_input=True)
     formulas = _formulas(doc)
     if len(formulas) != len(alts):
@@ -89,9 +91,10 @@ def _undescribed(pdf: Path) -> int:
 
 def _selftest() -> int:
     """⟨P, F, δ⟩ — a PDF with a /Formula element carrying no /Alt:
-      P: after describe_formulas, the /Formula carries the equation as /Alt, 0 undescribed remain.
-      F: a count mismatch (2 formulas, 1 alt) raises rather than describing a partial set.
-      δ: whether the /Formula has an /Alt — the exact bit clause 7.7 checks."""
+    P: after describe_formulas, the /Formula carries the equation as /Alt, 0 undescribed remain.
+    F: a count mismatch (2 formulas, 1 alt) raises rather than describing a partial set.
+    δ: whether the /Formula has an /Alt — the exact bit clause 7.7 checks.
+    """
     import tempfile
     fails = []
 

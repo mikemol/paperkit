@@ -43,14 +43,30 @@ from pathlib import Path
 ENG = Path(__file__).resolve().parent.parent
 ROOT = ENG.parent
 sys.path.insert(0, str(ENG))
-import resolver  # noqa: E402
+import resolver
 
 
 def _consumer(w: Path, body: str) -> Path:
-    """A project shipping its OWN library, whose concepts.py behaves as `body` dictates."""
+    """A project shipping its OWN library, whose witness behaves as `body` dictates.
+
+    ⚑ Ζ·lib·contract — THE FIXTURE DECLARES ITSELF A PROJECT.  It used to write `concepts.py`
+    alone, which satisfied the old directory test (`(cand / "concepts.py").is_file()`) — weaker
+    than the contract, and the ecosystem populated the gap: `gcalculus/library/` and
+    `summit/library/` pass that test while carrying no paper.toml and no concepts.bib, and
+    `substrate/catalog/library/` carries no concepts.py at all and fell through to the ENGINE's
+    library, which holds none of its keys.
+
+    ⚑ AND THE WITNESS IS DELIBERATELY NOT NAMED `concepts.py`.  `_library_cmd` reads the module
+    from this paper.toml's `[checks.claim] cmd`; a fixture named concepts.py would pass equally
+    against a resolver that still hardcoded the name, and would prove nothing about the
+    declaration being READ.
+    """
     proj = w / "view"
     (proj / "library").mkdir(parents=True, exist_ok=True)
-    (proj / "library" / "concepts.py").write_text(body)
+    (proj / "library" / "paper.toml").write_text(
+        '[paper]\ntitle="c"\nrubric="r.tsv"\nwarrants=["concepts.bib"]\nout="l.md"\n'
+        '\n[checks.claim]\ncmd = "python3 witness.py {target}"\n')
+    (proj / "library" / "witness.py").write_text(body)
     return proj
 
 
@@ -127,14 +143,25 @@ def main() -> int:
         print("      (3 arms skipped; they run on the CLI route where the file is present)")
         return _finish(fails, ran)
     bzl = bzl_path.read_text()
-    m = re.search(r'key = check\[len\("concept:"\):\](.{0,400})', bzl, re.S)
-    emitted = m.group(1) if m else ""
+    # ⚑ THE ANCHOR IS THE EMITTED LINE, NOT A WINDOW AFTER A NEARBY TOKEN.  This read
+    # `key = check[len("concept:"):]` and then took the NEXT 400 CHARACTERS, so it asserted a
+    # property of source PROXIMITY rather than of the emitter.  Measured 2026-08-28: the
+    # Ζ·grid·dangling fix inserted ~28 lines of comment and a `fail()` between that anchor and
+    # the `pk_result` line, pushing `sibling_verdict` outside the window — two arms went red and
+    # the third CRASHED with an IndexError on `.split(...)[1]`, for a change that altered nothing
+    # this suite is about.  Source-grep witness token fragility, third instance in this tree.
+    #
+    # The honest anchor is the emitted STRING: find the pk_result line for the concept branch and
+    # assert on IT.  A comment can then say anything, and only a real change to what is emitted
+    # moves this arm.
+    emitted = next((ln.strip() for ln in bzl.splitlines()
+                    if "pk_result(name = " in ln and "@paperkit_library//:" in ln), "")
     check("the Bazel emitter builds its label from the key (it is reachable to read at all)",
           bool(emitted) and "sibling_verdict" in emitted)
     check("...and that label names ONE fixed library repo, not the consuming project",
           "@paperkit_library//:" in emitted)
     check("...so nothing in the emitted label varies with WHO cites the key",
-          "project" not in emitted.split("sibling_verdict")[1][:120])
+          "proj" not in emitted.split("sibling_verdict")[1])
 
     # ── therefore: the routes CAN disagree, and today they do ────────────────────────────────
     # An arm asserting True is a PRINTED STATEMENT, not a check (Λ·instrument-vs-gate: it would

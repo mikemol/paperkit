@@ -40,7 +40,8 @@ except ImportError:                          # Ζ·tier·exit — pikepdf absent
 def _words_by_page(pdf: Path) -> dict[int, list[tuple[float, float, float, float, str]]]:
     """{1-based page: [(x0,y0,x1,y1,word)]} in PDF coordinates (y-up, bottom origin).
     The page height comes from each `<page height=...>` element — pdftotext measures from the top,
-    PDF annotations from the bottom, so each word is flipped through its own page's height."""
+    PDF annotations from the bottom, so each word is flipped through its own page's height.
+    """
     xml = subprocess.run(["pdftotext", "-bbox", str(pdf), "-"],
                          capture_output=True, text=True).stdout
     out: dict[int, list[tuple[float, float, float, float, str]]] = {}
@@ -93,7 +94,8 @@ def uninformative(pdf: Path) -> list:
 def _is_marker(text: str) -> bool:
     """A description that is a bare reference MARKER — a digit, a bracketed number, a single
     token — rather than words.  These are what a footnote or citation link covers, and they carry
-    no information out of context."""
+    no information out of context.
+    """
     t = text.strip().strip("[]()")
     # A URI is a DESCRIPTION, not a marker: "https://doi.org/10.1145/3236774" is one token and
     # says exactly where the link goes, which is what a description is for.  Measured on the latex
@@ -114,12 +116,13 @@ def _is_marker(text: str) -> bool:
 def _destination_hint(annot) -> str:
     """What KIND of thing a link points at, from its own destination — so a marker-only link can
     say "footnote 1" rather than "1".  Read from the annotation, never guessed: an internal
-    destination is a note or section within the document, an external URI names its host."""
+    destination is a note or section within the document, an external URI names its host.
+    """
     try:
         act = annot.get("/A")
         if act is not None and act.get("/URI") is not None:
             uri = str(act.get("/URI"))
-            host = uri.split("//")[-1].split("/")[0]
+            host = uri.rsplit("//", maxsplit=1)[-1].split("/", maxsplit=1)[0]
             return f"link to {host}" if host else "external link"
     except Exception:
         pass
@@ -138,7 +141,8 @@ def describe_links(pdf: Path) -> int:
     Saves in place.  Returns the count described from their OWN text (excludes the "link" fallback).
 
     Vendored from sre-troubleshooting's linkalt.py (summit floor, ask-adopt-pdfua-render-workarounds)
-    — the authoritative method, preserved before that tree is retired."""
+    — the authoritative method, preserved before that tree is retired.
+    """
     words = _words_by_page(pdf)
     doc = pikepdf.open(str(pdf), allow_overwriting_input=True)
     filled = 0
@@ -189,9 +193,10 @@ def _undescribed(pdf: Path) -> int:
 
 def _selftest() -> int:
     """⟨P, F, δ⟩ — build a 1-page PDF with an undescribed link over 'see Figure', then:
-      P: after describe_links, that link carries /Contents and 0 undescribed remain.
-      F: the CENTRE rule (sre's bug) on two adjacent links leaves one bare; OVERLAP describes both.
-      δ: overlap-vs-centre selection — one link that is bare under centre carries /Contents here."""
+    P: after describe_links, that link carries /Contents and 0 undescribed remain.
+    F: the CENTRE rule (sre's bug) on two adjacent links leaves one bare; OVERLAP describes both.
+    δ: overlap-vs-centre selection — one link that is bare under centre carries /Contents here.
+    """
     import tempfile
     fails = []
 
@@ -260,7 +265,8 @@ def _make_fixture(pdf: Path) -> None:
     pdftotext extracts as a SINGLE word, covered by TWO adjacent link annots (one over its left
     half, one over its right), both with empty /Contents.  The single word's CENTRE lies inside
     only ONE rect (or neither, if split at the seam), so the centre rule describes at most one link
-    while the OVERLAP rule — the word box intersects BOTH rects — describes both."""
+    while the OVERLAP rule — the word box intersects BOTH rects — describes both.
+    """
     doc = pikepdf.Pdf.new()
     page = doc.add_blank_page(page_size=(200, 100))
     # one contiguous token, no space, so pdftotext yields a single <word> spanning both links
@@ -282,7 +288,8 @@ def _make_fixture(pdf: Path) -> None:
 def _describe_by_centre(pdf: Path) -> int:
     """The sre-bug reference: select a word only if its CENTRE lies inside the rect.  A word that
     extracts as one token straddling two links has a centre in neither → described by neither.
-    Returns the count that WOULD be described (does not save)."""
+    Returns the count that WOULD be described (does not save).
+    """
     words = _words_by_page(pdf)
     doc = pikepdf.open(str(pdf))
     n = 0

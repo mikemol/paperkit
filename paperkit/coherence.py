@@ -64,7 +64,7 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bib  # noqa: E402  (the parser/data-model leaf — read the bib structure + `link` acknowledgments)
+import bib
 
 _ENGINE = Path(__file__).resolve().parent
 # Ζ·ladder·sentinel — the same REFUSE rung discriminate types (a caller bug the tool will not
@@ -74,7 +74,8 @@ _REFUSE = 3
 
 def _linearize(records: list) -> dict:
     """The prose linearization: each section's claims in dep_order (topological by
-    `from`), concatenated in section-first-appearance order.  Returns {key: position}."""
+    `from`), concatenated in section-first-appearance order.  Returns {key: position}.
+    """
     frm = {r["key"]: r.get("from", []) for r in records}
     secs, order = [], {}
     for r in records:                       # sections in first-appearance order
@@ -109,7 +110,8 @@ def structure_residual(records: list, discharged=frozenset()) -> dict:
     cross-reference — a citation / figure / expounding (the same thing a connective is, at
     distance > 0; the direction is the sign of the prose-distance).  The residual is the
     long edges not yet projected; ADVISORY, dischargeable by a `link` footnote (or, the
-    constructive close, by actually projecting the reference)."""
+    constructive close, by actually projecting the reference).
+    """
     pos = _linearize(records)
     carried, long_edges = 0, []
     for r in records:
@@ -188,7 +190,8 @@ def grouping_residual(records: list, gamma: float = 1.0, discharged=frozenset())
 def sensitivity_residual(records: list) -> dict:
     """Face two: how many DISTINCT sensitivity signatures the behavioral witnesses
     actually have, vs how many name-distinct witnesses there are.  The collapse is the
-    count that share their signature with another (name-distinct, sensitivity-same)."""
+    count that share their signature with another (name-distinct, sensitivity-same).
+    """
     sigs: dict = {}
     for r in records:
         if r.get("grade") != "behavioral":
@@ -229,7 +232,8 @@ def scope_residual(records: list) -> dict:
     Everything else is REPORTED, not judged: `full` claims are the default and unremarkable, and a
     `fragment` on a behavioral witness is exactly what the axis is for.  The residual is the count
     of contradicted disclosures — a face that reds only where the declaration and its own evidence
-    cannot both be true."""
+    cannot both be true.
+    """
     # Read the AUTHORED field, falling back to the clamp-annotated one.  `scope` is written by
     # grade.clamp; reading only that would make this face silently empty on any record that had
     # not been through it — a face that measures nothing while reporting residual 0 is the
@@ -287,7 +291,8 @@ def _engine_cap(tests, universal=frozenset()) -> set:
     the claim.  `paperkit/tests/` (the shared fixture builder) is the same argument at the
     engine's scale.  So the frame is a COMPOSITION — structural exclusion by kind, then the
     computed quotient by universality — and only the old `paperkit/`-only INCLUSION filter is
-    gone, since that is the part that made a self-contained project read as vacuous."""
+    gone, since that is the part that made a self-contained project read as vacuous.
+    """
     return {t for t in tests
             if t not in universal
             and not t.startswith("checks/")
@@ -311,7 +316,8 @@ def _universal_sites(records: list) -> frozenset:
     measurement would read vacuous — conflating "every claim tests the same thing" (genuinely
     undiscriminating) with "there is only one claim" (nothing to discriminate FROM).  Below two
     fingerprints the frame is UNDEFINED, and the identity quotient is the honest answer: report
-    what was measured rather than subtract a frame that was never established."""
+    what was measured rather than subtract a frame that was never established.
+    """
     sets = [{t for t in r.get("tests", [])
              if not t.startswith("checks/") and not t.startswith("paperkit/tests/")}
             for r in records if r.get("tests")]
@@ -344,7 +350,8 @@ def unmeasured_edges(records: list, all_keys=frozenset()) -> dict:
     is not *nothing to measure*.  This face separates them, so a partial reading states its own
     incompleteness instead of implying coverage it does not have.  `pending` shrinks to zero as
     the grade completes; a `dangling` edge names a target no bib entry declares at all, which is
-    a broken edge rather than an ungraded one and does not shrink."""
+    a broken edge rather than an ungraded one and does not shrink.
+    """
     graded = {r["key"] for r in records}
     pending, dangling = [], []
     for r in records:
@@ -369,7 +376,8 @@ def grounding_residual(records: list, discharged=frozenset(), universal=frozense
                     acknowledges it (the sibling of the structure face's discharge).
 
     Only a GENUINE miss — X tests engine capability, disjoint from Y's, and un-acknowledged
-    — is the residual: declared grounding the measurement does not see and no one explained."""
+    — is the residual: declared grounding the measurement does not see and no one explained.
+    """
     S = {r["key"]: _engine_cap(r.get("tests", []), universal) for r in records}
     edges = reflected = rhetorical = undischarged = 0
     misses = []
@@ -408,7 +416,8 @@ def emergence_residual(records: list, universal=frozenset()) -> dict:
     rests-on), the claim's irreducible contribution, or pure check mechanism.  The sound under-grounding
     signal is the GROUNDING face (overlap), not this one.  A LEAF (no rests-on) is an axiom.  Where
     grounding's OVERLAP can pass (the edge shares one site) while the claim still tests more,
-    emergence's SUBSET catches it: the residual is the increments — claims the grounding does not COVER."""
+    emergence's SUBSET catches it: the residual is the increments — claims the grounding does not COVER.
+    """
     S = {r["key"]: _engine_cap(r.get("tests", []), universal) for r in records}
     collapse = leaf = 0
     increments = []
@@ -478,7 +487,8 @@ def _records_from_calcs(project_dir: Path, calc_files: list) -> list:
     """Ζ·emerge·gate — assemble the records coherence reads from CACHED calc records (the measurement,
     sens) + the bib STRUCTURE (rests-on/section/from), instead of re-running the def-resolution sweep.
     This is what makes the ∂² faces a CHEAP READING over the cached calculation.  The structure comes
-    from the canonical parser (paperkit.bib, via bib.parse) — entries already carries rests-on."""
+    from the canonical parser (paperkit.bib, via bib.parse) — entries already carries rests-on.
+    """
     F = bib.parse_project(project_dir)
     recs = []
     for f in calc_files:
@@ -503,7 +513,8 @@ def _coverage(project_dir: Path, records: list) -> tuple:
 
     So the reading NAMES its own coverage.  This is the Ζ·pi·unresolved discipline one level down:
     an incomplete observation must not be indistinguishable from a complete one, and the fix is
-    never to guess the remainder — it is to say what was not looked at."""
+    never to guess the remainder — it is to say what was not looked at.
+    """
     have = {r["key"] for r in records}
     # ⚑ ELIGIBLE, not ALL.  The denominator is the claims that CAN carry a def-sweep certificate:
     # a `concept:` claim is graded by its OWNING library and imported as a certificate (Π-typed
@@ -546,7 +557,8 @@ def _records_from_cache(project_dir: Path) -> list:
     collapses to the import-crash signature (the reason `_records` asks for def), so reading one
     would feed the sensitivity, grounding and emergence faces a measurement that cannot
     discriminate — and `_vacuous_exit` would then report a vacuous DOCUMENT rather than a wrong
-    tool.  Ν·loud: refuse, naming the resolution found, rather than degrade."""
+    tool.  Ν·loud: refuse, naming the resolution found, rather than degrade.
+    """
     # Both refusals below are REFUSE (_REFUSE = 3, discriminate's alphabet), not a floor-unmet 1:
     # pointing this at a project with no cache, or with a file-resolution one, is a CALLER BUG the
     # tool will not answer — the same category as an unknown --only key.  `raise SystemExit(str)`
@@ -584,21 +596,24 @@ def _records_from_cache(project_dir: Path) -> list:
 
 def _all_keys(project_dir: Path) -> frozenset:
     """Every key the bib DECLARES — the set against which an ungraded target is `pending`
-    (a claim awaiting measurement) rather than `dangling` (an edge to nothing at all)."""
+    (a claim awaiting measurement) rather than `dangling` (an edge to nothing at all).
+    """
     F = bib.parse_project(project_dir)
     return frozenset(F)
 
 
 def _discharged(project_dir: Path) -> set:
     """Claims carrying a `link` footnote — the author has acknowledged that this claim's
-    prose and grounding edges diverge, and why; that discharges the advisory."""
+    prose and grounding edges diverge, and why; that discharges the advisory.
+    """
     F = bib.parse_project(project_dir)
     return {k for k, f in F.items() if f.get("link")}
 
 
 def _vacuous_exit(project_dir: Path, rep: dict) -> bool:
     """Ν·vac — print + signal when the measurement carries NO engine capability at all, so a
-    caller never reports a verdict (green or red) over a vacuous def-sweep."""
+    caller never reports a verdict (green or red) over a vacuous def-sweep.
+    """
     if not rep["vacuous"]:
         return False
     print(f"Ν·vac: coherence over {project_dir.name or project_dir}: NO claim tests any engine "
@@ -620,7 +635,8 @@ def _grounding_exit(rep: dict) -> int:
     reason to stderr before returning nonzero; this one is the outlier, not the pattern.  A gate
     whose failure carries no residual is not cheaper, it just relocates the work to whoever
     reads it — and it reads as a harness fault (the thing `Ν·vac` exists to distinguish) rather
-    than the genuine finding it usually is."""
+    than the genuine finding it usually is.
+    """
     g = rep["grounding"]
     if g["undischarged"] == 0:
         return 0
@@ -636,7 +652,8 @@ def _grounding_exit(rep: dict) -> int:
 
 def _residual_exit(rep: dict, max_resid) -> int:
     """The Ρ·deck·residual·gate exit: 0 unless an explicit budget is exceeded by the
-    UN-ACKNOWLEDGED residual.  No flag → always 0 (instrument, not control)."""
+    UN-ACKNOWLEDGED residual.  No flag → always 0 (instrument, not control).
+    """
     if max_resid is None:
         return 0
     gr = rep["grouping"]
@@ -655,7 +672,8 @@ def _max_residual(argv: list):
     `--min-strength`.  Absent → the face is an INSTRUMENT (reported, never fatal); present → a
     CONTROL that fails when the UN-ACKNOWLEDGED residual exceeds N.  An instrument earns trust
     per-use by re-verifying its output; a control has to be sound in both directions first, which
-    is why the discharge mechanism (a `link` on the named claim) had to land before this flag."""
+    is why the discharge mechanism (a `link` on the named claim) had to land before this flag.
+    """
     for i, a in enumerate(argv):
         if a == "--max-residual" and i + 1 < len(argv):
             return int(argv[i + 1])
@@ -665,6 +683,25 @@ def _max_residual(argv: list):
 
 
 def main(argv: list) -> int:
+    # Ζ·cohere·help — ANSWER BEFORE MEASURING.  `--help` used to fall through every branch below:
+    # it is not a positional, so `pos` came back empty, `project_dir` defaulted to the CWD, and the
+    # tool began a full def-sweep — 2+ minutes before printing anything, and then printing a
+    # REPORT rather than a usage.  A tool whose help is unreachable without paying for a
+    # measurement has no help; the flag is answered here, first, touching nothing.
+    if "--help" in argv or "-h" in argv:
+        print(__doc__.strip().split("\n\n")[0])
+        print("\nusage: coherence.py [project] [--json] [--from-calcs <calc.json>...] "
+              "[--from-cache] [--max-residual N]\n"
+              "  (no project)        the current directory\n"
+              "  --json              emit the full report as JSON, not just the exit verdict\n"
+              "  --from-calcs …      read CACHED def-sweep certificates (__dcalc) — no re-sweep;\n"
+              "                      REFUSES (exit 2) if the calc set covers only part of the graph\n"
+              "  --from-cache        read the accumulated per-check cache from --state increments\n"
+              "  --max-residual N    fail when the grouping residual exceeds N\n"
+              "\nExit: 0 coherent, 1 a face is red, 2 CANNOT-RUN (a partial or vacuous reading).\n"
+              "⚑ Bare, this SWEEPS: it grades every check to fingerprint it, which is minutes, not\n"
+              "  seconds.  --from-calcs is the gate's path and reads what the build already banked.")
+        return 0
     as_json = "--json" in argv
     max_resid = _max_residual(argv)
     # the flag's VALUE is not a positional project dir

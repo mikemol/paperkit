@@ -19,13 +19,14 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import driver  # noqa: E402
+import driver
 
 N = 5
 
 
 class W:
     """A faithful 5-item pump-witness; pump can sleep a hair so a budget can bite."""
+
     def __init__(self, slow=0.0):
         self.slow = slow
 
@@ -50,7 +51,9 @@ class W:
 
 class Broken(W):
     """Violates the soundness obligation: serialize drops a field, so the state does
-    not round-trip."""
+    not round-trip.
+    """
+
     def serialize(self, s):
         return json.dumps({"c": s["c"]})
 

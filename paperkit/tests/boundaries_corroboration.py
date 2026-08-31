@@ -16,8 +16,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_delta import discriminate  # noqa: E402
-from _fixture_model import entry  # noqa: E402
+from _fixture_delta import discriminate
+from _fixture_model import entry
 
 
 def grade(check):
@@ -70,6 +70,7 @@ def main() -> int:
     # unmeasurable sharing must not read as a measured one, in either direction.
     import shutil as _sh
     import tempfile as _tf
+
     import resolver as _R
     _d = Path(_tf.mkdtemp())
     try:

@@ -115,7 +115,8 @@ if not (os.path.exists(dst) and os.path.getsize(dst) > 0):
 
 def _uno_python() -> str | None:
     """A python interpreter that can `import uno` (system python, LibreOffice's), or None — probed,
-    not assumed.  The mise interpreter running the checks cannot import uno on this host."""
+    not assumed.  The mise interpreter running the checks cannot import uno on this host.
+    """
     env = {**os.environ,
            "URE_BOOTSTRAP": f"file://{_LO}/fundamentalrc",
            "PYTHONPATH": f"{_LO}:/usr/lib/python3/dist-packages",
@@ -133,7 +134,8 @@ def _uno_python() -> str | None:
 def export_pdfua(src: Path, out: Path, timeout: int = 900) -> Path | None:
     """Export `src` (docx) to a tagged PDF/UA-1 at `out` over the UNO bridge, indexes refreshed.
     Returns `out` on success, None if no uno-capable python is available OR the bridge is killed at
-    the deadline (a loud absence, never a stale/empty pass)."""
+    the deadline (a loud absence, never a stale/empty pass).
+    """
     py = _uno_python()
     if py is None:
         print("lo-export: no uno-capable python found (looked at /usr/bin/python3) — "
@@ -162,7 +164,8 @@ def _selftest() -> int:
       F: an impossibly short deadline kills the bridge → None (a LOUD, bounded failure — the failure
          sre's macro path lacked, a silent hang).
       δ: the deadline — a generous one exports a Tagged PDF, a 1s one is killed.
-    If no uno-capable python exists, SKIP LOUD (never skip-green)."""
+    If no uno-capable python exists, SKIP LOUD (never skip-green).
+    """
     fails = []
 
     def check(desc, cond):

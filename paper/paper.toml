@@ -6,6 +6,14 @@ rubric = "rubric.tsv"
 warrants = ["model.bib", "engine.bib", "resolver.bib", "projection.bib", "gate.bib", "adequacy.bib", "liveness.bib", "rhetoric.bib", "composition.bib", "implications.bib", "conclusion.bib", "references.bib"]
 out = "paper.md"
 
+# Ζ·bib·declare — the standard BibTeX metadata `references.bib` carries.  The engine consumes
+# NONE of it (the projector reads title/author/year); declaring it here CARRIES it on the parsed
+# record, engine-inert, the way `note` is.  This is a declaration and not a courtesy: paperkit
+# holds no roster of "real bibliography" fields, because which reference metadata a document
+# keeps is the DOCUMENT's policy — an engine-side list would be the engine deciding, and would
+# drift from actual BibTeX (it did: `type = {RFC}` was absent from it and loud-dropped).
+consumer_fields = ["journal", "volume", "number", "pages", "booktitle", "doi"]
+
 # Custom check type: `claim:<key>` runs the per-claim witness in checks/claims.py,
 # which asserts the specific proposition that claim makes about the engine — a
 # distinct, discriminating verifier per claim (so Δ grades it behavioral and the

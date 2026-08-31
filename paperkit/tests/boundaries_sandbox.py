@@ -13,14 +13,14 @@ a downstream project living in a home that also holds a clone/cache would explod
 from __future__ import annotations
 
 import os
-import shutil
 import pathlib
+import shutil
 import sys
 import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import layout  # noqa: E402  (sandbox topology lives in the layout core)
+import layout
 
 
 def main() -> int:

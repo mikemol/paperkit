@@ -1,7 +1,9 @@
 intro	paper-is-projection	node-is-claim	claim-bears-check	fail-omits	claim-is-record	record-is-bibentry	prose-projected	ordered-by-deps	joined-by-glue
 model	deterministic	projector-emits	prose-is-artifact	gate-rejects-drift	edit-cant-survive	coverage-both-sides	every-section-appears	every-claim-cited
 engine	module-split	paper-is-paperkit	claims-are-warrants	prose-is-projection	gate-is-subject
-selfhost	paperkit-on-paperkit	one-green-check	closes-gap	unverified-cant-ship	not-project
+selfhost	paperkit-on-paperkit	one-green-check
+implications	depth-annotates-without-reordering
+conclusion	closes-gap	unverified-cant-ship	not-project
 edges	edge-from-orders	edge-rests-grounds
 edges	edge-chiral	edge-move-types
 edges	edge-formulas
@@ -58,5 +60,6 @@ implications	gamma-is-reachable
 implications	genre-declared-runs
 implications	observe-bounded-by-adoption
 implications	forward-direction
+implications	from-and-rests-on-are-distinct
 related	knuth-lit	buckheit-donoho	mokhov-build
 related	cassian-fresh

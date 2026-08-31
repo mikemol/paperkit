@@ -27,7 +27,10 @@ from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ENGINE))
+sys.path.insert(0, str(ENGINE.parent))
 import config as C  # noqa: E402
+from tools import dagderive as _dagderive  # noqa: E402
+from tools import dagnames as _dagnames  # noqa: E402
 
 # Synthetic Params — the mechanism's specimens (no coupling to any real knob).
 VAL = C.Param("syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def"))
@@ -49,15 +52,22 @@ def _literal(path, name):
 
 
 def _cone(stem, imports):
-    """Transitive import closure of a module STEM over dag.bzl's IMPORTS (keys are paths)."""
-    seen, todo = set(), [stem]
-    while todo:
-        m = todo.pop()
-        if m in seen:
-            continue
-        seen.add(m)
-        todo += imports.get(m + ".py", [])
-    return seen
+    """Transitive import closure of a module STEM, as module NAMES.
+
+    ⚑ THE WALK IS DELEGATED, BECAUSE THE PRIVATE COPY WAS THE BUG dagderive PREDICTED.  This read
+    `imports.get(m + ".py", [])`, appending the suffix per hop — correct while dag.bzl's VALUES
+    were bare stems, and silently one-hop once Ξ·dag·dotted made both sides of an edge a PATH
+    (`"bib.py"` + `".py"` matches nothing).  `dagderive.cone`'s docstring names this exact
+    consequence in advance: *"reported `gate.REGISTRY == 6` where the real cone hosts 12"*.
+    Measured here: 6 and 9, with `extra=[...]` naming six and fifteen knobs the walk never
+    reached — a guard that UNDER-derives its expected set passes a registry MISSING knobs, which
+    is the shape the guard exists to catch, committed by the guard.
+
+    ⚑⚑ AND IT PASSED FROM THE REPO ROOT WHILE FAILING FROM `boundaries/`, which is the only
+    directory the bib ever runs it from.  A stale dag.bzl was being read on the other route.
+    """
+    paths = _dagderive.cone(stem + ".py", imports)
+    return {_dagnames.to_module(p, ENGINE.name) for p in paths}
 
 
 def _hosted(mod):
@@ -117,7 +127,12 @@ def main() -> int:
     print("\n⟨entry-registry completeness⟩ — Μ·kernel·shrink·registry\n")
     imports = _literal(ENGINE / "dag.bzl", "IMPORTS")
     components = _literal(ENGINE / "components.bzl", "COMPONENTS")
-    engine_stems = [f[:-3] for c, fs in components.items() if c != "tests" for f in fs]
+    # ⚑ A COMPONENT FILE IS A PATH; A MODULE NAME IS DOTTED.  `f[:-3]` strips `.py` and leaves
+    # the DIRECTORY, so `tools/bibstruct.py` became the module name `tools/bibstruct` the moment
+    # the engine grew its first subpackage, and importlib raised ModuleNotFoundError — reddening
+    # this suite over the PARTITION rather than anything it asserts.  The translation is owned by
+    # tools/dagnames.py (the fourth private copy is where it broke; there is not a fifth here).
+    engine_stems = _dagnames.module_names(ENGINE, skip=("tests",), pkg=ENGINE.name)
     mods = {s: importlib.import_module(s) for s in engine_stems}
 
     check("the kernel hosts ZERO Params (config.py is the mechanism alone)",

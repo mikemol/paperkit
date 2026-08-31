@@ -43,7 +43,16 @@ emit SOFFICE  soffice --version
 
 # veraPDF's PDF/UA verdict is a pure function of its JAR, so its content sha256 is a finer key than
 # the banner (a rebuilt-same-version JAR with a different ruleset would otherwise cache-collide).
-jar=$(ls "$HOME"/.local/opt/verapdf/bin/cli-*.jar 2>/dev/null | head -1)
+# ⚑ SC2012 FIXED, NOT SUPPRESSED — and the fix is SIMPLER than the flagged form.  This was
+# `ls …/cli-*.jar | head -1`, which parses ls output and, when the glob matches nothing, takes
+# ls's ERROR path: the pipeline yields empty and the `-n` below reads that as "absent" for the
+# right reason by accident.  A shell glob needs no subprocess at all: it expands to the matches,
+# or to the UNEXPANDED PATTERN when there are none — which `-f` then rejects, so absence is
+# tested rather than inferred from a swallowed error.
+jar=""
+for _j in "$HOME"/.local/opt/verapdf/bin/cli-*.jar; do
+    [ -f "$_j" ] && { jar="$_j"; break; }
+done
 if [ -n "$jar" ] && command -v sha256sum >/dev/null 2>&1; then
     echo "STABLE_TOOLCHAIN_VERAPDF_JAR $(sha256sum "$jar" | cut -d' ' -f1)"
 else

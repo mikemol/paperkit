@@ -1122,6 +1122,58 @@ def observe_bounded_by_adoption():
         "a project WITH grounding edges must not be reported degenerate"
 
 
+def from_and_rests_on_are_distinct():
+    # Δ·pi·claim — `from` records PROSE CONSEQUENCE and `rests-on` records what makes a claim TRUE.
+    # The engine keeps them in two disjoint code paths: _linearize reads `from` for POSITION
+    # (coherence.py: `frm = {r["key"]: r.get("from", []) ...}`) and bib.dep_order visits only
+    # `from`; the grounding graph is built from `rests-on` alone.  So a prose connective cannot
+    # license a grounding edge, and neither field substitutes for the other.
+    import coherence
+    # A record set carrying `from` but NO `rests-on`: prose order exists, grounding does not.
+    prose_only = [{"key": "a", "section": "S", "from": [], "rests-on": []},
+                  {"key": "b", "section": "S", "from": ["a"], "rests-on": []}]
+    r = coherence.grouping_residual(prose_only)
+    assert r["edges"] == 0, \
+        "`from` must contribute NO grounding edge — a prose connective is not a truth-maker"
+    assert r["degenerate"], \
+        "a record set with only `from` has no grounding graph, so the face must declare degenerate"
+    # The converse: grounding WITHOUT prose adjacency still builds the graph.
+    ground_only = [{"key": "a", "section": "S", "from": [], "rests-on": ["b"]},
+                   {"key": "b", "section": "S", "from": [], "rests-on": ["a"]}]
+    assert coherence.grouping_residual(ground_only)["edges"] > 0, \
+        "`rests-on` alone must build the grounding graph — prose adjacency is not required for it"
+
+
+def depth_annotates_without_reordering():
+    # Δ·pi·claim — `depth` is the precedent for a per-claim RENDERING annotation: a declared scalar
+    # that changes MATERIALIZATION (project.py indents the claim as a nested proof step) over a
+    # derived order it does not disturb.  bib.dep_order visits only `from`, so the sequence is
+    # invariant under adding `depth` to any entry.
+    import bib as B
+    # The fixture is built so that DEP-order and DEPTH-order DISAGREE: dep_order must yield
+    # [a, b, c] (c depends on b, b on a), while sorting by `depth` would surface c first.
+    # If the annotation ever leaked into ordering, these two would be distinguishable.
+    # ⚑ The pairs are UNCHAINED on purpose: with a `from` edge between them the topological
+    # constraint would fix the order by itself and the fixture could not detect a depth-sort.
+    # Here only the authored sequence decides, so a projector that let `depth` seed the walk
+    # would surface c first and the arm reddens.
+    F = {"a": {"claim": "first", "depth": "3"},
+         "b": {"claim": "second", "depth": "2"},
+         "c": {"claim": "third", "depth": "1"}}
+    keys = ["a", "b", "c"]
+    got = B.dep_order(keys, F)
+    assert got == ["a", "b", "c"], \
+        f"dep_order must follow authored order and `from` alone; a depth-sort gives [c, b, a] (got {got})"
+    # And the order is INVARIANT under changing depth: same records, depths permuted.
+    G = {k: dict(v) for k, v in F.items()}
+    for k, d in (("a", "1"), ("b", "3"), ("c", "2")):
+        G[k]["depth"] = d
+    assert B.dep_order(keys, G) == got, \
+        "permuting `depth` must leave dep_order fixed — the hint annotates, it does not reorder"
+    assert "depth" in B._SCALAR, \
+        "`depth` must be a declared scalar field, not an ad-hoc key the projector guesses at"
+
+
 def compose_two_imports():
     # Ρ·paper·compose — exactly TWO verbs cross a project boundary, and that is a STRUCTURAL bit
     # in the engine's own registry, not a convention.  Derived from VERBS, never re-listed here
@@ -1269,6 +1321,8 @@ CLAIMS = {
     "genre-declared-runs": genre_declared_runs,
     "observe-second-shape": observe_second_shape,
     "observe-bounded-by-adoption": observe_bounded_by_adoption,
+    "from-and-rests-on-are-distinct": from_and_rests_on_are_distinct,
+    "depth-annotates-without-reordering": depth_annotates_without_reordering,
     "fresh-by-construction": fresh_by_construction,
     "trust-boundary": trust_boundary,
     "env-sanitized": env_sanitized,

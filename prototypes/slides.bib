@@ -10,8 +10,6 @@
 % Sections trace the argument's own emergent structure (foundation → cut → recursion →
 % composition → genre). Read the DAG, not the file order.
 
-% ── foundation: paperkit's projection is already coalgebraic ──────────────────────────
-
 @misc{projection-is-coalgebra,
   section = {foundation},
   claim   = {paperkit's document is not authored but PROJECTED --- an unfold (anamorphism) of the claim-DAG. The carrier is the DAG; project(cfg, target) is the observation; `target` selects the OBSERVATION FUNCTOR (markdown/web/footnote/plain/pandoc), which the projector's own docstring names: only how a citation MATERIALIZES differs by target}
@@ -28,8 +26,6 @@
   claim   = {docx and pdf are NOT new observations of the DAG --- they are downstream TRANSFORMS of the pandoc observation (pandoc then LibreOffice). So an exporter-of-finished-prose would make a deck a second-class artifact that has ALREADY lost the DAG structure; observing the DAG directly is what keeps rests-on as build-order},
   rests-on = {targets-are-total-linearizations}
 }
-
-% ── the cut: slides break the linearization invariant ─────────────────────────────────
 
 @misc{slides-break-linearization,
   section = {cut}, from = {targets-are-total-linearizations},
@@ -49,8 +45,6 @@
   rests-on = {},
 }
 
-% ── the invariant grouping: emergent from rests-on, not authored ──────────────────────
-
 @misc{grouping-is-recursive,
   section = {grouping}, from = {slides-break-linearization},
   claim   = {a slide is a composite of claims; a chapter a composite of slides; a deck a composite of chapters --- ONE grouping operation applied RECURSIVELY. The coalgebra is S -> RoseTree(S): an anamorphism into a tree (deck > chapters > slides > claims), not three ad-hoc levels},
@@ -68,8 +62,6 @@
   claim   = {a full DAG (~84 claims) cannot be ~84 slides, so a deck may observe a FILTERED carrier. rests-on-modularity gives the GROUPING; effective_grade/centrality gives the PROMINENCE (spine vs detail). The two compose: a slide is a strongly-grounded cluster, low-grade detail falls to speaker-notes/appendix AUTOMATICALLY. Structure from grounding, emphasis from grade, neither authored},
   rests-on = {grouping-emerges-from-rests-on}
 }
-
-% ── composition <-> decomposition: one operator, two directions ───────────────────────
 
 @misc{carrier-is-a-union-of-a-collection,
   section = {composition},
@@ -120,8 +112,6 @@
   claim   = {the genre knob and the "optimal collection" objective function are the SAME choice viewed twice. A genre IS a named objective on pagination (talk = minimise high-load slides; teaching = one concept per unit; brief = maximise coverage per slide; collection = e.g. minimise cross-document rests-on edges --- where the dangling-premise gate becomes the COST function). You do not pick an abstract cost AND a genre; the genre is a reusable named cost, the way paragraph=woven is a reusable named choice},
   rests-on = {genre-supplies-pagination, grade-is-the-prominence-axis}
 }
-
-% ── terminus: the whole design in one statement ───────────────────────────────────────
 
 @misc{the-slide-coalgebra,
   section = {terminus}, from = {genre-names-the-objective},

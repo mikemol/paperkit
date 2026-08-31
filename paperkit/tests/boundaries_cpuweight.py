@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
-import cpuweight as W  # noqa: E402
+import cpuweight as W
 
 _fails = []
 

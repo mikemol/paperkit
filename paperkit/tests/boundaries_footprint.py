@@ -19,10 +19,11 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import resolver  # noqa: E402  (footprint lives in the resolver core — small blast radius, no gate loop)
+import resolver
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_delta import discriminate  # noqa: E402
-from _fixture_model import entry  # noqa: E402
+from _fixture_delta import discriminate
+from _fixture_model import entry
 
 
 def fp(check):

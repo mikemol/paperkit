@@ -23,8 +23,8 @@ Run:  python3 paperkit/tests/boundaries_result_addr.py
 from __future__ import annotations
 
 import json
-import shutil
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,14 +32,15 @@ from pathlib import Path
 
 ENG = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ENG))
-import resolver  # noqa: E402
+import resolver
 
 GATE = str(ENG / "gate.py")
 
 
 def _sib(tmp: Path, green: bool = True) -> Path:
     """A minimal sibling project 'g' with ONE claim `c`, green or red, plus a SECOND claim `d`
-    that is always green — so a per-warrant address can be shown to differ from the whole gate."""
+    that is always green — so a per-warrant address can be shown to differ from the whole gate.
+    """
     g = tmp / "g"
     (g / "").mkdir(parents=True, exist_ok=True)
     (g / "paper.toml").write_text(
@@ -142,6 +143,39 @@ def main() -> int:
              _resolve("result:../nonexistent#c", here), "cannot-run"),
         ]
         for label, got, want in tri:
+            ok = got == want
+            print(f"    {'ok  ' if ok else 'FAIL'} {label:<62} got={got}")
+            if not ok:
+                fails.append(f"{label} — got {got}, want {want}")
+
+        # ── 3b. Ω·owner·arm — THE CANNOT-RUN CARRIES WHO AND WHY ────────────────────────────────
+        # ⚑ THE HELPER ABOVE IS WHY THIS WAS NEEDED.  `_resolve` normalises a Verdict to one of
+        # three STRINGS before comparing, discarding `.owner` and `.why` — so every arm in this
+        # file passed identically whether or not the Ζ·unavailable·why widening existed at all.
+        # MEASURED: gutting `resolver.unavailable()` to `return UNAVAILABLE` (dropping both
+        # fields) left this suite BYTE-IDENTICALLY GREEN.  The machinery was unfalsifiable, and a
+        # widening nothing can refute is decoration.
+        #
+        # ⚑ It is also the flatten `Verdict` exists to refuse, committed by the witness: the type
+        # deliberately has no `__bool__` so no consumer folds it silently, and bnd-dispatch guards
+        # that — while this helper folded it to a three-element string enum one layer down.  A
+        # prohibition on the type is not a prohibition in the test.
+        print("\n  ⟨attribution⟩ a cannot-run says WHO could not answer, and why")
+        v_key = resolver.resolves(f"result:{rel_bad}#no-such-key", here, {})
+        v_gone = resolver.resolves("result:../nonexistent#c", here, {})
+        att = [
+            ("the sibling RAN and declined → owner names the citation",
+             bool(v_key.owner) and "no-such-key" in v_key.owner, True),
+            ("...and carries the delegate's own account, not a disjunction",
+             bool(v_key.why), True),
+            ("the sibling was UNREACHABLE → owner is filled too (was the bare singleton)",
+             bool(v_gone.owner), True),
+            ("...and says what could not be reached",
+             bool(v_gone.why), True),
+            ("δ: the two cannot-runs are DISTINGUISHABLE — same verdict, different owner",
+             v_key.owner != v_gone.owner, True),
+        ]
+        for label, got, want in att:
             ok = got == want
             print(f"    {'ok  ' if ok else 'FAIL'} {label:<62} got={got}")
             if not ok:

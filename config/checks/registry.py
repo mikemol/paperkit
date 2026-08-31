@@ -18,7 +18,25 @@ import config as C  # noqa: E402
 
 def union():
     """Every hosted Param, introspected over the engine's non-test modules (components.bzl is
-    the owner of that list), in canonical order (by knob name)."""
+    the owner of that list), in canonical order (by knob name).
+
+    ⚑ A COMPONENT IS SKIPPED WHEN IT IMPORTS NO ENGINE, NOT WHEN IT IS NAMED.  This walked every
+    component except a hardcoded `"tests"`, so the exclusion was an ENUMERATION beside the set it
+    guards — and a new component silently joined the IMPORT set.  Measured 2026-08-28: adding
+    `vendored` (bibstruct + its two composed modules, relocated from a peer repo) made this
+    `importlib.import_module("tools/bibstruct")`, which is not even a module NAME, and reddened
+    all three config checks in a commit that touched none of them.
+
+    The derived predicate is IMPORTABILITY: an engine module is importable as a TOP-LEVEL name,
+    so its partition entry is a bare filename, while every non-engine component states its
+    subdirectory (`tests/…`, `tools/…`).  "Has no separator" IS "importable here", and it
+    subsumes both exclusions without naming either — so a new subdirectory component joins
+    nothing by default, which is the direction a guard should fail.
+
+    ⚑ The same walk lives in paperkit/tests/boundaries_config.py, which broke the same way on
+    the same day.  Two copies of one traversal is the residue here; the predicate is at least
+    now identical in both, and derived rather than enumerated in either.
+    """
     src = Path("../paperkit/components.bzl").read_text()
     for node in ast.parse(src).body:
         if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "COMPONENTS" for t in node.targets):
@@ -27,7 +45,7 @@ def union():
     else:
         raise SystemExit("registry.py: no COMPONENTS literal in components.bzl")
     out = []
-    for stem in (f[:-3] for c, fs in comps.items() if c != "tests" for f in fs):
+    for stem in (f[:-3] for fs in comps.values() for f in fs if "/" not in f):
         out += [v for v in vars(importlib.import_module(stem)).values() if isinstance(v, C.Param)]
     return sorted(out, key=lambda p: p.name)
 

@@ -42,7 +42,8 @@ _DEFAULT_FRACTION = 0.4
 
 def budget_mb() -> int:
     """The mutation-sweep RAM budget in MB: PAPERKIT_SWEEP_RAM_MB if set (the operator's forward
-    judgment), else the topology-derived conservative floor (MemTotal × the default fraction)."""
+    judgment), else the topology-derived conservative floor (MemTotal × the default fraction).
+    """
     override = os.environ.get("PAPERKIT_SWEEP_RAM_MB")
     if override:
         return int(override)

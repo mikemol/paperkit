@@ -15,8 +15,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_gate import gate  # noqa: E402
-from _fixture_model import entry  # noqa: E402
+from _fixture_gate import gate
+from _fixture_model import entry
 
 # A multi-check project, so parallelism actually fans out (3 distinct checks).
 PASS = [entry("a", claim="alpha", check="cmd:true"),

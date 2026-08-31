@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
-import logs_push as L  # noqa: E402
+import logs_push as L
 
 _fails = []
 
@@ -54,8 +54,8 @@ def main() -> int:
           set(kinds) == {"hook_step", "bazel_target_fail", "coherence_grounding",
                          "coherence_miss", "gate_unresolvable", "jvm_oom"})
     check("P: the captured fields carry the identifiers, not just the message",
-          ["@@+bib+paperkit_talk//:gate", "1"] ==
-          next(e["fields"] for e in ev if e["kind"] == "bazel_target_fail"))
+          next(e["fields"] for e in ev if e["kind"] == "bazel_target_fail") ==
+          ["@@+bib+paperkit_talk//:gate", "1"])
     check("P: ordinary build chatter is DROPPED — a store full of noise is not queried",
           all("ordinary build chatter" not in e["_msg"] for e in ev))
 

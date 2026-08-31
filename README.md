@@ -68,6 +68,7 @@ A project's `paper.toml` `[paper]` table may set these keys. Generated from the 
 Two commands do the work — project turns the claims into the document, and gate verifies it [@rm-cmds]. You run them like this [@rm-cmds-eg].
 
 ```sh
+#!/bin/sh
 python3 paperkit/project.py paper   # claims -> paper/paper.md (the projection)
 python3 paperkit/gate.py    paper   # verify: projection-stable, checks pass, coverage
 ```
@@ -120,6 +121,7 @@ A passing check only proves a sentence named a verifier, not that the verifier e
 You run it as a report or as a gate, like this [@rm-delta-cmds].
 
 ```sh
+#!/bin/sh
 python3 paperkit/discriminate.py paper                            # report grades
 python3 paperkit/discriminate.py --min-strength behavioral paper  # gate on weak checks
 ```
@@ -143,6 +145,7 @@ README.md        this file — itself a paperkit projection of the root warrant 
 Checks run locally as a pre-commit githook — every commit runs bazel test //:hook (gating both documents as per-claim check targets) and the Delta adequacy grade, keeping the tool boundaries intact [@rm-ci]. A fresh clone enables it once, since git cannot auto-enable a hook from a commit [@rm-ci-enable].
 
 ```sh
+#!/bin/sh
 git config core.hooksPath .githooks   # enable the local-CI pre-commit hook (once per clone)
 ```
 

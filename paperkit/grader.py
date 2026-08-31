@@ -27,19 +27,28 @@ import time
 from pathlib import Path
 from typing import NamedTuple
 
-import config
-
 import resolver
-from layout import SKIP_DIRS, _ENGINE, _sandbox_root, _copy_sandbox, _nested_roots, _mutable
-from mutate import (  # Ζ·mutant / Μ·sweep·atom — the pure AST mutation primitives (their own leaf)
-    _def_sites, _mutate_lines, _branch_sites, _flip_sites, _flip_condition,
-    _data_sites, emit_mutant, _drop_data_multi)
 from grade import _grade_from_sens
+from layout import _ENGINE, SKIP_DIRS, _copy_sandbox, _mutable, _nested_roots, _sandbox_root
+from mutate import (  # Ζ·mutant / Μ·sweep·atom — the pure AST mutation primitives (their own leaf)
+    _branch_sites,
+    _data_sites,
+    _def_sites,
+    _drop_data_multi,
+    _flip_condition,
+    _flip_sites,
+    _mutate_lines,
+    emit_mutant,
+)
+
+import config
 
 
 class _Unreachable(int):
     """Falsy like False — every `if not baseline` still holds — but distinguishable, so the
-    ONE caller that builds a grade record can say WHY nothing was established."""
+    ONE caller that builds a grade record can say WHY nothing was established.
+    """
+
     def __new__(cls):
         return super().__new__(cls, 0)
     def __repr__(self):
@@ -64,7 +73,8 @@ def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
     """Resolved paths whose existence the build already presupposes — a file:
     check naming one of these is redundant with the project being runnable, so
     it is provably vacuous.  The declared bibs / rubric / config / output, plus
-    the engine scripts the checks invoke via ../paperkit."""
+    the engine scripts the checks invoke via ../paperkit.
+    """
     req = set(cfg["bibs"]) | {cfg["rubric"], cfg["out"], project_dir / "paper.toml"}
     req |= set(_ENGINE.glob("*.py"))
     return {p.resolve() for p in req}
@@ -74,7 +84,8 @@ def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path 
     """Mutable text inputs Δ may corrupt: the sandboxed project's own files PLUS the
     engine the checks run through (`engine_dir`) — so an engine-claim's witness is
     sensitive to the engine source it tests, not only to its own script.  The verifier
-    scripts and sibling projects are excluded; the engine is deduped if already inside."""
+    scripts and sibling projects are excluded; the engine is deduped if already inside.
+    """
     out, seen = [], set()
 
     def collect(base: Path, skip_nested: bool):
@@ -113,7 +124,8 @@ def surface_of(footprint: list | None, sandbox_project: Path, root_copy: Path | 
     property of the CLAIM).  Scope is decided here, from the subject; granularity stays a knob.
 
     Φ·degrade: no footprint (strace absent/blocked) falls back to the flat tree — over-sweeping is
-    the safe direction, and the caller's under-report guard still covers a partial trace."""
+    the safe direction, and the caller's under-report guard still covers a partial trace.
+    """
     if footprint is None:
         return sandbox_files(sandbox_project, set(), engine_dir)
     base = root_copy or sandbox_project
@@ -155,7 +167,8 @@ def unmeasured_reads(footprint: list | None, root_copy: Path | None) -> list:
     corroboration.  A grade says how falsifiable a claim is; this says how much of the claim the
     grade actually looked at.  Derived artifacts are excluded via SKIP_DIRS (a __pycache__/*.pyc
     is a build product of a .py that IS in the surface — its source is measured, so it is not a
-    gap; see the pyc-is-a-build-artifact reading)."""
+    gap; see the pyc-is-a-build-artifact reading).
+    """
     if footprint is None or root_copy is None:
         return []                                     # Φ·degrade: no trace ⇒ no claim either way
     out = []
@@ -173,7 +186,8 @@ def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None,
     """Label a corrupted file: relative to the project, or tagged engine/<…> when it is the engine
     (outside the project, e.g. the paper's ../paperkit).  Ζ·surface: a constructed surface can also
     name a THIRD tree (a claim about a sibling's content), labelled root-relative — the engine's own
-    label is left byte-identical so existing fingerprints do not move."""
+    label is left byte-identical so existing fingerprints do not move.
+    """
     try:
         return str(f.relative_to(sandbox_project))
     except ValueError:
@@ -197,7 +211,9 @@ class _BranchNode:
     has (`.body[0].lineno`, `.end_lineno`, `.body[0].col_offset`), so the arm's body line-span is
     replaced by the SAME uncatchable raise as a def body — zero change to _mutate_lines, and a
     branch: site is a raise-kind site indistinguishable from def: at the mutation atom.  It IS
-    monotone (the same primitive) and ADDITIVE (a NEW label, appended beside its def: site)."""
+    monotone (the same primitive) and ADDITIVE (a NEW label, appended beside its def: site).
+    """
+
     __slots__ = ("body", "end_lineno")
 
     def __init__(self, first, last):
@@ -212,7 +228,9 @@ class _DataNode:
     reader flips when the key is gone), so it belongs in _sites beside def:/branch: and the sweep
     consumes it uniformly; _apply renders a data node by applying its spec to the (possibly already
     def/branch-mutated) file text.  dflip: is NOT here — it is the non-monotone DflipSite the sweep
-    cannot receive (the structural bar), like flip:."""
+    cannot receive (the structural bar), like flip:.
+    """
+
     __slots__ = ("spec",)
 
     def __init__(self, qualname, n):
@@ -231,7 +249,8 @@ def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = 
     arm body → the same raise): a finer, still-monotone reach probe that never REPLACES the def:
     site, so the coarse behavioral grade and the def: cache cell both survive beside it.  flip:
     is NOT here — it is a distinct, non-monotone site type (a FlipSite) the sensitivity sweep is
-    structurally unable to consume; see _flip_sites_of."""
+    structurally unable to consume; see _flip_sites_of.
+    """
     sites = []
     for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
         label = _rel(f, sandbox_project, engine_dir, root_copy)
@@ -251,7 +270,8 @@ def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = 
 def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
     """Mutate one GROUP of sites at once (def bodies → uncatchable raise; whole files → CORRUPT),
     run the check, restore.  True iff the mutation flips chk red.  The atom shared by the
-    group-testing sweep (sensitivity) and the single-site probe (flip_one)."""
+    group-testing sweep (sensitivity) and the single-site probe (flip_one).
+    """
     saved: dict = {}
     linenodes: dict = {}   # def/branch nodes → _mutate_lines (body-span → raise)
     dataspecs: dict = {}   # Μ·sweep·atom — _DataNode specs → emit_mutant (literal rewrite)
@@ -295,7 +315,8 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     `path::qualname`, body→raise); any other file is one whole-file site (label
     `path`, corrupted).  Monotonicity (a cleared group truly holds no flipper) is by
     construction — the uncatchable raise in _mutate_lines.  engine_dir is None ⇒ file
-    resolution (the whole-file scan); a path ⇒ def resolution over project + engine."""
+    resolution (the whole-file scan); a path ⇒ def resolution over project + engine.
+    """
     # Ζ·broken·offaxis — read the VERDICT, not `.passed`.  `.passed` is a bool and the resolver
     # is tristate: an UNAVAILABLE ("I could not REACH the thing") and a FAIL ("the claim is
     # false") both collapse to False here, and the grade record downstream then said "repo is
@@ -385,7 +406,8 @@ def flip_one(chk: str, sandbox_project: Path, custom: dict,
     the fanout — one pk_mutant action per (claim, site) — instead of an adaptive in-process
     bisection.  Selects the site from the SAME _sites list the sweep group-tests, then _apply,
     so a per-site action and the sweep agree by construction.  Ν·loud if the label is not a site
-    in the surface (a stale/garbled mutant), rather than silently reporting no-flip."""
+    in the surface (a stale/garbled mutant), rather than silently reporting no-flip.
+    """
     for s in _sites(sandbox_project, engine_dir):
         if s[2] == site_label:
             return _apply(chk, sandbox_project, custom, [s])
@@ -522,7 +544,8 @@ def _vacuity_source(rec: dict, chk: str, sandbox_project: Path,
     Still green ⇒ insensitive to all project content: it reads only external/live state,
     or asserts the absence of content no corruption supplies — Δ cannot falsify it, and
     the fix is to read a PROJECT input (the dataset-backed pattern) or a Π counter-fixture.
-    Goes red ⇒ it does read project content, just not via any one file alone."""
+    Goes red ⇒ it does read project content, just not via any one file alone.
+    """
     files = sandbox_files(sandbox_project, set(), engine_dir)
     saved = {f: f.read_bytes() for f in files}
     try:
@@ -554,7 +577,9 @@ class FlipSite(NamedTuple):
     `f, node, _ = …` unpacking meets a 4-field NamedTuple whose fields are not (file, node, label) —
     a value inversion can never enter a falsifiability sweep, because the sweep's signature cannot
     receive one.  Consumed ONLY by decisions_unasserted, which feeds the orthogonal decision-coverage
-    axis, never the grade."""
+    axis, never the grade.
+    """
+
     file: Path
     qualname: str
     n: int
@@ -564,7 +589,8 @@ class FlipSite(NamedTuple):
 def _flip_sites_of(sandbox_project: Path, engine_dir: Path | None,
                    files: list | None = None, root_copy: Path | None = None) -> list:
     """Every flip: condition site as a FlipSite — a SEPARATE generator from _sites, so a flip: site
-    is never in the list the sensitivity sweep group-tests (revision c, the structural bar)."""
+    is never in the list the sensitivity sweep group-tests (revision c, the structural bar).
+    """
     out = []
     for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
         if f.suffix != ".py":
@@ -596,7 +622,8 @@ def decisions_unasserted(chk: str, sandbox_project: Path, custom: dict,
                                 cannot see (no fixture coincidence survives, since both arms are reached).
 
     Returns the labels of unasserted decisions.  An orthogonal AXIS, never a rung, never fed to
-    _grade_from_sens — an unasserted decision names a coverage gap, it does not lower the grade."""
+    _grade_from_sens — an unasserted decision names a coverage gap, it does not lower the grade.
+    """
     out = []
     branch_arms = _branch_arms_by_qn(sandbox_project, engine_dir)
     for fs in _flip_sites_of(sandbox_project, engine_dir):
@@ -623,7 +650,8 @@ def decisions_unasserted(chk: str, sandbox_project: Path, custom: dict,
 
 def _branch_arms_by_qn(sandbox_project: Path, engine_dir: Path | None) -> dict:
     """(file, qualname) → the branch: arm labels of that def — the siblings whose per-arm reach gates a
-    flip: as an assertable decision."""
+    flip: as an assertable decision.
+    """
     by_qn: dict = {}
     for f, node, lbl in _sites(sandbox_project, engine_dir):
         if isinstance(node, _BranchNode):
@@ -636,7 +664,8 @@ def _flip_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Path 
                 fs: FlipSite) -> bool:
     """Invert fs's condition in-place, run the check, restore.  True iff the inversion flips chk red —
     the witness asserts on the decision.  A NON-monotone probe (a value swap, not a raise), which is
-    exactly why fs is a FlipSite the sensitivity sweep cannot receive."""
+    exactly why fs is a FlipSite the sensitivity sweep cannot receive.
+    """
     saved = fs.file.read_bytes()
     try:
         fs.file.write_text(_flip_condition(saved.decode(), fs.qualname, fs.n))
@@ -650,7 +679,9 @@ class DflipSite(NamedTuple):
     of the Klein group and the DATA analog of FlipSite.  A DISTINCT 5-field type the raise-kind (file,
     node, label) sweep cannot unpack — the STRUCTURAL bar: a value swap can never enter the
     falsifiability sweep.  Consumed only by decisions_unasserted, feeding the orthogonal
-    decision-coverage axis, never the grade."""
+    decision-coverage axis, never the grade.
+    """
+
     file: Path
     qualname: str
     n: int
@@ -662,7 +693,8 @@ def _dflip_sites_of(sandbox_project: Path, engine_dir: Path | None,
                     files: list | None = None, root_copy: Path | None = None) -> list:
     """Every dflip: data-value site as a DflipSite — a SEPARATE generator from _sites (the structural
     bar), scoped to DICT VALUES and non-set elements (a bare set element has no value to perturb; only
-    presence, which data-: already covers).  A set literal contributes NO dflip: sites."""
+    presence, which data-: already covers).  A set literal contributes NO dflip: sites.
+    """
     out = []
     for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
         if f.suffix != ".py":
@@ -679,7 +711,8 @@ def _perturb_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Pa
                    ds: DflipSite) -> bool:
     """Perturb ds's value to a valid same-position counterfactual in-place, run the check, restore.
     True iff the perturb flips chk red — the witness ASSERTS on the value.  A NON-monotone probe (a
-    value swap, not a drop), which is why ds is a DflipSite the sensitivity sweep cannot receive."""
+    value swap, not a drop), which is why ds is a DflipSite the sensitivity sweep cannot receive.
+    """
     saved = ds.file.read_bytes()
     try:
         ds.file.write_text(emit_mutant(saved.decode(), f"dflip:{ds.qualname}#{ds.n}"))
@@ -732,7 +765,8 @@ def reap_sandboxes(older_than_s: int = 1800) -> int:
     hygiene rather than the disk fix above; the two are separate defects and only one of them
     was ever going to fill a filesystem.
     A directory is reaped only if it is older than the window AND holds no open file — a live
-    sweep's copy is neither."""
+    sweep's copy is neither.
+    """
     import time
     parent = Path(_scratch_dir() or tempfile.gettempdir())
     now, n = time.time(), 0
@@ -758,13 +792,14 @@ def _sandbox_setup(project_dir, resolution="def"):
     symlink OUT of the execroot though the engine IS copied to root/<name>).  Ν·loud if a def
     sweep's engine copy is missing: refuse to degrade to file resolution and emit a vacuous
     fingerprint (the Bazel-symlink degeneracy that once shipped a green-for-nothing gate).  Caller
-    rmtree's tmp."""
+    rmtree's tmp.
+    """
     tmp = Path(tempfile.mkdtemp(prefix=_SANDBOX_PREFIX, dir=_scratch_dir()))
     root = _sandbox_root(project_dir)
     _copy_sandbox(root, tmp / root.name)
     root_copy = tmp / root.name
     rel = project_dir.relative_to(root)
-    sandbox = root_copy if rel == Path(".") else root_copy / rel
+    sandbox = root_copy if rel == Path() else root_copy / rel
     engine = None
     if resolution == "def":
         eng_rel = _ENGINE.relative_to(root) if _ENGINE.is_relative_to(root) else Path(_ENGINE.name)
@@ -779,7 +814,8 @@ def _sandbox_setup(project_dir, resolution="def"):
 
 def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
     """Grade one check in its own fresh sandbox copy (so concurrent grades never share a
-    mutation).  `resolution` ("file"|"def") decides whether the engine joins the surface."""
+    mutation).  `resolution` ("file"|"def") decides whether the engine joins the surface.
+    """
     tmp, sandbox, engine, root_copy = _sandbox_setup(project_dir, resolution)
     try:
         # the check's READ footprint (strace).  Δ·scope: a def sweep is bounded to the files the
@@ -814,7 +850,8 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
 def mutate_one(project_dir: Path, chk: str, custom: dict, site_label: str) -> bool:
     """Ζ·mutant — set up the def-resolution sandbox and probe ONE site (flip_one).  The engine
     entry a pk_mutant action calls: one (claim, site) → flipped, hermetic in its own sandbox copy,
-    so Bazel owns and caches the sweep's fanout site-by-site instead of an in-process bisection."""
+    so Bazel owns and caches the sweep's fanout site-by-site instead of an in-process bisection.
+    """
     tmp, sandbox, engine, _ = _sandbox_setup(project_dir, "def")
     try:
         return flip_one(chk, sandbox, custom, engine, site_label)
@@ -830,7 +867,8 @@ def _grade_parallel(project_dir, checks, custom, presupposed, resolution="file")
     Δ·pulse: emit a progress heartbeat to stderr as checks complete, so a slow grade
     (a cold sweep paging through swap) reads as LIVE, never stalled — the batch path's
     answer to the liveness the resumable pump has by construction.  \\r-updates a tty;
-    throttled newline pulses to a log/pipe; PAPERKIT_DELTA_PULSE=0 silences it."""
+    throttled newline pulses to a log/pipe; PAPERKIT_DELTA_PULSE=0 silences it.
+    """
     from concurrent.futures import ThreadPoolExecutor
     jobs = max(1, min(len(checks), os.cpu_count() or 4))
     total, done, lock, t0 = len(checks), [0], threading.Lock(), time.monotonic()
@@ -867,7 +905,8 @@ class GradeWitness:
     pump and never crosses the serialization boundary — only the cheap cursor and the
     scalar grade results are persisted, so a long grade is resumable (driver.py).
     Used for the resumable (--state/--budget) path; the default path grades in
-    parallel via _grade_parallel."""
+    parallel via _grade_parallel.
+    """
 
     def __init__(self, project_dir, checks, custom, presupposed, resolution="file"):
         self.project_dir, self.checks = project_dir, checks

@@ -52,7 +52,8 @@ def group_digits(x: object, allowbreak: bool = False) -> str:
 
 def ungroup(s: str) -> str:
     r"""Inverse used by the exactness gate: strip every `\allowbreak`, thin space `\,`, and
-    ASCII space, recovering the bare sign+digits.  ungroup(group_digits(n, …)) == str(n)."""
+    ASCII space, recovering the bare sign+digits.  ungroup(group_digits(n, …)) == str(n).
+    """
     return s.replace(r"\allowbreak", "").replace(r"\,", "").replace(" ", "")
 
 

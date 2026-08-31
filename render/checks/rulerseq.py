@@ -46,7 +46,8 @@ _DOT, _DASH = "·", "-"
 def cycle_order(i: int) -> int:
     """Cycle order at row-boundary `i` = trailing-zero count of `i` (its 2-adic valuation): the
     order of the highest-index input that flips at that boundary.  (i=0 is the header rule; callers
-    skip it.)  Defined for i>=1; cycle_order(0) is undefined (0 has no lowest set bit)."""
+    skip it.)  Defined for i>=1; cycle_order(0) is undefined (0 has no lowest set bit).
+    """
     if i < 1:
         raise ValueError(f"cycle_order is defined on row-boundaries i>=1; got {i}")
     return (i & -i).bit_length() - 1
@@ -55,7 +56,8 @@ def cycle_order(i: int) -> int:
 def emit_f(bits: list[int], i: int = 0, s: str = _DOT) -> str:
     """F over a binary tuple (LSB-first): ε if i≥n; F(i+1,s) if bit_i=0;
     s^(2^i) ∥ F(i+1, s̄) if bit_i=1.  len(F(B)) == value(B); F injective (the ruler-sequence
-    motif family — order k prefixes order k+1)."""
+    motif family — order k prefixes order k+1).
+    """
     if i >= len(bits):
         return ""
     if bits[i] == 0:
@@ -65,20 +67,23 @@ def emit_f(bits: list[int], i: int = 0, s: str = _DOT) -> str:
 
 def morse_motif(k: int) -> str:
     """The cycle-order-k motif = F over the all-ones tuple up to bit k — the self-similar family,
-    parametric in k with NO cap (mat230 capped the reified names at 7; the generator does not)."""
+    parametric in k with NO cap (mat230 capped the reified names at 7; the generator does not).
+    """
     return emit_f([1] * (k + 1))
 
 
 def _rule_name(k: int) -> str:
     """A nicematrix custom-line command name for cycle order k, generated (not word-listed): the
     Morse motif rendered in TeX-safe letters, so \\RuleXoXX... is unique per order and uncapped
-    (· → o, - → X — a bijection into [A-Za-z], the only chars nicematrix accepts in a command)."""
+    (· → o, - → X — a bijection into [A-Za-z], the only chars nicematrix accepts in a command).
+    """
     return "Rule" + "".join("o" if c == _DOT else "X" for c in morse_motif(k))
 
 
 def dash_pattern(k: int, dot: float = 0.5, dash: float = 2.2, gap: float = 1.1) -> str:
     """A TikZ dash-pattern spec rendering the order-k Morse motif (· → short-on, - → long-on).
-    The geometry (dot/dash/gap lengths in pt) is exposed, not baked."""
+    The geometry (dot/dash/gap lengths in pt) is exposed, not baked.
+    """
     return "dash pattern=" + " ".join(
         f"on {dot if c == _DOT else dash}pt off {gap}pt" for c in morse_motif(k))
 
@@ -86,7 +91,8 @@ def dash_pattern(k: int, dot: float = 0.5, dash: float = 2.2, gap: float = 1.1) 
 def nicematrix_defs(n_vars: int, line_width: float = 0.5) -> str:
     """One `\\Rule<k>` nicematrix custom-line per cycle order an n-variable (2ⁿ-row) table uses,
     for the .tex preamble.  An n-variable table has boundaries of orders 0..n-1, so max_order is
-    DERIVED from the table (n_vars-1), not a fixed 5 (mat230's cap)."""
+    DERIVED from the table (n_vars-1), not a fixed 5 (mat230's cap).
+    """
     return "\n".join(
         r"\NiceMatrixOptions{custom-line={command=\\" + _rule_name(k)
         + r", tikz={line width=" + f"{line_width}" + r"pt, " + dash_pattern(k) + r"}}}"
@@ -109,7 +115,8 @@ def _md_dash(k: int) -> str:
 # short opaque segment, dash → a long one), so the same generator drives a CSS reading uncapped.
 def _css_stops(k: int, dot: float = 2.0, dash: float = 8.0, gap: float = 4.0) -> str:
     """A CSS repeating-linear-gradient stop list rendering the order-k Morse motif (· → short opaque
-    run, - → long opaque run, transparent gaps).  Lengths in px, exposed not baked."""
+    run, - → long opaque run, transparent gaps).  Lengths in px, exposed not baked.
+    """
     stops, pos = [], 0.0
     for c in morse_motif(k):
         on = dot if c == _DOT else dash
@@ -123,14 +130,16 @@ def _css_stops(k: int, dot: float = 2.0, dash: float = 8.0, gap: float = 4.0) ->
 def _css_rule(k: int) -> str:
     """The CSS declarations for a boundary of cycle order k: a bottom border-image painting the
     motif.  The PATTERN (the gradient's run lengths) carries the structure — never colour (it uses
-    currentColor) nor thickness."""
+    currentColor) nor thickness.
+    """
     return ("border-bottom: 2px solid transparent; "
             f"border-image: {_css_stops(k)} 2; border-image-slice: 2;")
 
 
 def css_defs(n_orders: int, prefix: str = "rs") -> str:
     """One CSS class `.<prefix>-<k>` per cycle order a table uses, for a <style> block or stylesheet.
-    n_orders DERIVED from the table (its max cycle order + 1), not a fixed cap."""
+    n_orders DERIVED from the table (its max cycle order + 1), not a fixed cap.
+    """
     return "\n".join(f".{prefix}-{k} {{ {_css_rule(k)} }}" for k in range(max(n_orders, 1)))
 
 
@@ -139,7 +148,8 @@ def rule(i: int, target: str = "tex") -> str:
     (WCAG 1.4.1) on EVERY target that affords per-row rules — the capability is target-independent.
     tex → nicematrix `\\Rule<k>` Morse custom-line (infinitely scalable);
     html → a CSS class `.rs-<k>` whose border-image gradient paints the motif;
-    md  → arydshln `\\hdashline[on/off]` whose lengths encode the order, uncapped."""
+    md  → arydshln `\\hdashline[on/off]` whose lengths encode the order, uncapped.
+    """
     k = cycle_order(i)
     if target == "tex":
         return "\\" + _rule_name(k)
@@ -152,7 +162,8 @@ def rule(i: int, target: str = "tex") -> str:
 
 def column_encoding(n_rows: int) -> list[int]:
     """The down-column sequence of rule orders for an n_rows table (n_rows a power of two): by
-    construction the binary encoding of the row numbers read as a column.  boundaries 1..n_rows-1."""
+    construction the binary encoding of the row numbers read as a column.  boundaries 1..n_rows-1.
+    """
     return [cycle_order(i) for i in range(1, n_rows)]
 
 

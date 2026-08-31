@@ -33,14 +33,16 @@ from pathlib import Path
 def convert(src, fmt, outdir, timeout=180):
     """Convert one file `src` to `fmt` (e.g. 'pdf', 'emf') into `outdir`, under a
     unique ephemeral profile, removing any stale target first.  Returns the output
-    Path, or None if libreoffice did not produce it."""
+    Path, or None if libreoffice did not produce it.
+    """
     return convert_many([src], fmt, outdir, timeout)[0]
 
 
 def convert_many(srcs, fmt, outdir, timeout=180):
     """Batch form: convert each of `srcs` to `fmt` in `outdir` under ONE ephemeral
     profile (one soffice startup).  Removes every target first.  Returns a list of
-    output Paths aligned with `srcs`, each None if not produced."""
+    output Paths aligned with `srcs`, each None if not produced.
+    """
     outdir = Path(outdir)
     srcs = [Path(s) for s in srcs]
     ext = fmt.split(":")[0]

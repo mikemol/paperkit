@@ -168,14 +168,16 @@ def level(sc: str) -> str:
 
 def sc_508_required(sc: str) -> bool:
     """DERIVED: 508 incorporates WCAG 2.0 A+AA, so a SC is 508-required iff it is a 2.0-origin A/AA
-    criterion — i.e. Level A or AA and NOT introduced in 2.1 or 2.2."""
+    criterion — i.e. Level A or AA and NOT introduced in 2.1 or 2.2.
+    """
     return level(sc) in ("A", "AA") and sc not in WCAG21_NEW and sc not in WCAG22_NEW
 
 
 def en_clause(sc: str) -> str | None:
     """EN 301 549 V3.2.1 §10 (non-web) clause for a SC, or None where V3.2.1 has no clause (a
     post-2.1 SC).  A Void row DOES have a clause number but the standard marks it not-applicable —
-    represented as the clause with a Void flag via en_status()."""
+    represented as the clause with a Void flag via en_status().
+    """
     if sc in WCAG22_NEW:
         return None                      # no clause in V3.2.1 (post-2.1)
     return "10." + sc                    # the pure-function clause for every 2.0/2.1 row (incl. Void)
@@ -183,7 +185,8 @@ def en_clause(sc: str) -> str | None:
 
 def en_status(sc: str) -> str:
     """The SC's status under EN 301 549 V3.2.1 non-web: 'clause' (adopted, applies), 'void' (clause
-    exists but marked N/A to documents), or 'absent' (no clause — post-2.1)."""
+    exists but marked N/A to documents), or 'absent' (no clause — post-2.1).
+    """
     if sc in WCAG22_NEW:
         return "absent"
     return "void" if sc in EN_VOID else "clause"
@@ -199,7 +202,8 @@ def counts() -> dict:
 def check() -> tuple[bool, list[str]]:
     """Completeness + internal consistency of the model, against the published counts.  A missing or
     extra SC would make a conformance report claim it evaluated a set it did not — so the count is
-    gated against the W3C Recommendation's own totals (31 A + 24 AA + 31 AAA = 86)."""
+    gated against the W3C Recommendation's own totals (31 A + 24 AA + 31 AAA = 86).
+    """
     problems = []
     c = counts()
     # WCAG 2.2 as PUBLISHED = 86 criteria, DERIVED and checkable: WCAG 2.1 has 78 SCs; 2.2 adds the 9

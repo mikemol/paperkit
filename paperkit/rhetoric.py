@@ -55,7 +55,7 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bib  # noqa: E402  (the parser/data-model leaf — NOT project, so rhetoric no longer closes the project↔rhetoric cycle)
+import bib
 
 # (kind, default connector).  kind is what SCHEMES constrain; connector is the
 # realization project.py falls back to when a claim gives no explicit `join`.

@@ -7,7 +7,6 @@
 % that no mutation can falsify.  `from` carries prose order; `rests-on` is the
 % grounding DAG.  Regenerate the dataset with `python3 probe.py --capture`.
 
-% ── machine ──────────────────────────────────────────────────────────────────
 @misc{mach-cores,
   section = {machine},
   claim   = {This machine exposes ten logical cores},
@@ -26,7 +25,6 @@
   check   = {ref:hybrid}
 }
 
-% ── swap ─────────────────────────────────────────────────────────────────────
 @misc{swap-zram,
   section = {swap},
   claim   = {Swap is served first from a block device that lives in RAM and compresses every page it stores},
@@ -91,7 +89,6 @@
   check   = {ref:zswap-shrinker}
 }
 
-% ── kernel ───────────────────────────────────────────────────────────────────
 @misc{kern-overcommit,
   section = {kernel},
   claim   = {The storage tiers are only half the story; the kernel's reclaim policy is the other half. It permits overcommit, so a process may ask for more memory than physically exists --- the precondition for any of this to matter},
@@ -116,7 +113,6 @@
   check   = {ref:thp-madvise}
 }
 
-% ── grace ────────────────────────────────────────────────────────────────────
 @misc{grace-dedup,
   section = {grace},
   claim   = {A fan-out workload spawns many near-identical processes, and their duplicate pages --- shared interpreter, shared imports --- are exactly what a compressor collapses},
@@ -177,7 +173,6 @@
   check   = {load:load-compressed}
 }
 
-% ── provenance ───────────────────────────────────────────────────────────────
 @misc{prov-source,
   section = {provenance},
   claim   = {None of these numbers were retyped from memory: probe.py's pump() interned them from the live kernel, and the dataset records its own sources --- every one a path under /proc or /sys},

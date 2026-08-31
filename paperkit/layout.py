@@ -2,7 +2,8 @@
 """Project file TOPOLOGY — the small shared foundation under both the cache and the grader:
 which files Δ may read/corrupt, where the mutation sandbox is rooted, and which directories
 are OTHER projects.  Factored out so neither the cache nor the grader has to own it (and so
-each can be imported and tested without the other)."""
+each can be imported and tested without the other).
+"""
 from __future__ import annotations
 
 import fnmatch
@@ -53,7 +54,8 @@ def _root_override(project_dir: Path) -> Path | None:
     """An EXPLICIT sandbox root — for container pipelines and downstream projects whose parent
     is not a tidy repo.  Resolved through the ONE config pipeline (Ω·config): PAPERKIT_ROOT env
     (a --root flag overrode it by setting it) > paper.toml [paper] root > none.  Whichever is
-    set must CONTAIN the project."""
+    set must CONTAIN the project.
+    """
     paper = {}
     cfg = project_dir / "paper.toml"
     if cfg.is_file():
@@ -80,7 +82,8 @@ def _sandbox_root(project_dir: Path) -> Path:
     The inferred parent is assumed to be a bounded repo.  If it is $HOME OR ABOVE — the case a
     downstream project (engine at ../paperkit, living directly in a home that also holds a
     multi-GB clone / package cache) hits — copying it whole would explode the disk, so we REFUSE
-    and tell the user to DECLARE the root.  A clear instruction beats a filled disk."""
+    and tell the user to DECLARE the root.  A clear instruction beats a filled disk.
+    """
     override = _root_override(project_dir)
     if override is not None:
         return override
@@ -100,7 +103,8 @@ def _nested_roots(base: Path) -> list:
     at ANY depth — e.g. paper/checks/fixture).  A root-level project (the README, whose dir IS
     the repo) must not key on or mutate sibling projects' files — only its own + the engine.
     Walks with SKIP_DIRS PRUNED and symlinks NOT followed (os.walk default), so a bazel-* link
-    into the GB cache is never traversed (Ζ·skip)."""
+    into the GB cache is never traversed (Ζ·skip).
+    """
     out = []
     for dirpath, dirnames, filenames in os.walk(base):
         dirnames[:] = [d for d in dirnames
@@ -120,7 +124,8 @@ def _suffixless_text(f: Path) -> bool:
     because the Δ sandbox is a copy without `.git` and mode is not reliable there — content is the
     only signal always present.  MUTABLE_SUFFIXES still owns the SUFFIXED text files; this owns the
     suffixless ones, and together they are a closer proxy for "could this file's content change a
-    claim's truth" than suffix alone (Ζ·surface·admit)."""
+    claim's truth" than suffix alone (Ζ·surface·admit).
+    """
     if f.suffix != "":
         return False
     try:
@@ -139,7 +144,8 @@ def _suffixless_text(f: Path) -> bool:
 def _mutable(f: Path) -> bool:
     """A text input Δ may corrupt: a known source suffix, or a suffixless text command (a versioned
     executable a witness reads — `scripts/*`, `bin/pk`, `.githooks/` hooks; the CLASS, not the one
-    `.githooks` artifact the exception used to name — ask-delta-extensionless)."""
+    `.githooks` artifact the exception used to name — ask-delta-extensionless).
+    """
     return (f.is_file() and f.name not in DERIVED_NAMES
             and (f.suffix in MUTABLE_SUFFIXES or _suffixless_text(f)))
 
@@ -151,5 +157,6 @@ def _copy_sandbox(root: Path, dest: Path) -> None:
     (PAPERKIT_ROOT / --root / paper.toml [paper] root) or inferred-and-guarded against being
     $HOME-or-above (_sandbox_root).  So a whole copy cannot escape into an unbounded home
     directory (a clone, a package cache): the bound lives on the ROOT, declared once, rather
-    than in a lossy per-dir skip (which once dropped .githooks — a real input the paper reads)."""
+    than in a lossy per-dir skip (which once dropped .githooks — a real input the paper reads).
+    """
     shutil.copytree(root, dest, ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)

@@ -19,9 +19,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_delta import discriminate  # noqa: E402
-from _fixture_gate import gate, gate_json  # noqa: E402
-from _fixture_model import entry  # noqa: E402
+from _fixture_delta import discriminate
+from _fixture_gate import gate, gate_json
+from _fixture_model import entry
 
 # a plain-target paper.toml (overrides the fixture default via assets)
 PLAIN = {"paper.toml": '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
@@ -29,8 +29,9 @@ PLAIN = {"paper.toml": '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.
 
 
 def chain(leaf_check):
-    """apex (section-tagged, woven) → g (sectionless) → h (sectionless), two rests-on hops.
-    Neither g nor h surfaces any marker in the rendered prose — only the closure reaches them."""
+    """Apex (section-tagged, woven) → g (sectionless) → h (sectionless), two rests-on hops.
+    Neither g nor h surfaces any marker in the rendered prose — only the closure reaches them.
+    """
     return [entry("a", claim="apex", rests="g"),
             entry("g", claim="ground", section=None, check="file:w.bib", rests="h"),
             entry("h", claim="bedrock", section=None, check=leaf_check)]
@@ -98,8 +99,21 @@ def main() -> int:
               "  claim   = {this claim closes its brace},\n  check   = {cmd:true}\n}\n")
     rc_mute, e_mute = gate([GOOD, RUNAWAY], assets=PLAIN)
     rc_said, _ = gate([GOOD, CLOSED], assets=PLAIN)
-    check("a claim whose `claim` brace runs away projects as its bare KEY — the gate REFUSES",
-          rc_mute == 1 and "bare KEY" in e_mute and "mute" in e_mute)
+    # ⚑ Ζ·bib·wire — THE REFUSAL MOVED FROM THE PROJECTOR TO THE PARSER, and that is the point.
+    # This arm used to assert the projector's "bare KEY" message: the old regex front end ended
+    # an entry at the first line-initial `}`, so a runaway `claim` brace produced a record with a
+    # MANGLED claim and no check, and the gate refused it downstream as a claim that says nothing.
+    # That refusal was an ACCIDENT of the truncation — the parser had no opinion about the file
+    # being broken, and two attempts to fix the front end (skip the entry; run to EOF) each moved
+    # the behaviour again, because a scanner has no grammar to answer from.
+    #
+    # A real parser answers by position: a `{` that never closes is a SYNTAX ERROR where it
+    # opened.  So the property this arm pins is unchanged — a runaway brace must not ship — while
+    # the WHO and the WORDING both move.  Asserting the message text would re-pin the next
+    # accident; asserting the refusal plus the named position is what the property actually is.
+    check("a claim whose `claim` brace runs away is REFUSED — now by the parser, at a position",
+          rc_mute != 0 and "mute" in e_mute
+          and any(w in e_mute for w in ("unterminated", "expected", "SyntaxError")))
     check("the same claim with its brace closed says something — the gate PASSES", rc_said == 0)
 
     print("\n⟨P, F, δ⟩ minimum-delta pairs\n")

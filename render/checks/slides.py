@@ -46,7 +46,8 @@ _ODP_MIME = b"application/vnd.oasis.opendocument.presentation"
 def _slide_level(paper_md: Path) -> int:
     """The heading level the section boundary lives at, READ from the projection rather than
     assumed: the shallowest level that occurs more than once.  A projector that changed its
-    heading scheme would move this with it instead of silently collapsing the deck."""
+    heading scheme would move this with it instead of silently collapsing the deck.
+    """
     levels = [len(m) for m in
               (line.split(" ")[0] for line in paper_md.read_text().splitlines())
               if m and set(m) == {"#"}]
@@ -59,7 +60,8 @@ def _slide_level(paper_md: Path) -> int:
 def pptx(paper_md: Path, out_pptx: Path) -> Path:
     """The md→pptx morphism (graph.tool_for('md','pptx') = pandoc): cite_split the source, then
     pandoc it to a .pptx, cut at the DERIVED slide level (see _slide_level) — the PROSE's own
-    section boundary, which is the finest cut this transform has available (see THE BOUND)."""
+    section boundary, which is the finest cut this transform has available (see THE BOUND).
+    """
     assert graph.tool_for("md", "pptx") == "pandoc", \
         "the graph no longer declares md→pptx as a pandoc morphism — derive the tool, never hardcode"
     with tempfile.TemporaryDirectory() as t:
@@ -192,7 +194,8 @@ def _repair_alt_text(pptx_path: Path, units: list) -> None:
 def odp(src_pptx: Path, outdir: Path) -> Path | None:
     """The pptx→odp morphism (graph.tool_for('pptx','odp') = soffice), through lo.convert so it
     gets the isolated ephemeral profile and the unlink-first provenance guarantee: a file at the
-    path is BY CONSTRUCTION the conversion of the current input, never a stale survivor."""
+    path is BY CONSTRUCTION the conversion of the current input, never a stale survivor.
+    """
     assert graph.tool_for("pptx", "odp") == "soffice", \
         "the graph no longer declares pptx→odp as a soffice morphism — derive the tool, never hardcode"
     return lo.convert(src_pptx, "odp", outdir)

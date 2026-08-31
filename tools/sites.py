@@ -28,7 +28,8 @@ Emits `module<TAB>spec`; the grid runs `mutate.py <module> <spec>` per site.  im
 dropping an import breaks the module, which the def-drop of any function it uses already covers — a
 redundant coarse cell.  (bib-edge / file nodes need eval.py to swap a non-.py artifact — a later rung;
 this surface is the .py toggles mutate.py already emits.)  branch:/flip: come from mutate.py itself (the
-ONE source the in-process sweep also imports — no separate twin to drift).  Usage: sites.py <module.py>…"""
+ONE source the in-process sweep also imports — no separate twin to drift).  Usage: sites.py <module.py>…
+"""
 import sys
 from pathlib import Path
 
@@ -36,14 +37,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "paperkit"))
 
 from def_sites import def_sites
 from imports import imports
+
 # Μ·sweep·atom — the ONE atom source (grader imports the same enumerators; no separate twin to drift).
-from mutate import _branch_sites, _flip_sites, _data_sites
+from mutate import _branch_sites, _data_sites, _flip_sites
 
 
 def sites(path, names):
     """The perturbation SPECS for one module: its def-drops (present behaviours), its branch-arm and
     condition sites, its DATA key-drops and value-perturbs (Μ·sweep·atom — all additive), and its
-    import+ injects (absent engine imports)."""
+    import+ injects (absent engine imports).
+    """
     text = Path(path).read_text()
     for qn in def_sites(text):
         yield qn                                        # def-drop — a bare qualname

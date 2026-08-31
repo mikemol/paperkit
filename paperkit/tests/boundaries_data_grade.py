@@ -25,7 +25,7 @@ from pathlib import Path
 ENGINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 
-import grader  # noqa: E402
+import grader
 
 _MOD = 'SCOPE = {"x": "full", "y": "fragment", "z": "full"}\ndef s(k):\n    return SCOPE[k]\n'
 
@@ -73,7 +73,7 @@ def main() -> int:
     # ── the DflipSite structural bar ─────────────────────────────────────────────────────────────
     ds = grader.DflipSite(file=Path("x.py"), qualname="D", n=0, kind="dict", label="x.py::dflip:D#0")
     try:
-        grader._apply("cmd:x", Path("."), {}, [ds])
+        grader._apply("cmd:x", Path(), {}, [ds])
         barred = False
     except (ValueError, TypeError):
         barred = True                                    # 5 fields vs the sweep's `f, node, _ =`

@@ -27,9 +27,9 @@ from pathlib import Path
 ENGINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 
-import bib      # noqa: E402
-import coherence  # noqa: E402
-import grade    # noqa: E402
+import bib
+import coherence
+import grade
 
 ran: list = []
 
@@ -87,7 +87,9 @@ def main() -> int:
     # module-level CALL is a module-level dependency even when its `import` sits inside a
     # function — what matters is when it EXECUTES.  So import grade with bib UNREACHABLE, the
     # way the sandbox does, rather than grepping the source for an import statement.
-    import subprocess, tempfile, shutil
+    import shutil
+    import subprocess
+    import tempfile
     _d = tempfile.mkdtemp()
     try:
         shutil.copy(ENGINE / "grade.py", _d)

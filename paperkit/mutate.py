@@ -50,7 +50,8 @@ def _def_sites(text: str) -> list:
     DEFINITION, not the file: corrupting a whole file breaks its import and flips every witness
     identically; replacing one function's BODY leaves the module importable, so a witness flips only
     if it actually exercises that function.  A one-liner (`def f(): return 1`) shares its signature
-    line with the body, so a line-span replacement can't isolate the body — it is skipped."""
+    line with the body, so a line-span replacement can't isolate the body — it is skipped.
+    """
     out: list = []
     try:
         tree = ast.parse(text)
@@ -78,7 +79,8 @@ def _base_catching_regions(tree) -> set:
     branch: mutation there is NON-monotone and MUST be refused (Μ·sweep·atom precondition, revision a).
     Intra-def only: a DYNAMIC catcher (contextlib.suppress(BaseException), or a caller-frame handler
     outside the def) is invisible here — currently no swept module uses either, but if one appears this
-    must widen (the branch: canary + the ∅-baseline/pk_canary guards catch a live regression loudly)."""
+    must widen (the branch: canary + the ∅-baseline/pk_canary guards catch a live regression loudly).
+    """
     unsafe: set = set()
     for n in ast.walk(tree):
         if isinstance(n, ast.Try) and any(
@@ -96,7 +98,8 @@ def _branch_sites(text: str) -> list:
     on the order).  Each arm's body → the same uncatchable raise as def:, so a witness flips only if it
     REACHES that arm — a finer, still-MONOTONE reach probe.  REFUSES an arm inside a BaseException-catching
     region (the raise would be swallowed) and a one-liner arm whose body shares its header line (can't
-    isolate the body span), mirroring _def_sites."""
+    isolate the body span), mirroring _def_sites.
+    """
     out: list = []
     try:
         tree = ast.parse(text)
@@ -138,7 +141,8 @@ def _flip_sites(text: str) -> list:
     """Every mutable CONDITION as (qualname, n, test_node): the `test` of each `if`/`while` within a def,
     numbered `#n` in stable source order.  A flip: mutation INVERTS the condition — NON-monotone, so this
     is a SEPARATE generator from _branch_sites; the sensitivity sweep never consumes it (the structural
-    bar lives at the consumer, not here)."""
+    bar lives at the consumer, not here).
+    """
     out: list = []
     try:
         tree = ast.parse(text)
@@ -169,7 +173,8 @@ def _split_qn_n(arg: str):
 
 def _mutate_branch(text: str, qualname: str, n: int) -> str:
     """DROP one branch arm's behaviour — its body → the uncatchable raise (the same _mutate_lines
-    primitive as def:, so branch: IS a raise-kind site)."""
+    primitive as def:, so branch: IS a raise-kind site).
+    """
     for qn, i, (b0, blast) in _branch_sites(text):
         if qn == qualname and i == n:
             lines = text.splitlines(keepends=True)
@@ -181,7 +186,8 @@ def _mutate_branch(text: str, qualname: str, n: int) -> str:
 
 def _flip_condition(text: str, qualname: str, n: int) -> str:
     """INVERT one condition — `if C:` → `if not (C):` — via a span rewrite of the test source.  Never
-    routed through _mutate_lines (a value-swap is not a raise; it is NON-monotone by design)."""
+    routed through _mutate_lines (a value-swap is not a raise; it is NON-monotone by design).
+    """
     for qn, i, test in _flip_sites(text):
         if qn == qualname and i == n:
             src = ast.get_source_segment(text, test)
@@ -206,7 +212,8 @@ def _swallowing_dicts(tree) -> set:
     of such a dict is NON-monotone (the default hides the drop, the DATA analog of a branch raise
     swallowed by `except BaseException`), so its sites are REFUSED.  Static + conservative: a dynamic
     access (`**merge`, `dict(d)` copy, a computed default) is invisible here and must widen if a swept
-    module grows one — the ∅-baseline + the canary catch a live regression loudly."""
+    module grows one — the ∅-baseline + the canary catch a live regression loudly.
+    """
     unsafe: set = set()
     for n in ast.walk(tree):
         # <name>.get(key, DEFAULT) — two args ⇒ a default that swallows a missing key
@@ -229,7 +236,8 @@ def _swallowing_dicts(tree) -> set:
 
 def _data_assigns(tree):
     """Every module-level `<NAME> = <dict/list/set/tuple literal>` as (name, literal_node).  Only a
-    single Name target (a tuple-unpack / attribute / subscript target has no stable scalar qualname)."""
+    single Name target (a tuple-unpack / attribute / subscript target has no stable scalar qualname).
+    """
     for stmt in tree.body:
         if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
             name, v = stmt.targets[0].id, stmt.value
@@ -245,7 +253,8 @@ def _data_sites(text: str) -> list:
     """Every mutable DATA site as (qualname, n, kind, key_node|None, value_node): each top-level
     key/element of a module-level dict/list/set/tuple literal, numbered #n in stable source order.  A
     dict whose EVERY read swallows a dropped key (`.get(k, DEFAULT)` / `except KeyError`, see
-    _swallowing_dicts) is REFUSED — the precondition that keeps data-: MONOTONE."""
+    _swallowing_dicts) is REFUSED — the precondition that keeps data-: MONOTONE.
+    """
     out: list = []
     try:
         tree = ast.parse(text)
@@ -268,7 +277,8 @@ def _data_sites(text: str) -> list:
 def _seg(text: str, node) -> str:
     """The exact source substring of an AST node (its lineno/col span) — used for byte-MINIMAL data
     edits: unlike ast.unparse (which reformats the WHOLE literal and would spuriously flip a
-    source-grep witness), a segment splice touches only the dropped/perturbed span."""
+    source-grep witness), a segment splice touches only the dropped/perturbed span.
+    """
     lines = text.splitlines(keepends=True)
     if node.lineno == node.end_lineno:
         return lines[node.lineno - 1][node.col_offset:node.end_col_offset]
@@ -293,7 +303,8 @@ def _drop_data(text: str, qualname: str, n: int) -> str:
     never flips, while the guaranteed-parseable rebuild handles every comma / trailing-comma / tuple
     case (a 1-element tuple keeps its `(x,)`, an empty container is `{}`/`[]`/`set()`/`()`).  A byte-
     minimal comma-splice cannot: dropping a 2-tuple to `("x")` silently loses tuple-ness (Python reads
-    a parenthesised value), which broke the sweep on resolver._ENV_KEEP_PREFIX."""
+    a parenthesised value), which broke the sweep on resolver._ENV_KEEP_PREFIX.
+    """
     for name, i, kind, k, val in _data_sites(text):
         if name == qualname and i == n:
             tree = ast.parse(text)
@@ -318,10 +329,11 @@ def _drop_data_multi(text: str, specs: list) -> str:
     indices of ONE literal would lose the later ones.  This resolves every (qualname, index) against
     the ORIGINAL text once and rebuilds each affected literal from the surviving entries in a single
     pass — the data analog of _mutate_lines taking a LIST of nodes.  A spec naming no current site is
-    Ν·loud (a genuine miss), but a spec whose index is valid in the original text always applies."""
+    Ν·loud (a genuine miss), but a spec whose index is valid in the original text always applies.
+    """
     by_qn: dict = {}
     for spec in specs:
-        arg = spec[len("data-:"):] if spec.startswith("data-:") else spec
+        arg = spec.removeprefix("data-:")
         qn, _, n = arg.rpartition("#")
         by_qn.setdefault(qn, set()).add(int(n))
     tree = ast.parse(text)
@@ -354,7 +366,8 @@ def _drop_data_multi(text: str, specs: list) -> str:
 def _leaf_path(entry_value, leaf) -> tuple | None:
     """The structural INDEX-PATH from an entry's value node down to `leaf` (e.g. () = the value IS the
     leaf; (0,) = first element of a tuple/list value; (0, 1) = nested).  None if leaf is not reachable
-    by positional descent (a dict-valued position has no positional index — handled as no-domain)."""
+    by positional descent (a dict-valued position has no positional index — handled as no-domain).
+    """
     if entry_value is leaf:
         return ()
     if isinstance(entry_value, (ast.Tuple, ast.List)):
@@ -367,7 +380,8 @@ def _leaf_path(entry_value, leaf) -> tuple | None:
 
 def _at_path(entry_value, path):
     """Follow an index-path into an entry value; None if the shape does not match (a sibling entry with
-    a different structure has no value at this path)."""
+    a different structure has no value at this path).
+    """
     node = entry_value
     for i in path:
         if isinstance(node, (ast.Tuple, ast.List)) and i < len(node.elts):
@@ -382,7 +396,8 @@ def _domain_of(text: str, qualname: str, value_node, leaf) -> list:
     structural position across the literal's sibling entries.  Position-aware (not "every string in
     the literal"): for a dict of `(scope, remark)` tuples the domain of the SCOPE leaf (path (0,)) is
     the set of first-tuple-elements {full, fragment, …}, never the keys or remarks.  Empty ⇒ no finite
-    same-position domain ⇒ the caller falls back to a distinct marker (grades presence, not correctness)."""
+    same-position domain ⇒ the caller falls back to a distinct marker (grades presence, not correctness).
+    """
     if not (isinstance(leaf, ast.Constant) and isinstance(leaf.value, str)):
         return []
     path = _leaf_path(value_node, leaf)
@@ -404,7 +419,8 @@ def _domain_of(text: str, qualname: str, value_node, leaf) -> list:
 def _counterfactual(text: str, qualname: str, entry_value, leaf) -> str:
     """A source-literal DIFFERENT from `leaf`: a valid-enum SAME-POSITION sibling (grades correctness)
     if the leaf's position has a finite domain, else a type-directed distinct marker (grades presence).
-    `entry_value` is the whole entry value (the top of the position path); `leaf` the scalar to swap."""
+    `entry_value` is the whole entry value (the top of the position path); `leaf` the scalar to swap.
+    """
     v = leaf.value
     if isinstance(v, str):
         dom = _domain_of(text, qualname, entry_value, leaf)
@@ -425,7 +441,8 @@ def _perturb_data(text: str, qualname: str, n: int) -> str:
     col_offset slicing: an entry on a line with escaped/raw strings (e.g. a regex `(r"\\\\'E", "É")`)
     desyncs naive column arithmetic from the true span, so the segment API (which Python guarantees
     correct) locates the leaf's source, and the replacement is scoped to the ENTRY's segment so a
-    same-text leaf elsewhere in the module is untouched (byte-minimal, like _drop_data's rebuild)."""
+    same-text leaf elsewhere in the module is untouched (byte-minimal, like _drop_data's rebuild).
+    """
     assign = _assign_of(ast.parse(text), qualname)      # the whole `<qualname> = <literal>` statement
     for name, i, kind, k, val in _data_sites(text):
         if name == qualname and i == n:
@@ -477,7 +494,8 @@ def _mutate_lines(text: str, nodes: list) -> str:
     closure/branch, both in the group), replacing the outer body already removes the inner, and
     replacing BOTH would slice a line list a prior replacement already shortened — corrupting content
     below (the data atom exposed this: it silently overwrote a module-level literal far downstream).
-    So drop any node whose span is contained in another's, then replace the survivors bottom-up."""
+    So drop any node whose span is contained in another's, then replace the survivors bottom-up.
+    """
     spans = [(n.body[0].lineno, n.end_lineno, n.body[0].col_offset) for n in nodes]
     outer = [(s, e, c) for i, (s, e, c) in enumerate(spans)
              if not any(j != i and os <= s and e <= oe and (os, oe) != (s, e)
@@ -500,9 +518,7 @@ def _drop_import(text: str, name: str) -> str:
     """Remove the top-level `import <name>` / `from <name> import …` (a PRESENT import → absent)."""
     drop = set()
     for node in ast.parse(text).body:
-        if isinstance(node, ast.Import) and any(a.name == name for a in node.names):
-            drop.update(range(node.lineno, node.end_lineno + 1))
-        elif isinstance(node, ast.ImportFrom) and node.module == name:
+        if (isinstance(node, ast.Import) and any(a.name == name for a in node.names)) or (isinstance(node, ast.ImportFrom) and node.module == name):
             drop.update(range(node.lineno, node.end_lineno + 1))
     if not drop:
         raise KeyError(f"Ζ·mutant: '{name}' is not a top-level import in the module")
@@ -516,7 +532,8 @@ def _inject_import(text: str, name: str) -> str:
     `if False:` block from the .pyc, so it NEVER EXECUTES — no circular-import breakage flips OTHER
     claims spuriously (a top-level `import gate` into resolver would break resolver, an imprecise
     whole-module flip).  A PRECISE toggle of the import's TEXTUAL presence.  Placed after the module
-    docstring / any `from __future__` imports (which must stay first)."""
+    docstring / any `from __future__` imports (which must stay first).
+    """
     after = 0                                            # line to insert after (0 = top of file)
     for node in ast.parse(text).body:
         if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
@@ -533,7 +550,8 @@ def _inject_import(text: str, name: str) -> str:
 
 def emit_mutant(text: str, spec: str) -> str:
     """The module perturbed by `spec` (see the module docstring).  The EMPTY spec is the IDENTITY (∅).
-    A bare qualname (no ':') is a def-drop, for backward compatibility with def_sites.py."""
+    A bare qualname (no ':') is a def-drop, for backward compatibility with def_sites.py.
+    """
     if spec == "":
         return text                                      # ∅ — the identity element of the mutation set
     op, sep, arg = spec.partition(":")

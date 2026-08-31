@@ -33,7 +33,8 @@ BIBTEX = ROOT / "tools" / "bibtex.bzl"
 
 def prove_oracle_flags():
     """The flag tokens library/prove.py's certificate() builds after discriminate.py — derived
-    from the source (never a hardcoded canonical string), so the gate cannot drift from it."""
+    from the source (never a hardcoded canonical string), so the gate cannot drift from it.
+    """
     tree = ast.parse(PROVE.read_text())
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "argv" for t in node.targets) \
@@ -61,7 +62,8 @@ def prove_resolution():
 
 def dcalc_resolution():
     """The resolution the build emits __dcalc with (bibtex.bzl's non-witness emerge pk_calc) —
-    the frame the cached record was measured in.  Derived from the generator source."""
+    the frame the cached record was measured in.  Derived from the generator source.
+    """
     for line in BIBTEX.read_text().splitlines():
         if "__dcalc" in line and "resolution" in line:
             m = re.search(r'resolution\s*=\s*"(\w+)"', line)
@@ -73,13 +75,14 @@ def dcalc_resolution():
 
 
 def main() -> int:
-    fails = []
-
-    def check(desc, cond):
-        fails.append(desc) if not cond else None
-        print(f"  {'ok ' if cond else 'XX '}{desc}")
-
-    print("Ζ·prove-gate — --prove and __dcalc run the same oracle\n")
+    # Ζ·suite·count — the SHARED recorder owns the summary (see tests/_boundary.py).  The local
+    # closure recorded only failures, so "6 structural, 1 delta" was a literal beside the set it
+    # described — and its vocabulary ("structural") is why a census keyed on the word "behaviors"
+    # missed this file entirely.  A derived count has no vocabulary to miss.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _boundary import Suite
+    s = Suite("PROVE-ENVELOPE", "Ζ·prove-gate — --prove and __dcalc run the same oracle")
+    check = s.check
 
     # ⟨same oracle command⟩ — prove.py's argv IS the discriminate --calc def command pk_calc runs.
     flags = prove_oracle_flags()
@@ -114,18 +117,12 @@ def main() -> int:
         if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "resolution" for t in node.targets) \
                 and isinstance(node.value, ast.Constant):
             f_res = node.value.value
-    caught = (pr == "def") and (f_res == "file") and (f_res != dr)
-    fails.append("prove-envelope-delta") if not caught else None
-    print(f"  {'ok ' if caught else 'XX '}a cert that silently measures a DIFFERENT frame than __dcalc is CAUGHT")
-    print("      P (intact):  prove resolution == 'def' == __dcalc's frame → same oracle")
-    print("      F (drifted): resolution → 'file' → cert measures a weaker frame than the cached record")
-    print("      δ (min delta): one token, the resolution literal (prove.py) — or the _grade_from_sens import\n")
-
-    if fails:
-        print(f"PROVE-ENVELOPE: FAIL ({len(fails)} drifted)")
-        return 1
-    print("PROVE-ENVELOPE: PASS (6 structural, 1 delta)")
-    return 0
+    s.delta("a cert that silently measures a DIFFERENT frame than __dcalc is CAUGHT",
+            pr == "def", (f_res == "file") and (f_res != dr),
+            p="intact:  prove resolution == 'def' == __dcalc's frame → same oracle",
+            f="drifted: resolution → 'file' → cert measures a weaker frame than the cached record",
+            d="one token, the resolution literal (prove.py) — or the _grade_from_sens import")
+    return s.finish()
 
 
 if __name__ == "__main__":

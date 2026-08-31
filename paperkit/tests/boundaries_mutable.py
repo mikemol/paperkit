@@ -25,7 +25,7 @@ from pathlib import Path
 ENGINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 
-import layout  # noqa: E402
+import layout
 
 
 def main() -> int:

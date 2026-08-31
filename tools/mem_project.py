@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import mem_db as D  # noqa: E402
+import mem_db as D
 
 
 def render(db: Path, project: str) -> str:

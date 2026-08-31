@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import project as Pr  # noqa: E402
+import project as Pr
 
 R, S = Pr.references, Pr.sentence
 

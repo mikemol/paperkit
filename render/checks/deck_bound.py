@@ -27,7 +27,6 @@ This check gates the bound so it cannot rot into a comment nobody honours.  It a
 """
 from __future__ import annotations
 
-
 import sys
 from pathlib import Path
 

@@ -2,7 +2,8 @@
 """The Δ grade CACHE — content hashing and the on-disk cache file, factored out of the
 grader/CLI so it can be tested on its own.  A Δ grade is a pure function of the content a
 check reads, so it is cached PER CHECK on its read footprint (Φ) over a global engine
-EPOCH; content_key is the coarse soundness basis the per-check key refines."""
+EPOCH; content_key is the coarse soundness basis the per-check key refines.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -10,7 +11,7 @@ import json
 from pathlib import Path
 
 import durable
-from layout import SKIP_DIRS, _ENGINE, _mutable, _nested_roots
+from layout import _ENGINE, SKIP_DIRS, _mutable, _nested_roots
 
 
 def content_key(project_dir: Path) -> str:
@@ -19,7 +20,8 @@ def content_key(project_dir: Path) -> str:
     reads them): the SOUNDNESS BASIS of caching.  The cache itself keys finer — per check,
     on its read footprint plus the engine epoch (see _footprint_hash / _engine_hash) — so
     this whole-project key is no longer the cache key, but the invariant it expresses is
-    what makes the finer key sound (a footprint ⊆ this content)."""
+    what makes the finer key sound (a footprint ⊆ this content).
+    """
     parts = []
     for tag, base in (("proj", project_dir), ("engine", _ENGINE)):
         nested = _nested_roots(base) if tag == "proj" else []
@@ -35,7 +37,8 @@ def engine_hash() -> str:
     dependency (every check runs through the gate), and footprint() reports only files under
     a project (the engine usually sits OUTSIDE it at ../paperkit), so the read footprint is
     completed by this: an engine edit invalidates every check; a project edit invalidates
-    only the checks whose footprint touched it."""
+    only the checks whose footprint touched it.
+    """
     parts = [f"{f.relative_to(_ENGINE)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
              for f in sorted(_ENGINE.rglob("*"))
              if _mutable(f) and not any(p in SKIP_DIRS for p in f.parts)]
@@ -85,7 +88,8 @@ def footprint_hash(project_dir: Path, files: list, sensitive: list | None = None
     indeterminate/vacuous grade with no measured surface: surface-only there would MISS a def-body
     edit the file-level grade is genuinely sensitive to, and a check nothing flipped today may be
     flipped by tomorrow's edit.  So `fine` must be NON-EMPTY (a real def-granular test to key on),
-    not merely present, before a .py is hashed at definition granularity."""
+    not merely present, before a .py is hashed at definition granularity.
+    """
     h = hashlib.sha256()
     fine = {}
     if sensitive:

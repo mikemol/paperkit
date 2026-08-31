@@ -51,7 +51,8 @@ def _write_atomic(path, data):
     identically, so the copy cannot drift into a second behaviour unnoticed.
 
     Why it matters here: a verdict record is the artifact every other verdict is aggregated from,
-    so a torn or twin-corrupted one is a wrong ANSWER rather than a broken file."""
+    so a torn or twin-corrupted one is a wrong ANSWER rather than a broken file.
+    """
     import os
     import tempfile
     path = pathlib.Path(path)
@@ -75,11 +76,28 @@ def _write_atomic(path, data):
         raise
 
 
-def _write(out, verb, verdict):
+def _write(out, verb, verdict, why=""):
+    """Ζ·cohere·mute — the record may CARRY ITS REASON, and omitting it is a lossy verdict.
+
+    `why` is optional and absent from the JSON when empty, so every existing record is
+    byte-identical and every consumer that reads `verdict` alone is unaffected — the same
+    non-breaking widening `resolver.Verdict` took for UNAVAILABLE ("if a consumer ever measures a
+    need, it widens WITHOUT touching pass/fail").
+
+    ⚑ WHY A RECORD AND NOT JUST STDERR.  `:cohere`'s stderr already reaches the build log, and
+    that was not enough: a red `@paperkit_paper//:cohere` wrote `{"verb":"cohere","verdict":"fail"}`
+    and the test log said, in as many words, "no per-claim record names a failure — the aggregate
+    is the only signal".  Six faces and ~90 claims behind one bit.  Diagnosing it meant hand-
+    diffing two `.sens.json` fingerprints to find which grounding edge was disjoint — a
+    measurement the tool had already made and discarded at the layer that records it.  A log line
+    is read by whoever is watching; a record is read by whatever comes next.
+    """
     if verdict is True or verdict is False:
         verdict = "pass" if verdict else "fail"
-    _write_atomic(out,
-        json.dumps({"verb": verb, "verdict": verdict}, separators=(",", ":")) + "\n")
+    rec = {"verb": verb, "verdict": verdict}
+    if why:
+        rec["why"] = why
+    _write_atomic(out, json.dumps(rec, separators=(",", ":")) + "\n")
 
 
 def main(argv):
@@ -152,9 +170,30 @@ def main(argv):
         # thrown away at the one layer that reads them.  stdout stays muted (the --from-calcs arm
         # prints no report there), stderr carries the residual, on its own handle — never merged,
         # since the caller parses this process's own stdout ([[separate-filehandles]]).
-        rc = subprocess.run([sys.executable, "paperkit/coherence.py", "--from-calcs", a.project, *a.calcs],
-                            stdout=subprocess.DEVNULL).returncode
-        _write(a.out, a.verb, rc == 0)
+        #
+        # ⚑⚑ AND THE RECORD CARRIES IT TOO.  Letting stderr through fixed the LOG; the RECORD
+        # still said only `{"verdict":"fail"}`, so a red :cohere named neither the face nor the
+        # edge to anything that reads records rather than watches a build.  stderr is TEE'd — it
+        # still reaches the terminal (a caller watching the build must not lose it) AND lands in
+        # the verdict's `why`, capped, so the failure travels with the artifact.
+        p = subprocess.run([sys.executable, "paperkit/coherence.py", "--from-calcs", a.project, *a.calcs],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if p.stderr:
+            print(p.stderr, end="", file=sys.stderr)
+        # The LAST lines carry the diagnosis (the faces print progress before the residual), and a
+        # record is not a transcript — 2000 chars is enough for the named misses and bounded
+        # enough that a verdict stays a verdict.
+        why = p.stderr.strip()[-2000:] if p.returncode != 0 else ""
+        # ⚑ Ζ·verdict·tristate — 0/1/2 ARE THREE STATES, AND `rc == 0` KEPT TWO.  coherence.py
+        # returns 1 for a real refutation (`_grounding_exit`: N un-acknowledged rests-on edges)
+        # and 2 for a reading it could not honestly make (`Ν·partial`, a calc set covering part
+        # of the graph; `_vacuous_exit`).  Collapsing those to "fail" scores a CANNOT-RUN as a
+        # refutation — the exact fold this file's own header refuses for `pk_cmd` ("a cannot-run
+        # is NOT a failure ... no false-red on a toolchain-less box, no false-green"), applied
+        # everywhere except here.  Found while fixing the mute record: the partial-reading probe
+        # wrote `"verdict":"fail"` for a run that had explicitly declined to judge.
+        verdict = "pass" if p.returncode == 0 else ("cannot-run" if p.returncode == 2 else "fail")
+        _write(a.out, a.verb, verdict, why)
     elif a.cmd == "canary":
         # Ζ·canary — the positive control's verdict.  Both directions asserted (a gate is sound
         # both ways, [[instrument-vs-gate]]): the guaranteed-flip cell MUST flip, the ∅ identity

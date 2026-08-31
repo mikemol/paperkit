@@ -28,7 +28,7 @@ from pathlib import Path
 ENG = Path(__file__).resolve().parent.parent
 ROOT = ENG.parent
 sys.path.insert(0, str(ENG))
-import durable  # noqa: E402
+import durable
 
 
 def _twinned(d: Path, name: str, body: str) -> tuple:

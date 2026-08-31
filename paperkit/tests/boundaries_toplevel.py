@@ -30,9 +30,8 @@ from pathlib import Path
 ENGINE = Path(__file__).resolve().parents[1]
 ROOT = ENGINE.parent
 sys.path.insert(0, str(ROOT / "tools"))
-from closure import _reads  # noqa: E402  (the owner of the read-root semantics)
-
-from boundaries_components import _literal  # noqa: E402  (components.bzl literal reader)
+from boundaries_components import _literal
+from closure import _reads
 
 
 def emerge_dirs():
@@ -48,7 +47,8 @@ def emerge_dirs():
 
 def witness_modules():
     """{label: path} — the emerge projects' [checks.claim] scripts.  A missing paper.toml is a
-    LOUD failure (the project is under-staged; add its reads token), never a silent skip."""
+    LOUD failure (the project is under-staged; add its reads token), never a silent skip.
+    """
     out = {}
     for d in emerge_dirs():
         toml = ROOT / d / "paper.toml" if d != "." else ROOT / "paper.toml"
@@ -65,7 +65,8 @@ def witness_modules():
 
 def toplevel_reads(text, names):
     """The engine-module read roots contributed by TOP-LEVEL statements (defs/classes excluded —
-    a read inside a witness body is the sanctioned, per-witness-scoped form)."""
+    a read inside a witness body is the sanctioned, per-witness-scoped form).
+    """
     found = set()
     for stmt in ast.parse(text).body:
         if not isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -81,7 +82,7 @@ def main() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     components = _literal(ENGINE / "components.bzl", "COMPONENTS")
-    names = {f[:-len('.py')].rsplit("/", 1)[-1] for fs in components.values() for f in fs}
+    names = {f[:-len(".py")].rsplit("/", 1)[-1] for fs in components.values() for f in fs}
     mods = witness_modules()
 
     print("Ζ·bnd·toplevel — witness modules' top level is read-free\n")

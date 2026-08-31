@@ -28,7 +28,7 @@ Prints one line per project with a grid.  --check exits 1 if any has not converg
     nothing would notice it breaking.  Re-verify its output at each use rather than
     trusting a past reading; an instrument earns trust per-use, a gate by proven
     soundness in both directions, and this has only ever been the former.
-    """
+"""
 from __future__ import annotations
 
 import re

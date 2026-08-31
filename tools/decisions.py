@@ -26,7 +26,8 @@ Decision rules (mirroring grader.decisions_unasserted):
                  emitted as a flip:-kind record over the data key; UNASSERTED iff the drop is reached AND
                  the perturb does not flip.
 
-Usage: decisions.py --flips <rec>... --reach <rec>...   →  {"decisions_unasserted": [labels]} on stdout."""
+Usage: decisions.py --flips <rec>... --reach <rec>...   →  {"decisions_unasserted": [labels]} on stdout.
+"""
 import argparse
 import json
 import sys
@@ -75,7 +76,8 @@ def decisions_unasserted(flips, reach):
 def summarize(records):
     """Fold per-claim __decisions records into one project coverage summary.  Each record is
     `{"decisions_unasserted": [labels]}` (a claim's reached-but-unasserted decisions).  Returns the
-    union of unasserted labels + the per-claim count — an ORTHOGONAL coverage axis, never a grade."""
+    union of unasserted labels + the per-claim count — an ORTHOGONAL coverage axis, never a grade.
+    """
     allu = []
     for r in records:
         u = r.get("decisions_unasserted", [])

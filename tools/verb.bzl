@@ -125,7 +125,20 @@ def _cmd_impl(ctx):
         # bad-set is {fail}, so it does not red the commit) · any other nonzero → fail (ran-and-failed).
         # Closes the false-red: on a toolchain-less box an honest "cannot verify" no longer blocks commits.
         command = pyprefix + _engine_importable() + consume_prefix + '' +
-                  "( " + inner + " ) >/dev/null 2>&1; rc=$?; " +
+                  # Ζ·rungate·why — the check's own account of its failure goes to STDERR, not
+                  # /dev/null.  This read `>/dev/null 2>&1`, so a red check reported `{"verdict":
+                  # "fail"}` and NOTHING ELSE: the exit code survived and the reason never did.
+                  # Measured 2026-09-01: four separate diagnoses in one session hit that wall, and
+                  # the last one (bnd-concept-route, green on host and red in the cell) could not
+                  # be advanced at all without re-running the witness by hand OUTSIDE the cell —
+                  # which measures a different environment, so it answers a different question.
+                  # ⚑ STDOUT STAYS DISCARDED, DELIBERATELY: a check's stdout is its own protocol
+                  # (gate.py prints verdict lines) and letting it through would interleave with the
+                  # action's, but stderr is where a failing check ALREADY writes its account —
+                  # bazel captures it per-action and prints it on failure.  The verdict is still
+                  # `$?` alone (a verdict is $? — never parsed from a transcript), so this widens
+                  # only what a human can READ, never what the gate DECIDES.
+                  "( " + inner + " ) >/dev/null; rc=$?; " +
                   'if [ "$rc" = 0 ]; then V=pass; elif [ "$rc" = 3 ]; then V=cannot-run; else V=fail; fi; ' +
                   '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path,
         # Ρ·check·resource·set — a check action declares NO resource_set, so per-claim checks are

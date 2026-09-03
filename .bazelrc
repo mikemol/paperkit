@@ -108,9 +108,49 @@ build:memobserve --//tools:observe=True
 # symlinks out to the source tree — they see only the staged inputs (the mutated engine at its
 # canonical path).  The system dirs are mount-paired for bash/python+libs; the SOURCE tree is NOT
 # mounted, so it stays unreachable.  Standard-FHS dirs → portable across Linux.
+#
+# ⚑ Ζ·mutant·default — THESE ARE `build`, NOT `build:mutant`, AND THAT IS THE WHOLE POINT.
+# They were opt-in, and an opt-in hermeticity flag is not hermeticity: a bare `bazel test` fell back
+# to the ORDINARY linux-sandbox, whose execroot is a directory of SYMLINKS INTO THE SOURCE TREE, so
+# a check's Path(__file__).resolve() walked straight back out to /home/…/paperkit and read HOST
+# sources that the action never declared.  That is a false GREEN available to anyone who forgets a
+# flag — the one outcome this engine exists to refuse — and it is not hypothetical:
+#
+# MEASURED 2026-09-02, @paperkit_boundaries//:gate, both arms forced (--nouse_action_cache) so
+# neither could serve the other's cached verdict:
+#   with the flags:     7 RED, every traceback rooted at /execroot/_main/… — no host prefix
+#   without the flags: 10 RED, tracebacks rooted at …/sandbox/linux-sandbox/N/execroot/…, and the
+#                      three extra reds are ESCAPES, not check failures:
+#     bnd-closure-script  ImportError: cannot import name 'closure_census' from 'tools'
+#                         (/home/mikemol/github/paperkit/paperkit/tools/__init__.py)  ← HOST tree
+#     bnd-scope           OSError: [Errno 30] Read-only file system:
+#                         '/home/mikemol/github/paperkit/paperkit/tests/_scope_tmp.bib'  ← HOST path
+#     bnd-hook-index      ModuleNotFoundError: No module named 'tools.indexdiverge'
+#   The bare arm resolved the string `tools` against the HOST package and got a DIFFERENT module set
+#   than the staged inputs define.  Which arm is red is not the finding; WHICH TREE THEY READ is.
+#
+# ⚑ AND THE SANDBOX FLAGS ARE NOT IN THE ACTION KEY, which is why this could not stay a convention.
+# Measured: `bazel build @paperkit_boundaries//:bnd-cache` with and then without --config=mutant is a
+# CACHE HIT both ways.  So a verdict computed under one regime is served under the other, and the
+# difference is invisible after the first run — [[bazel-action-idempotency]] again, with the
+# EXECUTION REGIME as the undeclared input.  A flag that changes what an action can read but not
+# what it is keyed on cannot be left to the caller to remember.
+#
+# ⚑ THE local/toolchain TIERS ARE UNAFFECTED, and that was the thing to check before promoting.
+# verb.bzl's _tier_exec puts "no-sandbox": "1" in execution_requirements for both, which selects the
+# `local` spawn strategy at the ACTION level — before any sandbox flag is consulted.  MEASURED:
+# `bazel build @paperkit_setup//:swap-zswap @paperkit_setup//:mach-cores --config=mutant` reports
+# `3 processes: 1 internal, 2 local` — the host-coupled probes still run on the host, unsandboxed,
+# reading the live /proc and /sys they exist to read.  Promotion does not touch them.
+# --config=mutant-oci overrides per-mnemonic (--strategy=PkEval=docker), so it still wins here too.
+build --experimental_use_hermetic_linux_sandbox
+build --sandbox_add_mount_pair=/bin --sandbox_add_mount_pair=/usr
+build --sandbox_add_mount_pair=/lib --sandbox_add_mount_pair=/lib64 --sandbox_add_mount_pair=/etc
+# `--config=mutant` is KEPT AS A NO-OP so every existing invocation stays valid: .githooks/pre-commit
+# passes it, so do the docs and the downstream consumers, and an rc with no `build:mutant` line at
+# all makes `--config=mutant` a hard ERROR.  Retiring the name is a separate, wider change; making
+# the behaviour unconditional is this one.  δ = the three lines above changed prefix, nothing else.
 build:mutant --experimental_use_hermetic_linux_sandbox
-build:mutant --sandbox_add_mount_pair=/bin --sandbox_add_mount_pair=/usr
-build:mutant --sandbox_add_mount_pair=/lib --sandbox_add_mount_pair=/lib64 --sandbox_add_mount_pair=/etc
 
 # Ζ·mutant·oci — the FULLY hermetic route: each counterfactual runs in a CONTAINER from the
 # proof-object Κ·image (paperkit-base:proof carries python+bash+strace), no host /usr at all —
@@ -121,7 +161,41 @@ build:mutant --sandbox_add_mount_pair=/lib --sandbox_add_mount_pair=/lib64 --san
 build:mutant-oci --experimental_enable_docker_sandbox
 build:mutant-oci --experimental_docker_image=localhost/paperkit-base:proof
 build:mutant-oci --experimental_docker_use_customized_images=false
-build:mutant-oci --strategy=PkEval=docker --strategy=PkMutate=docker
+# ⚑ Ζ·oci·spawn — THE DEFAULT, NOT TWO NAMED MNEMONICS.  This line read
+#   --strategy=PkEval=docker --strategy=PkMutate=docker
+# and the engine defines 28 action mnemonics across tools/{calc,verb,grade,witness}.bzl.  Two were
+# containerised; twenty-six silently ran on the host under a config whose whole claim is "no host
+# /usr at all" — and a 29th mnemonic added tomorrow would opt out with no signal at all.  That is a
+# hermeticity config that is hermetic for 7% of the graph, which is the false-GREEN shape this rc
+# already refuses one section up (Ζ·mutant·default: an opt-in hermeticity flag is not hermeticity).
+#
+# MEASURED against the live binary (bazel 8.7.0, `bazel help build --long`): --strategy's mnemonic is
+# OPTIONAL — its grammar is literally `[name=]value1[,..,valueN]` — and --spawn_strategy is the
+# purpose-built flag, documented as "Specify how spawn actions are executed by default".  So the
+# DEFAULT is settable, and setting it DISSOLVES the enumeration rather than maintaining it.
+#
+# ⚑ A DRIFT GUARD WAS CONSIDERED AND DECLINED, and the reasoning is the point.  The additive fix is
+# a check asserting "every `mnemonic =` in the .bzl files appears in this strategy list".  That is
+# [[guard-must-not-copy]]: the enumeration does not disappear, it MOVES from .bazelrc into the
+# checker, which then carries its own copy of the set it guards and needs its own maintenance on the
+# 29th mnemonic.  A guard holding a copy of the set certifies a tautology.  Setting the default
+# removes the set from the rc entirely, so there is nothing left to drift — the reductive fix.
+#
+# ⚑ THE FALLBACK IS LOAD-BEARING, priority-ordered highest-to-lowest: anything docker cannot execute
+# falls through to sandboxed, then local, rather than failing the build.  In particular verb.bzl's
+# _tier_exec puts {"local": "1", "no-sandbox": "1"} in execution_requirements for the local and
+# toolchain tiers, which selects the `local` strategy AT THE ACTION LEVEL before any strategy list is
+# consulted — setup's host-coupled /proc and /sys probes are not containerised by this line and could
+# not be.  Keeping `local` in the list is belt-and-braces on a property the action requirements
+# already guarantee (the same check the Ζ·mutant·default promotion note above records making).
+#
+# ⚑ UNVERIFIED, AND NOT RESOLVED BY GUESSING: whether all 28 mnemonics can actually EXECUTE under
+# localhost/paperkit-base:proof.  It could not be tested here — MEASURED 2026-09-02, `podman images`
+# on this box has no paperkit-base:proof at all, so --config=mutant-oci is unrunnable until the
+# prereq build above is run.  The fallback means an image-incapable mnemonic degrades to sandboxed
+# rather than erroring, which makes a gap quiet; the first real mutant-oci run should read the
+# `N processes: … docker` line to confirm the split.
+build:mutant-oci --spawn_strategy=docker,sandboxed,local
 
 # ═══ Ζ·cas — THE REMOTE ACTION CACHE, AND WHY IT REPLACES A PLANNED CONTAINER ═══════════════
 #

@@ -24,8 +24,21 @@ from _fixture_gate import gate, gate_json
 from _fixture_model import entry
 
 # a plain-target paper.toml (overrides the fixture default via assets)
+#
+# ⚑ Ζ·declare·resources — `root = "."` IS LOAD-BEARING, AND IS HERE BECAUSE THIS IS A SECOND
+# AUTHORING SITE FOR paper.toml.  _fixture_model._write declares the Δ sandbox root in the
+# paper.toml it writes; this asset then REWRITES that file wholesale to set `target = "plain"`,
+# so every field the fixture declared has to be restated — and the one that was not restated
+# was the only one whose absence is not a syntax error but a REFUSAL three frames deep in
+# layout._sandbox_root, surfacing as an empty stdout and a JSONDecodeError in the caller.
+#
+# Measured: with the fixture fixed and this override not, six of the seven arms below stayed
+# green (they call gate(), which does not sweep) and only the one Δ arm went red — the shape
+# guard-must-not-copy names, one level over: a copy of a declaration drifts from its original
+# the moment the original gains a field.
 PLAIN = {"paper.toml": '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
-                       'out = "out.md"\nnumbered = false\nreferences = false\ntarget = "plain"\n'}
+                       'out = "out.md"\nnumbered = false\nreferences = false\ntarget = "plain"\n'
+                       'root = "."\n'}
 
 
 def chain(leaf_check):

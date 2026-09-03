@@ -65,12 +65,56 @@ def entry(key, *, claim=None, emit=None, as_=None, frm=None, rests=None, glue=No
     return "@misc{%s,\n%s\n}\n" % (key, ",\n".join(fs))
 
 
-def _write(d, warrants, assets, rubric, title, numbered, references):
+#: The files `_write` AUTHORS.  An `assets` key equal to one of these REPLACES the fixture's
+#: own declaration rather than extending it — the drift shape documented on `_write`.  Kept as
+#: data so a caller (or a later refusal, once every call site can express `paper=`) can name it.
+_AUTHORED = ("paper.toml", "r.tsv", "w.bib")
+
+
+def _write(d, warrants, assets, rubric, title, numbered, references, paper=None):
+    """Write the minimal project.  `paper` names EXTRA [paper] FIELDS (e.g. {"target": "plain"})
+    — the additive channel for varying the config.
+
+    ⚑ WHY A FIELD CHANNEL AND NOT AN ASSET.  `assets` is keyed by FILENAME and written after
+    this function's own files, so a key of "paper.toml" silently overwrote the declaration
+    below — the caller restating every field by hand, and thereby pinning the fixture's
+    paper.toml to the shape it had ON THE DAY THE CALLER WAS WRITTEN.  That is exactly what
+    happened: `root = "."` was added here, the copy in boundaries_grounding.PLAIN did not
+    gain it, and six of seven arms stayed GREEN because only the one Δ arm sweeps.
+    guard-must-not-copy, one level over.  Naming a FIELD cannot drift, because the fields the
+    caller does NOT name are still authored here; an override written this way is impossible
+    to write partially.
+
+    ⚑ THE CHANNEL IS OPEN, THE OLD ONE IS NOT YET CLOSED.  The asset-key spelling still wins
+    (assets are written last), so this only makes the correct form AVAILABLE.  Closing it —
+    refusing a key in _AUTHORED — requires the three capability helpers (_fixture_gate,
+    _fixture_project, _fixture_delta) to forward `paper=` and boundaries_grounding.PLAIN to
+    move onto it; until then a refusal would red the tree with no path to green.
+    """
     proj = Path(d) / "proj"
     proj.mkdir(parents=True, exist_ok=True)
     flags = f"numbered = {'true' if numbered else 'false'}\nreferences = {'true' if references else 'false'}\n"
+    flags += "".join(f'{k} = "{v}"\n' for k, v in (paper or {}).items())
+    # Ζ·declare·resources — the fixture DECLARES its Δ sandbox root, because it is the owner of
+    # this project and the only party that can answer the ownership question.
+    #
+    # ⚑ IT USED TO BE INFERRED, AND THE INFERENCE WAS UNSOUND.  layout._sandbox_root returned
+    # `project_dir.parent` whenever the engine was a SIBLING rather than inside the project, which
+    # is exactly this fixture's shape: the project is a fresh tempfile.mkdtemp() and the engine
+    # lives in the checkout.  The inferred root was therefore $TMPDIR — every other temporary
+    # directory on the machine, including the OTHER fixtures a parallel suite is building — and
+    # the Δ sweep is entitled to MUTATE its root, so the measured surface silently included
+    # unrelated tests' fixtures.  layout.py now REFUSES to guess (Λ·registry: the owner declares,
+    # the engine reads), and this line is that declaration.
+    #
+    # `root = "."` is the honest answer and not merely the one that makes the refusal go away: the
+    # fixture project IS the bounded tree.  Everything Δ may legitimately corrupt for these
+    # suites — w.bib, r.tsv, paper.toml, the assets — is written below, inside `proj`; nothing
+    # above it belongs to the fixture, and a sweep reaching above it would be measuring the
+    # machine rather than the project.
     (proj / "paper.toml").write_text(
-        f'[paper]\ntitle = "{title}"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "out.md"\n' + flags)
+        f'[paper]\ntitle = "{title}"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "out.md"\n'
+        'root = "."\n' + flags)
     (proj / "r.tsv").write_text("".join(f"{k}\t{t}\n" for k, t in rubric))
     (proj / "w.bib").write_text("".join(warrants))
     for name, content in (assets or {}).items():

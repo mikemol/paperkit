@@ -61,5 +61,4 @@ IMPORTS = {
     "tests/boundaries_verdict.py": ["resolver.py"],
     "tests/boundaries_without_k.py": ["tests/_fixture_gate.py", "tests/_fixture_model.py"],
     "tests/boundaries_write_atomic.py": ["durable.py"],
-    "tools/bibstruct.py": ["tools/edit_snapshot.py", "tools/vfs.py"],
 }

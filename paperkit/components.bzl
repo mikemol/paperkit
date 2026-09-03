@@ -87,23 +87,36 @@ COMPONENTS = {
         "prove.py",
         "routes.py",
     ],
-    # Κ·bibstruct — VENDORED PEER TOOLS, relocated from substrate/scratch/ 2026-08-28 (transfer
-    # accepted by summit; ownership not yet flipped).  A structural `.bib` reader/writer and the
-    # two modules it composes: `vfs` (the read/write seam whose three-valued Presence keeps
-    # ABSENT distinct from unreadable) and `edit_snapshot` (the --apply XOR --dry-run mutation
-    # contract).  Their OWN component, with NO entry in DEPS, so the DAG guard enforces what
-    # vendoring means: nothing in the engine may import them, and they may not import the
-    # engine.  They are invoked as programs, never as libraries — which is why placing them
-    # anywhere else would have quietly licensed an edge nobody wants.
+    # Ζ·tools·merge — THE `vendored` COMPONENT IS GONE, AND ITS ABSENCE IS THE FIX.
     #
-    # ⚑ They were UNPLACED for a while, and the partition-totality arm is what said so: the
-    # boundary suite named all three by path rather than letting a new subdirectory drift in
-    # unowned.  That is the guard working, and the reason a vendored file is not "just a file".
-    "vendored": [
-        "tools/bibstruct.py",
-        "tools/edit_snapshot.py",
-        "tools/vfs.py",
-    ],
+    # It held `bibstruct.py` + the two modules it composes (`vfs`, `edit_snapshot`), adopted from
+    # substrate 2026-08-28, at `paperkit/tools/`.  With an `__init__.py` that made them a PACKAGE
+    # named `tools` — colliding with the repo-root `tools/` that pyproject.toml also declares.
+    # MEASURED 2026-09-02: a boundary suite run as a script puts `paperkit/` on sys.path[0], so
+    # `from tools import dagderive` bound to the THREE-module package and raised.  Four checks
+    # red on it (bnd-components, bnd-toplevel, bnd-closure-script, bnd-hook-index), identically
+    # on the host and in the cell — never a sandbox artifact.
+    #
+    # ⚑ THE TWO SETS WERE DISJOINT, WHICH IS WHAT MADE THE COLLISION ACCIDENTAL RATHER THAN A
+    # DESIGN.  Three modules against ~55, zero overlap, no shared history — they landed inside
+    # `paperkit/` because they are engine-adjacent, and nobody chose to shadow anything.
+    #
+    # ⚑⚑ AND `vendored` NAMED A TRANSITIONAL STATE, NOT A PROPERTY.  The comment this replaces
+    # said "transfer accepted by summit; ownership not yet flipped" — so the word described a
+    # handover in progress.  paperkit owns them now.  A directory named for an expiring state
+    # tells the next reader a lie about who owns the code, which is why the repair is not a
+    # RENAME (paperkit/vendored/, paperkit/struct/ — the latter would shadow the stdlib, the same
+    # class one door over) but a MERGE: one `tools` package instead of two.  The collision cannot
+    # recur because the second package no longer exists.
+    #
+    # The old comment argued that "placing them anywhere else would have quietly licensed an edge
+    # nobody wants".  That reasoning was about the ENGINE, and repo-root `tools/` is not the
+    # engine — nothing here may import it either.  The property survives the move: these files
+    # are gone from this partition because they are gone from `paperkit/`, and a partition that
+    # walks the engine tree cannot place a file outside it.
+    #
+    # ⚑⚑⚑ Census before the move: 7 in-repo references to `paperkit/tools/`, ZERO external.
+    # summit names it `bibstruct` as a COMMAND, never a path — so no consumer breaks.
     "delta": [
         "cache.py",
         "coherence.py",
@@ -167,6 +180,7 @@ COMPONENTS = {
         "tests/boundaries_mutate_atom.py",
         "tests/boundaries_mutable.py",
         "tests/boundaries_otlp.py",
+        "tests/boundaries_package_shadow.py",
         "tests/boundaries_path.py",
         "tests/boundaries_prove.py",
         "tests/boundaries_prove_envelope.py",
@@ -191,12 +205,10 @@ DEPS = {
     "gate": ["project", "model", "resolver", "kernel"],
     "library_kernel": ["delta", "gate", "project", "model", "resolver", "kernel"],
     "delta": ["gate", "project", "model", "resolver", "kernel"],
-    # ⚑ Κ·bibstruct — EMPTY, AND THAT IS THE DECLARATION.  A vendored tool imports no engine
-    # component, so the DAG guard turns "vendored" from a description into an enforced property:
-    # the moment one of these files imports `bib` or `resolver`, the edge lands outside DEPS and
-    # boundaries_components reds.  Nothing lists `vendored` as a dependency either, so the engine
-    # cannot start depending on a peer's tool by accident — they compose only with each other
-    # (bibstruct → edit_snapshot, vfs), which is an intra-component edge and therefore allowed.
-    "vendored": [],
+    # Ζ·tools·merge — `vendored` is gone from DEPS because it is gone from the partition; see the
+    # block above.  The property it enforced (nothing in the engine imports bibstruct/vfs/
+    # edit_snapshot) now holds for a stronger reason than a DAG rule: those files are no longer
+    # under `paperkit/`, so the partition cannot name them and an engine import of one would be
+    # an edge to a module this file does not know about.
     "tests": ["delta", "gate", "project", "model", "resolver", "kernel"],
 }

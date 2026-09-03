@@ -154,7 +154,7 @@ MUTANT = config.Param("mutant", "PAPERKIT_MUTANT",
 # every host below it in the DEPS lattice (bnd-config asserts this completeness — a
 # cone-resolved Param missing here would be a silently ignored flag).
 REGISTRY = [MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, MUTANT,
-            grader.DELTA_REPEAT, grader.DELTA_PULSE, layout.ROOT, resolver.PATH,
+            grader.DELTA_REPEAT, grader.DELTA_PULSE, layout.ROOT, resolver.PATH, resolver.ENGINE_PATH,
             G.SAFE, G.WITHOUT_K, G.JOBS, G.JSON, G.ONLY, G.INVARIANTS,
             project.TARGET, project.GENRE, project.GAMMA, project.OBSERVE, project.CHECK]
 

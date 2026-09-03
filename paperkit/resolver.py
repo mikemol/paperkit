@@ -335,10 +335,45 @@ _ENV_KEEP_PREFIX = ("LC_", "PAPERKIT_")        # locale + paperkit's own knobs
 # does not contain the project").  Recursive-check env leak (cf. Ω·config args-process-local).
 _ENV_DROP = {"PAPERKIT_ROOT"}
 
-# Ω·config — the knob this module RESOLVES, declared here (place-by-ownership; the kernel hosts
+# Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel hosts
 # the mechanism only).
 PATH = config.Param("path", "PAPERKIT_PATH",
                     help="pin tool resolution to these absolute dirs (colon-separated) instead of the host PATH — reproducibility, and dropping user-writable shadow dirs")
+
+# ⚑ Ζ·dispatch·pythonpath — THE DECLARED PASSTHROUGH FOR "WHERE IS THE ENGINE IMPORTABLE FROM".
+#
+# Two correct mechanisms collided, and neither side was wrong.  `library/run-witness` detects a
+# hermetic cell by testing `[ -d "$PYTHONPATH/paperkit" ]` — correct, and the only way it can know
+# not to build a `.venv` full of host absolute paths inside a sandbox.  `clean_env` above DROPS
+# `PYTHONPATH` by default-deny — also correct, and named in its own comment as an injection
+# surface (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH).  So a check spawned through this resolver saw
+# no PYTHONPATH, found no `.venv`, found no `uv`, and the witness could not run.  On the DEV HOST
+# it passed anyway, because a `.venv` happens to exist there — the failure was invisible in-repo
+# and fired only under the hermetic cell, which is the regime the sandbox exists to model.
+#
+# The seam already existed: `_ENV_KEEP_PREFIX` keeps `PAPERKIT_*`, so an OWNER-DECLARED knob
+# crosses `clean_env` without widening the allowlist by one entry.  That is the whole point of a
+# declared passthrough versus a wider allowlist: the value is one this engine CHOSE to export,
+# resolved through Ω·config's one pipeline (arg > env > config > default), not whatever the
+# ambient shell happened to be carrying.  `PYTHONPATH` itself stays denied.
+#
+# ⚑ THE DEFAULT IS `None`, AND THE FALLBACK LIVES AT THE USE SITE — design-for-portability.
+#
+# The obvious spelling is `default=lambda: str(Path(__file__).resolve().parent.parent)`, and it is
+# wrong for a reason the `config` project caught immediately: that project PROJECTS the knob union
+# as a committed table (assets/knobs.md, gated fresh by byte-diff), and `gen_knobs.py` INVOKES a
+# callable default to render it.  So this knob's default row read `/home/mikemol/github/paperkit`
+# — one machine's absolute path, frozen into a document every other machine would regenerate
+# differently, reddening the freshness check for everyone but its author.  A default that varies
+# with WHERE THE ENGINE IS CHECKED OUT has no portable literal, so it must not be rendered as one.
+#
+# `None` is also the more honest resolution: it means "nothing configured this", which is exactly
+# true — the engine's own location is not a CONFIGURED value, it is a fact `clean_env` reads from
+# `__file__` at the moment it builds the environment.  The knob keeps its full override power
+# (arg > env > paper.toml), and the table renders `—` like every other unset knob.
+ENGINE_PATH = config.Param(
+    "engine-path", "PAPERKIT_PYTHONPATH",
+    help="the directory `paperkit` is importable from, exported to every check as PAPERKIT_PYTHONPATH — a DECLARED passthrough across clean_env's default-deny, which drops the ambient PYTHONPATH (unset: the engine's own location)")
 
 
 def clean_env(env: dict | None = None) -> dict:
@@ -378,6 +413,20 @@ def clean_env(env: dict | None = None) -> dict:
     # — so a per-consumer guard requires every consumer to notice first, and one demonstrably did
     # not.  place-by-ownership-not-need: the claim "this check passed" is made HERE.
     out["PYTHONOPTIMIZE"] = "0"
+    # ⚑ Ζ·dispatch·pythonpath — EXPORT THE ENGINE'S LOCATION POSITIVELY, for the same reason
+    # PYTHONOPTIMIZE is set rather than merely omitted.  The allowlist DENIES `PYTHONPATH` (an
+    # injection surface), which is right; but a check that must import the engine then had no way
+    # to be told where it is, and `library/run-witness` fell through to a host `.venv` — present
+    # on the dev box, absent in a hermetic cell.  This is the DECLARED replacement: resolved
+    # through Ω·config (so a caller can override it by arg, env, or paper.toml), carried under the
+    # `PAPERKIT_` prefix the allowlist already keeps, and set by the ENGINE rather than inherited.
+    # A check reads PAPERKIT_PYTHONPATH; nothing reads the ambient PYTHONPATH, which stays dropped.
+    # Unset (the normal case) means the engine's OWN location — read from `__file__` here rather
+    # than declared as the Param's default, because that value is per-checkout and the config
+    # project renders declared defaults into a committed table (see ENGINE_PATH above).  Under
+    # Bazel this resolves to the STAGED tree, since `__file__` is itself inside the sandbox.
+    engine_path = config.resolve(ENGINE_PATH) or str(Path(__file__).resolve().parent.parent)
+    out["PAPERKIT_PYTHONPATH"] = str(engine_path)
     pinned = config.resolve(PATH)
     if pinned is not None:
         # Τ·path: PIN tool resolution to a DECLARED set of absolute, existing dirs —
@@ -585,6 +634,21 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
                     f"no library owns concept {target!r} — asked {lib}"
                     + (f", then the engine's {_LIBRARY}" if lib != _LIBRARY else ""),
                     str(lib))
+            # ⚑ Ζ·dispatch·pythonpath / Ε·fold — rc 3 IS CANNOT-RUN HERE TOO, and this was the
+            # THIRD face of the fold.  `run_ok` took the arm at the tier work and `agree:` took it
+            # at Ε·fold; `concept:` never did, so a library that RAN but could not establish its
+            # own environment (no engine on the path, no interpreter it could use) was scored a
+            # REFUTATION of the concept.  That is the worst direction for this verb to be wrong in:
+            # a concept is authored and graded ONCE in the library and IMPORTED everywhere, so one
+            # cannot-run propagates as a false refutation to every citing view at once.
+            #
+            # A witness that CANNOT RUN is not a witness that REFUTES — the distinction the Verdict
+            # docstring exists to protect, arriving here from an EXTERNAL process reporting it
+            # could not reach its toolchain, not from the engine being asked wrong.
+            if r.returncode == _CANNOT_RUN:
+                last = (r.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+                return unavailable((last[-1].strip()[:400] if last else
+                                    "the concept library reported it cannot run"), str(lib))
             return _pf(r.returncode == 0)
         except Exception as e:
             # The library is unreachable — the concept analogue of the sibling case above.

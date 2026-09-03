@@ -94,7 +94,8 @@ INVARIANTS = config.Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
                           help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks")
 # The gate CLI's composed registry: exactly the Params its import cone hosts (own 6 +
 # project's + resolver's; bnd-config asserts this completeness).
-REGISTRY = [SAFE, WITHOUT_K, JOBS, JSON, ONLY, INVARIANTS, P.TARGET, P.GENRE, P.GAMMA, P.OBSERVE, P.CHECK, resolver.PATH]
+REGISTRY = [SAFE, WITHOUT_K, JOBS, JSON, ONLY, INVARIANTS, P.TARGET, P.GENRE, P.GAMMA, P.OBSERVE, P.CHECK,
+            resolver.PATH, resolver.ENGINE_PATH]
 
 
 def cited_keys(prose: str) -> set:

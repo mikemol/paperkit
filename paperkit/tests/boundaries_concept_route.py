@@ -143,25 +143,84 @@ def main() -> int:
         print("      (3 arms skipped; they run on the CLI route where the file is present)")
         return _finish(fails, ran)
     bzl = bzl_path.read_text()
-    # ⚑ THE ANCHOR IS THE EMITTED LINE, NOT A WINDOW AFTER A NEARBY TOKEN.  This read
-    # `key = check[len("concept:"):]` and then took the NEXT 400 CHARACTERS, so it asserted a
-    # property of source PROXIMITY rather than of the emitter.  Measured 2026-08-28: the
-    # Ζ·grid·dangling fix inserted ~28 lines of comment and a `fail()` between that anchor and
-    # the `pk_result` line, pushing `sibling_verdict` outside the window — two arms went red and
-    # the third CRASHED with an IndexError on `.split(...)[1]`, for a change that altered nothing
-    # this suite is about.  Source-grep witness token fragility, third instance in this tree.
+    # ⚑⚑ THE FOURTH INSTANCE OF source-grep-witness-token-fragility IN THIS SUITE, AND THE ANCHOR
+    # IS NOW A PROPERTY RATHER THAN A SPELLING.
     #
-    # The honest anchor is the emitted STRING: find the pk_result line for the concept branch and
-    # assert on IT.  A comment can then say anything, and only a real change to what is emitted
-    # moves this arm.
-    emitted = next((ln.strip() for ln in bzl.splitlines()
-                    if "pk_result(name = " in ln and "@paperkit_library//:" in ln), "")
-    check("the Bazel emitter builds its label from the key (it is reachable to read at all)",
-          bool(emitted) and "sibling_verdict" in emitted)
-    check("...and that label names ONE fixed library repo, not the consuming project",
-          "@paperkit_library//:" in emitted)
+    # The ladder, so the next reader does not climb it again:
+    #   1. a WINDOW after a nearby token (`key = check[len("concept:"):]` + 400 chars) — asserted
+    #      source PROXIMITY.  Ζ·grid·dangling inserted a comment and a `fail()` inside the window;
+    #      two arms red, one IndexError.
+    #   2. the EMITTED LINE (`"pk_result(name = " in ln and "@paperkit_library//:" in ln`) — the
+    #      comment above this one called that "the honest anchor", because only a real change to
+    #      what is emitted could move it.  ⚑ THAT REASONING WAS WRONG IN ONE WORD: it is only a
+    #      real change to how the emission is SPELLED.  Ζ·grid·sibling lifted the label into
+    #      `_import_label(...)` and the emitted line became `... + lbl + ...` — the literal left
+    #      the file, `emitted` fell to "", and `.split("sibling_verdict")[1]` raised IndexError
+    #      again, for a refactor that changed NOTHING this suite is about.  Same defect, same
+    #      crash, one rung up.
+    #
+    # A witness that asserts a bare substring of engine source is measuring the source's SPELLING,
+    # and every legitimate refactor is then a false red.  The structural route out is to read the
+    # BUILT GRAPH instead of the generator — and it exists: on the host,
+    #
+    #     bazel query 'kind(pk_result, @paperkit_paper//:all)' --output=build
+    #
+    # prints every emitted `sibling_verdict = "@paperkit_library//:<key>"` directly (measured
+    # 2026-09-02: 29 concept imports from the paper view, every one library-owned).  That is the
+    # real artifact and no refactor preserving behaviour can move it.
+    #
+    # ⚑ IT IS NOT AVAILABLE TO THIS WITNESS, AND THE REASON IS ARCHITECTURAL, NOT INCIDENTAL.
+    # This check runs as a `pk_cmd` whose declared inputs are `//:files //boundaries:files
+    # //library:files //paperkit:engine` — a closure holding no bazel binary, no output base, and
+    # none of the generated `@paperkit_*` BUILD files.  Reaching a bazel server from inside would
+    # resolve OUT of the sandbox to the live tree, which is exactly the escape-that-PASSES that
+    # `library/run-witness` refuses a staged `.venv` for.  A witness cannot query the graph it is
+    # a node of; that would need the query's OUTPUT staged as a declared input, which is a
+    # different rung (an emitted-label manifest the generator writes and this suite reads — the
+    # honest structural fix, and the one Λ·library·manifest below would subsume anyway).
+    #
+    # So: re-anchored, but on the PROPERTY rather than the rendered string.  The three arms below
+    # assert that the concept branch builds its label through `_import_label` with a CONSTANT
+    # owner — which IS the claim ("the label is a function of the key alone, and the owner does
+    # not vary with the citer").  A rename of `lbl`, a reflow of the emission, or a move of the
+    # `pk_result` call cannot move it; only changing WHAT the owner is can, which is the change
+    # this arm exists to catch.  The branch is located by `concept:`, a token owned by
+    # resolver.VERBS rather than by this file's phrasing.
+    lines = bzl.splitlines()
+    start = next((i for i, ln in enumerate(lines) if 'check[len("concept:"):]' in ln), -1)
+    # the branch ends at its `continue`; that is Starlark control flow, not a spelling
+    end = next((i for i in range(start + 1, len(lines))
+                if lines[i].strip() == "continue"), -1) if start >= 0 else -1
+    branch = "\n".join(lines[start:end]) if start >= 0 and end > start else ""
+    # ⚑ THE ABSENCE ARM MUST READ CODE, NOT PROSE — the fifth face of the same defect, caught
+    # while repairing the fourth.  A first cut asserted `"@paperkit_" not in branch`, which was
+    # RED on arrival: the branch's own comment block and its two `fail()` messages quote
+    # `@paperkit_library//:%s__dcalc` while EXPLAINING the dangling-label hazard.  So the arm was
+    # measuring the branch's documentation — the very thing the re-anchor above exists to set
+    # free.  Strip line comments and string literals first; what remains is what the generator
+    # DOES, which is the only thing this suite has a claim on.
+    code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', re.sub(r'#[^\n]*', '', branch))
+    # the label constructor, and the OWNER it is handed at this call site
+    m = re.search(r'_import_label\(\s*(.*?)\)', branch, re.S)
+    owner_arg = ""
+    if m:
+        args = [a.strip() for a in m.group(1).split(",")]
+        owner_arg = args[3] if len(args) > 3 else ""   # (verb, name, key, OWNER, ...)
+
+    check("the Bazel emitter's concept branch is reachable to read, and builds a label",
+          bool(branch) and bool(m))
+    check("...and that label names ONE fixed library repo — the owner is a STRING LITERAL, "
+          f"not a variable (owner={owner_arg or '<none>'})",
+          owner_arg == '"library"')
+    # ⚑ AND THIS ARM ASSERTS AN ABSENCE, DELIBERATELY.  An earlier draft of it also matched
+    # `_import_label`'s RETURN LINE verbatim — which would have been the defect above committed
+    # inside its own repair, one function further away.  What this suite may honestly say about
+    # the branch is what the branch itself contains: the citing project reaches the emitter as
+    # `proj`, so if neither that name nor any repo name appears between the key extraction and
+    # the `continue`, the label cannot vary with the citer.  How `_import_label` assembles the
+    # string from a constant owner is ITS business, and the arm above already pins the owner.
     check("...so nothing in the emitted label varies with WHO cites the key",
-          "proj" not in emitted.split("sibling_verdict")[1])
+          bool(code.strip()) and "@paperkit_" not in code and "proj" not in code)
 
     # ── therefore: the routes CAN disagree, and today they do ────────────────────────────────
     # An arm asserting True is a PRINTED STATEMENT, not a check (Λ·instrument-vs-gate: it would

@@ -5,6 +5,7 @@
 | `check` (flag) | `--check` | `PAPERKIT_CHECK` | — | `—` |
 | `delta-pulse` (value) | `--delta-pulse` | `PAPERKIT_DELTA_PULSE` | — | `2` |
 | `delta-repeat` (value) | `--delta-repeat` | `PAPERKIT_DELTA_REPEAT` | — | `1` |
+| `engine-path` (value) | `--engine-path` | `PAPERKIT_PYTHONPATH` | — | `—` |
 | `footprint` (flag) | `--footprint` | `PAPERKIT_FOOTPRINT` | — | `—` |
 | `gamma` (value) | `--gamma` | `PAPERKIT_GAMMA` | `gamma` | `—` |
 | `genre` (value) | `--genre` | `PAPERKIT_GENRE` | `genre` | `talk` |

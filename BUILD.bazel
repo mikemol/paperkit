@@ -146,4 +146,23 @@ test_suite(name = "hook", tests = [
     # on a malformed record (a partition/aggregation regression), never on an unasserted-decision count.
     "@paperkit_paper//:decisions",
     "@paperkit_root//:decisions",
+    # Λ·hook·owner — library's decisions summary was ABSENT, and nothing recorded a reason.
+    # MEASURED 2026-09-02 by query: exactly three decisions: targets exist across every project
+    # (root, paper, library) and exactly three cohere: targets exist, over the same three — the
+    # generator emits both kinds for precisely the emerge projects.  The cohere: row above was
+    # complete; this one listed two of the same three.  Cost is not the discriminator either:
+    # library would add 18,714 marginal targets against paper's existing 19,438, the same order.
+    # So library's grid twin was BUILT every commit and CONSUMED by nothing — which is exactly the
+    # emitted-but-inert finding the Μ·sweep·atom note above exists to refuse, reappearing one
+    # project over.  A green target outside the suite is [[instrument-vs-gate]]: it produces signal
+    # and is never a control.
+    #
+    # ⚑ AND THE CLASS IS THIS LIST, NOT THIS LINE.  These members are a per-project x per-target-kind
+    # GRID that tools/bibtex.bzl already knows in full — it reads every project's emerge/adequacy/calc
+    # status and emits every kind from it — but the grid is transcribed BY HAND here, in a file the
+    # generator cannot see.  So adding a per-project kind requires an edit no owner is forced to make,
+    # and the SECOND such kind (decisions:, after cohere:) is the one that got missed.  All 23 members
+    # can fall out this way, silently.  [[place-by-ownership-not-need]]; see the report accompanying
+    # this commit for the generated-membership options.
+    "@paperkit_library//:decisions",
 ])

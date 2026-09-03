@@ -45,6 +45,39 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+# Ζ·anno·rhetoric — the shapes bib.py's readers actually return, named HERE because the engine's
+# flat sibling import (below) is invisible to the type checker: `import bib` behind a sys.path
+# insert resolves at runtime and not at analysis time, so every value crossing that edge arrives
+# untyped.  MEASURED, because the opposite was claimed: making the import resolve
+# (--ignore-missing-imports) takes this file from 65 mypy errors to 64 — it deletes the
+# import-not-found line and NOTHING else.  The Any-cascade was never the import's doing; it was
+# unannotated defs and bare generics inside this file.  So these aliases are not a workaround for
+# the import spelling, and fixing that spelling would not retire them: they are this module's
+# statement of what it requires of its dependency, which is a thing worth writing down either way.
+#
+# ⚑ READ OFF bib.py, NOT GUESSED.  A precise-looking annotation over a genuinely loose structure
+# buys a green by telling the checker something false, so each of these traces to a line:
+#   Fields  — bib.parse builds `f = {"_src": ..., "_type": ...}` (str), adds _SCALAR fields verbatim
+#             (str), and sets every _LIST field to `[a for a in re.split(...)]` (list[str]).  The
+#             union is REAL: `f.get("from", [])` is a list where `f.get("move")` is a str, and
+#             flattening it to dict[str, str] would be the false claim.
+#   Row     — bib.rubric_rows returns `[c.strip() for c in row]` over csv.reader → list[str].
+#   Config  — bib.load_config returns a HETEROGENEOUS dict (str, Path, list[Path], bool, tuple),
+#             so it is dict[str, object] and each read below narrows at its own use site.
+Fields = dict[str, "str | list[str]"]
+FieldMap = dict[str, Fields]
+Row = list[str]
+Config = dict[str, object]
+
+# One analyzed section: (key, declared scheme, claim keys in dep order, the non-first claims'
+# moves, the violations).  Named because it is analyze's return element AND main's loop variable,
+# and the two were free to drift while it was spelled `list` at both ends.
+Section = tuple[str, str, list[str], list[str | None], list[str]]
 
 # Ζ·pkg·shape — the engine's own directory, FIRST on sys.path, and it must stay a per-module
 # line rather than moving to paperkit/__init__.py: a package __init__ runs only when the
@@ -57,9 +90,26 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bib
 
+# ⚑ Ζ·anno·rhetoric — THE UNTYPED EDGE IS DECLARED ONCE, HERE, and this is the placement decision
+# in this file.  The import above is unfollowable to mypy (a runtime sys.path insert is not an
+# analysis-time fact), so every `bib.foo(...)` is a call on an Any and each such CALL EXPRESSION is
+# itself Any — casting the result narrows the value but not the call, which is why a per-call cast
+# left five errors standing and this binding leaves none.
+#
+# Naming the five functions this module uses, with the signatures bib.py actually defines, does
+# three things a scattered cast does not: it states this module's REQUIREMENT of its dependency in
+# one readable block, it confines the untyped surface to five lines instead of a dozen call sites,
+# and it puts the drift in ONE place if bib.py's signatures change.  These are not stubs for bib —
+# bib.py owns its own annotations — they are the contract rhetoric.py depends on.
+_rubric_rows: Callable[[Path], list[Row]] = bib.rubric_rows
+_load_config: Callable[[Path], Config] = bib.load_config
+_parse: Callable[[Path, tuple[str, ...]], FieldMap] = bib.parse
+_dep_order: Callable[[list[str], FieldMap], list[str]] = bib.dep_order
+_is_placed: Callable[[Fields], bool] = bib.is_placed
+
 # (kind, default connector).  kind is what SCHEMES constrain; connector is the
 # realization project.py falls back to when a claim gives no explicit `join`.
-MOVES = {
+MOVES: dict[str, tuple[str, str]] = {
     "consequence":   ("entail",   "so "),
     "amplification": ("extend",   "indeed, "),
     "scope-shift":   ("extend",   ". "),
@@ -71,7 +121,7 @@ MOVES = {
 }
 
 # scheme -> (min_claims, max_claims | None, admissible kinds for non-first claims).
-SCHEMES = {
+SCHEMES: dict[str, tuple[int, int | None, set[str]]] = {
     "period":      (1, 1, set()),
     "distich":     (2, 2, {"turn", "extend", "entail"}),
     "tricolon":    (3, 3, {"parallel"}),
@@ -80,26 +130,30 @@ SCHEMES = {
 }
 
 
-def kind_of(move: str):
+def kind_of(move: str) -> str | None:
+    """Return the category a scheme constrains, or None if `move` is outside the vocabulary."""
     return MOVES[move][0] if move in MOVES else None
 
 
-def schemes_from_rubric(path: Path) -> dict:
+def schemes_from_rubric(path: Path) -> dict[str, str]:
     """{section_key: scheme} from the optional 3rd tab-column of rubric.tsv."""
     # Ζ·rubric·csv — the ROWS come from bib.rubric_rows (the csv-backed single owner of the .tsv
     # format); this function owns only the MEANING of column 3.  It used to re-implement the
     # strip/comment/tab skip beside bib.rubric's copy, so the two could drift on which lines are
     # data — and they had already drifted on robustness.
-    import bib
-    return {r[0]: r[2] for r in bib.rubric_rows(path) if len(r) >= 3 and r[2]}
+    # A row is `key<TAB>title[<TAB>scheme]`; column 3 is this function's, and an absent or empty
+    # one means the section declares no scheme (the check is opt-in).
+    scheme_column = 3
+    return {r[0]: r[2] for r in _rubric_rows(path) if len(r) >= scheme_column and r[2]}
 
 
-def check_scheme(scheme: str, claims: list, moves: list) -> list:
+def check_scheme(scheme: str, claims: list[str], moves: list[str | None]) -> list[str]:
     """Violations of `scheme` by a section with these claim keys and non-first moves."""
     if scheme not in SCHEMES:
         return [f"unknown scheme '{scheme}' (known: {', '.join(sorted(SCHEMES))})"]
     lo, hi, kinds = SCHEMES[scheme]
-    v, n = [], len(claims)
+    v: list[str] = []
+    n = len(claims)
     if n < lo or (hi is not None and n > hi):
         v.append(f"{scheme} wants {lo}–{hi if hi is not None else '∞'} claims, has {n}")
     for i, mv in enumerate(moves, start=2):
@@ -108,46 +162,77 @@ def check_scheme(scheme: str, claims: list, moves: list) -> list:
         elif mv not in MOVES:
             v.append(f"claim #{i} move '{mv}' is not in the vocabulary")
         elif kinds and kind_of(mv) not in kinds:
-            v.append(f"claim #{i} move '{mv}' is a {kind_of(mv)}, but {scheme} admits {sorted(kinds)}")
+            v.append(f"claim #{i} move '{mv}' is a {kind_of(mv)}, "
+                     f"but {scheme} admits {sorted(kinds)}")
     return v
 
 
-def analyze(project_dir: Path) -> list:
+def analyze(project_dir: Path) -> list[Section]:
     """[(section, scheme, claim_keys, non_first_moves, violations)] for declared sections."""
-    cfg = bib.load_config(project_dir)
-    F = {}
-    for b in cfg["bibs"]:
-        F.update(bib.parse(b, cfg["consumer_fields"]))
-    by_sec = {}
-    for k, f in F.items():
-        if f.get("section"):
-            by_sec.setdefault(f["section"], []).append(k)
-    rows = []
-    for sk, scheme in schemes_from_rubric(cfg["rubric"]).items():
-        keys = bib.dep_order(by_sec.get(sk, []), F)
-        claims = [k for k in keys if not bib.is_placed(F[k])]
-        moves = [F[k].get("move") for k in claims[1:]]
+    # Ζ·anno·rhetoric — load_config returns a heterogeneous dict (str, Path, list[Path], bool,
+    # tuple), so it is narrowed PER KEY at the point of use rather than once at the top: there is
+    # no single element type to give it, and inventing one would be a false claim about a mapping
+    # whose whole job is to carry different kinds of thing under different names.
+    cfg = _load_config(project_dir)
+    bibs = cfg["bibs"]
+    consumer_fields = cfg["consumer_fields"]
+    if not isinstance(bibs, list) or not isinstance(consumer_fields, tuple):
+        msg = f"paperkit-rhetoric: {project_dir}/paper.toml gave a malformed bibs/consumer_fields"
+        raise TypeError(msg)
+    fields: FieldMap = {}
+    for b in bibs:
+        fields.update(_parse(b, consumer_fields))
+
+    # `section` is a _SCALAR field, so it is a str where present; the `.get` guard is what makes
+    # an unsectioned warrant simply not participate rather than key the map under a falsy value.
+    by_sec: dict[str, list[str]] = {}
+    for k, f in fields.items():
+        sec = f.get("section")
+        if sec and isinstance(sec, str):
+            by_sec.setdefault(sec, []).append(k)
+
+    rubric = cfg["rubric"]
+    if not isinstance(rubric, Path):
+        msg = f"paperkit-rhetoric: {project_dir}/paper.toml gave a non-path rubric"
+        raise TypeError(msg)
+    rows: list[Section] = []
+    for sk, scheme in schemes_from_rubric(rubric).items():
+        keys = _dep_order(by_sec.get(sk, []), fields)
+        claims = [k for k in keys if not _is_placed(fields[k])]
+        # `move` is a _SCALAR field: a str when the claim declares one, None when it does not —
+        # and the None is MEANINGFUL here, since a declared scheme requires a typed move on every
+        # non-first beat and check_scheme reports its absence by name.
+        moves = [m if isinstance(m, str) else None
+                 for m in (fields[k].get("move") for k in claims[1:])]
         rows.append((sk, scheme, claims, moves, check_scheme(scheme, claims, moves)))
     return rows
 
 
-def main(argv: list) -> int:
+def main(argv: list[str]) -> int:
+    """Print the rhythm map, or under --check the scheme verdict (exit 1 on any violation)."""
+    # Ζ·anno·rhetoric — sys.stdout.write, not print.  This module's stdout IS its protocol (the
+    # rhythm map is the output), which is the reason pyproject's per-file T201 list exempts the
+    # other entrypoints — gate, project, discriminate, coherence.  rhetoric.py is the same species
+    # and is NOT on that list, so rather than reach for a waiver in a file this arc does not own,
+    # it takes the conversion linux-sources paid tree-wide for the same rule.  The trailing \n is
+    # now explicit: write does not add one, and that is the whole behavioural risk in this change.
     args = [a for a in argv if not a.startswith("-")]
     project_dir = Path(args[0]).resolve() if args else Path.cwd()
     rows = analyze(project_dir)
     if not rows:
-        print("rhetoric: no section declares a scheme (rubric.tsv 3rd column) — nothing to check")
+        sys.stdout.write(
+            "rhetoric: no section declares a scheme (rubric.tsv 3rd column) — nothing to check\n")
         return 0
     rc = 0
-    for sk, scheme, claims, moves, viol in rows:
+    for sk, scheme, _claims, moves, viol in rows:
         spectrum = ", ".join(m or "—" for m in moves) or "single beat"
         mark = "✓" if not viol else "✗"
-        print(f"rhetoric: {mark} {sk}: {scheme} [{spectrum}]")
+        sys.stdout.write(f"rhetoric: {mark} {sk}: {scheme} [{spectrum}]\n")
         for w in viol:
-            print(f"rhetoric:     {w}", file=sys.stderr)
+            sys.stderr.write(f"rhetoric:     {w}\n")
             rc = 1
     if "--check" in argv:
-        print("rhetoric: PASS" if rc == 0 else "rhetoric: FAIL", file=sys.stderr)
+        sys.stderr.write("rhetoric: PASS\n" if rc == 0 else "rhetoric: FAIL\n")
         return rc
     return 0
 

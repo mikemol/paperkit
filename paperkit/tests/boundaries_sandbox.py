@@ -110,41 +110,55 @@ def main() -> int:
         with tempfile.TemporaryDirectory() as t:
             root = Path(t); proj = root / "proj"; proj.mkdir()
             os.environ.pop("PAPERKIT_ROOT", None)
+            # Ζ·root·declare — nothing declared is a REFUSAL, not an inference.  This arm used to
+            # assert `_sandbox_root(proj) == root` (the PARENT), which is the behaviour that
+            # copied ~/github ten times: the old guard refused only $HOME-or-above, and ~/github
+            # sits one level BELOW it.  The suite asserted the defect, so it could not catch it.
             (proj / "paper.toml").write_text('[paper]\ntitle = "t"\n')
-            check("nothing declared → root is INFERRED as the parent", layout._sandbox_root(proj) == root)
+            refused_undeclared = False
+            try:
+                layout._sandbox_root(proj)
+            except SystemExit:
+                refused_undeclared = True
+            check("nothing declared → REFUSED (the parent is not inferred, at any size)",
+                  refused_undeclared)
             (proj / "paper.toml").write_text('[paper]\ntitle = "t"\nroot = "."\n')
-            check("paper.toml [paper] root pins the root over inference", layout._sandbox_root(proj) == proj)
+            check("paper.toml [paper] root DECLARES the root", layout._sandbox_root(proj) == proj)
             os.environ["PAPERKIT_ROOT"] = str(root)
             check("PAPERKIT_ROOT env overrides the paper.toml declaration", layout._sandbox_root(proj) == root)
     finally:
         os.environ.pop("PAPERKIT_ROOT", None) if saved is None else os.environ.__setitem__("PAPERKIT_ROOT", saved)
 
-    print("\n⟨P, F, δ⟩ minimum-delta pair — the home-guard\n")
-    saved_r, saved_h = os.environ.get("PAPERKIT_ROOT"), os.environ.get("HOME")
+    print("\n⟨P, F, δ⟩ minimum-delta pair — the declaration\n")
+    # Ζ·root·declare — the pair USED to be the home-guard, whose δ was "the inferred parent being
+    # $HOME-or-above".  That δ described a SIZE threshold, and a threshold has no correct value:
+    # ~/github passed it while holding 53 repos and 29 GB, so the F arm proved a guard that did
+    # not guard.  The δ is now the DECLARATION — one line of TOML — because ownership, not size,
+    # is what the engine cannot infer and the owner alone can state.
+    saved_r = os.environ.get("PAPERKIT_ROOT")
     os.environ.pop("PAPERKIT_ROOT", None)
-    with tempfile.TemporaryDirectory() as home:
-        # point $HOME at a tmpdir (Path.home() reads it) so a project DIRECTLY in "home" exercises
-        # the guard WITHOUT writing to the real home — and so it works inside a hermetic sandbox.
-        os.environ["HOME"] = home
-        hp = Path(home) / "proj"; hp.mkdir()
+    with tempfile.TemporaryDirectory() as t:
+        parent = Path(t); hp = parent / "proj"; hp.mkdir()
         try:
+            # An ORDINARY parent — not $HOME, not oversized, nothing the old guard would refuse.
+            # That is the point: the refusal must not depend on the parent looking dangerous.
             (hp / "paper.toml").write_text('[paper]\ntitle = "t"\n')
             refused = False
             try:
                 layout._sandbox_root(hp)
             except SystemExit:
                 refused = True
-            (hp / "paper.toml").write_text('[paper]\ntitle = "t"\nroot = "."\n')   # declare → escapes the guard
+            (hp / "paper.toml").write_text('[paper]\ntitle = "t"\nroot = "."\n')   # declare → resolves
             ok = refused and layout._sandbox_root(hp) == hp
-            ran.append("home-guard")
-            fails.append("home-guard") if not ok else None
-            print(f"  {'ok ' if ok else 'XX '}declaring a root is the difference between refusal and a sandbox")
-            print("      P (inferred ok): parent is a normal dir → root inferred (the cases above)")
-            print("      F (refused):     parent is $HOME → SystemExit with guidance to declare a root")
-            print("      δ (min delta): the inferred parent being $HOME-or-above (declare to escape)\n")
+            ran.append("declare-or-refuse")
+            fails.append("declare-or-refuse") if not ok else None
+            print(f"  {'ok ' if ok else 'XX '}declaring a root is the difference between a sandbox and a refusal")
+            print("      P (declared): root = \".\" → the project IS the root, sandbox resolves")
+            print("      F (absent):   no declaration → SystemExit naming the three ways to declare")
+            print("      δ (min delta): one line of TOML — and the parent is an ORDINARY dir in")
+            print("                     BOTH arms, so nothing about its size or place decides this\n")
         finally:
             os.environ.pop("PAPERKIT_ROOT", None) if saved_r is None else os.environ.__setitem__("PAPERKIT_ROOT", saved_r)
-            os.environ.pop("HOME", None) if saved_h is None else os.environ.__setitem__("HOME", saved_h)
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")

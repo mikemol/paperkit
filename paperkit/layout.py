@@ -74,28 +74,54 @@ def _root_override(project_dir: Path) -> Path | None:
 
 
 def _sandbox_root(project_dir: Path) -> Path:
-    """The dir to copy into the Δ mutation sandbox.  An EXPLICIT root wins (PAPERKIT_ROOT env /
-    --root / paper.toml — see _root_override); else it is INFERRED: project_dir when the engine
-    lives INSIDE it (a self-contained repo — the README at the repo root), else its parent (deps
-    are a sibling, ../paperkit).
+    """The dir to copy into the Δ mutation sandbox — DECLARED, never inferred.
 
-    The inferred parent is assumed to be a bounded repo.  If it is $HOME OR ABOVE — the case a
-    downstream project (engine at ../paperkit, living directly in a home that also holds a
-    multi-GB clone / package cache) hits — copying it whole would explode the disk, so we REFUSE
-    and tell the user to DECLARE the root.  A clear instruction beats a filled disk.
+    An explicit root (PAPERKIT_ROOT env / --root / paper.toml [paper] root — see _root_override)
+    is the only answer, EXCEPT the one case that needs no declaration: the engine living INSIDE
+    the project, which makes the project self-contained and its own root by construction.
+
+    ⚑ THE PARENT IS NO LONGER INFERRED, AND THE INFERENCE WAS UNSOUND — not merely expensive.
+    This returned `project_dir.parent` for any project whose engine is a sibling (../paperkit),
+    guarded only against $HOME OR ABOVE.  `~/github` is one level BELOW home, so it passed the
+    guard while holding 53 repos and 29 GB.  MEASURED 2026-09-02: ~/.cache/paperkit-sweep held
+    TEN abandoned 9.5 GB copies of the whole tree — 95.8 GB — each a copy of every other repo on
+    the machine (gcalculus had already measured 18 abandoned 774 MB copies filling a 7.7 G tmpfs,
+    filed it, and declared root = "." in every paper.toml; this tree did not).
+
+    ⚑⚑ AND THE DISK WAS THE CHEAP HALF.  Δ mutates files in the copy and asks whether the check
+    flips, so the ROOT IS THE MEASURED SURFACE.  An unbounded root means (a) the sweep is
+    entitled to mutate other repos' sources — every MUTABLE_SUFFIXES file under 52 unrelated
+    trees — and report the result as this project's sensitivity, and (b) the copy is INCONSISTENT
+    BY CONSTRUCTION, because 29 GB takes minutes to copy while other sessions edit those trees.
+    The premise Δ rests on (a check is a pure function of the copied content) is false before the
+    sweep starts.  A grade computed over a surface nobody declared is not a weaker measurement,
+    it is a different one wearing a measurement's name.
+
+    ⚑⚑⚑ AND IT FAILED SILENTLY IN THE DANGEROUS DIRECTION, which is why 95.8 GB accumulated with
+    every build GREEN.  A root that is too SMALL breaks loudly (the check cannot find its inputs);
+    too LARGE and the sweep passes, measuring more than the project owns.  A guard whose only
+    failure mode is a false green is the one this engine exists to refuse.
+
+    So the guard's SHAPE was wrong, not its threshold.  `is it too big?` is a COST question with
+    no correct answer — every bound is arbitrary and the next tree is bigger.  `is this the
+    project's own tree?` is an OWNERSHIP question, and the owner is the only party who can answer
+    it.  Λ·registry: the owner declares, the engine reads.  A missing declaration is a REFUSAL,
+    never a guess — the same conclusion Ζ·entry·point reached for the witness module, which
+    stopped being inferred from `cmd` on exactly this reasoning.
     """
     override = _root_override(project_dir)
     if override is not None:
         return override
-    inferred = project_dir if _ENGINE.is_relative_to(project_dir) else project_dir.parent
-    home, r = Path.home().resolve(), inferred.resolve()
-    if r == home or home.is_relative_to(r):
-        raise SystemExit(
-            f"paperkit: refusing to infer the Δ sandbox root as {r} (your home directory or "
-            f"above) — copying it whole would explode the disk.  DECLARE the bounded root: set "
-            f"PAPERKIT_ROOT=<dir> in the environment (container pipelines), pass --root <dir>, "
-            f'or add [paper] root = "<rel>" to {project_dir.name}/paper.toml.')
-    return inferred
+    if _ENGINE.is_relative_to(project_dir):
+        return project_dir            # self-contained: the engine is IN the project
+    raise SystemExit(
+        f"paperkit: {project_dir} declares no Δ sandbox root, and the engine is a SIBLING "
+        f"({_ENGINE}) rather than inside it — so there is nothing to infer a bounded root from.  "
+        f"The parent used to be assumed; it is not, and assuming it copied ~/github (53 repos, "
+        f"29 GB) ten times while every build read green.  DECLARE it: set PAPERKIT_ROOT=<dir> in "
+        f"the environment (container pipelines), pass --root <dir>, or add "
+        f'[paper] root = "<rel>" to {project_dir.name}/paper.toml (root = "." when the project '
+        f"IS the bounded tree).")
 
 
 def _nested_roots(base: Path) -> list:

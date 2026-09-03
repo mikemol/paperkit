@@ -755,17 +755,86 @@ def _scratch_dir() -> str | None:
     return None                                   # tempfile's default: never a hard failure
 
 
+_OWNER_FILE = ".paperkit-owner"
+
+
+def _claim_sandbox(tmp: Path) -> None:
+    """Ζ·reap·claim — stamp this process's pid into the sandbox, so the reaper can tell a LIVE
+    copy from a corpse without guessing from mtime.  Best-effort: an unwritable sandbox is a
+    problem the copy itself will report, and a missing stamp reads as unowned (see `_owner_live`),
+    which is the CONSERVATIVE direction only in combination with the age window.
+    """
+    try:
+        (tmp / _OWNER_FILE).write_text(f"{os.getpid()}\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _owner_live(d: Path) -> bool:
+    """True if `d` carries an owner stamp naming a process that still exists.
+
+    This is the criterion the docstring of `reap_sandboxes` always claimed and never had.  It is
+    an explicit CLAIM, not an open-file probe: /proc/*/fd is Linux-only, racy, and unreadable for
+    a process owned by another uid or living in another mount namespace (the Bazel sandbox case) —
+    an open-file test would read those live sweeps as unowned and delete them, which is the exact
+    hazard it was supposed to prevent.  A pid stamp the owner writes is observable from outside
+    all of those boundaries.
+
+    An unstamped directory is NOT live: it predates this mechanism, or its owner died before it
+    could stamp.  Those are still gated by the age window.
+    """
+    try:
+        pid = int((d / _OWNER_FILE).read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return False
+    try:
+        os.kill(pid, 0)                # signal 0: existence probe, delivers nothing
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True                    # exists, owned by another uid — live
+    except OSError:
+        return True                    # unknown: refuse to reap on an ambiguous answer
+    return True
+
+
+_REAPED = False
+
+
+def _reap_once() -> None:
+    """Reap at most once per process.  `_sandbox_setup` runs per-CHECK — thousands of times in a
+    sweep — and the leak is per-PROCESS, so one scan at the first allocation collects everything a
+    prior run abandoned; repeating it would re-walk the scratch dir for nothing.
+    """
+    global _REAPED
+    if _REAPED:
+        return
+    _REAPED = True
+    try:
+        reap_sandboxes()
+    except Exception:
+        pass                          # hygiene must never fail the grade it precedes
+
+
 def reap_sandboxes(older_than_s: int = 1800) -> int:
     """Ζ·delta·leak — remove sweep sandboxes no live sweep owns.  Returns the count removed.
 
     `_grade_one` and `mutate_one` both rmtree their sandbox in a `finally`, which is correct and
-    runs on every normal exit.  It does NOT run on SIGKILL — and a long sweep gets killed: three
-    interrupted //:hook runs in one session left 42 husks behind.  They were small (672K total,
-    the copy having been reclaimed by the kernel when the process died mid-write), so this is
-    hygiene rather than the disk fix above; the two are separate defects and only one of them
-    was ever going to fill a filesystem.
-    A directory is reaped only if it is older than the window AND holds no open file — a live
-    sweep's copy is neither.
+    runs on every normal exit.  It does NOT run on SIGKILL — and a long sweep gets killed.
+
+    Ζ·reap·calibrated — MEASURED 2026-09-01: `~/.cache/paperkit-sweep` held 95.8 GB in ten
+    abandoned copies, 9.5 GB each and FULLY MATERIALIZED.  This docstring previously concluded
+    from an earlier incident (42 husks, 672K total) that the kernel reclaims a dying sweep's copy
+    mid-write and that reaping is therefore "hygiene rather than the disk fix" — that conclusion
+    is FALSE and is retracted here.  The 672K measurement was real; the generalisation from it was
+    not.  A killed sweep leaves its copy whole, so the reaper IS the disk fix, and its size is
+    bounded only by what `_sandbox_root` agrees to copy.
+
+    Ζ·reap·claim — a directory is reaped only if it is older than the window AND carries no live
+    owner (see `_owner_live`).  The age test alone is NOT sufficient: sweeps here run for hours,
+    so a live sweep's copy crosses any window worth having, and an age-only reaper deletes the
+    tree out from under it.  Two concurrent sweeps are safe for the same reason — the younger
+    one's reap sees the elder's live pid stamp and skips it.
     """
     import time
     parent = Path(_scratch_dir() or tempfile.gettempdir())
@@ -773,6 +842,8 @@ def reap_sandboxes(older_than_s: int = 1800) -> int:
     for d in parent.glob(_SANDBOX_PREFIX + "*"):
         try:
             if now - d.stat().st_mtime < older_than_s:
+                continue
+            if _owner_live(d):
                 continue
             shutil.rmtree(d, ignore_errors=True)
             n += 1
@@ -794,7 +865,16 @@ def _sandbox_setup(project_dir, resolution="def"):
     fingerprint (the Bazel-symlink degeneracy that once shipped a green-for-nothing gate).  Caller
     rmtree's tmp.
     """
+    # Ζ·reap·oncommit — reap BEFORE allocating.  The reaper's only trigger used to be
+    # .githooks/pre-commit, i.e. it fired only on a commit ATTEMPT; a session that sweeps
+    # repeatedly without landing a commit accumulated copies without bound, which is exactly what
+    # produced the 95.8 GB measured above (every commit that session failed on a red gate).  The
+    # trigger belongs at the allocation site, where it is conditioned on the leak's CAUSE rather
+    # than on a later success.  Safe against a concurrent sweep by Ζ·reap·claim: this call reaps
+    # only unowned corpses, and our own copy does not exist yet.
+    _reap_once()
     tmp = Path(tempfile.mkdtemp(prefix=_SANDBOX_PREFIX, dir=_scratch_dir()))
+    _claim_sandbox(tmp)               # stamp BEFORE the copy: a copy interrupted mid-write is owned
     root = _sandbox_root(project_dir)
     _copy_sandbox(root, tmp / root.name)
     root_copy = tmp / root.name

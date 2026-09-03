@@ -1,0 +1,90 @@
+#!/bin/sh
+# Ζ·entry·point — the library witness's ENTRY POINT: it owns the environment, the witness owns
+# the logic, and the bib names only this script.
+#
+# ⚑ WHY THE BIB MUST NOT NAME AN INTERPRETER.  `[checks.claim] cmd` read `python3 concepts.py
+# {target}`, which is a bare `python3` with no virtualenv and therefore no paperkit on the path.
+# The witness compensated with three `sys.path.insert` lines and five flat imports — environment
+# setup written in the wrong language, inside the payload, running after the interpreter had
+# already started.  This is where that setup belongs.
+#
+# ⚑⚑ AND THE MUTATION IS NOT A STYLE QUESTION — IT MAKES TWO INCOMPATIBLE WORLDS.  An insert
+# pointing at `paperkit/` puts the engine's modules on the path as TOP-LEVEL names, so flat
+# `import bib` resolves and `from paperkit import bib` does NOT (measured 2026-08-31: converting
+# one engine module reddened four boundary claims with `ModuleNotFoundError: No module named
+# 'paperkit'`, traced through library/concepts.py -> project.py -> bib.py).  The two spellings
+# need different sys.path contents, so a half-converted tree is broken for whichever half does
+# not match.  Operator's ruling, repeatedly: stop modifying sys.path.  With the venv there is one
+# world, and `paperkit` is a package in it.
+#
+# WHAT THIS OWNS, and what a reader should not look for in the witness:
+#   * the interpreter — the project venv's, not whatever `python3` resolves to
+#   * the fixture step — building the venv if it is absent, so a fresh checkout works
+#   * nothing else.  It exec's; it does not wrap, filter, or interpret the witness's output.
+#
+# ⚑ IT MUST NOT ACTIVATE A VENV INSIDE A BAZEL SANDBOX, AND DOES NOT NEED TO.  `tools/verb.bzl`
+# already exports `PYTHONPATH="$PWD"` over the staged .pyc closure, so the engine is importable
+# there BY LAYOUT; a `.venv` is a directory of pointers at host absolute paths, and staging one
+# would resolve OUT of the sandbox to the live tree and report green on unstaged sources — a
+# sandbox escape that PASSES.  So: if PYTHONPATH already reaches the engine, use the interpreter
+# we were given and change nothing.
+#
+# ⚑⚑ Ζ·dispatch·pythonpath — AND `PYTHONPATH` IS NOT THE ONLY NAME THAT CARRIES THAT FACT.
+#
+# Two correct mechanisms collided here.  The test below is right: it is how this script knows it
+# is in a hermetic cell and must not build a `.venv`.  But `resolver.clean_env` — the engine's own
+# sshd-style default-deny — DROPS `PYTHONPATH`, and it is right to: the resolver's comment names
+# it in the injection list beside LD_PRELOAD, IFS and BASH_ENV.  So a witness spawned through the
+# resolver saw no PYTHONPATH, fell through to a `.venv`, and found one ONLY on a dev host that
+# happens to have one.  The failure was invisible in-repo and fired in the sandbox — the regime
+# whose whole purpose is to model the machine that does NOT have the developer's leftovers.
+#
+# The fix is a DECLARED passthrough, never a wider allowlist.  `clean_env` keeps the `PAPERKIT_`
+# prefix, and the engine now RESOLVES `PAPERKIT_PYTHONPATH` through Ω·config (resolver.ENGINE_PATH,
+# arg > env > paper.toml > the engine's own location) and exports it.  So this script consults the
+# engine's declared answer FIRST and the ambient one second — the declaration outranks the
+# inheritance, which is the same precedence Ω·config states everywhere else.
+set -eu
+HERE=$(unset CDPATH; cd -- "$(dirname -- "$0")" && pwd)
+ROOT=$(unset CDPATH; cd -- "$HERE/.." && pwd)
+
+# In a hermetic cell the engine is already reachable and .venv must not be built or used.
+# The engine's DECLARED location (crosses clean_env) before the ambient one (does not).
+for base in "${PAPERKIT_PYTHONPATH:-}" "${PYTHONPATH:-}"; do
+    if [ -n "$base" ] && [ -d "$base/paperkit" ]; then
+        PYTHONPATH="$base"
+        export PYTHONPATH
+        exec python3 "$HERE/concepts.py" "$@"
+    fi
+done
+
+# ⚑ A WITNESS THAT CANNOT RUN IS NOT A WITNESS THAT REFUTES.  Everything below is environment
+# SETUP, and every way it can fail is a statement about this MACHINE, not about the concept the
+# caller asked us to witness.  These arms exited 1 — which the concept protocol reads as "the key
+# is MINE, and it FAILED", a refutation — so an absent `uv` on a fresh checkout silently refuted
+# every concept in the library.  `3` is the engine's declared cannot-run (resolver._CANNOT_RUN,
+# gate.py's _REFUSE, pk_cmd's cannot-run arm), and it must not be `2` either: 2 is the "not mine"
+# sentinel and would make the resolver fall THROUGH to another library, answering a question this
+# one was never able to ask.  The stderr line rides along — the resolver reads the last line of it
+# as the direction of the fix (Ζ·unavailable·why).
+CANNOT_RUN=3
+
+VENV="$ROOT/.venv"
+if [ ! -x "$VENV/bin/python3" ]; then
+    # The fixture step.  A checkout without a venv builds one rather than failing with an import
+    # error three frames deep in the witness — "bootstrap the build environment as part of the
+    # build".  uv is this machine's declared tool (project-tooling); its absence is a real error
+    # and is reported as one rather than silently falling back to a bare interpreter.
+    command -v uv >/dev/null 2>&1 || {
+        echo "run-witness: CANNOT RUN — no engine on PAPERKIT_PYTHONPATH/PYTHONPATH, no $VENV, and no uv to build one (see project-tooling)" >&2
+        exit $CANNOT_RUN
+    }
+    ( cd "$ROOT" && uv sync --quiet ) || {
+        echo "run-witness: CANNOT RUN — uv sync failed; cannot establish the witness environment" >&2
+        exit $CANNOT_RUN
+    }
+fi
+
+# `paperkit` resolves through the editable install (pyproject declares packages =
+# ["paperkit", "tools"]), so the witness needs no path manipulation of its own.
+exec "$VENV/bin/python3" "$HERE/concepts.py" "$@"

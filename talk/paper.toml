@@ -34,5 +34,10 @@ mechanical = false
 
 # Mechanism claims with no matching library concept yet: a per-claim witness asserting the
 # specific proposition the claim makes about the engine, so it FAILS if the claim is false.
+#
+# ⚑ `witness` IS SEPARATE FROM `cmd`, AND REQUIRED (Ζ·entry·point).  `cmd` is the INVOCATION,
+# opaque to the engine; `witness` is the MODULE the cell grid, the top-level audit and the closure
+# census each read.  It used to be inferred from the first `.py` token in `cmd`.
 [checks.claim]
 cmd = "python3 checks/talk.py {target}"
+witness = "checks/talk.py"

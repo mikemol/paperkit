@@ -3,6 +3,13 @@
 # witness (concepts.py) and grades it once, exporting the certificate views import.
 filegroup(name = "files", srcs = [
         "concepts.py",
+        # ⚑ Ζ·entry·point — the witness's ENTRY POINT, named by paper.toml's `[checks.claim] cmd`.
+        # A cell runs the declared command, so an unstaged entry point is a check that cannot start:
+        # the file is on disk, the declaration points at it, and the sandbox has neither.  Third
+        # instance of this class today (tools/dagnames.py, boundaries_closure_census.py) — a file a
+        # manifest does not name is invisible to the build, and the failure surfaces far from the
+        # cause.
+        "run-witness",
         # Ζ·library·kernel — prove/routes/checkcache/labelmap/conclusiongate moved to the
         # ENGINE (paperkit/), where they belong: they are concept-library MECHANISM, not this
         # library's content, and every project's `concept:` resolution goes through them.  As

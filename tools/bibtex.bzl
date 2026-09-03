@@ -168,7 +168,72 @@ def _body(check, custom):
         return custom[typ].replace("{target}", target)
     return None
 
-def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = [], vis = ""):
+def _import_label(verb, name, key, owner, exports, wired, hint):
+    """Ζ·grid·sibling — REFUSE a cross-project import label that nothing will emit.
+
+    `result:` and `concept:` are the two BOUNDARY-CROSSING verbs: each writes a label into a
+    SIBLING generated repo (`@paperkit_<owner>//:<key>`) that nothing on this side produces or
+    validates.  Bazel discovers the lie only when the action runs — measured for `concept:` on
+    2026-08-28: an entry written with the wrong verb resolved GREEN standalone, passed its
+    project gate at 43/43, and died ~5,000 lines into a two-hour //:hook as `missing input file
+    '@@+bib+paperkit_library//:degeneracy-has-kinds__dcalc'`.  That message names the SYMPTOM.
+    The information needed to refuse — which projects are wired, which EXPORT, and what keys they
+    export — is resolved in the module extension and handed here, so the refusal happens at
+    generation with the one-word cause in it.
+
+    Three ways the label can dangle, three distinct causes:
+      * the owner project is not a `bib.project` at all      → NO SUCH PROJECT
+      * it is wired but does not export (owns_* unset)       → NOT EXPORTED
+      * it exports, but not this key (a rename, a typo)      → NO SUCH CLAIM
+
+    ⚑ AN EMPTY POPULATION REFUSES, IT DOES NOT REJECT.  `wired` is the set of every bib.project
+    tag, so it can only be empty if the extension did not hand one down — the instrument never saw
+    the population.  Rejecting each citation against an empty set would fail-closed on EVERY
+    cross-project import, including true ones, and a guard that reds a correct citation teaches
+    the next reader to delete the guard rather than read it.  Measured here 2026-09-02: a sibling
+    agent's query landed in the window between this attr being declared (default []) and the
+    extension being taught to populate it, and saw exactly that — `rm-status`, a valid
+    `result:paper`, refused with an empty `Wired:` list.  The transient cause is gone; the
+    fail-closed shape it exposed is what this arm removes.  "I cannot tell" is a different verdict
+    from "this dangles", and folding the first into the second is the defect.
+    """
+    if not wired:
+        fail(("bibtex Ζ·grid·sibling: %s: cannot check `check = {%s}` — the WIRED PROJECT SET IS " +
+              "EMPTY, so this guard never saw a population to check against.  That is an " +
+              "uncalibrated instrument, not a dangling label: the citation may well be correct.  " +
+              "The set is computed in _bib_ext_impl from the `bib.project` tags and passed on the " +
+              "`wired` attr; an empty one means the extension did not hand it down (a stale " +
+              "generated repo mid-edit, or a bib_repo instantiated outside the extension).  " +
+              "Re-fetch; if it persists, the extension is the layer to fix — do NOT relax this " +
+              "guard, which is measuring nothing, not measuring a failure.") % (name, verb))
+    if owner not in wired:
+        fail(("bibtex Ζ·grid·sibling: %s: `check = {%s}` names the project '%s', which is NOT A " +
+              "WIRED PROJECT.  This emits `@paperkit_%s//:%s`, a label in a repo MODULE.bazel " +
+              "never declares, so it would surface hours into the build as `missing input file` " +
+              "rather than here.  Add a `bib.project(name = \"paperkit_%s\", …)` and list it in " +
+              "`use_repo`, or fix the project name.  Wired: %s") %
+             (name, verb, owner, owner, key, owner, ", ".join(wired)))
+    have = {}
+    for e in exports:
+        p, _, k = e.partition("\t")
+        if p == owner:
+            have[k] = True
+    if not have:
+        fail(("bibtex Ζ·grid·sibling: %s: `check = {%s}` imports from '%s', which EXPORTS " +
+              "NOTHING.  A project's per-claim records are public only when it opts in, so " +
+              "`@paperkit_%s//:%s` is not emitted and the import would fail as `missing input " +
+              "file` hours from now.  Set `%s` on '%s' in MODULE.bazel — the owner declares its " +
+              "claims a public surface it intends views to cite (and accepts that renaming one " +
+              "is a breaking change).") % (name, verb, owner, owner, key, hint, owner))
+    if key not in have:
+        fail(("bibtex Ζ·grid·sibling: %s: `check = {%s}` names '%s', which is NO SUCH CLAIM in " +
+              "project '%s'.  `@paperkit_%s//:%s` is a label nothing emits — a RENAMED or " +
+              "misspelled key, the exact shape that resolves green locally and dies hours into " +
+              "the build as `missing input file`.  '%s' exports: %s") %
+             (name, verb, key, owner, owner, key, owner, ", ".join(sorted(have))))
+    return "@paperkit_" + owner + "//:" + key
+
+def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = [], vis = "", exports = [], wired = []):
     """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
     script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd (the exit-code
     oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `tier` is the
@@ -196,8 +261,24 @@ def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imp
         # finer address is a LABEL change, not a new rule: the structure was there, only the
         # aggregate was ever addressed.  Bare `<project>` keeps the gate_rec dep unchanged.
         sproj, _, sclaim = target.partition("#")
-        rec = sclaim if sclaim else "gate_rec"
-        return "pk_result(name = " + _lit(name) + ', sibling_verdict = "@paperkit_' + sproj + '//:' + rec + '"' + vis + ')'
+        # Ζ·grid·sibling — REFUSE a dangling sibling label HERE (see _import_label).  `gate_rec` is
+        # emitted PUBLIC by every generated project, so the bare `result:<proj>` form needs only the
+        # WIRING check; the `#<claim>` form additionally needs the owner to export that key, which
+        # is the live risk — render is owns_warrants and talk cites four of its claims BY NAME, so
+        # a rename in render reproduces Ζ·grid·dangling exactly.
+        if sclaim:
+            lbl = _import_label("result:" + target, name, sclaim, sproj, exports, wired, "owns_warrants = True")
+        elif sproj not in wired:
+            fail(("bibtex Ζ·grid·sibling: %s: `check = {result:%s}` names the project '%s', which " +
+                  "is NOT A WIRED PROJECT.  This emits `@paperkit_%s//:gate_rec`, a label in a " +
+                  "repo MODULE.bazel never declares, so it would surface hours into the build as " +
+                  "`missing input file` rather than here.  Add a `bib.project(name = " +
+                  "\"paperkit_%s\", …)` and list it in `use_repo`, or fix the project name.  " +
+                  "Wired: %s") % (name, target, sproj, sproj, sproj, ", ".join(wired)))
+            lbl = ""
+        else:
+            lbl = "@paperkit_" + sproj + "//:gate_rec"
+        return "pk_result(name = " + _lit(name) + ', sibling_verdict = "' + lbl + '"' + vis + ')'
     elif typ == "agree":
         prods = ", ".join([_lit(p.strip()) for p in target.split("|||") if p.strip()])
         return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "]" + pj + tc + vis + ")"
@@ -280,9 +361,29 @@ def _surface(module_ctx, core):
     return [l for l in res.stdout.splitlines() if "\t" in l]
 
 def _claim_script(module_ctx, project):
-    """The claim-WITNESS module a project's `claim:` type runs — the .py in its paper.toml
-    [checks.claim] cmd (paper → checks/claims.py, root → checks/readme.py; NOT hardcoded — the second
-    consumer, root's readme.py, proved the assumption).  None if the project declares no claim: type."""
+    """The claim-WITNESS module a project's `claim:` type runs — DECLARED as [checks.claim] witness.
+
+    ⚑ IT USED TO BE INFERRED FROM `cmd`, BY TAKING THE FIRST `.py` TOKEN ON THAT LINE.  That reads a
+    MODULE out of a string whose only contract is to be a runnable COMMAND, and it made the two
+    inseparable: the grid, bnd-toplevel and closure_census all need the module, the resolver needs
+    the command, and one string served both only for as long as the command happened to name a
+    python file.
+
+    ⚑⚑ Ζ·entry·point BROKE THAT, WHICH IS HOW THE COUPLING SURFACED.  A witness whose environment is
+    owned by an entry point declares `cmd = "./run-witness {target}"` — no `.py` anywhere — and the
+    inference silently returned None, so the library's witness became underivable and bnd-toplevel
+    reported 2 of 3 emerge projects.  Not a regression in the entry point: the inference was always
+    reading a filename out of a command, and the entry point is simply the first command that does
+    not contain one.
+
+    The declaration is REQUIRED, not defaulted (operator's call, 2026-08-31: *"Require it; this is
+    why I haven't published yet"*).  A fallback to the old scan would keep the inference alive in
+    the one place it is hardest to see — a project that silently gets the historical behaviour —
+    and there is no published consumer to protect.  A project declaring `claim:` and no `witness`
+    FAILS the generation, naming the file and the key, rather than yielding an empty closure that
+    degrades a cell grid into monolithic sweeps (the Ζ·library·grid failure: ~10 min per claim, a
+    critical path nothing could parallelise, and no def memory measurement at all).
+    """
     lbl = "@@//:paper.toml" if project == "." else "@@//" + project + ":paper.toml"
     p = module_ctx.path(Label(lbl))
     if not p.exists:
@@ -292,12 +393,27 @@ def _claim_script(module_ctx, project):
     i = text.find("[checks.claim]")
     if i < 0:
         return None
-    j = text.find("cmd", i)                      # the cmd = "python3 <script> {target}" line
-    line = text[j:text.find("\n", j)]
-    for tok in line.split(" "):
-        t = tok.strip('"').strip("'")
-        if t.endswith(".py"):
-            return t  # relative to the project dir, e.g. checks/claims.py
+    # ⚑ THE KEY IS MATCHED AT LINE START, NOT AS A SUBSTRING.  A bare `text.find("witness", i)`
+    # matches the word inside `cmd = "./run-witness {target}"` — which comes FIRST — and then reads
+    # `{target}"` as the value.  Measured: it failed exactly that way on library/paper.toml, the
+    # one project whose command names an entry point.  The scan that this replaces had the same
+    # class of defect one field over; repeating it here would have been the joke telling itself.
+    for raw in text[i:].split("\n"):
+        stripped = raw.strip()
+        if stripped.startswith("[") and not stripped.startswith("[checks.claim]"):
+            break                                    # left the table without finding the key
+        if not stripped.startswith("witness"):
+            continue
+        rest = stripped[len("witness"):].strip()
+        if not rest.startswith("="):
+            continue                                 # `witness_something = ...`, not our key
+        val = rest[1:].strip().strip('"').strip("'")
+        if val.endswith(".py"):
+            return val  # relative to the project dir, e.g. checks/claims.py
+        fail("·gen·closure: %s [checks.claim] `witness` is not a .py path: %s" % (lbl, stripped))
+    fail("·gen·closure: %s declares [checks.claim] but no `witness` key.  The witness MODULE " % lbl +
+         "is no longer inferred from `cmd` (a command need not name a .py — see Ζ·entry·point); " +
+         "declare it explicitly, e.g. `witness = \"checks/claims.py\"`.")
     return None
 
 def _closures(module_ctx, project, core):
@@ -331,6 +447,37 @@ def _closures(module_ctx, project, core):
     if res.return_code != 0:
         fail("·gen·closure: closure.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]
+
+def _exports(module_ctx, project, bib_label):
+    """Ζ·grid·sibling — the claim keys a project EXPORTS, resolved in the EXTENSION.
+
+    A cross-project check (`result:<proj>#<claim>`, `concept:<key>`) emits a label in ANOTHER
+    generated repo, and a `repository_ctx` cannot see that repo: it holds only its own attrs.  So
+    the importing side asserted the label and let Bazel discover the lie hours later as `missing
+    input file` — the Ζ·grid·dangling shape, one seam over.  The module extension is the layer
+    that OWNS cross-project resolution: it enumerates every `bib.project` tag, so it can read each
+    exporting project's bibs here, once, and hand every repo the resolved key set.
+
+    Returns the CHECKED claim keys (a check-less bib reference emits no target, so it is not
+    importable).  The warrants list resolves exactly as _bib_repo_impl resolves it — paper.toml
+    `warrants`, else the anchor bib's basename — because that is what decides which entries the
+    generated package contains."""
+    bp = module_ctx.path(bib_label)
+    warrants = []
+    tomlp = bp.dirname.get_child("paper.toml")
+    if tomlp.exists:
+        module_ctx.watch(tomlp)
+        warrants = _warrants(module_ctx.read(tomlp))
+    if not warrants:
+        warrants = [bp.basename]
+    keys = []
+    for w in warrants:
+        wp = module_ctx.path(Label(w)) if (":" in w or w.startswith("@")) else bp.dirname.get_child(w)
+        module_ctx.watch(wp)
+        for k, check, _s, _r, _rr, _t, _c in _entries(module_ctx.read(wp)):
+            if check:
+                keys.append(project + "\t" + k)
+    return keys
 
 def _bib_repo_impl(repository_ctx):
     bibp = repository_ctx.path(repository_ctx.attr.bib)
@@ -444,11 +591,14 @@ def _bib_repo_impl(repository_ctx):
     # [checks.claim] cmd (paper → paper/checks/claims.py, root → checks/readme.py), project-prefixed.
     # NOT hardcoded: root's readme.py is a different module than paper's claims.py, so a hardcoded
     # paper/checks/claims.py ran the wrong script for every root cell → every root ∅ flipped (garbage).
-    wscript = ""
-    for tok in custom.get("claim", "").split(" "):
-        if tok.endswith(".py"):
-            wscript = tok if proj == "." else proj + "/" + tok
-            break
+    # Ζ·entry·point — DECLARED, not inferred.  This scanned `custom["claim"]` (the `cmd` string)
+    # for a `.py` token, which reads a filename out of a string whose only contract is to be
+    # RUNNABLE.  `cmd = "./run-witness {target}"` names no .py, so wscript was "" and every
+    # library cell ran `eval.py --check` with no argument.  The declaration is resolved once by
+    # _claim_script (the owner, in the extension) and arrives on the `witness` attr.
+    wscript = repository_ctx.attr.witness
+    if wscript and proj != ".":
+        wscript = proj + "/" + wscript
     if emerge:
         out.append("# ·gen·surface: %d core engine def-sites (enumerated once, engine-side)" % len(sites))
     if calc:
@@ -536,8 +686,14 @@ def _bib_repo_impl(repository_ctx):
                       "a label nothing produces (surfacing hours later as `missing input file`).  " +
                       "Use `check = {claim:%s}` — the library's own witness verb, declared in its " +
                       "paper.toml `[checks.claim]`.") % (k, key, key, key))
-            out.append("pk_result(name = " + _lit(k) + ', sibling_verdict = "@paperkit_library//:' + key + '")')
-            imported_cert[k] = "@paperkit_library//:" + key + "__dcalc"
+            # Ζ·grid·sibling — the MIRROR of the guard above.  That one refuses the library citing
+            # a key it AUTHORS; this one refuses a VIEW citing a key the library does NOT author.
+            # Same dangling label, same `missing input file` hours later — only the direction of
+            # the mistake differs, and a key rename in concepts.bib produces exactly this one.
+            lbl = _import_label("concept:" + key, k, key, "library", repository_ctx.attr.exports,
+                                repository_ctx.attr.wired, "owns_concepts = True")
+            out.append("pk_result(name = " + _lit(k) + ', sibling_verdict = "' + lbl + '")')
+            imported_cert[k] = lbl + "__dcalc"
             recs.append('":%s"' % k)
             continue
         if calc and wt == "sandbox" and _body(check, custom) != None:
@@ -669,7 +825,8 @@ def _bib_repo_impl(repository_ctx):
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
                            str(_membucket(mem, k, "def")) + ", data = [" + dl + "]" + (vis if owns else "") + ")")
         else:
-            out.append(_verb_rule(k, check, proj, files, reads, custom, wt, consumes, imports, wvis))
+            out.append(_verb_rule(k, check, proj, files, reads, custom, wt, consumes, imports, wvis,
+                                  repository_ctx.attr.exports, repository_ctx.attr.wired))
         recs.append('":%s"' % k)
 
     if calc_claims:
@@ -849,8 +1006,23 @@ bib_repo = repository_rule(
         "emerge": attr.bool(default = False),  # Ζ·emerge·gate: a def-calc per claim + pk_cohere (∂² faces in //:hook)
         "sites": attr.string_list(default = []),  # ·gen·surface: the engine def-sites (enumerated once by the extension)
         "closures": attr.string_list(default = []),  # ·gen·closure: per-claim witness closure roots (Ξ·dag·eval)
+        # Ζ·entry·point — the claim-witness MODULE, project-relative, resolved by _claim_script in
+        # the EXTENSION (which can read paper.toml) and passed in.  A repository_ctx cannot call
+        # _claim_script — it holds no module_ctx — so re-deriving it here is the only alternative,
+        # and re-deriving is what broke: this value used to be inferred by scanning the `cmd`
+        # string for a `.py` token, which returned "" for `cmd = "./run-witness {target}"` and
+        # emitted every library cell with an EMPTY `--check` (measured: `eval.py: error: argument
+        # --check: expected one argument`, three cells, //:hook red).  ONE owner, two readers.
+        "witness": attr.string(default = ""),
         "owns_concepts": attr.bool(default = False),  # Λ·witness: the concept LIBRARY — its per-concept verdict + def-cert are PUBLIC, imported by views' concept: checks
         "owns_warrants": attr.bool(default = False),  # Λ·delegate: this project EXPORTS its per-claim verdict records, so a sibling result:<proj>#<claim> can import ONE warrant instead of the whole gate
+        # Ζ·grid·sibling — the cross-project IMPORT SURFACE, resolved once in the extension (the
+        # only layer that can see sibling projects) and handed to every repo: "<proj>\t<key>" for
+        # each claim an owns_warrants/owns_concepts project exports, plus the WIRED project names
+        # (every bib.project tag).  Without them a dangling import label is merely ASSERTED here
+        # and diagnosed hours later by Bazel as `missing input file` — Ζ·grid·dangling's shape.
+        "exports": attr.string_list(default = []),
+        "wired": attr.string_list(default = []),
     },
 )
 
@@ -860,9 +1032,27 @@ def _bib_ext_impl(module_ctx):
     # project).  Both project the shared engine AST (core), beside the bib parse.
     core = _core(module_ctx)
     sites = _surface(module_ctx, core)
+    # Ζ·grid·sibling — the cross-project IMPORT SURFACE, resolved ONCE here.  A `result:` or
+    # `concept:` check emits a label into a SIBLING generated repo, and only this loop can see
+    # which siblings exist, which ones EXPORT (owns_warrants / owns_concepts), and what keys they
+    # export.  Resolved here, the two import verbs are checkable at generation instead of hours
+    # later; see the guards at the emit sites in _bib_repo_impl.
+    wired = []
+    exports = []
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, owns_warrants = tag.owns_warrants, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [])
+            wired.append(tag.project)
+            if tag.owns_warrants or tag.owns_concepts:
+                exports += _exports(module_ctx, tag.project, tag.bib)
+    wired = sorted(wired)
+    for mod in module_ctx.modules:
+        for tag in mod.tags.project:
+            # Ζ·entry·point — `witness` is resolved HERE (only a module_ctx can read paper.toml)
+            # and passed down; the repository rule reads the declaration instead of re-deriving it
+            # from `cmd`.  Unconditional, not gated on emerge: _claim_script returns None for a
+            # project declaring no `[checks.claim]`, and a project that HAS one owes the key
+            # whether or not it builds a grid.
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, owns_warrants = tag.owns_warrants, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [], witness = _claim_script(module_ctx, tag.project) or "", exports = exports, wired = wired)
 
 bib = module_extension(
     implementation = _bib_ext_impl,

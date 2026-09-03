@@ -11,8 +11,14 @@ references = false    # a README has no bibliography section
 # Custom check type: claim:<key> runs the per-claim witness in checks/readme.py —
 # a distinct, discriminating verifier per README claim (so --without-K and
 # --min-strength behavioral hold), just as paper/ does.
+#
+# ⚑ `witness` IS SEPARATE FROM `cmd`, AND REQUIRED (Ζ·entry·point).  `cmd` is the INVOCATION,
+# opaque to the engine; `witness` is the MODULE the cell grid, the top-level audit and the closure
+# census each read.  It used to be inferred by taking the first `.py` token out of `cmd` — a
+# filename read out of a string whose only contract is to be runnable.
 [checks.claim]
 cmd = "python3 checks/readme.py {target}"
+witness = "checks/readme.py"
 
 # concept:<key> is a BUILTIN import verb (Λ·witness): it imports a concept authored + GRADED once in
 # the //library project (its pitch record composed via //paper:adequacy_pitch.bib), resolving to the

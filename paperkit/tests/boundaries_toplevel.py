@@ -55,11 +55,21 @@ def witness_modules():
         if not toml.is_file():
             raise SystemExit(f"bnd-toplevel: emerge project {d!r}'s paper.toml is NOT STAGED — "
                              "add its token to the bnd-toplevel claim's reads")
-        cmd = tomllib.loads(toml.read_text()).get("checks", {}).get("claim", {}).get("cmd", "")
-        for tok in cmd.split():
-            if tok.endswith(".py"):
-                p = (toml.parent / tok).resolve()
-                out[str(p.relative_to(ROOT))] = p
+        claim = tomllib.loads(toml.read_text()).get("checks", {}).get("claim", {})
+        if not claim:
+            continue
+        # ⚑ THE MODULE IS DECLARED, NOT INFERRED FROM `cmd` (Ζ·entry·point).  This read the first
+        # `.py` token out of the COMMAND — a filename recovered from a string whose only contract
+        # is to be runnable.  A witness whose environment is owned by an entry point declares
+        # `cmd = "./run-witness {target}"`, which contains no `.py`, and the scan then returned
+        # NOTHING: this suite reported 2 of 3 emerge projects and passed, because a silently
+        # shorter population still satisfies "every module I found is clean".
+        witness = claim.get("witness", "")
+        if not witness:
+            raise SystemExit(f"bnd-toplevel: {toml} declares [checks.claim] but no `witness` — "
+                             "the module is no longer inferred from `cmd`; declare it")
+        p = (toml.parent / witness).resolve()
+        out[str(p.relative_to(ROOT))] = p
     return out
 
 

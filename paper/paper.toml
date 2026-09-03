@@ -19,5 +19,12 @@ consumer_fields = ["journal", "volume", "number", "pages", "booktitle", "doi"]
 # distinct, discriminating verifier per claim (so Δ grades it behavioral and the
 # gate's --without-K is satisfied for these claims).  Declaring it here — not in the
 # engine — is itself the witness for the resolver section's [@new-domain-adds].
+#
+# ⚑ `witness` IS SEPARATE FROM `cmd`, AND REQUIRED (Ζ·entry·point).  `cmd` is the INVOCATION,
+# opaque to the engine; `witness` is the MODULE the cell grid, the top-level audit and the closure
+# census each read.  The module used to be inferred by taking the first `.py` token out of `cmd`,
+# which read a filename out of a string whose only contract is to be runnable — it held only while
+# every command happened to name a python file.
 [checks.claim]
 cmd = "python3 checks/claims.py {target}"
+witness = "checks/claims.py"

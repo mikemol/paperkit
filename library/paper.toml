@@ -8,8 +8,25 @@ out = "library.md"
 numbered = false
 references = false
 
+# ⚑ Ζ·entry·point — THE BIB NAMES AN ENTRY POINT, NOT AN INTERPRETER.  This read `python3
+# concepts.py {target}`: a bare `python3` with no virtualenv, so the witness had to reach the
+# engine itself via three `sys.path.insert` lines.  `run-witness` owns the environment (the venv,
+# and building it if absent); `concepts.py` owns the logic; this declaration names only the
+# entry point.  What the script does is its own business — see its header.
+#
+# ⚑⚑ MEASURED: with `paperkit/bib.py` on the PACKAGE spelling, `python3 concepts.py
+# claim-is-record` dies `ModuleNotFoundError: No module named 'paperkit'` while `./run-witness
+# claim-is-record` reports OK.  Same witness, same engine, same target — the entry point is the
+# whole delta, and it is what lets an engine module adopt `from paperkit import x` at all.
+#
+# ⚑⚑⚑ `witness` IS SEPARATE FROM `cmd`, AND REQUIRED.  `cmd` is the INVOCATION (opaque — the
+# engine runs it and reads nothing out of it); `witness` is the MODULE, which the cell grid, the
+# top-level audit and the closure census each need.  One string cannot be both: the module used to
+# be inferred by taking the first `.py` token out of `cmd`, which worked only while the command
+# happened to name a python file.  This entry point does not.
 [checks.claim]
-cmd = "python3 concepts.py {target}"
+cmd = "./run-witness {target}"
+witness = "concepts.py"
 
 # Ζ·library·grid — the per-claim WITNESS type, declared so the def-sweep runs as a CELL GRID
 # rather than 42 monolithic sweeps.  The grid gate needs a per-claim closure; _closures() finds

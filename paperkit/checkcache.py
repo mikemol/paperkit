@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -152,12 +153,53 @@ def slice_of(fn: str, fns, names, imports):
     return seen, mods
 
 
+def _spec_file(mod: str) -> Path | None:
+    """Resolve MOD to a file by ASKING THE IMPORT SYSTEM, with no sys.path mutation of our own.
+
+    Ζ·checkcache·keys — this is the arm that must survive Ζ·path·retire.  The directory search
+    below it can only find what some caller already put on sys.path; `find_spec` finds what the
+    module name actually DENOTES in this interpreter, which is the same question the witness's own
+    `import` will answer at run time.  It therefore works identically whether the engine is reached
+    flat (`import routes`, today's script route) or as a package (`import paperkit.routes`, after
+    the retirement) — MEASURED: both spellings resolve to the same paperkit/routes.py, so the
+    CONTENT entering the key is identical across the flip and only the recorded `mod:` NAME differs.
+    That name change invalidates every entry once, at the flip, by design; it never serves a stale
+    PASS, because a differing name can only ever ADD a miss.
+
+    find_spec must be prosecuted defensively: it returns None for an unknown top-level name but
+    RAISES ModuleNotFoundError when an intermediate parent package is missing, and it IMPORTS those
+    parent packages as a side effect.  Any failure degrades to None, which the caller reads as
+    "record by name only" — the fail-closed direction is the caller's `_owned` gate, not this.
+    """
+    try:
+        spec = importlib.util.find_spec(mod)
+    except (ImportError, AttributeError, ValueError):
+        return None
+    if spec is None:
+        return None
+    # `origin` is typed `str | None` on ModuleSpec, so read it directly rather than through
+    # getattr — getattr's result is Any, and an Any here would reach the key's hash input
+    # unchecked, which is the narrowing-at-the-edge this repo's mypy bar exists to force.
+    origin: str | None = spec.origin
+    if origin is None or origin in ("built-in", "frozen"):
+        return None
+    p = Path(origin)
+    return p if p.is_file() else None
+
+
 def _module_file(mod: str, search: list[Path]) -> Path | None:
+    """Resolve a slice's module name to a FILE: declared search dirs first, then the import system.
+
+    The explicit `search` list is tried first because it is the CALLER'S declaration — a fixture
+    naming the temp directory its modules live in must not be answered by a same-named module that
+    happens to be installed.  `_spec_file` is the general answer for everything else, and it is what
+    makes the engine's own modules resolvable without anyone having mutated sys.path.
+    """
     for d in search:
         for cand in (d / f"{mod.replace('.', '/')}.py", d / mod.replace(".", "/") / "__init__.py"):
             if cand.is_file():
                 return cand
-    return None
+    return _spec_file(mod)
 
 
 def _owned(f: Path) -> bool:
@@ -170,36 +212,25 @@ def _owned(f: Path) -> bool:
 
 
 def search_path(src_path: Path) -> list[Path]:
-    """The directories a slice's modules may live in: the source's own, plus every path the source
-    ADDS TO sys.path at import time.
+    """Name the directories a slice's modules may live in: the source's own, and nothing more.
 
-    A witness module routinely reaches code that is not beside it — paperkit's own library imports
-    engine modules and per-capability test fixtures from `ENGINE` and `ENGINE/tests`, which it puts
-    on sys.path in its header.  Searching only the source's directory leaves every one of those
-    UNRESOLVED, and an unresolved module degrades to name-only: the local-import edge is detected
-    but its CONTENT never enters the key, so the fail-open reopens one level out.  Importing the
-    module and reading the sys.path it established is what makes the file set real rather than
-    nominal.
+    ⚑ Ζ·checkcache·keys — THIS USED TO EXECUTE THE WITNESS AND READ THE sys.path IT ESTABLISHED,
+    and that was a stale-green waiting for Ζ·path·retire.  The probe measured the mutations a
+    bootstrap happened to leave behind, so with the mutations gone it would have measured the EMPTY
+    SET — every engine module unresolvable, every one degraded from a content hash to a bare
+    `mod:<name>`, and an edit to an engine module no longer invalidating the witnesses that read it.
+    A key that stops tracking content while still looking like a key is exactly the false PASS this
+    cache exists to refuse, and it would have arrived silently, as a speed-up.
+
+    The reach is not lost, it MOVED to where it is answerable by construction: `_module_file` now
+    asks the import system (`_spec_file`) what a module name denotes, which is the same question the
+    witness's own `import` answers, and needs nobody to have mutated anything.  So this function is
+    reduced to what it can honestly compute without side effects — the caller's declared directory,
+    for modules that are NOT importable by name (a fixture's temp dir).  It no longer imports the
+    witness, no longer touches sys.path, and no longer needs a save/restore, because it makes no
+    mutation to restore.
     """
-    out, seen = [src_path.parent], {str(src_path.parent)}
-    before = list(sys.path)
-    try:
-        import importlib.util
-        sys.path.insert(0, str(src_path.parent))
-        spec = importlib.util.spec_from_file_location("_slice_probe", src_path)
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules["_slice_probe"] = mod
-        spec.loader.exec_module(mod)
-        for p in sys.path:
-            rp = str(Path(p).resolve()) if p else ""
-            if rp and rp not in seen and Path(rp).is_dir():
-                seen.add(rp)
-                out.append(Path(rp))
-    except Exception:
-        pass                       # unimportable → the shorter search; unresolved modules stay nominal
-    finally:
-        sys.path[:] = before
-    return out
+    return [src_path.parent]
 
 
 def slice_key(fn: str, route: str, fns, names, segs, imports, search: list[Path]) -> str | None:
@@ -243,16 +274,39 @@ def routes_and_owners(src_path: Path) -> dict[str, str]:
     disagree with the resolver about how deep a table goes.  (Upstream had a 2-level loop here
     beside a depth-agnostic resolver: a grade-3 family would resolve for the gate and VANISH from
     the cache's driver, so those checks silently stopped running.)
+
+    ⚑ Ζ·checkcache·keys — THE INSERT HERE WAS ONE STATEMENT DOING TWO JOBS, AND WAS NEVER RESTORED.
+    It served this module's own `import routes as R` (a BOOTSTRAP, which the package declaration
+    covers and which retires with Ζ·path·retire) and the by-path load of an arbitrary witness (a
+    RUNTIME need, which does not).  Fused and unrestored, the process kept the entry forever, so a
+    later unrelated import in the same interpreter could resolve out of whatever directory the last
+    call happened to pass — a caller-order-dependent import, which is the shape of a heisenbug.
+
+    Split, and NEITHER HALF ADDS A NEW MODULE-LEVEL MUTATION: `routes` is imported function-locally
+    (the edge paperkit/dag.bzl already declares), so this file gains no top-level sys.path line for
+    Ζ·path·retire to have to remove again; and the runtime half is scoped to the load that needs it
+    and undone in a `finally` — the discipline `search_path`'s sibling site already had.
     """
-    import importlib.util
-    sys.path.insert(0, str(src_path.parent))
-    import routes as R
+    # ⚑ DELIBERATELY FUNCTION-LOCAL (ruff PLC0415 is accepted here, not suppressed).  A top-level
+    # `import routes` resolves only through the flat bootstrap this arc is retiring, so hoisting it
+    # would mean adding a module-level sys.path line for Ζ·path·retire to delete again — trading
+    # one retirement item for another.  Local, it rides the caller's already-established path and
+    # converts to `from paperkit import routes` in one line when the package form lands.
+    import routes
+
     spec = importlib.util.spec_from_file_location("_concepts_probe", src_path)
+    if spec is None or spec.loader is None:
+        return {}
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["_concepts_probe"] = mod
-    spec.loader.exec_module(mod)
-    out = {}
-    for path, target in R.leaves(mod.ROUTES):
+    before = list(sys.path)
+    try:
+        sys.path.insert(0, str(src_path.parent))
+        sys.modules["_concepts_probe"] = mod
+        spec.loader.exec_module(mod)
+    finally:
+        sys.path[:] = before
+    out: dict[str, str] = {}
+    for path, target in routes.leaves(mod.ROUTES):
         fn = getattr(target[0] if isinstance(target, tuple) else target, "__name__", None)
         if fn:
             out["/".join(path)] = fn
@@ -283,7 +337,49 @@ def run_check(route: str, src_path: Path) -> bool | None:
     return r.returncode == 0
 
 
+def _key_mode(argv) -> int:
+    """Ζ·checkcache·cli — emit ONE slice key for `--key <witness.py> <fn> <route>`, or `-` if the
+    slice cannot be computed.  The module's key derivation, reachable as a PROGRAM.
+
+    ⚑ WHY A CLI AND NOT AN IMPORT, WHICH IS THE WHOLE POINT.  `components.bzl` partitions the
+    engine and `boundaries_components` enforces the DAG over it.  `checkcache.py` is in
+    `library_kernel`; the boundary suites are in `tests`; the two are SIBLINGS with identical
+    dependency sets and NEITHER depends on the other.  So a suite that `import checkcache` draws
+    an edge SIDEWAYS between peers — measured 2026-09-02, the first such crossing in 45 suites,
+    and the guard reddened on it.  Widening `DEPS["tests"]` would license all 45 to reach the
+    concept-library kernel to serve one; that is how `vendored: []`'s enforced-property discipline
+    erodes, one locally-reasonable addition at a time.
+
+    ⚑⚑ THE TREE ALREADY HAD THE ANSWER.  `boundaries_prove.py` tests `prove.py` — also
+    `library_kernel` — and imports NOTHING from it: stdlib plus `subprocess`.  It exercises its
+    subject AS A PROGRAM.  That is how the boundary held for 45 suites, and the missing piece was
+    never the guard: it was that this module had no entry point to exercise (its `main()` targets
+    a `concepts.py` that does not exist, so nothing here was reachable as a program at all).  The
+    component guard did not obstruct the test; it named a gap in this module's own surface.
+
+    The caller declares the search path via PYTHONPATH — the same thing a real witness gets — so
+    the subprocess measures module resolution as the import system performs it, not as this
+    process happens to have been bootstrapped.
+    """
+    i = argv.index("--key")
+    try:
+        src, fn, route = argv[i + 1], argv[i + 2], argv[i + 3]
+    except IndexError:
+        sys.stderr.write("checkcache: --key needs <witness.py> <fn> <route>\n")
+        return 2
+    p = Path(src)
+    if not p.is_file():
+        sys.stderr.write(f"checkcache: --key: no such witness source: {src}\n")
+        return 2
+    _tree, fns, names, segs, imports = module_index(p.read_text())
+    k = slice_key(fn, route, fns, names, segs, imports, search_path(p))
+    print(k if k is not None else "-")
+    return 0
+
+
 def main(argv, src_path: Path = DEFAULT_SRC, cache_path: Path = DEFAULT_CACHE) -> int:
+    if "--key" in argv:
+        return _key_mode(argv)
     if "--clear" in argv:
         cache_path.unlink(missing_ok=True)
         print("cache cleared")

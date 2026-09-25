@@ -43,6 +43,46 @@ _EVAL = re.compile(r"^pk_eval\(name.*$", re.M)
 _MEM = re.compile(r"mem = (\d+)")
 
 
+# ⚑ Ζ·converge·path — A PROJECT'S NAME IS NOT ITS PATH, AND MODULE.bazel OWNS THE MAPPING.
+#
+# This built the manifest path as `"%s/mem.json" % proj` from the external repo's name
+# (`+bib+paperkit_library` -> `library`), with a hand-written `if proj == "root"` special case for
+# the one mismatch anyone had noticed.  MEASURED 2026-09-13: it reported `library` as
+# `def=MISSING NOT CONVERGED` over 67,796 cells while `paperkit/library/mem.json` sits on disk
+# carrying `"def": 64` — byte-identical in shape to paper's, which the same run called converged.
+# The library moved (`library/` -> `paperkit/library/`) and this tool's copy of the mapping did not.
+#
+# The `if proj == "root"` case was the tell: MODULE.bazel already writes that mapping as
+# `project = "."`, so the special case was a second copy of a fact with an owner.  Both the
+# special case and the bug are the SAME defect — project PATH conflated with project NAME, which
+# `tools/bibtex.bzl` was bitten by too (there it DROPPED a target rather than misreporting).
+#
+# So: ask the owner.  `bib.project(name = ..., project = ...)` is the declaration; parse it rather
+# than re-deriving a path from a repo name that only coincidentally matches for most projects.
+def _manifest_rel(root, proj):
+    """<project path>/mem.json, resolved through MODULE.bazel's own name->path declaration."""
+    mod = root / "MODULE.bazel"
+    path = None
+    if mod.is_file():
+        try:
+            for m in re.finditer(r'bib\.project\(([^)]*)\)', mod.read_text()):
+                body = m.group(1)
+                nm = re.search(r'name\s*=\s*"paperkit_([^"]+)"', body)
+                pp = re.search(r'project\s*=\s*"([^"]+)"', body)
+                if nm and pp and nm.group(1) == proj:
+                    path = pp.group(1)
+                    break
+        except OSError:
+            path = None
+    if path is None:
+        # ⚑ NAMED, never silently guessed: an undeclared project is a finding about the OWNER.
+        print("mem-converge: %s is not declared in MODULE.bazel — falling back to its name as a "
+              "path, which is the very conflation this function exists to avoid" % proj,
+              file=sys.stderr)
+        path = proj
+    return "mem.json" if path == "." else "%s/mem.json" % path
+
+
 def survey(external: Path, root: Path) -> list:
     """[(project, cells, floor_cells, def_bucket)] for every project with a grid."""
     out = []
@@ -65,7 +105,7 @@ def survey(external: Path, root: Path) -> list:
             m = _MEM.search(c)
             if m is None or m.group(1) == "0":
                 floor += 1
-        man = root / ("mem.json" if proj == "root" else "%s/mem.json" % proj)
+        man = root / _manifest_rel(root, proj)
         bucket = None
         if man.is_file():
             import json

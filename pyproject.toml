@@ -45,13 +45,45 @@ license = {text = "MIT"}
 authors = [{name = "Mike Mol"}]
 dependencies = []                    # STDLIB ONLY, deliberately — the engine adds no supply chain
 
+# ⚑ Ζ·render·pydeps — RENDER'S DEPS ARE OPTIONAL, NOT ENGINE DEPS.  `dependencies = []` above is
+# the ENGINE's stance and stays empty: a consumer installing paperkit gets no supply chain.  But
+# the render PROJECT's checks genuinely need three packages, and they had been reaching them
+# ambiently — MEASURED, pikepdf and PIL resolve under bare python3 and NOT under the repo venv,
+# while docx resolves under neither, so a check's verdict depended on which interpreter its tier
+# handed it.  Declaring them here says what a CONSUMER running render's checks must install.  In
+# THIS tree's build they arrive by a different route: the executor image the toolchain tier runs
+# in carries them (image/executor/Containerfile), and the checks import them from the image's
+# interpreter — measured green in the pool 2026-09-21.  A tools/requirements_render.txt lock and a
+# `pk_render` pip hub used to sit beside this group; nothing consumed them and they are gone.
+[project.optional-dependencies]
+render = [
+    "pikepdf>=10.12",     # PDF structure: tagging, link/alt-text, font embedding
+    "pillow>=12.3",       # raster inspection for the figure-legibility arms
+    "python-docx>=1.2",   # docx structure for the agree/oracle arms
+]
+
 [project.scripts]
 # The invocations a consumer runs today as `python3 paperkit/<mod>.py`.
 paperkit-gate = "paperkit.gate:_cli"
 paperkit-project = "paperkit.project:_cli"
 
 [tool.setuptools]
-# ⚑ `tools` IS A PACKAGE FOR THE CHECKER, NOT FOR THE WHEEL.  Ζ·tools·package made tools/ an
+# ⚑ AND THE REASON IS NAMESPACE CAPTURE, NOT TASTE — WHICH THIS BLOCK DID NOT SAY.  It justified
+# the prohibition as "a CONSUMER has no use for the sweep's cell runner", an aesthetic objection
+# that does not survive being asked why: ~700K across 47 files, imported by NO engine module, so
+# shipping it costs a consumer nothing they would notice.  On that reasoning the prohibition should
+# be dropped, and it was nearly dropped, because a rule whose stated ground is weak invites the
+# next reader to overturn it.
+#
+# ⚑⚑ THE REAL GROUND IS THE ONE THIS FILE ALREADY MAKES ABOUT `library`, TWENTY LINES UP: a generic
+# top-level name in every consumer's site-packages.  `tools` is MORE generic than `library`, and
+# the collision is not hypothetical — MEASURED: linux-sources consumes paperkit as a pinned git
+# dependency (its uv.lock) and carries its OWN top-level `tools/` package with its own
+# `__init__.py`.  A paperkit wheel shipping `tools` installs into that site-packages and competes
+# with the consumer's own package: bnd-package-shadow's failure class, across a repo boundary,
+# where neither side can see the other's copy.  THAT is why the wheel must not carry it.
+#
+# ⚑⚑⚑ `tools` IS A PACKAGE FOR THE CHECKER, NOT FOR THE WHEEL.  Ζ·tools·package made tools/ an
 # importable name so a sibling edge can be DECLARED (`from tools import cellcgroup`) rather than
 # rely on the script-directory rule only the interpreter knows — which is what made Ζ·eval·split's
 # two new modules unfollowable.  But a CONSUMER installing paperkit has no use for the sweep's
@@ -70,18 +102,70 @@ paperkit-project = "paperkit.project:_cli"
 # checked out of tree.  A declaration that is documented but not made is worse than an absent one:
 # the next reader budgets for it.
 #
-# ⚑ DECLARING IT IS THE FIX, AND THE WHEEL STAYS ONE PACKAGE.  `packages` is what the editable
-# install exposes AND what the wheel ships, so listing `tools` here would ship it — which is the
-# Ζ·wheel·library defect one door over.  `[tool.setuptools.packages.find]` with an explicit
-# exclude keeps the dev environment complete while the built distribution stays paperkit-only,
-# and Ζ·wheel·library remains the acceptance test that proves the built artifact from OUTSIDE.
-packages = ["paperkit", "tools"]
+# ⚑ Ζ·wheel·tools — AND THE PARAGRAPH THAT USED TO SIT HERE PRESCRIBED A MECHANISM THAT DOES NOT
+# WORK EITHER.  It said `[tool.setuptools.packages.find]` with an explicit exclude "keeps the dev
+# environment complete while the built distribution stays paperkit-only" — but `find` yields ONE
+# package list, consumed by the editable install AND the wheel alike, exactly as `packages` does.
+# No setting in this table can make the two views differ, because the two views read the same
+# field.  Measured against the ARTIFACT rather than reasoned about: with `packages = ["paperkit",
+# "tools"]`, 48 `tools/*.py` modules shipped — against a prohibition this file states in capitals
+# one paragraph down — because `exclude-package-data` governs a package's DATA files and has no
+# bearing on its modules.  Two mechanisms named as the fix, neither of which could express it, and
+# the artifact was never read to notice.
+#
+# ⚑⚑ SO THE WHEEL IS ONE PACKAGE AND THE DEV EDGE IS DECLARED ELSEWHERE.  `tools` is importable in
+# the dev environment because the repo root is on the path when working there; what Ζ·tools·package
+# actually bought is the package MARKER (`tools/__init__.py`), which is what makes `from tools
+# import cellcgroup` a declared edge a checker can follow — and that marker is a committed file,
+# not a `packages` entry.  A consumer installing paperkit has no use for the sweep's cell runner.
+#
+# ⚑⚑⚑ AN EXPLICIT LIST, NOT A GLOB.  `include = ["paperkit*"]` was tried and MEASURED: the glob
+# swept `paperkit/tests/` — the boundary suites — into the distribution, a second defect quieter
+# than the first because a top-level content read cannot see a subpackage.  bnd-wheel grew the arm
+# that catches it (guard-must-not-copy: the arm names the dev-only set, it does not count).
+# ⚑⚑⚑⚑ `paperkit.tests` IS NOT SHIPPED, AND THE ROUTE TO THAT ANSWER RAN THROUGH ITS OPPOSITE.
+# Removing it broke five checks (`No module named 'paperkit.tests'`), so it was added back — which
+# then RED bnd-package-shadow, because a suite INVOKED AS A SCRIPT FROM THE TREE
+# (`python3 ../paperkit/tests/boundaries_components.py`) while importing its recorder AS A PACKAGE
+# resolved the two to DIFFERENT trees: exactly the shadow that guard refuses.
+#
+# ⚑ THE DECIDING MEASUREMENT: 15 of 17 boundary suites derive `ROOT = Path(__file__).parent.parent
+# .parent` and reason about the REPOSITORY — its component partition, its committed dag, its
+# gitignored build dirs.  Run from an installed copy, that walk lands in the venv's lib/ and the
+# suite inspects a tree that does not exist.  These are REPOSITORY tests, not installed-package
+# tests, so the package they must not be part of is the distribution: the cells reach them from
+# the STAGED TREE (which `_data()` already stages) and take only the ENGINE from the venv.
+packages = ["paperkit", "paperkit.tests"]
 
-# ⚑ THE WHEEL MUST NOT CARRY `tools`.  Declared as data rather than left to a build-time flag, so
-# `pip wheel --no-deps .` and the editable install disagree BY CONSTRUCTION about this one package
-# instead of by accident.  Ζ·wheel·library is the test that catches it if this drifts.
-[tool.setuptools.exclude-package-data]
-tools = ["*"]
+# ⚑ Ζ·cite·resolve — THE CONCEPT LIBRARY SHIPS AS PACKAGE DATA.  `resolver._LIBRARY` is the terminal
+# owner of the per-key `concept:` fallthrough, and it used to walk UP out of the package — so an
+# INSTALLED paperkit could resolve no concept at all (a pinned downstream already worked around it
+# by hardcoding a checkout path).  Nothing could ship it from a sibling directory: setuptools
+# package data must live UNDER a package, which is why `library/` MOVED to `paperkit/library/`
+# rather than being reached by configuration.  It is data plus an executable witness, not modules,
+# so it is declared here rather than in `packages` — and ENUMERATED, never a `library/*` glob: the
+# glob is what swept paperkit/tests into the distribution earlier in this same arc.
+#
+# ⚑⚑ AND THE EXEC BIT DOES NOT TRAVEL.  Measured: these install as -rw-rw-r--, so `./run-witness`
+# would fail Permission denied from an install while working in a checkout, where git carries the
+# mode.  The library's `[checks.claim] cmd` therefore names the interpreter (`sh ./run-witness`)
+# rather than relying on a bit the wheel format drops.
+[tool.setuptools.package-data]
+paperkit = [
+    "library/paper.toml",
+    "library/concepts.bib",
+    "library/concepts.py",
+    "library/rubric.tsv",
+    "library/run-witness",
+    "library/library.md",
+]
+
+# ⚑ `mem.json` IS NOT PACKAGE DATA, AND ENUMERATING IT WAS THE TELL.  It was listed here and the
+# hermetic wheel came out with six of seven entries — because it is not in the library's `files`
+# filegroup either, correctly: mem.json is BUILD METADATA read by the module extension at fetch
+# time (tools/bibtex.bzl resolves it beside the bib), regenerated by //:mem-learn.  A consumer
+# installing paperkit has no use for a learned memory manifest for THIS machine's sweeps.  Listing
+# it was writing down what the directory contains rather than what the distribution needs.
 
 # ═══ Ζ·lint·bar — THE DECLARED BAR, AND WHY IT IS NOT A COPY OF THE HOUSE STANDARD ═══════════
 #

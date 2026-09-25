@@ -109,6 +109,7 @@ from grade import (
     mark_content_sensitive,
 )
 from grader import (
+    UNREACHABLE,          # Ζ·broken·offaxis — the tristate sentinel, carried onto the calc record
     GradeWitness,
     _grade_parallel,
     _sandbox_root,
@@ -251,6 +252,34 @@ def main(argv: list) -> int:
             # the compliance disclosure see it without re-sweeping.  Absent ⇒ no such decision (common).
             calc = {"claim": only, "baseline": rec.get("baseline", rec["grade"] != "broken"),
                     "sens": rec.get("tests", [])}
+            # ⚡ Ζ·calc·why·carry — CARRY THE CHECK'S OWN ACCOUNT ONTO THE CALC RECORD.
+            # grader.py sets rec["check_said"] on a failing baseline (Ζ·calc·why) and this dict
+            # dropped it, so the record every consumer reads said `{"baseline": false, "sens": []}`
+            # — one bit — for a check that had explained itself in five arms.  MEASURED on
+            # arch-roster-wired: green on the host, red in the cell, and two successive diagnoses
+            # built on that one bit were both wrong.  Absent when the baseline passed or the check
+            # said nothing, so every existing record stays byte-identical — the same non-breaking
+            # widening `why` took in the verdict record.
+            if rec.get("check_said"):
+                calc["check_said"] = rec["check_said"]
+            # ⚑ Ζ·broken·offaxis — CARRY THE TRISTATE ACROSS THE SERIALIZATION BOUNDARY.
+            #
+            # `baseline` above is the RAW measured verdict, and UNREACHABLE (grader._Unreachable) is
+            # an `int` subclass returning 0 — falsy, so every `if not baseline` still holds, and
+            # distinguishable IN PROCESS.  json.dumps writes it as `0`, BYTE-IDENTICAL to a refuted
+            # `False`, and tools/read_grade.py cannot pass `reachable=` because the record no longer
+            # says which one it was.  So every calc-derived grade record reported
+            # `baseline: "refuted"` with "repo is not green" — including for a check that merely
+            # could not RUN.  That is the exact false statement grade.py:86-92 records as MEASURED
+            # TWICE on 2026-08-26, reappearing at the one boundary the Bazel pipeline runs through.
+            #
+            # The sentinel cannot survive JSON, so the AXIS is carried beside the value, on the
+            # `decisions_unasserted` model directly below: an orthogonal key, present only when it
+            # applies, that NAMES THE GAP and never moves the rung (BASELINE_C's own discipline —
+            # "unreachable is not worse than refuted, it is a different kind of statement").
+            # Absent ⇒ reachable, so every existing record and reader is unaffected.
+            if rec.get("baseline") is UNREACHABLE:
+                calc["reachable"] = False
             if rec.get("decisions_unasserted"):
                 calc["decisions_unasserted"] = rec["decisions_unasserted"]
             print(json.dumps(calc))

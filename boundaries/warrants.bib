@@ -82,7 +82,7 @@
   section = {engine}, from = {bnd-write-atomic}, join = {. },
   claim   = {ONE citation must not name two owners (Λ·library·seam) --- a concept: is resolved by two different mechanisms, the CLI deciding ownership AT RUNTIME per key by the exit-2 not-mine sentinel (the consuming project's library first, the engine's on fallthrough) and the build deciding it AT ANALYSIS TIME by a label built from the key alone, which cannot probe because a dependency exists in the graph before anything runs or it does not; those are two rules rather than two implementations of one, they agree in this repository only because a single project declares ownership so the fallthrough never fires, and the divergence is therefore invisible in-repo and waits for the downstream consumer the seam exists to serve --- measured here on a constructed consumer that owns an engine key and gets a DIFFERENT witness by route},
   check   = {cmd:python3 ../paperkit/tests/boundaries_concept_route.py},
-  reads   = {., library}
+  reads   = {., paperkit/library}
 }
 @misc{bnd-dag-regen,
   section = {engine}, from = {bnd-write-atomic}, join = {. },
@@ -149,19 +149,19 @@
   section = {engine}, from = {bnd-lint}, join = {. },
   claim   = {a claim-witness module's TOP LEVEL carries no engine-source reads (Ζ·bnd·toplevel) --- a module-level convenience becomes a staged input of EVERY grid row (one engine edit re-keys the whole grid), so a source inspection lives INSIDE the witness that makes it, scoped to exactly its rows; the witness set is discovered from the paper.tomls and the read semantics derive from closure.py, the owner},
   check   = {cmd:python3 ../paperkit/tests/boundaries_toplevel.py},
-  reads   = {., paper, library}
+  reads   = {., paper, paperkit/library}
 }
 @misc{bnd-prove,
   section = {engine}, from = {bnd-toplevel}, join = {. },
   claim   = {the prove face's boundary (Ζ·prove·degrade) --- a certificate is NEVER emitted from an unmeasured sweep: with the engine unreachable the --prove face exits nonzero and emits no record at all, so an absent measurement cannot masquerade as an insensitive one (an empty fingerprint is only ever a MEASURED result); the sound arm runs green against the real engine, and the minimum delta is one environment variable},
   check   = {cmd:python3 ../paperkit/tests/boundaries_prove.py},
-  reads   = {., library}
+  reads   = {., paperkit/library}
 }
 @misc{bnd-prove-envelope,
   section = {engine}, from = {bnd-prove}, join = {. },
   claim   = {the prove face runs the SAME oracle as the build's cached record (Ζ·prove-gate) --- a concept's --prove certificate and its library <key>__dcalc build target invoke the byte-identical discriminate sweep (--only <key> --calc --resolution def) and grade through the one shared ladder leaf, so their verdict, baseline, sensitivity and grade agree BY CONSTRUCTION without the check re-running any sweep; what stays unproven --- that the two independent executions emit byte-identical output --- is entailed by action idempotency, an engine invariant owned elsewhere, not a bare hand-verification},
   check   = {cmd:python3 ../paperkit/tests/boundaries_prove_envelope.py},
-  reads   = {., library}
+  reads   = {., paperkit/library}
 }
 @misc{bnd-hook-index,
   section = {engine}, from = {bnd-prove-envelope}, join = {. },
@@ -178,7 +178,7 @@
   section = {engine}, from = {bnd-grounding}, join = {. },
   claim   = {the check-TYPE registry's boundary --- the built-in verb set is DECLARED once as data (resolver.VERBS), and every site that dispatches on a check's type derives from it rather than carrying a copy: a verb is not MIGRATED when its verdict works but when the verdict path, the grade path, the footprint audit and the generator all agree about it, and a verb that CROSSES a project boundary (crosses=True) is delegated to its owner by all of them at once --- so a new verb cannot reach the gate green while a site the gate cannot see still reads the old set},
   check   = {cmd:python3 ../paperkit/tests/boundaries_dispatch.py},
-  reads   = {., library}
+  reads   = {., paperkit/library}
 }
 @misc{bnd-ladder,
   section = {engine}, from = {bnd-dispatch}, join = {, and }, rests-on = {bnd-dispatch},
@@ -250,4 +250,162 @@
   claim    = {the engine package's IDENTITY boundary --- `from paperkit import bib` names ONE tree, and a second importable directory called paperkit earlier on the path silently serves a different engine through the same spelling; the arms assert the resolved __file__ rather than the attribute, because a stale copy carries the attribute too, so an arm checking hasattr passes in BOTH arms and measures nothing --- which is asserted here as its own behaviour so a later weakening of the check cannot look like a check; and a standing arm refuses any second importable paperkit anywhere in the tree, the condition that made this reachable rather than theoretical: a setuptools build/lib copy 23 modules deep, every one differing from live and three live modules absent entirely, pinned ahead of the real engine by its own __init__'s sys.path.insert, and regenerated by the pip wheel that Ζ·wheel·library's own acceptance test runs},
   check    = {cmd:python3 ../paperkit/tests/boundaries_package_shadow.py},
   reads    = {.}
+}
+% ⚑ AND THE TIER WENT BACK TO sandbox, WHICH IS THE POINT OF Ζ·wheel·backend.  This was briefly
+% `toolchain` because the builder shelled out to `uv`, a host binary no sandbox stages — the
+% honest tier for a check that genuinely needs the host.  Declaring the PEP 517 backend removed
+% that need: the builder now imports setuptools from a pinned, hashed pip dependency Bazel
+% stages, so the wheel builds IN the sandbox with no exemption.  Measured, and it is the tier
+% that makes the check meaningful — a wheel built against the live tree proves nothing about a
+% wheel built from declared inputs, which is exactly the false green this arc found (the library
+% was in the artifact only because `uv` ran unsandboxed).
+@misc{bnd-wheel,
+  section  = {engine},
+  from     = {bnd-package-shadow},
+  join     = {.},
+  claim    = {the BUILT DISTRIBUTION's content boundary --- what a consumer installing paperkit receives is a fact about an artifact, so it is asserted against the artifact: the suite builds the wheel offline and reads its top-level names, never the declaration that was supposed to produce them; and the declaration was WRONG, which is how this claim came to be authored --- pyproject.toml states that the wheel must not carry tools and that the two views disagree by construction, while the mechanism it chose cannot express that (packages names what BOTH the editable install exposes and the wheel ships, and exclude-package-data governs data files rather than a package's modules), so 48 modules shipped against an explicit prohibition and nothing read the output to notice; the arms assert STRUCTURE and never a count, because a guard carrying its own copy of the set it guards certifies a tautology; and the library arm was RED when this claim was authored and is now green, which is the only reason to trust it --- the gate was written against a wrong artifact and the artifact was then fixed, rather than the assertion being written to match what the build already did: resolution stopped walking up out of the package, the library moved inside it and ships as enumerated package data, and a concept now resolves from a pure install with no checkout anywhere in the picture --- the gap a pinned downstream had been paying for by hardcoding a path to somebody's home directory},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_wheel.py},
+  reads    = {.},
+  builds   = {@@//paperkit:wheel}
+}
+
+% ⚑ Ζ·suite·orphan — FOUR SUITES WERE STAGED AND GATED BY NOTHING.  paperkit/components.bzl
+% enumerated 48 boundary suites and this bib named 44; the four below existed, were staged into
+% cells, passed when run by hand, and no warrant ran them.  Neither enumeration was wrong on its
+% own terms — components.bzl stages what exists, the bib gates what someone wrote a warrant for —
+% and with no common owner the gap was invisible to both.  Found by asking the POPULATION question
+% (a peer's framing: key a census on what a thing DOES, not what it is called), after three
+% ownerless greps of the same set returned three different counts and settled nothing.
+@misc{bnd-clamp,
+  section  = {delta},
+  from     = {bnd-scope},
+  join     = {. },
+  claim    = {the effective-grade CLAMP's boundary --- a claim's own grade is bounded by the weakest GROUNDING premise it rests on, so a behavioral claim resting on a vacuous one cannot present as behavioral, and the clamp walks the rests-on cone rather than the immediate parent: a strong claim two hops above a vacuous premise is clamped by it, which is what stops a chain of strong-looking claims from laundering an unverified root},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_clamp.py},
+  reads    = {.}
+}
+@misc{bnd-cpuweight,
+  section  = {runtime},
+  from     = {bnd-cache},
+  join     = {. },
+  claim    = {the CPU-weight admission lever's boundary --- the sweep weights the cgroup its cells ACTUALLY land in, discovered at runtime from a live cell rather than assumed from the shell's own cgroup, because a build server reparents its actions and a weight applied to the wrong scope is a knob that reads as set and changes nothing},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_cpuweight.py},
+  % ⚑ local, BECAUSE IT READS THE LIVE CGROUP HIERARCHY.  At sandbox tier its F arm fails —
+  % `verify() does not report the decoy as a cell` — because the sandbox has no /sys/fs/cgroup
+  % topology to discover a cell in.  That is the tier's definition: unpinned live host state
+  % bazel cannot hash, so a cached verdict would bank a host-dependent die-roll.
+  tier     = {local},
+  reads    = {.}
+}
+@misc{bnd-mem-db,
+  section  = {runtime},
+  from     = {bnd-cpuweight},
+  join     = {. },
+  claim    = {the memory observation STORE's boundary --- the per-action peak readings accumulate in a store whose schema is owned in one place, and the learned reservation projected from it (mem.json) is a build INPUT rather than an observation, so a machine with no observations degrades to the declared floor instead of inventing a reservation from an empty set},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_mem_db.py},
+  reads    = {.}
+}
+@misc{bnd-logs-push,
+  section  = {runtime},
+  from     = {bnd-mem-db},
+  join     = {. },
+  claim    = {the findings-log push splits at the same boundary as the telemetry pusher --- its PURE half (parse the findings, attribute each to its owner, aggregate) is deterministic and gated, while the live half (the POST to an endpoint that may be down) is best-effort and never gates, so an unreachable log sink degrades a build to silent rather than to red},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_logs_push.py},
+  reads    = {.}
+}
+
+@misc{bnd-genre-emit,
+  section  = {engine},
+  claim    = {the GENERATOR emits a genre check exactly where a project DECLARES one --- bibtex.bzl is the build graph and its only prior claim was three regexes over its TEXT, so this asserts its OUTPUT: a project declaring a genres table gets a :genres target that INVOKES each declared cmd, and a project declaring none gets no target, since a check over an empty registry is green by vacuity},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_genre_emit.py},
+  % ⚑ Ζ·reads·file — DECLARED PER FILE.  `reads` names a PACKAGE and stages its whole filegroup,
+  % which flattens "this witness opens bibtex.bzl" into "this witness depends on tools/", re-keying
+  % the cell on every unrelated edit in that package.  Operator's ruling: "I don't like directories
+  % as read targets.  That's a flattening of what's actually going on under the hood."  `builds`
+  % carries Bazel LABELS and joins `data` directly (bibtex.bzl:270), so the FILE is expressible.
+  % MEASURED control: bnd-check and bnd-toplevel read MODULE.bazel, DECLARE it, and pass; these read
+  % it, declared nothing, and came back baseline=false in a pristine sandbox.
+  % ⚑ Ζ·genre·stage — THE 13 paper.toml FILES ARE INPUTS, AND THEY WERE NOT DECLARED.
+  % The witness stats every wired project's paper.toml to partition declaring from quiet;
+  % `builds` named only the generator and the manifest, so in a cell NO toml was staged and every
+  % project read as "declares NONE" — the host says 1 declaring / 12 not, the cell's record said
+  % 13 not.  Enumerated per FILE (the same 13 labels arch-roster-wired carries), never as
+  % packages: a package read flattens what is actually being opened.
+  builds   = {@@//:MODULE.bazel, @@//tools:bibtex.bzl, @@//:paper.toml, @@//arch:paper.toml, @@//boundaries:paper.toml, @@//config:paper.toml, @@//demo:paper.toml, @@//guide:paper.toml, @@//image:paper.toml, @@//paper:paper.toml, @@//paperkit/library:paper.toml, @@//render:paper.toml, @@//report:paper.toml, @@//setup:paper.toml, @@//talk:paper.toml}
+}
+
+@misc{bnd-genre-pure,
+  section  = {engine},
+  claim    = {troubleshooting is BLOCKED and the block is FALSIFIABLE --- a genre is a pure function of the grouping plus the records, so ordering by what is failing NOW is inexpressible: no verdict-shaped name is in the engine field vocabulary nor any project consumer_fields (check is the DECLARED verifier, never its result), and the component lattice bars the projector from computing one because delta depends on project, making a project-to-delta import an upward edge. Either half going false REFUTES the obstacle, and the repair is then to DELETE this check and build the genre},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_genre_pure.py},
+  % ⚑ Ζ·reads·file — DECLARED PER FILE.  `reads` names a PACKAGE and stages its whole filegroup,
+  % which flattens "this witness opens bibtex.bzl" into "this witness depends on tools/", re-keying
+  % the cell on every unrelated edit in that package.  Operator's ruling: "I don't like directories
+  % as read targets.  That's a flattening of what's actually going on under the hood."  `builds`
+  % carries Bazel LABELS and joins `data` directly (bibtex.bzl:270), so the FILE is expressible.
+  % MEASURED control: bnd-check and bnd-toplevel read MODULE.bazel, DECLARE it, and pass; these read
+  % it, declared nothing, and came back baseline=false in a pristine sandbox.
+  % ⚑ Ζ·genre·pure·vacuous — MODULE.bazel AND THE 13 paper.tomls ARE INPUTS.  The absence this
+  % claim asserts has TWO halves: the engine vocabulary and every project's `consumer_fields`.
+  % The second was computed by globbing `*/paper.toml`, which in a cell finds what was STAGED —
+  % nothing — so the intersection shrank and the arm passed having measured half its own claim.
+  % The roster now comes from MODULE.bazel (the owner of which projects exist) and every named
+  % toml must be readable; an absent one is a loud cannot-run.
+  builds   = {@@//paperkit:components.bzl, @@//:MODULE.bazel, @@//:paper.toml, @@//arch:paper.toml, @@//boundaries:paper.toml, @@//config:paper.toml, @@//demo:paper.toml, @@//guide:paper.toml, @@//image:paper.toml, @@//paper:paper.toml, @@//paperkit/library:paper.toml, @@//render:paper.toml, @@//report:paper.toml, @@//setup:paper.toml, @@//talk:paper.toml}
+}
+
+@misc{bnd-genre-census,
+  section  = {engine},
+  claim    = {every REGISTERED genre is a DISTINCT VANTAGE, measured over claim-PAIRS rather than unit counts --- the apparatus collected 21 publication genres to exercise the codomain on the design that each genre is its own reading and that disagreement between readings is DATA, which is empty if two genres produce the same partition. Two with the same NUMBER of units may cut completely differently, so the measure is the fraction of claim-pairs they disagree about, zero exactly when the partitions coincide. The one known coincidence is DECLARED with its reason rather than relaxing the check},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_genre_census.py},
+  % ⚑ Ζ·reads·file — a PROJECT is the honest unit HERE, and only here.  The witness does not open
+  % files under paper/: it hands `ROOT/"paper"` to `P.load_config(proj)`, so the engine consumes the
+  % PROJECT and the directory is what is actually depended on, not a flattening of a file set.
+  reads    = {paper}
+}
+
+@misc{bnd-generator,
+  section  = {engine},
+  claim    = {the GENERATOR obeys its own DECLARATIONS --- bibtex.bzl and calc.bzl are the build graph and their only prior claim was three regexes over their TEXT, all shell hygiene, asserting nothing about what is emitted. Three declaration-to-target rules are gated here: adequacy=True guards the adequacy record, emerge=True guards the cohere record, and :invariants is emitted UNCONDITIONALLY carrying --without-K at every tier --- the last being the argument on which report and image were wired, which nothing checked until now},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_generator.py},
+  % ⚑ Ζ·reads·file — DECLARED PER FILE.  `reads` names a PACKAGE and stages its whole filegroup,
+  % which flattens "this witness opens bibtex.bzl" into "this witness depends on tools/", re-keying
+  % the cell on every unrelated edit in that package.  Operator's ruling: "I don't like directories
+  % as read targets.  That's a flattening of what's actually going on under the hood."  `builds`
+  % carries Bazel LABELS and joins `data` directly (bibtex.bzl:270), so the FILE is expressible.
+  % MEASURED control: bnd-check and bnd-toplevel read MODULE.bazel, DECLARE it, and pass; these read
+  % it, declared nothing, and came back baseline=false in a pristine sandbox.
+  builds   = {@@//:MODULE.bazel, @@//tools:bibtex.bzl}
+}
+
+@misc{bnd-env-facts,
+  section  = {engine},
+  claim    = {the STANDING FIGURES this repo quotes match what the tree reports --- an audit of the working ledger found FOUR OF FIVE environment claims stale, including the project count and the claim count, in the block every reader trusts before measuring anything. A figure nothing re-derives is a claim nobody is checking, so the three with a single owner are gated here: wired projects from MODULE.bazel, root-declaring projects from each paper.toml, and bib entries from the warrants list. It does not PIN the numbers --- when a project is added the gate reds, the prose is corrected, and it goes green: the red is the notification},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_env_facts.py},
+  % ⚑ Ζ·reads·file — the bib set here is COMPUTED, not static: the witness reads paper/paper.toml
+  % and then reads the bibs that toml NAMES (`for b in cfg["warrants"]`).  Enumerating them here
+  % would make this warrant carry its own copy of paper.toml's roster — a guard copying the set it
+  % guards.  So paper/ is declared as the project whose manifest owns that list, and cotype's single
+  % file is declared as a file.
+  reads    = {paper},
+  % ⚑⚑ cotype/leverage-ledger.md IS NOT DECLARED, and that is a FINDING rather than an omission:
+  % the file is UNTRACKED (git ls-files cotype/ lists README.md, check.py, ledger.md only) and
+  % cotype/ has no BUILD.bazel, so no label can name it and no sandbox can stage it.  A witness
+  % reading an untracked file is reading something no other party can see — the read must move to a
+  % tracked artifact, or the witness must declare the read UNAVAILABLE.  Left undeclared so the cell
+  % reds on it rather than a label failing analysis.
+  builds   = {@@//:MODULE.bazel}
+}
+
+@misc{bnd-roster-sync,
+  section  = {engine},
+  claim    = {two hand-maintained rosters of one set are COMPARED rather than trusted --- paper.toml's `warrants` names the bibs the document composes and paper/BUILD.bazel's filegroup names the bibs the sandbox stages, both authored by hand, and until this witness nothing checked that they agree, so a bib added to one and not the other is a document that builds on the host and fails in a cell (or a file staged for nothing); the duplication is LOAD-BEARING and generating one list from the other would let the audited artifact supply its own audit, which is why the arms compare two INDEPENDENT textual sources and report the DIFFERENCE in each direction separately --- the two drifts call for opposite repairs, so a single "they disagree" would hand the next reader two rosters to diff by hand},
+  check    = {cmd:python3 ../paperkit/tests/boundaries_roster_sync.py},
+  % ⚑ Ζ·reads·file — the two rosters are FILES, named as labels rather than as their packages.
+  % ⚑ Ζ·roster·referrer — THE CROSS-PROJECT REFERRERS ARE INPUTS TOO.  The witness composes the
+  % toml roster from paper/paper.toml PLUS every root *.toml naming a `"//paper:<x>.bib"` label
+  % (the root paper.toml declares adequacy_pitch.bib that way).  Undeclared, a cell staged none of
+  % them, the composed roster came up short, and the F arm redded on a correctly-declared file:
+  % `XX F: no bib is staged by BUILD.bazel but undeclared in paper.toml -> ['adequacy_pitch.bib']`.
+  builds   = {@@//paper:paper.toml, @@//paper:BUILD.bazel, @@//:paper.toml, @@//:pyproject.toml}
 }

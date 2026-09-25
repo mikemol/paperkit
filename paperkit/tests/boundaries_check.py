@@ -31,8 +31,36 @@ MODULE = (ROOT / "MODULE.bazel").read_text()
 
 
 def hook_tests(build: str) -> set:
-    m = re.search(r'test_suite\(\s*name\s*=\s*"hook".*?tests\s*=\s*\[(.*?)\]', build, re.S)
-    return set(re.findall(r'"([^"]+)"', m.group(1))) if m else set()
+    """The //:hook member list.
+
+    ⚑ THIS USED A NON-GREEDY `\\[(.*?)\\]` AND SILENTLY LOST A MEMBER.  The member list's own
+    comments carry wiki-style refs — `[[place-by-ownership-not-need]]` at BUILD.bazel:191 — so the
+    first `]` a non-greedy match finds is INSIDE a comment, four lines above the real close of the
+    list.  MEASURED 2026-09-09: that scrape captured 24 members while `bazel query tests(//:hook)`
+    reported 25, dropping `@paperkit_library//:decisions` (BUILD.bazel:194) — the very member whose
+    earlier omission the surrounding comment was written to narrate.  So this suite's completeness
+    proof ran over 24 of 25 members and reported PASS: a green that measured the scrape.
+
+    Found by writing tools/hook_grid.py, which copied the regex and inherited the bug.
+
+    The slice is now BRACKET-COUNTED from `tests = [` to its matching close, and only then scanned
+    for quoted LABELS (`@repo//:target` or `//pkg:target`) — a bracketed wiki-ref carries no quotes,
+    but the slice has to be right before that matters.
+    """
+    i = build.find("tests = [", build.find('name = "hook"'))
+    if i < 0:
+        return set()
+    i = build.index("[", i)
+    depth = 0
+    for j in range(i, len(build)):
+        if build[j] == "[":
+            depth += 1
+        elif build[j] == "]":
+            depth -= 1
+            if depth == 0:
+                break
+    return {t for t in re.findall(r'"([^"]+)"', build[i + 1:j])
+            if t.startswith("@") or t.startswith("//")}
 
 
 def projects(module: str) -> dict:

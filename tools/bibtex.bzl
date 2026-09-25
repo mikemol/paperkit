@@ -24,6 +24,8 @@ shape: an entry begins only at a LINE-START `@type{key,`; a claim is checkable i
 line's name is `check`.
 """
 
+load("//tools:pool.bzl", "TOOLCHAIN_POOL")
+
 def _entries(content):
     out = []
     key = None
@@ -33,13 +35,14 @@ def _entries(content):
     rests = []      # rests-on: the premise claims this one is grounded on (Ζ·compose deps)
     tier = ""       # Ζ·tier — per-warrant `tier = {sandbox|local|toolchain}` ("" = inherit the project default)
     consumes = []   # Ρ·wcag·oracle-edge — sibling warrant KEYS whose verdict RECORD this check reads
+    builds = []     # Ζ·wheel·dep — Bazel LABELS of BUILT ARTIFACTS this check reads (not dirs, not keys)
                     # (records-as-deps within a project: the sibling runs ONCE, memoized, and its
                     # verdict.json is a declared bazel input here — freshness by the action graph)
     for raw in content.splitlines():
         s = raw.strip()
         if s.startswith("@") and "{" in s:
             if key != None:
-                out.append((key, check, sib, reads, rests, tier, consumes))
+                out.append((key, check, sib, reads, rests, tier, consumes, builds))
             key = s.split("{", 1)[1].split(",", 1)[0].strip()
             check = ""
             sib = ""
@@ -61,11 +64,20 @@ def _entries(content):
                 rests = [t.strip() for t in inner.split(",") if t.strip()]
             elif name == "tier" and "{" in s and "}" in s:
                 tier = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
+            elif name == "builds" and "{" in s and "}" in s:
+                # ⚑ Ζ·wheel·dep — A CLAIM ABOUT AN ARTIFACT MUST BE ABLE TO NAME THAT ARTIFACT.
+                # `reads` stages DIRECTORY PATHS and `consumes` names sibling warrant KEYS; neither
+                # can say "the built wheel".  bnd-wheel tried `reads = {., wheel}` and analysis
+                # failed with `no such package 'wheel'` — the field it needed did not exist, so the
+                # warrant named a package that never could.  These are Bazel labels, staged as
+                # action inputs alongside the read directories.
+                inner = s.split("{", 1)[1].rsplit("}", 1)[0]
+                builds = [t.strip() for t in inner.split(",") if t.strip()]
             elif name == "consumes" and "{" in s and "}" in s:
                 inner = s.split("{", 1)[1].rsplit("}", 1)[0]
                 consumes = [t.strip() for t in inner.split(",") if t.strip()]
     if key != None:
-        out.append((key, check, sib, reads, rests, tier, consumes))
+        out.append((key, check, sib, reads, rests, tier, consumes, builds))
     return out
 
 def _data(tokens, files, imports = [], engine = True):
@@ -231,9 +243,20 @@ def _import_label(verb, name, key, owner, exports, wired, hint):
               "misspelled key, the exact shape that resolves green locally and dies hours into " +
               "the build as `missing input file`.  '%s' exports: %s") %
              (name, verb, key, owner, owner, key, owner, ", ".join(sorted(have))))
-    return "@paperkit_" + owner + "//:" + key
+    # ⚑ Ζ·lib·land — THE REPO NAME IS NOT THE PROJECT PATH, and this line conflated them until a
+    # project moved into a subdirectory.  `owner` has to satisfy two roles at once: membership in
+    # `wired` (a project PATH, e.g. "paperkit/library") and the suffix of a generated repo NAME
+    # (`@paperkit_library`).  Those were the same string while every project sat at the repo root,
+    # so one parameter carried both coordinates and nothing distinguished them.  When `library/`
+    # became `paperkit/library/`, passing the path emitted `@paperkit_paperkit/library//:...` — a
+    # label whose repo name contains a slash, which Bazel cannot parse, and which surfaced as
+    # `missing value for mandatory attribute 'calc'` because the malformed label was DROPPED rather
+    # than rejected.  The guard above checks the path role and cannot see the name role at all.
+    # MODULE.bazel already declares the two independently: bib.project(name = "paperkit_library",
+    # project = "paperkit/library"), so the repo name is the LAST SEGMENT of the path.
+    return "@paperkit_" + owner.split("/")[-1] + "//:" + key
 
-def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = [], vis = "", exports = [], wired = []):
+def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = [], vis = "", exports = [], wired = [], builds = []):
     """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
     script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd (the exit-code
     oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `tier` is the
@@ -244,14 +267,29 @@ def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imp
     i = check.find(":")
     typ = check[:i]
     target = check[i + 1:]
-    dl = ", ".join([_lit(d) for d in _data(reads, files, imports)])
+    # Ζ·wheel·dep — a `builds` label is ALREADY a Bazel label, so it joins `data` directly rather
+    # than going through _data (which turns a project-relative directory into a filegroup label).
+    # ⚑ Ζ·builds·path — BUILT ARTIFACTS RIDE THEIR OWN ARG, not `data`.  They were merged into `dl`
+    # here, so pk_cmd could not tell a staged SOURCE (which lands at its own repo-relative path)
+    # from a built ARTIFACT (which lands under bazel-out) — and therefore could not export the
+    # artifact's path the way `consumes` exports a record's.  They stay in `data` too: the rule
+    # needs them staged AND needs the handle.  Same shape as `cs` two lines down.
+    dl = ", ".join([_lit(d) for d in _data(reads, files, imports)] + [_lit(b) for b in builds])
+    bs = "" if not builds else ", builds = [" + ", ".join([_lit(b) for b in builds]) + "]"
     pj = "" if proj == "." else ", project = " + _lit(proj)
     tc = "" if tier == "sandbox" else ", tier = " + _lit(tier)
+    # Ζ·render·pool — a `toolchain` warrant's toolchain is an EXECUTOR IMAGE, not the host: the
+    # target selects the pool that runs that image (`exec_properties` is a common attr, and the
+    # pool is a platform property the remote executor matches on).  Operator 2026-09-21: the
+    # executor grants integrity by construction, and "you can specify whatever you want to BE in
+    # the image" — image/executor/Containerfile is that specification.  `sandbox` and `local`
+    # stay in the unnamed default pool; the name itself has ONE owner (verb.bzl TOOLCHAIN_POOL).
+    tc += "" if tier != "toolchain" else ", exec_properties = {\"Pool\": " + _lit(TOOLCHAIN_POOL) + "}"
     # Ρ·wcag·oracle-edge — each consumed sibling key → its verdict-record target label ":<key>" in the
     # same generated package (all warrants of a project are pk_* siblings here — no visibility barrier).
     cs = "" if not consumes else ", consumes = [" + ", ".join([_lit(":" + c) for c in consumes]) + "]"
     if typ == "cmd":
-        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + tc + cs + ", data = [" + dl + "]" + vis + ")"
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + tc + cs + bs + ", data = [" + dl + "]" + vis + ")"
     elif typ == "file":
         return "pk_file(name = " + _lit(name) + ", path = " + _lit(target) + ", data = [" + dl + "]" + vis + ")"
     elif typ == "result":   # records-as-deps: depend on the sibling's verdict record
@@ -281,7 +319,9 @@ def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imp
         return "pk_result(name = " + _lit(name) + ', sibling_verdict = "' + lbl + '"' + vis + ')'
     elif typ == "agree":
         prods = ", ".join([_lit(p.strip()) for p in target.split("|||") if p.strip()])
-        return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "]" + pj + tc + vis + ")"
+        # Ζ·render·hermetic — producers stage `data` like a pk_cmd (they were staging NOTHING; the
+        # host tier hid it, the executor pool named it).
+        return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "]" + pj + tc + ", data = [" + dl + "]" + vis + ")"
     elif typ in custom:     # a config-declared cmd template — {target} substituted, run as a cmd oracle
         cmd = custom[typ].replace("{target}", target)
         return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + tc + ", data = [" + dl + "])"
@@ -359,6 +399,45 @@ def _surface(module_ctx, core):
     if res.return_code != 0:
         fail("·gen·surface: sites.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]
+
+def _declared_genres(module_ctx, project):
+    """The genre NAMES a project declares — every `[genres.<name>]` table in its paper.toml.
+
+    Ν-F7 — WHY THIS EXISTS.  A project-declared genre is a `cmd` the engine RUNS (`genre.run_declared`),
+    and until now nothing in the build graph invoked it.  Measured (tick 27): two genres declared
+    `python3 -Ichecks checks/…` — `-I` is ISOLATED MODE, so it parsed as `-c hecks` and raised
+    `NameError` — and every gate in the repo stayed green, because `//:hook` reaches
+    gate/adequacy/cohere/decisions and none of those touches the genre seam.  `genre.py --check`
+    does invoke them, and it was wired to NOTHING: no reference in BUILD.bazel, in this file, or in
+    .githooks/pre-commit.  A declaration naming an unrunnable command is a pagination the project
+    cannot perform while the build reports success.
+
+    ⚑ PARSED HERE, IN THE EXTENSION, FOR THE REASON `witness` IS (Ζ·entry·point).  A repository_ctx
+    holds no module_ctx and cannot read paper.toml, so the alternative is re-deriving inside the
+    repo rule — which is exactly what broke for `witness`.  One owner, passed as an attribute.
+
+    ⚑ The two documented parsing traps are honoured, because they are one field over and would
+    repeat verbatim: a table header is matched at LINE START (a bare `find` matches the word inside
+    a `cmd` string), and a `[` that is not ours ENDS the scan rather than being skipped.
+    """
+    lbl = "@@//:paper.toml" if project == "." else "@@//" + project + ":paper.toml"
+    p = module_ctx.path(Label(lbl))
+    if not p.exists:
+        return []
+    text = module_ctx.read(p)
+    module_ctx.watch(p)
+    names = []
+    for raw in text.split("\n"):
+        stripped = raw.strip()
+        if not stripped.startswith("[genres."):
+            continue
+        # `[genres.brief]` → `brief`; a malformed header is left to genre.registry to refuse, since
+        # this function's job is to NAME the population, not to validate the table.
+        name = stripped[len("[genres."):]
+        end = name.find("]")
+        if end > 0:
+            names.append(name[:end])
+    return names
 
 def _claim_script(module_ctx, project):
     """The claim-WITNESS module a project's `claim:` type runs — DECLARED as [checks.claim] witness.
@@ -474,7 +553,7 @@ def _exports(module_ctx, project, bib_label):
     for w in warrants:
         wp = module_ctx.path(Label(w)) if (":" in w or w.startswith("@")) else bp.dirname.get_child(w)
         module_ctx.watch(wp)
-        for k, check, _s, _r, _rr, _t, _c in _entries(module_ctx.read(wp)):
+        for k, check, _s, _r, _rr, _t, _c, _b in _entries(module_ctx.read(wp)):
             if check:
                 keys.append(project + "\t" + k)
     return keys
@@ -532,7 +611,7 @@ def _bib_repo_impl(repository_ctx):
     # local or toolchain, never sandbox).  The footprint audit (a per-sandbox-warrant declare-vs-strace
     # cross-check) is emitted iff SOME warrant is sandbox — so its symbols load iff `not all_host`.
     all_host = True
-    for _pk, _pc, _ps, _pr, _prr, _pt, _pcons in parsed:
+    for _pk, _pc, _ps, _pr, _prr, _pt, _pcons, _pb in parsed:
         if _pc and ((_pt if _pt else proj_tier) == "sandbox"):
             all_host = False
             break
@@ -552,9 +631,26 @@ def _bib_repo_impl(repository_ctx):
     # The store is where provenance lives ("256 rests on 79 cells, 76-216MB, measured when"); the
     # projection is where the build reads a number.  Regenerate with tools/mem_project.py — the
     # generate-and-gate discipline (project-dont-author), not a hand-maintained copy.
+    # ⚑⚑ Σ-F8 — WATCH BEFORE THE EXISTENCE TEST, NOT INSIDE IT.  `repository_ctx.watch()` accepts a
+    # NON-EXISTENT path, and watching one is how a repo rule learns that the file later APPEARED.
+    # Guarding the watch behind `.exists` meant a project with no manifest recorded no dependency on
+    # that path, so generating its first `mem.json` was INVISIBLE: the rule never re-ran and every
+    # cell kept `mem = 0`, the cold-start floor, climbing 4→8→16→32MB with four killed processes
+    # before one survived.
+    #
+    # ⚑ PROVEN FROM THE MARKER FILES, not argued — Bazel records what each rule watched:
+    #     @+bib+paperkit_arch.marker    → paper.toml, warrants.bib          (NO mem.json)
+    #     @+bib+paperkit_library.marker → concepts.bib, mem.json, paper.toml (WATCHED)
+    # Same generator, same code path, opposite outcome, decided solely by whether the file existed
+    # when the rule last ran.  Eleven of thirteen projects are the appearing case.
+    #
+    # ⚑ And it is what THIS BLOCK'S OWN COMMENT already promises: "watching the projection
+    # invalidates exactly when a RESERVATION changes" — a manifest appearing IS a reservation
+    # changing, from the cold-start floor to a learned value.  The unguarded form is also already
+    # the idiom for a must-read input in this same file (the warrant read at :590).
     memp = repository_ctx.path(repository_ctx.attr.bib).dirname.get_child("mem.json")
+    repository_ctx.watch(memp)
     if memp.exists:
-        repository_ctx.watch(memp)
         mem = json.decode(repository_ctx.read(memp))
 
     out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")']
@@ -633,7 +729,7 @@ def _bib_repo_impl(repository_ctx):
     # intends downstream views to cite, and accepts that renaming one is a breaking change.
     wvis = ', visibility = ["//visibility:public"]' if repository_ctx.attr.owns_warrants else ""
     vis = ', visibility = ["//visibility:public"]'  # the owner EXPORTS per-concept records for views to import
-    for k, check, sib, reads, rests, tier, consumes in parsed:
+    for k, check, sib, reads, rests, tier, consumes, builds in parsed:
         if not check:
             continue
         # Ζ·tier — the warrant's effective tier: its own `tier = {…}`, else the project default.  A
@@ -690,7 +786,20 @@ def _bib_repo_impl(repository_ctx):
             # a key it AUTHORS; this one refuses a VIEW citing a key the library does NOT author.
             # Same dangling label, same `missing input file` hours later — only the direction of
             # the mistake differs, and a key rename in concepts.bib produces exactly this one.
-            lbl = _import_label("concept:" + key, k, key, "library", repository_ctx.attr.exports,
+            # ⚑ Ζ·lib·land — "paperkit/library" is the concept library's PROJECT PATH, and this is a
+            # HAND-HELD COPY of a name MODULE.bazel already declares.  It moved from "library" when
+            # the library went INSIDE the package (setuptools package data must live under a
+            # package), and this literal did not move with it: every view's `concept:` check emitted
+            # a label naming a project that was no longer wired, and the fetch refused with
+            # "NOT A WIRED PROJECT ... Wired: ., boundaries, config, demo, guide, paper,
+            # paperkit/library, render, setup, talk" — the guard reporting the stale copy correctly.
+            # ⚑⚑ THE COPY IS THE DEFECT, NOT THE VALUE.  `owns_concepts` is a per-project BOOL, so a
+            # CONSUMING repository cannot ask which project owns concepts — it can only be told, and
+            # here it is told by a literal.  Λ·registry at the module-extension layer: the owner
+            # declares, and the consumer should resolve rather than restate.  Threading the owner's
+            # name through the extension is the fix; this line tracks the rename until then.
+            lbl = _import_label("concept:" + key, k, key, "paperkit/library",
+                                repository_ctx.attr.exports,
                                 repository_ctx.attr.wired, "owns_concepts = True")
             out.append("pk_result(name = " + _lit(k) + ', sibling_verdict = "' + lbl + '")')
             imported_cert[k] = lbl + "__dcalc"
@@ -702,10 +811,25 @@ def _bib_repo_impl(repository_ctx):
             # Ζ·tier — only a SANDBOX warrant is swept (the `wt == "sandbox"`): the sweep is hermetic
             # (calc.bzl has no host-escape), so a host-coupled check cannot be mutation-swept; it falls
             # to the `else` verb-rule branch and is GATED but not graded.
-            dl = ", ".join([_lit(d) for d in _data(reads, files, imports)])
+            # ⚑ Ζ·builds·calc — `builds` MUST JOIN HERE TOO, AND IT DID NOT.  _verb_rule (:270)
+            # appends the builds labels to its data — "a `builds` label is ALREADY a Bazel label, so
+            # it joins `data` directly" — but this branch recomputed dl from _data alone, so a
+            # warrant whose ONLY declaration was `builds` staged nothing extra in its SWEEP cell.
+            # MEASURED: arch-projects, arch-report-scope and arch-roster-wired declared per-file
+            # labels, the generated cell read `data = ["@@//arch:files", "@@//paperkit:engine"]`,
+            # and all three came back baseline=refuted in a pristine sandbox.  It stayed invisible
+            # because bnd-wheel — the field's only prior user — is consumed by its GATE, which does
+            # get the labels; the grading path was never exercised with a builds-only claim.
+            dl = ", ".join([_lit(d) for d in _data(reads, files, imports)] + [_lit(b) for b in builds])
+            # ⚑ Ζ·builds·path — `builds` IS PASSED TWICE, AND BOTH ARE LOAD-BEARING.  It joins `dl`
+            # so the sweep cell STAGES the artifact, and it is emitted as its own attr so the cell
+            # can EXPORT it (PAPERKIT_BUILT_ARTIFACTS names only declared-built artifacts, not
+            # every staged file).  Without the second, bnd-wheel's grade cell had the wheel in its
+            # inputs and still reported `CANNOT RUN — //paperkit:wheel is not staged`.
+            cbs = "" if not builds else ", builds = [" + ", ".join([_lit(b) for b in builds]) + "]"
             out.append("pk_calc(name = " + _lit(k + "__calc") + ", claim = " + _lit(k) +
                        ", project = " + _lit(proj) + ", mem = " + str(_membucket(mem, k, "file")) +
-                       ", data = [" + dl + "])")
+                       cbs + ", data = [" + dl + "])")
             out.append("pk_verdict(name = " + _lit(k) + ", calc = " + _lit(":" + k + "__calc") + (vis if owns else "") + ")")
             calc_claims[k] = True
             if emerge and (closures.get(k) or rroots.get(k)):
@@ -821,12 +945,14 @@ def _bib_repo_impl(repository_ctx):
                 # (pk_calc resolution=def) computes exactly that {claim, baseline, sens:∅}, so pk_cohere
                 # consumes a __dcalc for EVERY emerge calc claim uniformly (the grid just optimizes the
                 # witness subset — a projection, not a special case).
+                # Ζ·builds·path — the def-resolution calc needs the export for the same reason.
                 out.append("pk_calc(name = " + _lit(k + "__dcalc") + ", claim = " + _lit(k) +
                            ", project = " + _lit(proj) + ', resolution = "def", mem = ' +
-                           str(_membucket(mem, k, "def")) + ", data = [" + dl + "]" + (vis if owns else "") + ")")
+                           str(_membucket(mem, k, "def")) + cbs + ", data = [" + dl + "]" +
+                           (vis if owns else "") + ")")
         else:
             out.append(_verb_rule(k, check, proj, files, reads, custom, wt, consumes, imports, wvis,
-                                  repository_ctx.attr.exports, repository_ctx.attr.wired))
+                                  repository_ctx.attr.exports, repository_ctx.attr.wired, builds))
         recs.append('":%s"' % k)
 
     if calc_claims:
@@ -888,6 +1014,24 @@ def _bib_repo_impl(repository_ctx):
     out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + "".join([", " + _lit(i) for i in imports]) + ', "@@//paperkit:engine"])')
     recs.append('":invariants"')
 
+    # Ν-F7 — genres — INVOKE every genre this project DECLARES, on the `:invariants` model: a
+    # whole-project meta-check, at the project tier, joining `recs` so a red fails the gate.
+    #
+    # ⚑ EMITTED ONLY WHEN THE PROJECT DECLARES ONE.  A check that runs over an empty registry is
+    # green by vacuity, and eleven of this repo's twelve projects declare no genre — so an
+    # unconditional target would add eleven green rows asserting nothing and one that matters,
+    # which is the `--without-K` collapse in target form.
+    #
+    # ⚑ IT RUNS `genre.py --check`, WHICH ALREADY INVOKES EACH DECLARED `cmd` (tick 28) AND HOLDS
+    # THE RESULT TO `is_total` VIA `run_declared` — the same seam `--observe` uses.  Re-implementing
+    # the protocol here would give the build a second reading of what a pagination is, free to
+    # drift from the engine's.  The generator's job is to WIRE the oracle, not to be one.
+    if repository_ctx.attr.genres:
+        gen = "\"$(command -v python3)\" paperkit/genre.py --check " + proj
+        out.append("pk_cmd(name = \"genres\", cmd = " + _lit(gen) + lc + ", data = [" + _lit(files) +
+                   "".join([", " + _lit(i) for i in imports]) + ', "@@//paperkit:engine"])')
+        recs.append('":genres"')
+
     # pk_gate aggregates the records → the project verdict; the assert-test puts it in the live gate.
     out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
     # Ζ·gate·detail — stage the PER-CLAIM records beside the aggregate, so a red names the claims
@@ -901,7 +1045,7 @@ def _bib_repo_impl(repository_ctx):
         # pk_adequacy; the assert-test puts it in //:hook.  (The old discriminate.py sweep sh_test
         # is retired; discriminate.py stays as the per-claim grade ORACLE behind pk_grade_claim.)
         grades = []
-        for k, check, sib, reads, rests, tier, _consumes in parsed:
+        for k, check, sib, reads, rests, tier, _consumes, _builds in parsed:
             if not check:
                 continue
             # Ζ·tier — a NON-sandbox warrant (local or toolchain) is GATED but not GRADED: the adequacy
@@ -956,7 +1100,7 @@ def _bib_repo_impl(repository_ctx):
     # (not in //:hook).  Ζ·tier — a `local` (host-coupled) WARRANT's footprint needs the host, so it
     # is skipped per-warrant; the audit is still emitted for a project with ANY sandbox warrant.
     foots = []
-    for k, check, sib, reads, rests, tier, _consumes in parsed:
+    for k, check, sib, reads, rests, tier, _consumes, _builds in parsed:
         if not check or sib or check.startswith("concept:"):  # result:/concept: are import edges — no local footprint
             continue
         if (tier if tier else proj_tier) != "sandbox":   # a host-run warrant's footprint needs the host
@@ -971,10 +1115,10 @@ def _bib_repo_impl(repository_ctx):
         # Ζ·compose — each claim's WITNESS as a build artifact; rests-on as build DEPS (the grounding
         # DAG IS the build DAG).  `bazel build //<proj>:proof` builds every witness — build-success =
         # proven, and an unproven premise blocks every claim resting on it.  On-demand (not //:hook yet).
-        checked = {k: True for k, check, sib, reads, rests, tier, _consumes in parsed if check}
+        checked = {k: True for k, check, sib, reads, rests, tier, _consumes, _builds in parsed if check}
         wits = []
         pj = "" if proj == "." else ", project = " + _lit(proj)
-        for k, check, sib, reads, rests, tier, _consumes in parsed:
+        for k, check, sib, reads, rests, tier, _consumes, _builds in parsed:
             if not check:
                 continue
             prem = ['":%s__witness"' % r for r in rests if r in checked]
@@ -1014,6 +1158,12 @@ bib_repo = repository_rule(
         # emitted every library cell with an EMPTY `--check` (measured: `eval.py: error: argument
         # --check: expected one argument`, three cells, //:hook red).  ONE owner, two readers.
         "witness": attr.string(default = ""),
+        # Ν-F7 — the genre NAMES this project declares, resolved by _declared_genres in the
+        # extension (the only layer that can read paper.toml) and passed in, exactly as `witness`
+        # is.  Non-empty ⇒ emit a `:genres` check that INVOKES each declared `cmd`.  Empty ⇒ no
+        # target, because a project declaring no genre has nothing to gate and an always-emitted
+        # check would be green-by-vacuity on eleven of twelve projects.
+        "genres": attr.string_list(default = []),
         "owns_concepts": attr.bool(default = False),  # Λ·witness: the concept LIBRARY — its per-concept verdict + def-cert are PUBLIC, imported by views' concept: checks
         "owns_warrants": attr.bool(default = False),  # Λ·delegate: this project EXPORTS its per-claim verdict records, so a sibling result:<proj>#<claim> can import ONE warrant instead of the whole gate
         # Ζ·grid·sibling — the cross-project IMPORT SURFACE, resolved once in the extension (the
@@ -1052,7 +1202,7 @@ def _bib_ext_impl(module_ctx):
             # from `cmd`.  Unconditional, not gated on emerge: _claim_script returns None for a
             # project declaring no `[checks.claim]`, and a project that HAS one owes the key
             # whether or not it builds a grid.
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, owns_warrants = tag.owns_warrants, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [], witness = _claim_script(module_ctx, tag.project) or "", exports = exports, wired = wired)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, owns_warrants = tag.owns_warrants, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [], witness = _claim_script(module_ctx, tag.project) or "", genres = _declared_genres(module_ctx, tag.project), exports = exports, wired = wired)
 
 bib = module_extension(
     implementation = _bib_ext_impl,

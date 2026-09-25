@@ -76,7 +76,7 @@ def _write_atomic(path, data):
         raise
 
 
-def _write(out, verb, verdict, why=""):
+def _write(out, verb, verdict, why="", account=None):
     """Ζ·cohere·mute — the record may CARRY ITS REASON, and omitting it is a lossy verdict.
 
     `why` is optional and absent from the JSON when empty, so every existing record is
@@ -97,6 +97,30 @@ def _write(out, verb, verdict, why=""):
     rec = {"verb": verb, "verdict": verdict}
     if why:
         rec["why"] = why
+    # ⚑ Ζ·cell·account — the CHECK's own stderr, folded into the record on a non-pass.
+    #
+    # Ζ·rungate·why stopped DISCARDING a check's stderr and that was only half the fix: a pk_* cell
+    # EXITS 0 and reports its verdict as a RECORD, so bazel never sees a failed action and never
+    # prints the stderr it captured.  The channel was reopened and nothing reads it.  MEASURED:
+    # four boundary suites went RED in the cell while passing on the host, and their verdict files
+    # held `{"verb":"cmd","verdict":"fail"}` and nothing else — no traceback, no assertion, no line.
+    #
+    # ⚑⚑ AND RE-RUNNING ON THE HOST CANNOT SUBSTITUTE, which verb.bzl already recorded on
+    # 2026-09-01: a suite "green on host and red in the cell ... could not be advanced at all
+    # without re-running the witness by hand OUTSIDE the cell — which measures a different
+    # environment, so it answers a different question."  I did exactly that this session, called
+    # four suites fixed on host evidence, and the gate disagreed.
+    #
+    # PASS carries no tail: a green check's stderr is noise, and every passing record stays
+    # byte-identical — the same non-breaking widening `why` took above.
+    if account and verdict != "pass":
+        try:
+            tail = [ln for ln in pathlib.Path(account).read_text(
+                errors="replace").splitlines() if ln.strip()][-40:]
+        except OSError:
+            tail = []
+        if tail:
+            rec["account"] = tail
     _write_atomic(out, json.dumps(rec, separators=(",", ":")) + "\n")
 
 
@@ -109,6 +133,10 @@ def main(argv):
         for e in extra:
             p.add_argument(e)
         p.add_argument("out")
+        # Ζ·cell·account — only `emit` runs a check and therefore has stderr to fold in.
+        if name == "emit":
+            p.add_argument("--account", default=None,
+                           help="file holding the check's stderr; its tail rides the record on a non-pass")
     pg = sub.add_parser("agg")
     pg.add_argument("verb")
     pg.add_argument("out")
@@ -133,7 +161,7 @@ def main(argv):
     if a.cmd == "emit":
         # Ζ·tier·exit — pk_cmd passes pass|fail|cannot-run; anything else is a caller bug → fail closed.
         v = a.ok if a.ok in ("pass", "fail", "cannot-run") else "fail"
-        _write(a.out, a.verb, v)
+        _write(a.out, a.verb, v, account=getattr(a, "account", None))
     elif a.cmd == "exists":
         _write(a.out, a.verb, pathlib.Path(a.path).exists())
     elif a.cmd == "agg":
@@ -154,7 +182,24 @@ def main(argv):
         def field_val(r):
             return str(json.loads(pathlib.Path(r).read_text()).get(a.field)).lower()
 
-        _write(a.out, a.verb, all(field_val(r) not in bad for r in a.records))
+        # ⚑ Ζ·account·verdict — NAME THE RECORDS THAT FAILED, never just the conjunction.
+        #
+        # This wrote `all(... for r in a.records)` — one bit for N records — and Ζ·cell·account's
+        # tail does not reach here: that folds a CHECK's stderr into a `cmd:` record, and a
+        # `verdict:` verb runs no command, so a red aggregate said `{"verb":"verdict","verdict":
+        # "fail"}` and nothing else.  MEASURED 2026-09-12: arch//:gate went red on arch-projects
+        # and arch-report-scope, both records held exactly that, and the claims PASS when run on
+        # the host — so the bare bit sent me diagnosing a staging gap that did not exist (I
+        # "found" an undeclared MODULE.bazel read; MODULE.bazel is in //:files and always was).
+        #
+        # ⚑⚑ THE OFFENDERS WERE ALREADY COMPUTED.  field_val(r) is evaluated for every record to
+        # decide the conjunction; only the names were thrown away.  Anywhere you assert an
+        # expression, print the terms it was computed from — the same defect boundaries_dispatch's
+        # seven-term arm had, one layer out, in the aggregator rather than the suite.
+        vals = [(r, field_val(r)) for r in a.records]
+        offenders = [(r, v) for r, v in vals if v in bad]
+        _write(a.out, a.verb, not offenders,
+               why="; ".join(f"{pathlib.Path(r).name}={v}" for r, v in offenders)[:400])
     elif a.cmd == "agree":
         # CONCURS — the producers' full outputs are all byte-equal (one distinct TEXT), none failed.
         # (Not one distinct LINE: a producer output is a whole document; collapsing to lines would

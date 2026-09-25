@@ -45,7 +45,20 @@ _SCALAR = ("title", "author", "year", "note", "section", "claim",
 # reversed (prose runs general→specific, grounding specific→general); `reads` =
 # the declared cross-package footprint (the declare+audit source, Ζ·foot);
 # `consumes` = sibling warrant keys whose verdict RECORD this check reads (records-as-deps).
-_LIST = ("from", "rests-on", "reads", "consumes")
+# ⚑ Ζ·builds·declare — `builds` IS ENGINE-OWNED, and it was declared in only ONE of the two readers.
+# tools/bibtex.bzl (the Starlark module extension) parses it at FETCH time and joins the labels into
+# each cell's `data`; paperkit/bib.py (the DOCUMENT-MODEL reader) did not know the name, so every
+# parse loud-dropped it.  MEASURED: arch//:gate red with three identical accounts —
+# "field 'builds' is not a paperkit field and was DROPPED (not silently)" — one per declaring claim.
+#
+# ⚑⚑ THE ROUTE MATTERS AND THIS FILE ALREADY RULED IT.  The alternative is a project declaring
+# `consumer_fields = ["builds"]`, which means CARRY IT, ENGINE-INERT — the wrong answer here,
+# because the engine is precisely what consumes it.  "A field is ENGINE-OWNED (_SCALAR / _LIST) or
+# PROJECT-DECLARED (consumer_fields), and anything else is named LOUDLY."  Whether a warrant can
+# name a BUILT ARTIFACT is a fact about paperkit, not about a document.
+#
+# `builds` = Bazel LABELS of built artifacts / exported files this check reads (not dirs, not keys).
+_LIST = ("from", "rests-on", "reads", "consumes", "builds")
 # Ξ·entails — the legal `entails` values.  Owned at the MODEL layer because the parser is
 # what must refuse a typo, and the parser may not reach up into the delta layer for a
 # constant.  grade.SCOPE_C ranks these; it does not re-list them.
@@ -332,6 +345,23 @@ def _param_config_keys() -> tuple:
     return tuple(out)
 
 
+# Ζ·toml·scope — tables whose keys are a DECLARED SCHEMA owned by another module, so a key name
+# shared with [paper] is a coincidence rather than a scoping error (Ι-F1).  Each entry names its
+# OWNER and the schema, because an exemption whose reason is "it's fine" launders a hole into a
+# decision: the inhabitant is the owning module, not this comment.
+#
+#   genres  →  genre.registry (genre.py:326) reads raw["genres"]; schema {what, cmd, gamma},
+#              documented in that docstring and named in genre.resolve's refusal message.
+#              `gamma` here is the GENRE'S DECLARED DEFAULT; [paper] gamma is the project-wide
+#              OVERRIDE (GAMMA = Param(…, config="gamma", default=None)).  Two parameters, one
+#              spelling.  claims.py:gamma_is_reachable gates that both exist.
+#
+# ⚑ NOT exempt, deliberately: [checks.*].  Its `cmd` shadowing trap is one of the three faces this
+# guard was built for, and its keys are NOT a closed schema owned elsewhere — a [paper] key landing
+# there is exactly the misplacement being caught.
+_SCHEMA_TABLES = frozenset({"genres"})
+
+
 def _misplaced_paper_key(cfg: Path) -> None:
     """Refuse LOUDLY if a [paper] key was declared in a table that is not [paper].
 
@@ -357,6 +387,33 @@ def _misplaced_paper_key(cfg: Path) -> None:
 
     REFUSES rather than warns: a warning is what the consumer already had, and it did not stop
     the build.
+
+    ⚑ TABLES WITH THEIR OWN SCHEMA ARE NOT MISPLACEMENTS (Ι-F1, 2026-09-10).  This guard tests key
+    NAMES against the [paper] key set, which is right for a table that has no schema of its own —
+    a key under [checks.claim] that happens to be `root` IS a misplaced `root`, because nothing
+    else owns that name there.  It is WRONG for a table whose keys are a declared vocabulary owned
+    by another module, where a shared name is a COINCIDENCE rather than a scoping error.
+
+    `[genres.<name>]` is such a table.  `genre.registry` (`genre.py:326`) owns it, its schema is
+    `{what, cmd, gamma}` — documented in that docstring and named in `resolve`'s refusal message —
+    and `spec.get("gamma", 1.0)` READS the key this guard was refusing.  The two `gamma`s are
+    different parameters that share a spelling:
+
+        [paper]  gamma  — the PROJECT-WIDE OVERRIDE, registered by
+                          `GAMMA = Param("gamma", …, config="gamma", default=None)`, whose own
+                          comment reads "overriding the genre's own … Default None = whatever the
+                          genre asks for"
+        [genres.X] gamma — THAT GENRE'S DECLARED DEFAULT, the value the override overrides
+
+    So refusing the second made the first's documented behaviour unreachable: there was nothing
+    left to override.  `paper/checks/claims.py:gamma_is_reachable` asserts exactly this —
+    *"γ is the resolution dial and must be REACHABLE, not frozen into each genre"* plus
+    `GAMMA.default is None` so *"a genre's declared γ is not overridden by a constant"* — a
+    PASSING gate stating that a genre declares its own γ, while this guard refused the declaration.
+
+    The exemption is therefore BY OWNERSHIP, not by key: a table listed here has another module
+    that defines what its keys mean, and this guard defers to it.  `[checks.*]` is deliberately NOT
+    exempt — its trap (the `cmd` shadowing case) is one of the three faces on record above.
     """
     import tomllib as _t
     keys = set(paper_keys()) | set(_param_config_keys())
@@ -371,7 +428,7 @@ def _misplaced_paper_key(cfg: Path) -> None:
         if k in keys and not isinstance(v, dict):
             _refuse(k, "at the top level of paper.toml (above any [paper] header)")
     for table, body in raw.items():                # any NON-[paper] table, and its subtables
-        if table == "paper" or not isinstance(body, dict):
+        if table == "paper" or table in _SCHEMA_TABLES or not isinstance(body, dict):
             continue
         for k, v in body.items():
             if k in keys and not isinstance(v, dict):

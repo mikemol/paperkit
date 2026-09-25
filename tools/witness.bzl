@@ -9,13 +9,13 @@ paper's results = treating it as a library); the package boundary is not semanti
 CROSS one (`result:`, `concept:`) get no special case here.  pk_proof builds the whole DAG (every witness); building it proves the paper.
 """
 
+load("@@//tools:cell.bzl", "cell_pypath")
+
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
 def _sq(s):
     return "'" + s.replace("'", "'\\''") + "'"
 
-def _pypath(py):
-    return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
 def _witness_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
@@ -31,7 +31,7 @@ def _witness_impl(ctx):
     ctx.actions.run_shell(
         outputs = [w],
         inputs = depset(ctx.files.premises + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + guard + "if ( " + inner + " ) >/dev/null 2>&1; then " +
+        command = cell_pypath(py) + guard + "if ( " + inner + " ) >/dev/null 2>&1; then " +
                   "echo '{\"claim\":\"" + ctx.label.name + "\",\"witness\":\"holds\"}' > " + w.path +
                   "; else echo 'witness " + ctx.label.name + " does not hold' >&2; exit 1; fi",
         mnemonic = "PkWitness",

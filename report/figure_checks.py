@@ -60,8 +60,34 @@ def shows_terminal():
     assert 'r="7.5"' in SVG, "no terminal rings drawn (every claim has a dependent?)"
 
 
+def shows_layout():
+    # Ρ·report·fig·layout — rpt-dag-fig's own witness: foundational atoms on the LEFT, the theses
+    # they ground on the RIGHT, the effective grade on the VERTICAL axis.
+    #
+    # ⚑ It used to share `fresh:dag.svg` with rpt-fig-data, whose claim is the different one that
+    # the figure is RENDERED FROM PIPELINE DATA, never placed by hand.  Freshness witnesses that
+    # the committed file matches its generator; it says nothing about what the generator LAID OUT,
+    # so a generator that plotted every node at one coordinate would still be fresh.  Two claims,
+    # one witness, neither discriminating — the collapse --without-K exists to name.
+    #
+    # The axes are read from the rendered figure rather than from figure.py, so this fails if the
+    # renderer stops encoding depth horizontally or grade vertically.
+    circles = re.findall(r"<circle[^>]*\bcx=\"([\d.]+)\"[^>]*\bcy=\"([\d.]+)\"", SVG)
+    assert len(circles) > 1, f"the figure plots {len(circles)} node(s) — nothing to lay out"
+    xs = {float(x) for x, _ in circles}
+    ys = {float(y) for _, y in circles}
+    assert len(xs) > 1, ("every node shares one x — grounding depth is not on the horizontal "
+                         "axis, so there is no atoms-left-to-theses-right walk")
+    assert len(ys) > 1, ("every node shares one y — the effective grade is not on the vertical "
+                         "axis")
+    # the axis is LABELLED as a grade axis, so "vertical position" is not merely incidental spread
+    assert re.search(r"<text[^>]*>\s*(behavioral|existence|imported|vacuous|indeterminate)\s*<",
+                     SVG), "no grade rung is labelled on the figure's vertical axis"
+
+
 CHECKS = {"okabe-ito": okabe_ito, "dark-on-light": dark_on_light, "well-formed": well_formed,
-          "shows-clamp": shows_clamp, "shows-terminal": shows_terminal}
+          "shows-clamp": shows_clamp, "shows-terminal": shows_terminal,
+          "shows-layout": shows_layout}
 
 
 def main(argv):

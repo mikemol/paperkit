@@ -1,14 +1,26 @@
 # Hand-maintained file manifest (Ζ·sunset) — a data dep of the Ζ·starlark-generated
 # @paperkit_report check graph; the bib is the source, this just lists the files.
+#
+# ⚑ Α·wired·scope — THIS MANIFEST WAS INCOMPLETE, AND NOTHING COULD SAY SO.  The comment above
+# calls it a data dep of the @paperkit_report check graph — but report/ carried no bib.project in
+# MODULE.bazel, so that repo did not exist and this filegroup fed no target.  A manifest that
+# stages nothing cannot be wrong: determinism.py and mitigation.py were absent from it while
+# rpt-reproducible and rpt-mitigation invoked them by name, and the omission was free.  Wiring the
+# project is what makes a missing file a BUILD failure instead of a silent nothing.
 filegroup(name = "files", srcs = [
         "REPORT.md",
         "assets/dag.svg",
         "assets/delta.md",
         "assets/gate.md",
         "assets/without-k.md",
+        "determinism.py",   # rpt-reproducible
+        "distinct.py",      # rpt-proof      — Α2: --without-K is CLEAN, not merely rendered
         "figure.py",
         "figure_checks.py",
+        "grades.py",        # rpt-delta      — Α2: Δ grades by falsifiability, not a constant label
+        "grounding.py",     # rpt-dag        — Α2: the grounding graph is a walkable DAG
         "gen.py",
+        "mitigation.py",    # rpt-mitigation
         "paper.toml",
         "rubric.tsv",
         "warrants.bib",
@@ -16,4 +28,4 @@ filegroup(name = "files", srcs = [
 
 # Ζ·ladder·wire — the ladder's downstream readers, referenceable as individual file targets so the
 # root manifest can stage them for boundaries' bnd-ladder check (mirrors tools/BUILD.bazel).
-exports_files(["gen.py", "figure.py"])
+exports_files(["gen.py", "figure.py", "paper.toml"], visibility = ["//visibility:public"])

@@ -43,6 +43,13 @@ _FIELD_DOC = {
     "consumes": ("sibling warrant keys whose verdict RECORD this check reads (records-as-deps: the "
                  "sibling runs once and is memoized; its verdict.json is a declared bazel input, "
                  "exported in PAPERKIT_CONSUMED_RECORDS as key=path — Ρ·wcag·oracle-edge)", "warrant"),
+    # ⚑ Ζ·fields·gloss — `builds` was added to bib._LIST (Ζ·builds·declare) and this gloss was
+    # NOT, so render() raised "undocumented bibliography field(s) ['builds']" and rm-fields went
+    # red.  The generator refusing is correct: project, don't author — the SET comes from the
+    # parser, and a field with no gloss would emit an undocumented row.
+    "builds":   ("Bazel LABELS of built artifacts or exported files this check reads — not "
+                 "directories (that is `reads`) and not sibling warrant keys (that is `consumes`); "
+                 "staged as action inputs so a claim about an ARTIFACT can name the artifact", "warrant"),
 }
 
 # What each [paper] key controls.  The KEY SET is derived below from load_config's own source.

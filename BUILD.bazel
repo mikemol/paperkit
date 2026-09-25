@@ -3,6 +3,25 @@
 # source, no checked-in BUILD projection.  This file keeps only: the root project's file manifest
 # (:files — a data dep of the generated targets; includes this BUILD + MODULE so bnd-check can read
 # them), and the local-CI suite (//:hook).
+# Ζ·wheel·phantom — pyproject.toml is the wheel's METADATA INPUT (it selects `packages` and
+# `package-data`), so //paperkit:wheel must reference it as a label.  Unexported, that reference
+# failed analysis with "target not declared ... however, a source file of this name exists" —
+# the same shape as the missing pk_wheel rule one layer up: a use with no declaration behind it.
+# ⚑ Ζ·reads·file — MODULE.bazel AS A LABEL, so a witness can depend on THE FILE rather than on
+# `//:files`.  Five boundaries suites read MODULE.bazel and/or paperkit/components.bzl; the only way
+# to stage them was `reads = {.}`, which pulls the ENTIRE root filegroup and re-keys every such cell
+# on any root-file edit.  Operator's ruling: "we shouldn't express a dependency on //:files.
+# Instead, we should express dependencies on the specific files needed."  `builds` already carries
+# Bazel LABELS (bibtex.bzl:270 — "a `builds` label is ALREADY a Bazel label, so it joins `data`
+# directly"), so exporting the file is the whole enabling change.  components.bzl is already
+# exported at paperkit/BUILD.bazel:57.
+# ⚑ Ζ·exports·visible — PUBLIC, because exports_files DEFAULTS TO PRIVATE and the bib-generated
+# repos are EXTERNAL (@@+bib+paperkit_arch).  Measured: the twelfth gate attempt died in
+# ANALYSIS with "target '//:paper.toml' is not visible from @@+bib+paperkit_arch//:...", 0
+# of 2 tests run.  Every filegroup here already says visibility=public; the exports_files
+# calls never did, and nothing cross-repo depended on them until per-file `builds` labels.
+exports_files(["pyproject.toml", "MODULE.bazel", "paper.toml"], visibility = ["//visibility:public"])
+
 filegroup(name = "files", srcs = [
         ".containerignore",
         ".githooks/pre-commit",
@@ -49,6 +68,16 @@ filegroup(name = "files", srcs = [
         # Ζ·hook·index — bnd-hook-index gates the equivalence predicate's pure core.
         "//tools:hook_index.py",
         "//tools:otlp_push.py",
+        # ⚑ Ζ·cell·account — bnd-logs-push and bnd-mem-db raised ModuleNotFoundError INSIDE
+        # the cell while passing on the host, which is the failure this manifest's
+        # Ζ·pyc·package note already records ("five boundary suites reddened exactly that
+        # way").  Their suites import these BY NAME; undeclared, the editable install
+        # supplies them on the host and nothing supplies them in the sandbox.
+        "//tools:logs_push.py",
+        "//tools:mem_db.py",
+        # mem_db imports mem_learn BY NAME; the account channel surfaced it only after
+        # mem_db itself resolved — each declaration advances the diagnosis one named step.
+        "//tools:mem_learn.py",
         # ⚑ Ζ·pyc·package — `tools` IS A PACKAGE IN THE SANDBOX ONLY IF ITS MARKER IS STAGED.
         # This manifest listed individual `tools/*.py` files and no `__init__.py`, which was
         # sufficient while every consumer reached them by `sys.path.insert` + a flat import.  A
@@ -91,6 +120,23 @@ test_suite(name = "hook", tests = [
     "@paperkit_root//:gate",
     "@paperkit_paper//:gate",
     "@paperkit_boundaries//:gate",
+    # Ζ·boundaries·adequacy — the 49 witnesses that gate the ENGINE'S OWN TOOLS are now SWEPT, not
+    # merely run.  Gated-but-never-graded is the one hole a boundary suite must not have: a vacuous
+    # lint would pass forever while the tools it certifies went uncertified.
+    #
+    # ⚑ AND bnd-check CAUGHT THE MISSING HALF OF THIS EDIT, WHICH IS THE POINT.  Setting
+    # adequacy=True in MODULE.bazel created a graded project whose adequacy target was not a member
+    # here, and bnd-check went red on exactly that — its own delta pair names the case (dropping the
+    # boundaries adequacy target from the hook is CAUGHT as an incomplete local CI).  That is the
+    # hand-transcribed grid rotting the instant a project gains a kind, per the class note below,
+    # detected this time rather than silently.
+    "@paperkit_boundaries//:adequacy",
+    # Λ·arch — ARCHITECTURE.md's structural COUNTS, gated.  ⚑ hook_grid CAUGHT BOTH OF THESE
+    # MISSING, exactly as the note above records for boundaries: a project gains a kind and the
+    # hand-transcribed grid rots the same instant.  Third recorded instance of the class, detected
+    # rather than silent, which is why Η's gate exists.
+    "@paperkit_arch//:gate",
+    "@paperkit_arch//:adequacy",
     # Ζ·hook-rot — config is wired (bib.project) but declares neither adequacy nor emerge, so
     # bnd-check's completeness never OWED it a member; its gate rotted silently outside the hook.
     # Ζ·config·adequacy — now ADEQUACY-graded too, not gate-only.  Four cmd: checks against the

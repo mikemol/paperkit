@@ -1,4 +1,4 @@
-load("//tools:calc.bzl", "pk_pyc")
+load("//tools:calc.bzl", "pk_pyc", "pk_wheel")
 load("//paperkit:dag.bzl", "IMPORTS")
 load("//paperkit:components.bzl", "COMPONENTS")
 
@@ -29,9 +29,34 @@ filegroup(
 
 exports_files(ENGINE_SRCS)
 
+# Ζ·venv·install — the engine's WHEEL: what a cell INSTALLS the engine from, rather than a .pth
+# naming a root that resolves through a symlink into the live tree.  One host-tier action (uv),
+# byte-reproducible, keyed on ENGINE_SRCS + pyproject.toml; every cell installs this artifact with
+# stdlib zipfile alone.  `library/` is NOT in it (resolver._LIBRARY walks up out of the package —
+# the open Ζ·cite·resolve arc), so a `concept:` check still needs the library staged as data.
+pk_wheel(
+    name = "wheel",
+    # ⚑ ENGINE_SRCS ALONE, AND THE FIRST DRAFT ADDED `//tools:files` — which is the OVER-declared
+    # half of the glob defect.  A declared input that the output does not depend on does not cause a
+    # false green; it busts the cache, and here it would bust EVERY cell's venv on any tools/ edit.
+    # Since Ζ·wheel·tools the wheel ships `paperkit` only (pyproject's `packages`), so the honest
+    # input set is the engine sources and the metadata that selects them — nothing wider.
+    # ⚑ AND THE PACKAGE DATA, WHICH THE HERMETIC BUILD PROVED WAS MISSING.  This staged the .py
+    # modules alone and the wheel came out with 26 modules and ZERO library files — setuptools
+    # cannot include package data that is not in the tree it builds from.  It had looked right only
+    # because `uv` ran UNSANDBOXED against the live checkout, so the library was present by accident
+    # of location rather than by declaration: a build reading files it never declared, and passing.
+    # bnd-wheel asserts the ARTIFACT's contents precisely so that direction cannot hide.
+    srcs = ENGINE_SRCS + ["//paperkit/library:files"],
+    pyproject = "//:pyproject.toml",
+    visibility = ["//visibility:public"],
+)
+
 # Μ·kernel·wire — the partition and the import DAG are FILES as well as loads, so the
 # bnd-components guard (staged via //:files) can verify the boundary from the owners.
-exports_files(["components.bzl", "dag.bzl"])
+# ⚑ Ζ·exports·visible — PUBLIC: bib-generated repos are EXTERNAL and exports_files defaults to
+# private, so a per-file `builds` label from another repo cannot see these without it.
+exports_files(["components.bzl", "dag.bzl"], visibility = ["//visibility:public"])
 
 # Ζ·pyc·engine — the engine's COMPILED form: one pk_pyc per module (one .cc → one .o), so editing a
 # module recompiles only its .pyc.  The output preserves the module's path (tests/_fixture_model.py →

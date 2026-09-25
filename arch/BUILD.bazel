@@ -1,0 +1,43 @@
+# Λ·arch — the data deps of the Ζ·starlark-generated @paperkit_arch check graph.
+#
+# ⚑ EVERY FILE A WITNESS READS MUST BE LISTED (Α-F2, Μ-F1).  `report/BUILD.bazel` once staged a
+# manifest missing two witness files while their claims invoked them by name, and Μ.1's `:genres`
+# target failed in the sandbox with four `[Errno 2]` for exactly this reason: a file on disk that
+# no manifest names is invisible to the build.  These witnesses read the ENGINE's manifests
+# (components.bzl, MODULE.bazel, tools/*.bzl) and `report/gen.py`, which arrive via
+# `@@//paperkit:engine` and the sibling filegroups rather than from here.
+filegroup(
+    name = "files",
+    srcs = [
+        # ⚑ Σ-F5 — `ARCH.md` IS THE `out` AND MUST BE STAGED.  Omitting it made every one of this
+        # project's six claims RED in the sandbox with one cause: `invariants` reported
+        # "ARCH.md not built — run paperkit-project", because the gate compares the committed
+        # document against a fresh projection and the document was not there.  Measured at tick 44:
+        # 6 claims red, 1 root cause, and the gate had passed on the HOST all along (where the file
+        # exists) — the host/sandbox split that Μ-F1 records for `:genres` and Σ-F3 for Pillow.
+        #
+        # ⚑ The distinction `talk/BUILD.bazel` draws is the one to follow: the `out` document IS
+        # listed (it is what `≡ projection` compares), while FURTHER-derived artifacts are not —
+        # listing a deliverable as a source input would make the artifact an input to its own gate.
+        "ARCH.md",
+        # Σ-F1 — the LEARNED memory manifest.  Without it every cell starts at `calc.bzl`'s
+        # cold-start floor and climbs 4→8→16→32MB, four killed processes before one survives
+        # (measured: 19 OOM retries in the first ~70 actions of the tick-41 graph run).  Generated
+        # by `bazel build --config=memobserve @paperkit_arch//:mem_learn`, which is the ONLY
+        # configuration where the peak channel is on — a default build writes the sentinel `0`
+        # and `mem_learn` correctly drops it rather than learning a false floor (Χ-F7).
+        "mem.json",
+        "paper.toml",
+        "rubric.tsv",
+        "warrants.bib",
+        "checks/arch.py",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# ⚑ Ζ·exports·visible — PUBLIC, because exports_files DEFAULTS TO PRIVATE and the bib-generated
+# repos are EXTERNAL (@@+bib+paperkit_arch).  Measured: the twelfth gate attempt died in
+# ANALYSIS with "target '//:paper.toml' is not visible from @@+bib+paperkit_arch//:...", 0
+# of 2 tests run.  Every filegroup here already says visibility=public; the exports_files
+# calls never did, and nothing cross-repo depended on them until per-file `builds` labels.
+exports_files(["paper.toml", "warrants.bib"], visibility = ["//visibility:public"])

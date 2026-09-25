@@ -61,6 +61,15 @@ def _deps_absent() -> str | None:
             return sty + ".sty"
     if a11y._find_verapdf(None) is None:    # the UA-2 gate needs veraPDF; absent → cannot-run, not a crash
         return "verapdf"
+    # ⚑ Σ-F4 — pikepdf BELONGS IN THIS ROSTER: `_selftest` imports it directly, so its absence was
+    # a `ModuleNotFoundError` the gate read as a FAILED verification while four sibling checks
+    # reported the same missing library as cannot-run.  The roster is what makes the difference
+    # between "the toolchain is not here" and "the claim is false", so a dependency missing FROM
+    # the roster is a dependency whose absence lies.
+    try:
+        import pikepdf  # noqa: F401
+    except ImportError:
+        return "pikepdf"
     return None
 
 
@@ -129,12 +138,21 @@ def build(paper_md: Path, out_pdf: Path, work: Path) -> Path | None:
 
 
 def main(argv: list[str]) -> int:
-    if argv and argv[0] == "--selftest":
-        return _selftest()
+    # ⚑ Σ-F4 — THE GUARD RUNS FIRST, FOR BOTH PATHS.  `--selftest` used to branch ABOVE this
+    # check, so the one path that imports pikepdf directly was the one path that never consulted
+    # the toolchain roster: `ModuleNotFoundError` propagated and the gate scored a missing library
+    # as a REFUTATION.  Σ-F3 was this same shape at two other entry points; here the guard already
+    # existed and a branch simply jumped over it.
+    #
+    # ⚑ The selftest is a ⟨P,F,δ⟩ proof of the METHOD, so it is exactly the thing that cannot be
+    # honestly run without the method's tools — a selftest that "passes" by not testing is the
+    # unfalsifiable check this repo grades `vacuous`.
     absent = _deps_absent()
     if absent:
         print(f"latex: {absent} absent — CANNOT BUILD (not a pass)", file=sys.stderr)
         return 3                                            # cannot-run, not a green
+    if argv and argv[0] == "--selftest":
+        return _selftest()
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         pdf = build(Path("../paper/paper.md"), d / "paper.pdf", d)

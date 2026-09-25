@@ -48,6 +48,25 @@ from paperkit.tests._boundary import Suite
 
 ENG = Path(__file__).resolve().parent.parent
 ROOT = ENG.parent
+def _edges_of(dag_text: str, module: str) -> list:
+    """⚑ Ζ·dag·coedge — THE RECORDED EDGES OF ONE MODULE, PARSED, NOT SUBSTRING-MATCHED.
+
+    Two arms below asserted the rendered line verbatim — `\'"genre.py": ["durable.py"]\' in
+    dag.read_text()` — which holds only while the probe module has NO OTHER EDGE.  That was true
+    when they were written and stopped being true the moment `genre.py` gained one
+    (Ζ·spawn·owner\'s `from resolver import spawn_declared` in its `__main__` block), so the line
+    renders `["durable.py", "resolver.py"]` and the substring misses.
+
+    MEASURED 2026-09-13: both arms red while every other arm — staleness, repair, round trip,
+    idempotence, the package spelling — passed.  The GENERATOR was correct; the assertion was
+    coupled to a co-edge it never meant to constrain.  The property is MEMBERSHIP: `durable.py`
+    is recorded among the probe module\'s edges, whatever else is.
+    """
+    import re as _re
+    m = _re.search(r'"%s": \[([^\]]*)\]' % _re.escape(module), dag_text)
+    return _re.findall(r'"([^"]+)"', m.group(1)) if m else []
+
+
 ANCHOR = "import sys\n"
 EDGE = "import sys\nimport durable  # boundaries_dag_regen probe\n"
 # ⚑ Ζ·dagderive·pkg — THE SAME EDGE, WRITTEN THE OTHER WAY.  `import durable` and `from paperkit
@@ -122,7 +141,7 @@ def main() -> int:
         # ⚑ THE VALUE IS A PATH (Ξ·dag·dotted): `durable.py`, not `durable`.  This arm is what
         # pins the rename — a regression to bare stems reds here rather than in a sweep.
         s.check("   ...and the new edge is actually IN the file, as a module PATH",
-                '"genre.py": ["durable.py"]' in dag.read_text())
+                "durable.py" in _edges_of(dag.read_text(), "genre.py"))
         rc, _ = run("--check")
         s.check("   ...so --check is green again", rc == 0)
 
@@ -151,7 +170,7 @@ def main() -> int:
         rc, _ = run("--write")
         s.check("--write accepts the package spelling", rc == 0)
         s.check("   ...and records the SAME edge the flat form does",
-                '"genre.py": ["durable.py"]' in dag.read_text())
+                "durable.py" in _edges_of(dag.read_text(), "genre.py"))
 
         probe.write_text(pristine_probe)
         run("--write")

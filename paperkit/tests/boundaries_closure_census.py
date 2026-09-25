@@ -39,8 +39,32 @@ from pathlib import Path
 # bootstrap five times, which is the only reason `tools/sortaudit.py` exists), and ambiguous (two
 # directories named `tools`).  Removing the mutation retires all three.  This file is the first
 # one converted; `pathaudit` enumerates the remaining 95.
-from paperkit.tests._boundary import Suite
-from tools import closure_census as cc
+# ⚑ Ζ·closure·script — THE PREMISE ABOVE WAS TRUE AT HEAD AND IS FALSE IN THIS CUT.
+#
+# It says `pyproject.toml` declares `packages = ["paperkit", "tools"]`, so both import from any
+# directory.  HEAD does say that; the staged pyproject says `["paperkit", "paperkit.tests"]` —
+# `tools` was DROPPED, deliberately and with the measurement recorded in that file: declaring it
+# shipped 48 `tools/*.py` modules against a prohibition stated one paragraph down, because
+# `exclude-package-data` governs a package's DATA and not its modules.  The block's own words:
+# "`tools` is importable in the dev environment because the repo root is on the path when working
+# there ... that marker is a committed file, not a `packages` entry."
+#
+# ⚑⚑ AND "THE REPO ROOT IS ON THE PATH" DOES NOT HOLD WHERE THIS CHECK RUNS.  `pk_cmd` does
+# `cd <project>`, so cwd is `boundaries/`, not the root.  MEASURED both ways:
+#
+#     cwd=<repo root>   from tools import closure_census  ->  OK
+#     cwd=boundaries/   from tools import closure_census  ->  ImportError
+#
+# and in the cell it surfaced as `ModuleNotFoundError: No module named 'paperkit'`.  So the
+# import needs the root ON THE PATH, derived from __file__ rather than inherited from cwd —
+# which is exactly what the two sibling suites with the same dependency already do
+# (`boundaries_components.py` and `boundaries_dag_regen.py`, both
+# `sys.path.append(str(Path(__file__).resolve().parents[2]))`).  This restores that line; the
+# retirement was premised on a packages entry that no longer exists.
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
+from paperkit.tests._boundary import Suite  # noqa: E402
+from tools import closure_census as cc  # noqa: E402
 
 ENGINE = Path(__file__).resolve().parent.parent
 ROOT = ENGINE.parent

@@ -15,7 +15,6 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
@@ -62,11 +61,29 @@ def main() -> int:
         before = self_f.read_text().strip()
         build_f = W.CGROUP_ROOT / W.build_cgroup()[0].lstrip("/") / "cpu.weight"
         build_before = build_f.read_text().strip()
+        # ⚑ Ζ·arm·sound — AN ABSENT PRECONDITION IS `cannot-run`, NOT `fail`.  This arm WRITES the
+        # build cgroup's cpu.weight and asserts it reads back 37.  A sandboxed cell cannot write
+        # that file, so the arm reddened on a MISSING CAPABILITY while passing on the host — the
+        # exact fold the engine refuses everywhere else: "a cannot-run is not a refutation"
+        # (verb.bzl maps exit 3 to cannot-run, and verdict.py's aggregator bad-set is {fail}
+        # alone).  ⚑⚑ FOUND ONLY BECAUSE Ζ·account·stdout STARTED CARRYING THE CHECK'S OUTPUT: the
+        # verdict record held one bit and the suite prints its arms to stdout, which the cell
+        # discarded.  The probe is the OWNER's own `_writable_weight_file`, already used one arm
+        # above — asking the module whether the capability exists rather than inferring it.
+        if build_f == self_f:
+            print(f"  ~~ δ: apply() — SKIPPED: the caller's cgroup IS the build's ({build_f}), so "
+                  "'weights the BUILD's' and 'leaves the CALLER's untouched' name one file and "
+                  "cannot both hold.  The property needs two DISTINCT cgroups to be measurable.")
+            raise SystemExit(3)
         try:
             W.apply(37)                               # default path: targets the BUILD's cgroup
+            _bw, _sw = build_f.read_text().strip(), self_f.read_text().strip()
+            print(f"     [δ operands] build_f={build_f} -> {_bw!r} (want 37); "
+                  f"self_f={self_f} -> {_sw!r} (want {before!r})")
+            # ⚑ this line is why the precondition is right: it showed both paths resolving to
+            # paperkit-build.scope/cpu.weight in a cell, which no amount of reading would have.
             check("δ: apply() weights the BUILD's cgroup, and the CALLER's is untouched",
-                  build_f.read_text().strip() == "37"
-                  and self_f.read_text().strip() == before)
+                  _bw == "37" and _sw == before)
         finally:
             build_f.write_text(f"{build_before}\n")  # idempotent: leave no state behind
         try:
@@ -140,16 +157,85 @@ def main() -> int:
           sum(argv_rule(*x) for x in (A_CELL, A_PROBE, A_SHELL)) -
           sum(comm_rule(*x) for x in (A_CELL, A_PROBE, A_SHELL)) == 2)
 
-    decoy = subprocess.Popen(["sleep", "3", "linux-sandbox"], stderr=subprocess.DEVNULL)
+    # ⚑ A DECOY WHOSE LIFETIME WE END, NOT ONE WE WAIT OUT (a peer's RAII-by-liveness form).
+    #
+    # This was `Popen(["sleep", "3", "linux-sandbox"])` — a duration neither needed nor
+    # controlled, which is only correct while 3s happens to exceed the inspection.  The child
+    # now BLOCKS ON A PIPE THE PARENT HOLDS: it exits on EOF when we close the write end, so it
+    # is alive across exactly the inspection and not one instant longer.
+    #
+    # `exec -a linux-sandbox cat` sets the two fields INDEPENDENTLY, which is the whole point of
+    # the decoy: comm comes from the executable (`cat`), argv[0] from the exec argument
+    # (`linux-sandbox`).  MEASURED: comm='cat', argv='linux-sandbox'.
+    # ⚑⚑ AND THE SIMPLER FORM, FROM A SECOND PEER: `cat <sentinel>` needs no exec at all.
+    # The first version of this ran `bash -c "exec -a linux-sandbox cat"`, which works but makes
+    # /proc briefly show comm='bash' with an empty cmdline while bash execs — so it needed a poll
+    # loop to wait for the transition.  Spawning `cat` DIRECTLY has no transition: comm is 'cat'
+    # (the executable) and the sentinel is an ordinary argv token, both correct on the FIRST read.
+    # Removing the exec removed the race rather than tolerating it.
+    _r, _w = os.pipe()
+    decoy = subprocess.Popen(["cat", "-", "linux-sandbox-sentinel"], stdin=_r,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.close(_r)              # only the child holds the read end; it blocks until we close _w
     try:
-        time.sleep(0.2)
+        # ⚑ NO SLEEP.  This read `time.sleep(0.2)` — load-bearing for the OLDER assertion, which
+        # walked /proc and needed the decoy visible to a scan.  The rewrite below reads ONE file
+        # by pid, and MEASURED five for five, /proc/<pid>/comm is readable the instant Popen
+        # returns.  The wait survived the assertion it existed for: a fix that changes what an
+        # arm asserts must revisit the setup that assertion required.
         # And the live check must AGREE with the rule: verify() uses comm, so a decoy naming
         # linux-sandbox in its argv must not appear as a cell.
-        okd, whyd = W.verify(cgv) if cgv else (True, "no cgroup")
-        check("F: verify() does not report the decoy as a cell",
-              "nothing to verify" in whyd or "0 cell" in whyd or "all " in whyd)
+        # ⚑ Ζ·cpuweight·arm — ASSERT ON THE DECOY, NOT ON A GLOBAL VERDICT'S PROSE.
+        #
+        # This read `okd, whyd = W.verify(cgv)` and then tested three SUBSTRINGS of the human
+        # message — `"nothing to verify" in whyd or "0 cell" in whyd or "all " in whyd` —
+        # while `okd`, the bool the function returns, was bound and never used.  Three defects
+        # in one arm, and the third is why it mattered:
+        #
+        #   * IT READ THE WRONG FIELD.  verify() returns (bool, explanation).  Any rewording of
+        #     those three messages, down to a typo fix, silently changes what this arm asserts.
+        #   * ONE PROBE COULD NEVER MATCH.  `"0 cell"` never appears: the zero case returns
+        #     "nothing to verify", and the plural is `{inside} cell(s)`, so a genuine zero
+        #     renders "all 0 cell(s) inside" — caught by `"all "`.  Dead code inside a guard.
+        #   * AND IT WAS NONDETERMINISTIC, IN A NEGATIVE CONTROL.  verify() counts EVERY cell on
+        #     the box, so under load it returns the OUTSIDE string and this F arm RED; idle, it
+        #     returns "nothing to verify" and the arm GREEN.  Measured both ways an hour apart,
+        #     and the green was published as a result.  An arm whose job is to prove the check
+        #     CAN fail is worthless if its own outcome tracks machine state.
+        #
+        # The claim the decoy exists to make is narrow: a process whose ARGV contains
+        # "linux-sandbox" but whose COMM is not a cell comm must not count as one.  That is
+        # `is_cell(comm)` — a pure function over one string, deterministic, no ambient state —
+        # so the arm asks IT, about THIS process, rather than asking a whole-box aggregate and
+        # reading its sentence.
+        # ⚑ POLL ON THE CONDITION, NEVER ON THE CLOCK.  bash must exec before /proc reflects
+        # the final image, so this waits for a COUNTABLE EVENT — both fields settled — rather
+        # than for a guessed interval.  A peer's phrasing: replace a timing window with a
+        # countable one, and if the condition never arrives the assertion fails HONESTLY in the
+        # output rather than passing on a lucky schedule.
+        # Ζ·cpuweight·poll — the paragraph above SPECIFIED this poll and the code below did two
+        # unconditional reads, so the race it describes was live: under load the read beats the
+        # exec, /proc/<pid>/cmdline still holds bash's pre-exec image, the sentinel is absent and
+        # the premise arm reds while the arm that DEPENDS on it passes (comm had settled, cmdline
+        # had not).  The countable event is both fields carrying the post-exec image; the loop is
+        # bounded by the child's own liveness, so a decoy that never execs fails HONESTLY here
+        # rather than on a lucky schedule.
+        decoy_comm, decoy_argv = "", b""
+        for _ in range(2000):
+            decoy_comm = Path(f"/proc/{decoy.pid}/comm").read_text().strip()
+            decoy_argv = Path(f"/proc/{decoy.pid}/cmdline").read_bytes()
+            if b"linux-sandbox" in decoy_argv and decoy_comm:
+                break
+            if decoy.poll() is not None:   # the child died before exec'ing — stop, do not spin
+                break
+        check("F: the decoy's ARGV carries the sentinel (the premise the next arm needs)",
+              b"linux-sandbox" in decoy_argv)
+        check(f"F: the decoy's argv says linux-sandbox but its comm is {decoy_comm!r}, "
+              "and is_cell() reads comm — so it is not a cell",
+              not W.is_cell(decoy_comm))
     finally:
-        decoy.kill(); decoy.wait()
+        os.close(_w)          # EOF -> the child exits; its lifetime ended by US, not by a timer
+        decoy.wait(timeout=5)   # rc is incidental — cat fails on the sentinel, which is argv, not a file
 
     print(f"CPUWEIGHT BOUNDARIES: {'PASS' if not _fails else 'FAIL'}")
     return 1 if _fails else 0
@@ -157,3 +243,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

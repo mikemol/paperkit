@@ -4,6 +4,11 @@ subtitle = "The one project that DECLARES a consumer field and carries it on a c
 warrants = ["warrants.bib"]
 rubric = "rubric.tsv"
 out = "DEMO.md"
+
+# Γ·delta·root — the Δ sandbox root, declared because the engine is a sibling and
+# layout._sandbox_root refuses to infer.  The bound is the REPO (the demo exercises the engine's
+# consumer-field carry path).  See paper/paper.toml for the full account.
+root = ".."
 numbered = false
 references = false
 consumer_fields = ["provenance"]

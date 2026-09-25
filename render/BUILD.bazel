@@ -2,8 +2,13 @@
 # graph; the bib is the source, this just lists the files.  render is a MIXED-TIER project (Ζ·tier):
 # its pure compliance warrants (wcag_model, matrix, cube, use_of_colour, the format selector) are
 # sandbox-gated and mutation-swept in //:hook; its render/oracle warrants are `tier = {toolchain}`
-# (deterministic given a pinned toolchain — pandoc/veraPDF/lualatex/soffice — so run on the host,
-# cached + stamped with the toolchain fingerprint, enforceable every commit AND fast).
+# (deterministic given a pinned toolchain — pandoc/veraPDF/lualatex/soffice — carried by the
+# executor image in pool `paperkit` (image/executor/Containerfile), cached + stamped with that
+# image's digest, enforceable every commit AND fast).
+# ⚑ checks/render.sh was MISSING from this manifest until 2026-09-21: its warrant ran `tier = local`
+# on the live tree, so the omission was invisible until the claim moved into a staged cell and the
+# calc baseline said `sh: 0: cannot open checks/render.sh` — a hand-kept roster drifts exactly where
+# nothing reads it.
 filegroup(name = "files", srcs = [
         "RENDER.md",
         "assets/paper-units.tsv",
@@ -42,6 +47,8 @@ filegroup(name = "files", srcs = [
         "checks/pdf.py",
         "checks/plain.py",
         "checks/prose.py",
+        "checks/render.sh",
+        "checks/route.py",
         "checks/ruler.py",
         "checks/ruler_inject.py",
         "checks/rulerseq.py",
@@ -55,3 +62,9 @@ filegroup(name = "files", srcs = [
         "checks/wcag_model.py",
         "checks/widen_tables.py",
     ], visibility = ["//visibility:public"])
+
+# ⚑ Ζ·exports·visible — paper.toml AS A VISIBLE LABEL, so a witness in a bib-generated EXTERNAL
+# repo can depend on THIS FILE rather than on this package's whole filegroup.  exports_files
+# defaults to PRIVATE; a filegroup here already declares visibility=public, and the export did
+# not, which is why the twelfth gate attempt died in analysis rather than on a claim.
+exports_files(["paper.toml"], visibility = ["//visibility:public"])

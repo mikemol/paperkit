@@ -40,6 +40,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import contextlib
+import io
 import tempfile
 import time
 from pathlib import Path
@@ -56,17 +58,31 @@ import uno
 from com.sun.star.beans import PropertyValue
 def prop(name, value):
     p = PropertyValue(); p.Name, p.Value = name, value; return p
-def connect(pipe, deadline):
+def connect(pipe, proc):
+    """⛑ Ζ·lo·connect — WAIT ON THE PROCESS, NOT ON A CLOCK.  This took a `deadline` and gave up
+    when it expired, so on a loaded box a soffice that was still starting was declared a failure:
+    the F arm's subject then died at CONNECTION rather than at the hang it exists to exercise,
+    `killed is None` passed for the wrong reason and "the kill is LOUD" reddened against a message
+    about the connection.  A slow box is not a broken one — the operator's ruling, twice: "time-based
+    gates and deadlines are intrinsically unreliable and unsafe.  Unsound by construction."
+
+    The countable event is our OWN child's liveness: we start soffice on a PRIVATE pipe, so an
+    office that is alive is still coming up and one that has EXITED will never accept a connection.
+    That terminates on the subject's own state at any speed, and says which of the two happened."""
     ctx = uno.getComponentContext()
     resolver = ctx.ServiceManager.createInstanceWithContext(
         "com.sun.star.bridge.UnoUrlResolver", ctx)
     url = "uno:pipe,name=%s;urp;StarOffice.ComponentContext" % pipe
-    while time.time() < deadline:
+    while True:
         try:
             return resolver.resolve(url)
         except Exception:
-            time.sleep(0.5)
-    raise SystemExit("lo-export: office did not accept a connection in time")
+            pass
+        rc = proc.poll()
+        if rc is not None:
+            raise SystemExit(
+                "lo-export: office EXITED (rc=%s) without accepting a connection on its pipe" % rc)
+        time.sleep(0.5)
 profile = tempfile.mkdtemp()
 pipe = "pk" + uuid.uuid4().hex[:12]
 proc = subprocess.Popen(
@@ -76,7 +92,7 @@ proc = subprocess.Popen(
     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 deadline = time.time() + timeout
 try:
-    ctx = connect(pipe, deadline)
+    ctx = connect(pipe, proc)
     desktop = ctx.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", ctx)
     doc = desktop.loadComponentFromURL(
         uno.systemPathToFileUrl(os.path.abspath(src)), "_blank", 0,
@@ -121,7 +137,11 @@ def _uno_python() -> str | None:
            "URE_BOOTSTRAP": f"file://{_LO}/fundamentalrc",
            "PYTHONPATH": f"{_LO}:/usr/lib/python3/dist-packages",
            "LD_LIBRARY_PATH": _LO}
-    for cand in ("/usr/bin/python3", "python3"):
+    # Ζ·render·hermetic — the executor image carries The Document Foundation's build, whose pyuno
+    # is compiled against its BUNDLED interpreter (program/python), not the system one; a Debian
+    # build answers from /usr/bin/python3 via python3-uno.  Try the bundled one first: it is
+    # right whenever it exists, and absent on a Debian install.
+    for cand in (f"{_LO}/python", "/usr/bin/python3", "python3"):
         try:
             if subprocess.run([cand, "-c", "import uno"], env=env,
                               capture_output=True, timeout=20).returncode == 0:
@@ -131,14 +151,36 @@ def _uno_python() -> str | None:
     return None
 
 
-def export_pdfua(src: Path, out: Path, timeout: int = 900) -> Path | None:
-    """Export `src` (docx) to a tagged PDF/UA-1 at `out` over the UNO bridge, indexes refreshed.
-    Returns `out` on success, None if no uno-capable python is available OR the bridge is killed at
-    the deadline (a loud absence, never a stale/empty pass).
+# ⚑ Ζ·lo·unsound — A SUBJECT THAT CONNECTS AND THEN CANNOT FINISH.
+#
+# This is the F arm's subject, and it exists so the falsifier is a property of the SUBJECT rather
+# than a race between two durations (the full reasoning is at the arm, in _selftest).  It performs
+# the same connect the real driver does — same pipe, same resolver, same bootstrap — and then blocks
+# forever instead of storing, which is precisely sre-troubleshooting's macro path: the office
+# process is alive and responsive and the export never completes.
+#
+# It is NOT `sleep` and NOT a bad argument: either would test the wrapper's timeout plumbing while
+# never reaching the bridge, and the claim is about owning an office process that WILL NOT EXIT.
+# ⚑ NO DURATION APPEARS HERE, DELIBERATELY.  `threading.Event().wait()` with no argument blocks on
+# an event nothing ever sets — an unsatisfiable wait, not a long one.  A `sleep(N)` would smuggle
+# the refuted construction back in as the subject: N would have to exceed the budget, so the arm
+# would once again depend on two durations comparing a particular way.
+_HANG_DRIVER = _DRIVER.replace(
+    "    doc.storeToURL(",
+    "    import threading; threading.Event().wait()\n    doc.storeToURL(", 1)
+
+
+def _export_via(driver: str, src: Path, out: Path, timeout: int) -> Path | None:
+    """Run `driver` as the bridge worker — the ONE owner of the office process.
+
+    ⚑ Factored out so the real export and the F arm's unfinishable subject share this code rather
+    than each carrying their own copy: a falsifier that re-implements the mechanism it falsifies
+    proves something about the copy (a guard must not copy what it guards).  The only difference
+    between the two callers is WHICH driver runs, which is exactly the δ the selftest asserts.
     """
     py = _uno_python()
     if py is None:
-        print("lo-export: no uno-capable python found (looked at /usr/bin/python3) — "
+        print(f"lo-export: no uno-capable python found (looked at {_LO}/python, /usr/bin/python3) — "
               "cannot drive the tagged-PDF export; refusing to skip-green", file=sys.stderr)
         return None
     env = {**os.environ,
@@ -147,23 +189,35 @@ def export_pdfua(src: Path, out: Path, timeout: int = 900) -> Path | None:
            "LD_LIBRARY_PATH": _LO}
     out.unlink(missing_ok=True)                                # unlink-first (Ρ·render·provenance)
     try:
-        subprocess.run([py, "-c", _DRIVER, str(src), str(out), str(timeout)],
+        subprocess.run([py, "-c", driver, str(src), str(out), str(timeout)],
                        env=env, timeout=timeout + 30, start_new_session=True, check=True)
     except subprocess.TimeoutExpired:
-        print(f"lo-export: export exceeded {timeout}s — killed (a hang is a LOUD failure, never a "
-              "silent stall)", file=sys.stderr)
+        # ⚑ The message is the LOUDNESS the claim promises, and the F arm asserts it: a silent kill
+        # would satisfy a termination-only check while refuting "a LOUD bounded failure".
+        print("lo-export: the bridge did not complete within its budget — killed "
+              "(a hang is a LOUD failure, never a silent stall)", file=sys.stderr)
+        out.unlink(missing_ok=True)                            # no partial artifact survives a kill
         return None
     except subprocess.CalledProcessError:
         return None
     return out if out.exists() and out.stat().st_size > 0 else None
 
 
+def export_pdfua(src: Path, out: Path, timeout: int = 900) -> Path | None:
+    """Export `src` (docx) to a tagged PDF/UA-1 at `out` over the UNO bridge, indexes refreshed.
+    Returns `out` on success, None if no uno-capable python is available OR the bridge is killed at
+    the deadline (a loud absence, never a stale/empty pass).
+    """
+    return _export_via(_DRIVER, src, out, timeout)
+
+
 def _selftest() -> int:
     """⟨P, F, δ⟩ — the tagged-PDF/UA export over the hang-safe bridge:
       P: the bridge exports a Tagged PDF from a docx (connect→refresh→UA export→store).
-      F: an impossibly short deadline kills the bridge → None (a LOUD, bounded failure — the failure
-         sre's macro path lacked, a silent hang).
-      δ: the deadline — a generous one exports a Tagged PDF, a 1s one is killed.
+      F: a bridge that CANNOT complete is killed → None, and the kill is REPORTED (a LOUD,
+         bounded failure — the failure sre's macro path lacked, a silent hang).
+      δ: whether the subject can finish at all — a real export yields a Tagged PDF, an
+         unsatisfiable one is killed and says so.  NOT a duration: see Ζ·lo·unsound.
     If no uno-capable python exists, SKIP LOUD (never skip-green).
     """
     fails = []
@@ -195,23 +249,56 @@ def _selftest() -> int:
         check("P: the bridge exports a Tagged PDF from a docx (UA export path)",
               got is not None and tagged)
 
-        # Ζ·lo·deadline — the F arm's deadline is DERIVED from the P arm's measured export, not
-        # hardcoded.  It was `timeout=1` with the comment "shorter than LO startup", and that
-        # premise DECAYED: this host now exports in 0.96s, so a 1s deadline no longer kills
-        # anything and the arm went red while the mechanism it tests was working perfectly.  A
-        # wall-clock constant in a fixture is a claim about the machine, and machines get faster.
+        # ⚑ Ζ·lo·unsound — THE F ARM NO LONGER RACES A DURATION, AND THAT LADDER IS CLOSED.
         #
-        # The deadline reaches the bridge as a FLOAT (the worker reads `float(sys.argv[3])`), so a
-        # sub-second fraction is expressible however fast the host is — the `int` annotation on
-        # export_pdfua is cosmetic.  A tenth of the measured time cannot outlive an export that
-        # actually took that time, on any machine, which is what makes the arm portable.
+        # Two rungs of the same wrong construction stood here.  First `timeout=1` with the comment
+        # "shorter than LO startup" — a premise that DECAYED when the host got faster.  Then a
+        # deadline DERIVED as a tenth of the P arm's measured export, which decays more slowly and
+        # decays the same way: it went red on 2026-09-12 reporting
+        # `a deadline of 3.545s (a tenth of the measured 35.45s) is killed -> None`, with the P arm
+        # PASSING.  Nothing about hang containment had changed; LibreOffice had got faster.
+        #
+        # ⚑⚑ THE OPERATOR'S RULING, AND IT IS THE GENERAL CASE: "time-based gates and deadlines are
+        # intrinsically unreliable and unsafe.  Unsound by construction."  A deadline is the
+        # MECHANISM this claim owns, but a deadline is not how you TEST it — racing one duration
+        # against another measures the office suite's SPEED, which is host state, toolchain version
+        # and cache warmth, none of which this claim is about.
+        #
+        # ⚑⚑⚑ SO THE SUBJECT IS MADE UNABLE TO FINISH, RATHER THAN MERELY RUSHED.  The subject is a
+        # docx the bridge can open and then never complete on: `_HANG_DRIVER` connects exactly as
+        # the real driver does and then blocks forever instead of storing.  Any budget kills it, so
+        # the kill is a property of the SUBJECT and not of the host's speed.  report/mitigation.py
+        # reasons this way already for the gate runner — "a zero-budget gate always times out, which
+        # is exactly the condition the runner turns into `error`" — so the construction is the
+        # repo's own, not a new one.
+        #
+        # ⚑ TWO PREMISES OF THE FIRST DRAFT WERE MEASURED AND BOTH WERE FALSE, WHICH IS WHY THE ARM
+        # READS THE WAY IT DOES:
+        #   * `timeout=0` does NOT make the parent give up immediately — `subprocess.run` is called
+        #     with `timeout=timeout + 30`, so a zero budget still waits 30s and then the WORKER
+        #     fails, raising CalledProcessError.  That is a different branch from the deadline kill
+        #     this claim is about, and it returns None with NO message at all.
+        #   * the killed notice goes to STDERR (`file=sys.stderr`), not stdout, so a
+        #     redirect_stdout capture reads empty and "the kill is LOUD" would have been asserted
+        #     against a silent path.
+        # A `cannot` needs a probe, not a sentence: both were quoted from the source before the arm
+        # was trusted, and both changed it.
         f_out = dd / "f.pdf"
-        f_deadline = round(p_secs / 10, 3)
-        killed = export_pdfua(docx, f_out, timeout=f_deadline)
-        check(f"F: a deadline of {f_deadline}s (a tenth of the measured {p_secs:.2f}s) is killed → None",
+        cap = io.StringIO()
+        with contextlib.redirect_stderr(cap):
+            killed = _export_via(_HANG_DRIVER, docx, f_out, timeout=5)
+        said = cap.getvalue()
+        print(said, end="")
+        check("F: a bridge that connects and never completes is killed → None (no duration raced "
+              "against another — the subject cannot finish at any budget)",
               killed is None)
-        check("δ: the deadline decides — the measured time exports a Tagged PDF, a tenth of it is killed",
-              got is not None and killed is None)
+        check("F: the kill is LOUD — the bridge reports it rather than stalling silently",
+              "killed" in said)
+        check("F: no partial artifact is left behind (never a stale pass)",
+              not f_out.exists())
+        check("δ: whether the subject CAN finish — a real export is Tagged, one that cannot "
+              "complete is killed and reported",
+              got is not None and tagged and killed is None and "killed" in said)
 
     if fails:
         print(f"LO-EXPORT SELFTEST: FAIL ({len(fails)})")

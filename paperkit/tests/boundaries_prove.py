@@ -25,7 +25,12 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LIB = ROOT / "library"
+# ⚑ Ζ·lib·land — the concept library lives INSIDE the package now, so this is ROOT/paperkit/library
+# and not ROOT/library.  A SECOND hardcoded copy of a path resolver.py already owns: the engine's
+# `_LIBRARY` was fixed when a consumer's gate went UNRESOLVABLE on the composed old path, and this
+# copy stayed wrong because nothing connects them — the same set held in two places, which is why
+# a guard that carries its own copy of what it guards certifies a tautology until the copy drifts.
+LIB = ROOT / "paperkit" / "library"
 
 
 def main() -> int:

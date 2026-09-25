@@ -16,7 +16,8 @@
 @misc{img-hermetic,
   section = {toolchain}, from = {img-pinned}, join = {, and },
   claim   = {the verification runs with the network disabled, so a check cannot reach beyond the image and the proof depends on nothing outside it},
-  check   = {cmd:grep -q -- "--network=none" checks/repro.sh}
+  check   = {cmd:grep -q -- "--network=none" checks/repro.sh},
+  tier     = {sandbox}
 }
 @misc{img-serve,
   section = {present},

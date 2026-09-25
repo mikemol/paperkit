@@ -6,6 +6,12 @@ warrants = ["warrants.bib", "//paper:adequacy_pitch.bib"]
 rubric = "rubric.tsv"
 out = "README.md"
 numbered = false      # README sections read better unnumbered
+
+# Γ·delta·root — the Δ sandbox root.  `"."` because THIS project IS the bounded tree: the repo
+# root's project is the repo.  Declared rather than inferred for the same reason every sibling
+# declares it — layout._sandbox_root refuses to guess, and the guess it used to make copied
+# ~/github (53 repos, 29 GB) ten times while every build read green.  See paper/paper.toml.
+root = "."
 references = false    # a README has no bibliography section
 
 # Custom check type: claim:<key> runs the per-claim witness in checks/readme.py —

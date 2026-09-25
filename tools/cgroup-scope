@@ -288,6 +288,28 @@ echo "$BYTES" > "$CG/memory.max"
 #   cap plus a nicety) — so never expose one without the other.
 echo 0 > "$CG/memory.swap.max" 2>/dev/null \
   || _die "cannot write memory.swap.max in $CG — refusing: with swap reachable, memory.max only throttles (reclaim into zram) and never kills, so the returned scope would look capped and contain nothing"
+# ⚑ Ζ·cell·pids — BOUND THE TREE, NOT ONLY ITS MEMORY.  A mutant can flip a check into PROCESS
+# RECURSION rather than runaway allocation, and no per-process limit sees that: each child is
+# small, so RLIMIT_AS never binds, and each burns little CPU, so RLIMIT_CPU never binds — while
+# the TREE grows without bound and the cgroup kills it on memory at every rung of the climb.
+#
+# MEASURED: `concept-views__config__flip_positionals_arm_2` exhausted the entire climb three
+# times (4->4096, then 4->8192 twice) and killed three //:hook runs.  config.positionals is a
+# BOUNDED `for` over argv and cannot spin; inverting its condition empties `pos`, and gate.py's
+# `Path(pos[0]) if pos else Path.cwd()` then aims the gate at the execroot — a DIFFERENT project,
+# whose concepts resolve, each spawning another gate.
+#
+# ⚑⚑ AND THIS IS WHY THE CLIMB COULD NEVER CONVERGE ON IT: membudget doubles to DISCOVER a cell's
+# honest footprint, and a recursing tree has none to find.  Every rung re-runs the recursion and
+# dies identically, so the instrument reports an exhausted ceiling — a HARNESS verdict — where the
+# honest answer is that the mutant FLIPPED the check.  A pids bound makes the flip detectable:
+# the fork fails, the check raises, and eval.py reads a real verdict instead of a missing output.
+#
+# SOFT, unlike the memory pair above.  Those two are one control and a failure to write either is
+# a refusal (a scope that looks capped and contains nothing).  This one is a BACKSTOP: a machine
+# that delegates memory but not pids should still grade documents, exactly as the `probe` guard
+# says a cap must never become a precondition for grading.
+[ -f "$CG/pids.max" ] && { echo "${CLIMB_MAX_PIDS:-256}" > "$CG/pids.max" 2>/dev/null || true; }
 [ -n "$CPUW" ] && { echo "$CPUW" > "$CG/cpu.weight" 2>/dev/null || true; }
 
 # --- run the command inside it -------------------------------------------------
@@ -323,8 +345,20 @@ for _attempt in 1 2 3 4 5 6 7 8 9 10; do
   # "did it increment" is right under both; assuming +1 would not be.
   [ "${_oom_after:-0}" -gt "${_oom_before:-0}" ] || break     # not an OOM: the payload's own failure
   _climb_mb=$(( _climb_mb * 2 ))
-  if [ "$_climb_mb" -gt "${CLIMB_MAX_MB:-4096}" ]; then
-    echo "cgroup-scope: [${CG##*/}] OOM at ${CLIMB_MAX_MB:-4096}MB ceiling — refusing to climb further" >&2
+  # ⚑ Ζ·mem·ceiling — 8192, RAISED FROM 4096, AND THE CAUSE IS STILL OPEN.  One cell exhausts the
+  # whole ladder: `concept-views__config__flip_positionals_arm_2` climbed 4→8→…→4096MB and was
+  # refused here, twice, killing a full //:hook run each time:
+  #     cgroup-scope: [mb-11-...] OOM at 4096MB ceiling — refusing to climb further
+  #     ERROR: ...+bib+paperkit_library/BUILD.bazel:70196:8: Ζ·eval concept-views__config__
+  #            flip_positionals_arm_2 failed: not all outputs were created or valid
+  # ⚑⚑ THE RAISE IS A CEILING, NOT A DIAGNOSIS.  The witness for `concept-views` resolves
+  # `concept:adequacy-pitch` TWICE, and that key's own witness calls the real Δ grader — so the
+  # cell runs a grader inside a grader.  Whether that composition or Ζ·cell·cone's 23 flat engine
+  # sources is what needs the gigabytes is UNMEASURED; the hypothesis that the cone is the memory
+  # cost as well as the cache cost has never been tested.  This buys the run past the wall so the
+  # cause can be measured with a green baseline, and it is not the fix.
+  if [ "$_climb_mb" -gt "${CLIMB_MAX_MB:-8192}" ]; then
+    echo "cgroup-scope: [${CG##*/}] OOM at ${CLIMB_MAX_MB:-8192}MB ceiling — refusing to climb further" >&2
     break
   fi
   echo "cgroup-scope: [${CG##*/}] OOM at $(( _climb_mb / 2 ))MB — retrying at ${_climb_mb}MB" >&2

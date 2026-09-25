@@ -1020,7 +1020,15 @@ def partition_merges():
 def genre_declared_runs():
     # Ρ·deck·genre·cmd — a project-DECLARED objective actually runs, and is held to the same
     # totality invariant as a built-in (the open half cannot buy laxity by living outside).
+    #
+    # ⚑ Ζ·spawn·owner — THE SPAWN IS INJECTED, and this witness is a CALLER the signature change
+    # had to reach.  `genre.run_declared` no longer builds the subprocess itself: running a
+    # command a document declared is resolver's capability (`resolver.spawn_declared`), and
+    # `genre` may not import it (project → resolver was an undeclared upward edge).  So every
+    # caller supplies it.  This file is a paper witness, outside the engine partition, so it
+    # imports resolver directly — exactly as project.py does at the live call site.
     import genre
+    from resolver import spawn_declared
     d = Path(tempfile.mkdtemp())
     try:
         (d / "ok.py").write_text(
@@ -1028,7 +1036,7 @@ def genre_declared_runs():
             "for g in [l.split(chr(9)) for l in sys.stdin.read().splitlines() if l.strip()]:\n"
             "    [print(k) for k in g]\n")
         spec = {"cmd": f"python3 {d / 'ok.py'}"}
-        units = genre.run_declared(spec, [["a", "b"]], [])
+        units = genre.run_declared(spec, [["a", "b"]], [], spawn=spawn_declared)
         assert units == [["a"], ["b"]], f"the declared objective's units did not come back, got {units}"
         # DROPS ⇒ refused, with the same message a built-in would get.
         (d / "bad.py").write_text(
@@ -1036,19 +1044,54 @@ def genre_declared_runs():
             "for g in [l.split(chr(9)) for l in sys.stdin.read().splitlines() if l.strip()]:\n"
             "    print(g[0])\n")
         try:
-            genre.run_declared({"cmd": f"python3 {d / 'bad.py'}"}, [["a", "b"]], [])
+            genre.run_declared({"cmd": f"python3 {d / 'bad.py'}"}, [["a", "b"]], [],
+                               spawn=spawn_declared)
             raise AssertionError("a declared objective that DROPS a claim was accepted")
         except SystemExit:
             pass
         # a FAILING objective is refused rather than read as an empty pagination.
         (d / "fail.py").write_text("import sys\nsys.exit(3)\n")
         try:
-            genre.run_declared({"cmd": f"python3 {d / 'fail.py'}"}, [["a"]], [])
+            genre.run_declared({"cmd": f"python3 {d / 'fail.py'}"}, [["a"]], [],
+                               spawn=spawn_declared)
             raise AssertionError("a declared objective that FAILED was accepted")
         except SystemExit:
             pass
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+def genre_declared_gated():
+    # Ν-F7 — THIS PROJECT'S OWN declared genres are INVOKED, not merely parsed.
+    #
+    # `genre_declared_runs` above proves the MECHANISM on synthetic fixtures in a tempdir; it
+    # never touches what paper.toml actually declares.  So a real `[genres.X]` table naming an
+    # unrunnable command was gated by nothing: measured at tick 27, two genres declared
+    # `python3 -Ichecks checks/…` (`-I` is ISOLATED MODE, so it parsed as `-c hecks` →
+    # NameError) and every gate in the repo stayed green.
+    #
+    # ⚑ AND `genre.py --check` — which DOES invoke them since tick 28 — IS WIRED TO NOTHING.
+    # Two independent searches over BUILD.bazel, tools/bibtex.bzl and .githooks/pre-commit find
+    # no reference: it runs when a human types it.  A capability that exists and is unwired is
+    # the shape audit finding 6 and Η-F2 both record; this claim is the wire.
+    import genre
+    proj = Path(__file__).resolve().parent.parent
+    reg = genre.registry(proj)
+    declared = {n: s for n, s in reg.items() if s.get("declared")}
+    assert declared, ("paper.toml declares no [genres.*] table — this claim asserts the project's "
+                      "OWN declarations are gated, and there are none to gate")
+    # the same fixture shape the engine's own --check uses: two clusters and a singleton.
+    groups = [["a", "b"], ["c"]]
+    for name, spec in sorted(declared.items()):
+        assert spec.get("cmd"), f"declared genre {name!r} names no cmd"
+        # run_declared raises SystemExit on a non-zero exit AND on a non-total result, so this
+        # single call covers both — the same seam the live --observe path uses, not a copy of it.
+        # Ζ·spawn·owner — the spawn is injected (see genre_declared_runs above).
+        from resolver import spawn_declared
+        units = genre.run_declared(spec, groups, [], cwd=proj, spawn=spawn_declared)
+        flat = sorted(k for u in units for k in u)
+        assert flat == ["a", "b", "c"], (
+            f"declared genre {name!r} is not total over the grouping: got {units}")
 
 
 def gamma_is_reachable():
@@ -1319,6 +1362,7 @@ CLAIMS = {
     "partition-merges": partition_merges,
     "gamma-is-reachable": gamma_is_reachable,
     "genre-declared-runs": genre_declared_runs,
+    "genre-declared-gated": genre_declared_gated,
     "observe-second-shape": observe_second_shape,
     "observe-bounded-by-adoption": observe_bounded_by_adoption,
     "from-and-rests-on-are-distinct": from_and_rests_on_are_distinct,

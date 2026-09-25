@@ -4,5 +4,10 @@ subtitle = "Every knob resolves one way — arg over env over config over defaul
 warrants = ["warrants.bib"]
 rubric = "rubric.tsv"
 out = "CONFIG.md"
+
+# Γ·delta·root — the Δ sandbox root, declared because the engine is a sibling and
+# layout._sandbox_root refuses to infer.  The bound is the REPO (these witnesses read the engine's
+# config registry).  See paper/paper.toml for the full account.
+root = ".."
 numbered = false
 references = false

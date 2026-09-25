@@ -72,9 +72,29 @@ def _literal(path: Path, name: str) -> dict[str, list[str]]:
 
 
 def engine_files() -> set[str]:
-    """Collect every real .py file under the engine, engine-relative."""
+    """Collect every real .py file under the engine, engine-relative.
+
+    ⚑ Ζ·partition·subpackage — A SUBPACKAGE'S FILES ARE NOT THE ENGINE'S TO PARTITION.
+    A directory with its own BUILD.bazel is a separate Bazel package that OWNS and stages its
+    own sources, and `//paperkit:<path>` cannot even name a file across that boundary.
+
+    MEASURED 2026-09-13: `library/` became `paperkit/library/` (Ζ·lib·land), which put a WIRED
+    PROJECT inside the tree this walk covers.  The totality arm then demanded
+    `library/concepts.py` be placed in COMPONENTS, and placing it broke the build in ANALYSIS —
+    `Label '//paperkit:library/concepts.py' is invalid because 'paperkit/library' is a
+    subpackage` — because BUILD.bazel derives ENGINE_SRCS (the `engine` filegroup, exports_files,
+    one pk_pyc per module) from this same partition.
+
+    So the two sets had silently stopped being one object: this walk reads the FILESYSTEM while
+    ENGINE_SRCS builds LABELS. Pruning subpackages here makes them one again BY CONSTRUCTION
+    rather than by two lists agreeing — and states the rule where it belongs: the engine
+    partition covers the files the engine package owns.
+    """
+    subpkgs = {b.parent for b in ENG.rglob("BUILD.bazel") if b.parent != ENG}
     return {p.relative_to(ENG).as_posix()
-            for p in ENG.rglob("*.py") if "__pycache__" not in p.parts}
+            for p in ENG.rglob("*.py")
+            if "__pycache__" not in p.parts
+            and not any(sp in p.parents for sp in subpkgs)}
 
 
 def totality(components: dict[str, list[str]], files: set[str]) -> tuple[list[str], list[str]]:

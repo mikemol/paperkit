@@ -4,6 +4,11 @@ subtitle = "Gated every commit: the paper renders to a Word document, and the do
 warrants = ["warrants.bib"]
 rubric = "rubric.tsv"
 out = "RENDER.md"
+
+# Γ·delta·root — the Δ sandbox root, declared because the engine is a sibling and
+# layout._sandbox_root refuses to infer.  The bound is the REPO (render's sandbox-tier compliance
+# witnesses read the engine's projector and the WCAG model).  See paper/paper.toml.
+root = ".."
 numbered = false
 references = false
 # Ζ·tier — render's PURE compliance warrants (wcag_model/matrix/cube/use-of-colour/format)

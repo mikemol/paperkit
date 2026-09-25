@@ -1,12 +1,14 @@
 common --enable_bzlmod
 test --test_output=errors --test_summary=terse
-# Ζ·tier·toolchain — stamp every build with the host toolchain fingerprint (STABLE_TOOLCHAIN_* keys:
-# pandoc/veraPDF/lualatex/soffice versions + the veraPDF JAR sha256).  A `toolchain`-tier check
-# (verb.bzl) is a STAMPED action depending on the stable status, so a toolchain change invalidates it
-# precisely (measured: a changed stable key re-runs the action, an unchanged one is a cache hit) while
-# an unchanged toolchain keeps it cached — the check is enforceable every commit AND fast.  The same
-# keys are the fingerprint a consumer needs to trust which environment proved a claim (the VPAT tier
-# disclosure).  Cheap: the status command runs once per build; stable keys invalidate only on change.
+# Ζ·tier·toolchain — stamp every build with the toolchain fingerprint: STABLE_TOOLCHAIN_IMAGE, the
+# digest of the executor image a `toolchain`-tier check runs in (tools/toolchain_status.sh →
+# tools/image_digest.py → luthen's images_query, by name).  A toolchain-tier check (verb.bzl) is a
+# STAMPED action depending on the stable status, so an image re-declare invalidates it precisely
+# (measured: a changed stable key re-runs the action, an unchanged one is a cache hit) while an
+# unchanged image keeps it cached.  The key is the fingerprint a consumer needs to trust which
+# environment proved a claim (the VPAT tier disclosure).  ⚑ Until 2026-09-21 the keys were the
+# CLIENT HOST's tool version banners — they described the box the command was typed on, not the
+# pool the verdict ran in (Ζ·toolchain·declare).
 # Ζ·jvm·raise — the COORDINATOR's heap, on the same climb ladder every sweep cell already uses.
 #
 # Bazel passes NO heap flag: src/main/cpp/startup_options.cc's AddJVMMemoryArguments is an empty
@@ -78,16 +80,43 @@ test --test_output=errors --test_summary=terse
 # are exactly the compressible kind.  If 16G OOMs, that is the measurement saying this graph no
 # longer fits this box, and the answer becomes splitting //:hook — not another gigabyte.
 startup --host_jvm_args=-Xmx16g
+# ⚑ Ζ·jvm·parallel — PARALLEL, NOT G1, FOR A ONE-SHOT BATCH WORKLOAD (operator, 2026-09-08).
+# G1 is a LOW-PAUSE collector: it spends CPU and memory overhead (region metadata, remembered
+# sets, SATB write barriers, concurrent marking threads) to keep individual pauses short.  A
+# build does not care about pause time — nobody minds a 4-second stop, they mind whether the
+# build finishes — so that overhead is paid and never repaid.
+#
+# MEASURED on the live server (pid 1706204, jstat via hsperfdata, four reads minutes apart):
+#   OC = 16,777,216.0 KB (the full -Xmx16g)   OU = 16,769,987.9 KB   -> 99.96% FULL
+#   FGC 28 -> 32 across the reads, FGCT 4923 -> 5279 s, and OU DID NOT MOVE
+#   CGC = 11, CGCT = 20.449 s
+#   LGCC = G1 Evacuation Pause, GCC = G1 Compaction Pause  (G1 in last-resort full compaction)
+#
+# ⚑⚑ THE OPERATOR'S FIRST FRAMING WAS "disable incremental compaction", and the numbers REFINE
+# it rather than confirm it: the incremental side is CGCT=20.4s of 5575s total GC — 0.4%.  There
+# is no incremental cost to remove; the spiral is ALREADY 100% full-GC.  So the lever is not
+# disabling a phase of G1, it is not running a concurrent collector at all.
+#
+# ⚑⚑⚑ AND THIS IS NOT THE FIX FOR THE UNDERLYING PROBLEM, STATED PLAINLY SO THE NEXT READER
+# DOES NOT MISTAKE IT FOR ONE.  32 full GCs freeing ZERO bytes means the LIVE SET does not fit —
+# that is data, not garbage, and no collector reclaims live data.  ParallelGC gets more USABLE
+# heap from the same -Xmx (no region metadata, no remembered sets, simpler layout), which buys
+# headroom; it does not make a too-large graph fit.  The rc's own escape clause above still
+# stands and is now overdue: "If 16G OOMs, that is the measurement saying this graph no longer
+# fits this box, and the answer becomes splitting //:hook — not another gigabyte."
+#
+# VERIFIED ACCEPTED on this box's JDK 25 before landing: -XX:+PrintFlagsFinal reports
+# `UseParallelGC = true {command line}` and `UseG1GC = false {default}`.
+startup --host_jvm_args=-XX:+UseParallelGC
 
 build --stamp --workspace_status_command=tools/toolchain_status.sh
-# Ζ·tier·toolchain — a toolchain-tier check runs under the HOST toolchain unsandboxed (verb.bzl:
-# use_default_shell_env), and part of that toolchain lives under $HOME: lualatex resolves its
-# TEXMFHOME tree (~/texmf — luaotfload.sty et al.) via HOME, veraPDF/pandoc read ~/.local caches.
-# use_default_shell_env does NOT reliably carry HOME (bazel sanitizes it), so pass it explicitly.
-# This reaches only NON-sandboxed actions (local/toolchain tiers); the hermetic sandbox (the pure
-# swept compliance checks, --config=mutant) gets a fixed sandbox env and ignores action_env, so its
-# reproducibility is untouched — measured: the sandbox compliance checks stay green + graded.
-build --action_env=HOME
+# Ζ·toolchain·declare — `build --action_env=HOME` WAS here and is REMOVED, 2026-09-21.  It carried
+# the client's $HOME into toolchain-tier actions because part of the toolchain lived there
+# (~/texmf's luaotfload.sty et al., ~/.local caches) — 169 files the build graph never declared
+# (operator: hashing them "indicates the build graph isn't properly built out").  The toolchain
+# now lives in the executor image (image/executor/Containerfile), where TeX Live's own tree is
+# the TEXMF root; nothing an action needs is under anyone's home, so nothing forwards it.  If a
+# check still reaches for $HOME the pool will NAME it, which is the point.
 # Memory bounding is Τ·mem: each pk_calc declares a resource_set (the learned mem.json bucket via
 # the bib generator's ladder), and Bazel's local scheduler bounds concurrent sweeps against
 # --local_ram_resources (default HOST_RAM*.67) — no rc pool needed.  The old --local_extra_resources
@@ -218,29 +247,167 @@ build:mutant-oci --spawn_strategy=docker,sandboxed,local
 # containerising the PATH, and conflating them is what made the container look sufficient.)
 #
 # THE ENDPOINT.  buildbuddy-app-onprem, already running on this box as the podman container
-# `cassian-buildbuddy` (gRPC 1985, web 8080).  ⚑ It is NOT in the k3s cluster that manages
+# ⚑ ENDPOINTS MOVED 2026-09-04 (cassian's ◆gate-k8s-execution): the podman quadlet BuildBuddy is
+# DISABLED and the control plane now runs IN k3s.  gRPC 1985 -> 31985 (loopback-pinned NodePort),
+# web 8080 -> 31080.  VERIFIED HERE before changing anything: :1985 closed, :31985 open.  The
+# sentence below said it was NOT in the k3s cluster; that is now false, and it is kept struck
+# rather than deleted because the reason it was true (a podman container outside the cluster) is
+# what the migration changed.  It WAS in `cassian-buildbuddy` (gRPC 1985, web 8080), NOT in the
+# k3s cluster that manages
 # everything else here — it is the same bespoke shape as the builds it serves, and moving it in is
 # its own arc.  Pointing Bazel at it WHERE IT IS first is deliberate: if remote caching misbehaves,
 # the diagnosis is the caching and not a concurrent migration.
 #
-# ⚑ OPT-IN, NOT DEFAULT, AND THAT IS THE POINT.  An unproven cache that silently serves a wrong
-# artifact is strictly worse than no cache — it converts a build failure into a false GREEN, which
-# is the one outcome this engine exists to refuse.  [[instrument-vs-gate]]: an instrument earns
-# trust per-use, a GATE earns it by proven soundness in both directions.  This has neither yet.
-# It becomes a default only after the CAS is shown to (a) hit across two distinct worktree paths
-# and (b) produce byte-identical outputs to a cold local build.  Until then: `--config=cas`.
+# ⚑ THIS WAS OPT-IN ON A FALSE-GREEN ARGUMENT, AND THE ARGUMENT WAS WRONG AT ITS ROOT.  It read:
+# "an unproven cache that silently serves a wrong artifact is strictly worse than no cache — it
+# converts a build failure into a false GREEN", gated behind two promotion conditions (hits across
+# two worktree paths; byte-identical output vs a cold local build).  Superseded 2026-09-07:
+#
+#   there is no false-green risk if the cache keys are constructed properly, and if they are NOT
+#   constructed properly, the false-green risk does not depend on peers to cause the collision
+#
+# A wrong key collides with THIS repo's own prior invocation on one machine exactly as readily as
+# with a peer's.  So sharing changes the BLAST RADIUS and not the soundness, and gating adoption on
+# sharing was guarding the wrong variable.  The real precondition is correct keys — the open
+# Ζ·closure·owner arc (a cell staging 23 flat engine sources where calc.bzl's PycInfo already
+# carries a transitive cone; 8.4% hit rate on a one-line edit) — and that is owed whether or not
+# anything else ever reads this cache.  MEASURED here, three arms with `bazel clean` between each:
+# --remote_instance_name=DELIBERATELY_WRONG missed and re-executed, the correct name returned
+# "1 remote cache hit" — the CONTROL, without which a miss is indistinguishable from a dead CAS.
 #
 # --remote_upload_local_results: WRITE as well as read.  A read-only cache on a single machine is
 # a no-op — nothing else populates it.
-# --remote_local_fallback: a cache that is DOWN must not fail the build.  buildbuddy is a podman
-# container with no restart policy (that is the k8s arc); an unreachable endpoint degrades to a
-# local build rather than reporting a red gate for an infrastructure reason.
-# --experimental_remote_cache_async: do not block the critical path on uploads.
-build:cas --remote_cache=grpc://127.0.0.1:1985
+# ⚑ Ζ·cas·adopt — --remote_local_fallback WAS set here and is now REMOVED, deliberately.  The
+# rationale it carried ("a cache that is DOWN must not fail the build ... degrades to a local
+# build rather than reporting a red gate for an infrastructure reason") is REFUTED by what the
+# fallback degrades TO: an uncoordinated local build is the resource hazard this configuration
+# exists to prevent, so the flag is not a safety measure but an escape hatch FROM the policy,
+# firing silently on every affected machine at the moment shared infrastructure is under stress.
+# A red for an unreachable CAS is now the INTENDED outcome — a loud failure that stops work,
+# not a quiet degradation that consumes the box.
+# --remote_instance_name: the CAS is SHARED across repos with different toolchains and action
+# keys.  An unnamed instance is one namespace for all of them; the name is the partition.
+# --remote_cache_async: do not block the critical path on uploads.
+build:cas --remote_cache=grpc://buildbuddy-bes.buildbuddy.svc.cluster.local:1985
 build:cas --remote_upload_local_results=true
-build:cas --remote_local_fallback=true
-build:cas --experimental_remote_cache_async=true
+build:cas --remote_instance_name=paperkit
+build:cas --remote_cache_async=true          # (was --experimental_remote_cache_async, deprecated in 8.7)
 # Name the run in buildbuddy's UI, so a CAS question can be answered from the artifact rather than
 # from a guess about which invocation wrote what.
-build:cas --bes_results_url=http://127.0.0.1:8080/invocation/
-build:cas --bes_backend=grpc://127.0.0.1:1985
+build:cas --bes_results_url=http://buildbuddy-web.buildbuddy.svc.cluster.local:8080/invocation/
+build:cas --bes_backend=grpc://buildbuddy-bes.buildbuddy.svc.cluster.local:1985
+
+# ⚑⚑ ARMED — `cas` IS PROMOTED TO THE DEFAULT, which is what makes every line above load-bearing.
+# MEASURED 2026-09-07, before this block existed: `bazel build --nobuild //paperkit:__init__` with
+# no `--config` printed NO `Streaming build results to:` line, and a fleet reading put paperkit
+# alone among four bazel trees with every endpoint behind an unpromoted config — so a bare
+# `bazel test`, and the `--config=mutant` the pre-commit hook invokes, drew NOTHING from the shared
+# CAS, contributed NOTHING to it, and emitted no BES stream.  A config nobody passes is a config
+# nobody uses: the block was correct and inert, which reads identically to absent.
+# Promotion by CONFIG rather than by flag (linux-sources' shape) keeps the rationale above attached
+# to the flags it explains, instead of scattering four endpoint flags onto bare `build` lines.
+build --config=cas
+# (`test` inherits `build`, so a `test --config=cas` line here is the SECOND expansion bazel
+# warned about — `[cas] expanded more than once`, measured 2026-09-21 with it present.)
+
+# ⚑ Ζ·keepgoing·closure — STOP AT THE FIRST FAILURE.  Under a correct closure a failed cell forces
+# a fix, the fix invalidates that cell AND everything downstream of the inputs it touched, and
+# computing those first is waste: they are neither CONTEXT for the diagnosis nor a TRIGGER for a
+# further fix.  What the fix does NOT invalidate is already in the action cache, so stopping early
+# costs nothing — which is what makes fail-fast free rather than merely impatient, and why it is
+# the CLOSURES that earn the flag rather than the flag that earns itself.
+#
+# MEASURED on the run that motivated this: `boundaries//:gate` reported FAIL at log line 971 and
+# the invocation continued to 19,520 actions executed — ~18,500 of them computed after a known
+# failure whose fix touches `boundaries/warrants.bib`, a file the whole boundaries grid keys on.
+# A second failure (Ζ·eval concept-views__config__flip_positionals_arm_2, "not all outputs were
+# created or valid") sat at line 2,773 and went unread for four ticks because the tail was
+# advancing and nothing surfaced it.
+#
+# ⚑⚑ TWO FLAGS, OPPOSITE DEFAULTS, AND THE FIRST DRAFT SET THE WRONG ONE.  This block once said
+# `--nokeep_going` was what stopped the run at a red gate.  It is not, and it was already the
+# default — setting it changed nothing.  From bazel 8.7.0's own source (linux-sources read it at
+# a6d8d66737d5; this tree runs 8.7.0, verified, so the citations apply without a version gap):
+#
+#   KeepGoingOption.java   name = "keep_going",      defaultValue = "false"
+#   ExecutionOptions.java  name = "test_keep_going", defaultValue = "true"
+#     "When disabled, any non-passing test will cause the entire build to stop.  By default all
+#      tests are run, even if some do not pass."
+#
+# THREE FAILURE SHAPES, THREE MECHANISMS, and only one is a test:
+#   (a) a pk_* CELL exits 0 and emits a verdict record — NOT a failure to bazel at any layer.
+#       Correct by design: bazel sees a red ACTION, never a red CHECK.
+#   (b) `FAIL: //:gate (Exit 1)` — a TEST failure, governed by test_keep_going.
+#   (c) `not all outputs were created or valid` — an ACTION failure (SkyframeActionExecutor's
+#       ACTION_OUTPUTS_NOT_CREATED), governed by keep_going.
+#
+# ⚑⚑⚑ THE RUN THAT MOTIVATED THIS HIT (b) AT LINE 971 AND (c) AT LINE 2,773 — two failures needing
+# two different flags, and the one set governed the SECOND.  The 18,500 wasted actions are the gap
+# between them.  Both flags land on one field (AggregatingTestListener's `skipTargetsOnFailure`,
+# "in the presence of --nokeep_going or --notest_keep_going"), which is why the wrong one LOOKED
+# like it should have worked.  The doc warns against `--notest_keep_going` with `--keep_going` —
+# the CONTRADICTORY pair; the pair below is the consistent one.
+#
+# ⚑⚑⚑ THE COST IS REAL AND ACCEPTED: fail-fast is free only when the failure is OBSERVABLE IN
+# FLIGHT.  --test_summary=terse withholds verdicts until the end, so the stopping signal arrives
+# through the BES stream and the log rather than a summary — which is why the CAS/BES arming above
+# is a precondition for this line rather than an unrelated setting.
+build --nokeep_going
+test --nokeep_going
+test --notest_keep_going
+
+# ═══ Ζ·rbe — REMOTE EXECUTION, NOT JUST THE CACHE ══════════════════════════════════════════════
+#
+# The same gRPC endpoint (:31985 since the k3s move) serves a SCHEDULER as well as BES + cache:
+# cassian's buildbuddy gained a
+# remote executor, and this box is the same box, so loopback reaches it.
+#
+# ⚑ WHY, AND IT IS NOT SPEED.  The executor runs each action in a WRAPPER IMAGE whose rootfs is
+# COPIED, so an action's in-place writes are contained and cannot escape into the source tree —
+# unlike Bazel's local sandbox, which symlinks first-party packages straight back to the working
+# tree (measured this session: $EXECROOT/paperkit is a symlink to the live checkout, which is how
+# a check could read UNSTAGED sources and pass).  A failing action leaves its debris in a copy
+# that is thrown away.  That is a containment property, and it is the reason to switch.
+#
+# ⚑⚑ THE CONSTRAINT THIS ENGINE OWNS IS HONORED.  Scheduling is governed by the learned per-action
+# mem.json ladder (the resource_set the bib generator projects); the executor gives a generous
+# budget and does NOT admission-control over those client hints.  Confirmed by the operator of the
+# executor, unprompted, rather than assumed here.
+#
+# ⚑⚑⚑ TWO BOUNDS, STATED BECAUSE THEY DECIDE WHERE THIS IS USED.  (1) It is a SINGLE executor —
+# one host, one worker, no shared pool — so a cold ~137k-action //:hook would SERIALIZE through it
+# and be slower than local.  Use it for the sweeps and the gc-sensitive work, measure before
+# leaning on it for the whole hook.  (2) require_executor_authorization is OFF: unauthenticated on
+# loopback, single-operator trust.  Fine on one box; not a property to inherit anywhere else.
+#
+# ⚑⚑⚑ WHY THE EXECUTOR EXISTS — AND IT IS NOT SPEED.  Operator, 2026-09-21: "The remote executors
+# were _created_ because of integrity problems with paperkit's local sandbox runs."  The two
+# bounds above weigh the executor against local as if local were the baseline and remote the
+# optimisation.  That is backwards.  Local sandbox runs are what the executor was built to REPLACE;
+# a //:hook that "serializes through it and is slower than local" is slower than something that
+# was not producing trustworthy verdicts in the first place.  Every September 2026 gate run on the
+# previous host reported `remote-cache, linux-sandbox` — cache consulted, execution LOCAL — and
+# under this framing none of them was a run.  The 118-path cut those runs "gated" has never been
+# gated with integrity by construction; its first such run is on luthen.
+#
+# ⚑ Ζ·remote·nofallback — LOCAL FALLBACK IS REFUSED, BY DECLARATION.  Operator, same exchange:
+# "hard 'no' on the sandbox fallback. the remote executor is what grants you integrity by
+# construction."  This block used to argue the opposite — "an executor that is DOWN must not fail
+# the build ... it is an instrument, not a gate" — and its own reason is the refutation: a
+# fallback "has not yet been shown to produce byte-identical outputs to a cold local build", which
+# is precisely why a local result may never stand in for a remote one.  A cell that ran in
+# linux-sandbox under --config=remote produced a verdict WITHOUT the property that makes verdicts
+# trustworthy; the run is not green-with-a-note, it is not a run.
+#
+# Bazel's default for --remote_local_fallback is already false, but ABSENT is weaker than REFUSED:
+# a later command-line flag or a stray `build:` line would re-enable it silently.  Pinned off here
+# so the declaration is the policy.  An executor that is down reds the build with a typed
+# infrastructure exit (34/36/37/38/39 — see Ζ·exit·infra), which is the honest outcome.
+build:remote --noremote_local_fallback
+# (no `--config=cas` here: `build --config=cas` above already applies it to every command, and a
+# second expansion is what `[cas] expanded more than once` warned about — measured 2026-09-21.)
+# ⚑ The addresses below and in `cas` are PROJECTED by tools/project_endpoints.py from the host's
+# endpoint directory (luthen-observability, by service name through the dns-delegate) — never
+# edit them by hand; `python3 tools/project_endpoints.py --check` reports drift.
+build:remote --remote_executor=grpc://buildbuddy-bes.buildbuddy.svc.cluster.local:1985
+build:remote --remote_instance_name=paperkit

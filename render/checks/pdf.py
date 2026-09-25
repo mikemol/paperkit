@@ -125,6 +125,21 @@ def main(argv: list[str]) -> int:
     if via not in graph.ROUTES:
         print(f"pdf: unknown route --via {via} (expected {'|'.join(graph.ROUTES)})", file=sys.stderr)
         return 3
+    # Ζ·tier·exit — pikepdf is part of THIS route's toolchain too: `_office_pdf` calls
+    # `linkalt.describe_links` (PDF/UA 7.18), which opens the PDF with it.  Absent, that raised
+    # `AttributeError: 'NoneType' object has no attribute 'open'` from inside `render()` and the
+    # gate read a missing library as a FAILED verification (Σ-F3, measured in the tick-41
+    # full-graph run: `rnd-link-alt` cannot-run vs `rnd-pdf` fail, one absent dependency).
+    #
+    # ⚑ The guard belongs HERE rather than in `describe_links`, beside the two cannot-run exits
+    # this function already has — "the route's toolchain is unavailable" below is the same
+    # judgement about a different tool.  Guarding the callee would make it return a sentinel its
+    # four in-module callers would each have to re-interpret; guarding the ENTRY POINT keeps one
+    # owner for the verdict, which is why `linkalt` and `mathalt` guard in their own `main`.
+    if linkalt.pikepdf is None:
+        print("pdf: pikepdf absent — CANNOT VERIFY the deliverable's link descriptions "
+              "(not a pass, not a failure)", file=sys.stderr)
+        return 3
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         pdf = render(Path("../paper/paper.md"), d / "p.pdf", via, d)

@@ -1,0 +1,27 @@
+# Hand-maintained file manifest (Ζ·sunset) — a data dep of the Ζ·starlark-generated
+# @paperkit_image check graph; the bib is the source, this just lists the files.
+#
+# ⚑ Α·wired·scope — image/ had NO BUILD.bazel at all, which is a second and independent reason it
+# was never wired: bib.project's _claim_script reads //image:paper.toml, and a directory with no
+# BUILD file is not a package, so the extension failed to load rather than emitting a check graph.
+# The missing bib.project line was the visible absence; this was the one underneath it.
+#
+# Ζ·tier — image is `local` (host-coupled): every check shells podman, and stable.sh runs two
+# independent --no-cache builds to compare digests.  So these warrants are GATED, never GRADED —
+# the adequacy sweep would have to rebuild a container image per mutation site.
+filegroup(name = "files", srcs = [
+        "IMAGE.md",
+        "checks/repro.sh",
+        "checks/serve.sh",
+        "checks/stable.sh",
+        "entrypoint.sh",
+        "paper.toml",
+        "rubric.tsv",
+        "warrants.bib",
+    ], visibility = ["//visibility:public"])
+
+# ⚑ Ζ·exports·visible — paper.toml AS A VISIBLE LABEL, so a witness in a bib-generated EXTERNAL
+# repo can depend on THIS FILE rather than on this package's whole filegroup.  exports_files
+# defaults to PRIVATE; a filegroup here already declares visibility=public, and the export did
+# not, which is why the twelfth gate attempt died in analysis rather than on a claim.
+exports_files(["paper.toml"], visibility = ["//visibility:public"])

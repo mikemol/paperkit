@@ -302,6 +302,12 @@ def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
             f.write_bytes(b)
 
 
+# Ζ·calc·why — the failing check's own reason, set by sensitivity() and read by grade_check()
+# immediately after.  Not a return value: see the note at the assignment for why arity is not
+# widened here.  Empty when the baseline passed or the check said nothing.
+_LAST_WHY = ""
+
+
 def sensitivity(chk: str, sandbox_project: Path, custom: dict,
                 engine_dir: Path | None = None, footprint: list | None = None,
                 root_copy: Path | None = None) -> tuple[bool, list]:
@@ -324,6 +330,24 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     # green repo whose cells were being killed by their memory cap.
     _v = resolver.resolves(chk, sandbox_project, custom)
     if not _v.passed:
+        # ⚑ Ζ·calc·why — KEEP THE CHECK'S OWN REASON, which this line discarded.
+        #
+        # `_v` is a Verdict carrying `_why` — the failing check's stderr tail, populated by
+        # run_ok (Ζ·fail·why).  The sweep read `.passed`, returned a bare bool, and threw the
+        # object away, so every downstream record said only "check does not pass in a pristine
+        # sandbox — repo is not green": the grader's GENERIC line, true of every failure and
+        # informative about none.  MEASURED 2026-09-13: arch-roster-wired red for three
+        # attempts while passing on the host AND from the execroot, with its labels verifiably
+        # staged — and nothing anywhere recorded what the check itself said.  Three hypotheses
+        # (declaration, cwd, execroot) each cost a full gate to refute, because the one artifact
+        # that would settle it was being dropped one attribute from where it was needed.
+        #
+        # Module-level rather than a third tuple element ON PURPOSE: widening a return arity
+        # breaks unpack sites that a variable-NAME grep cannot find (measured in this tree —
+        # the 7→8 entries widening missed a comprehension and two prefixed unpacks).  One
+        # caller reads it immediately below, so the window is a single statement.
+        global _LAST_WHY
+        _LAST_WHY = _v.why or ""
         return (UNREACHABLE if _v.is_unavailable() else False), []
     if engine_dir is None:
         # file resolution — corrupt each whole file, label by path.  Ξ·depth·explain: scope
@@ -498,6 +522,11 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     # but not plain False) when the check could not be reached at all.
     rec = _grade_from_sens(baseline, sens, reachable=(baseline is not UNREACHABLE))
     rec["baseline"] = baseline   # Ζ·calc — the measured baseline (the verdict), part of the CALCULATION
+    # Ζ·calc·why — the CHECK's own words, beside the grader's generic ones.  Present only when the
+    # check said something, so a passing record stays byte-identical (the non-breaking widening
+    # `why` and `account` already took in verdict.py).
+    if not baseline and _LAST_WHY:
+        rec["check_said"] = _LAST_WHY[:400]
     if rec["grade"] == "indeterminate":
         rec = _vacuity_source(rec, chk, sandbox_project, custom, engine_dir)
     # Ε·agree·grade — the corroboration AXIS, orthogonal to the falsifiability grade above:

@@ -6,10 +6,10 @@ re-measured (pk_cmd runs the check, pk_grade_claim re-sweeps), here one sweep fe
 change re-runs only pk_calc; the readings are instant.  footaudit/emergence are the same shape.
 """
 
+load("@@//tools:cell.bzl", "cell_builds_env", "cell_pypath")
+
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
-def _pypath(py):
-    return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
 # Τ·mem·observe·clean — a native bool build setting (no skylib) gating the cgroup peak read.  Only
 # under --config=memobserve (which sets --//tools:observe=True) is each action in its own cgroup, so
@@ -164,12 +164,49 @@ def _calc_impl(ctx):
     # Τ·mem·observe·clean — read the cgroup peak ONLY when observing (per-action cgroup ⇒ tree-accurate);
     # otherwise write a clean 0.  The branch makes the flag part of the action key (see ObserveInfo).
     peak = _peak_snippet(ctx.attr._observe[ObserveInfo].enabled, p.path)
+    # Ζ·toolchain·declare — the cell runs in the DEFAULT executor pool, so its verdict is a function
+    # of that pool's IMAGE too: ctx.info_file carries STABLE_EXECUTOR_IMAGE (tools/toolchain_status.sh),
+    # and a rebuilt default image re-runs every cell.  Measured 2026-09-21 without it: strace added
+    # to the image, `113 action cache hit`, four refuted footprint baselines served back stale.
     ctx.actions.run_shell(
         outputs = [c, p],
-        inputs = depset(ctx.files.data + [ctx.file._cap], transitive = [py.files]),
-        command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' + _cap_prefix(ctx.file._cap.path, bucket) +
+        inputs = depset(ctx.files.data + [ctx.file._cap, ctx.info_file], transitive = [py.files]),
+        # ⚡ Ζ·account·calc — REPLAY THE SWEEP'S STDERR, because this cell discards it too.
+        # Ζ·cell·account fixed exactly this for pk_cmd (verb.bzl tees BOTH streams into a file the
+        # record carries) and the calc family was never reached: stdout is redirected INTO the
+        # record here, stderr goes to the action's stream, and a pk_* cell EXITS 0 — so bazel never
+        # treats it as a failed action and never prints what it captured.  MEASURED: arch-roster-wired
+        # came back `{"baseline": false, "sens": []}` — one bit — while passing on the host, and two
+        # successive diagnoses built on that one bit were both wrong.  The record's SCHEMA is owned by
+        # discriminate.py (stdout), so this does not widen it; it replays stderr to the action's own
+        # stream, which the build log keeps.  A baseline that fails now SAYS WHY.
+        # ⚑ Ζ·builds·path — THE SWEEP CELL GETS THE DECLARED ARTIFACTS TOO.  This family never had
+        # the export: it landed in verb.bzl's pk_cmd and calc.bzl never mentioned the variable, so
+        # a claim's VERDICT cell could find its `builds` artifact and its GRADE cell could not.
+        # MEASURED: bnd-wheel declares `builds = {@@//paperkit:wheel}`, the generator staged it in
+        # this cell's `data` correctly, and the sweep still reported `CANNOT RUN — //paperkit:wheel
+        # is not staged`.  One owner now (cell_builds_env), two callers.
+        # ⚑ Ζ·scratch·per-action — PAPERKIT_SCRATCH is a SIBLING of this action's execroot, never a
+        # shared home and never INSIDE the root.  grader._scratch_dir's ladder bottoms out at
+        # ~/.cache/paperkit-sweep; in the executor pool (isolation `none`, uid 0, HOME unset — all
+        # MEASURED by luthen-observability 2026-09-21, inv 5cf33efa: one pid namespace, one mount
+        # namespace, one writable /root for every concurrent cell) that directory is SHARED across
+        # cells, and bnd-delta's scan restored a file into a copy something had removed
+        # (FileNotFoundError under ~/.cache/paperkit-sweep/paperkit-delta-…; the remover is
+        # UNNAMED — a pid-namespace explanation was refuted by the measurement).  A per-action
+        # scratch removes the shared surface regardless.
+        # ⚑⚑ NOT `$PWD/.pk-scratch`: the sweep copies the ROOT ($PWD) into scratch, so a scratch
+        # inside the root copies itself into itself — measured as a 6MB shutil.Error of
+        # .pk-scratch/paperkit-delta-…/.pk-scratch/paperkit-delta-…/… (b87dw6ihw).  `${PWD}.pk-scratch`
+        # is unique per action (the execroot path is) and outside the tree; removed on exit below.
+        command = cell_pypath(py) + cell_builds_env(ctx.files.builds) +
+                  'export PAPERKIT_ROOT="$PWD" PAPERKIT_SCRATCH="${PWD}.pk-scratch"; PK_ACCT="$PWD/.pk-calc-account.$$"; ' +
+                  _cap_prefix(ctx.file._cap.path, bucket) +
                   '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
-                  " --calc" + res + " " + ctx.attr.project + " > " + c.path + peak,
+                  " --calc" + res + " " + ctx.attr.project + " > " + c.path + ' 2>"$PK_ACCT"; rc=$?; ' +
+                  'cat "$PK_ACCT" >&2; rm -f "$PK_ACCT"; rm -rf "$PAPERKIT_SCRATCH"; ' +
+                  '[ "$rc" = 0 ] || echo "Ζ·account·calc: discriminate exited $rc for ' + ctx.attr.claim + '" >&2' +
+                  peak,
         mnemonic = "PkCalc",
         progress_message = "Ζ·calc " + ctx.label.name,
         # Τ·mem — bound concurrent sweeps against --local_ram_resources (Bazel-native, portable);
@@ -192,6 +229,12 @@ pk_calc = rule(
         # Ζ·cell·cap — the vendored capper, staged so the cell can exec it in the sandbox.
         "_cap": attr.label(default = "//tools:cgroup-scope", allow_single_file = True, cfg = "exec"),
         "data": attr.label_list(allow_files = True),
+        # ⚑ Ζ·builds·path — DECLARED SEPARATELY FROM `data`, because the export needs the SUBSET.
+        # The generator folds `builds` labels into `data` for staging (Ζ·builds·calc), which is
+        # right — they ARE inputs — but PAPERKIT_BUILT_ARTIFACTS must name only the artifacts the
+        # warrant DECLARED as built, not every staged file.  So the label list is passed twice:
+        # once to stage, once to name.  pk_cmd carries the same pair of attrs for the same reason.
+        "builds": attr.label_list(allow_files = True),
         "_observe": attr.label(default = "@@//tools:observe"),
     },
 )
@@ -211,7 +254,7 @@ def _mem_learn_impl(ctx):
     ctx.actions.run_shell(
         outputs = [out],
         inputs = depset([ctx.file._tool] + peaks, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
                   " ".join([p.path for p in peaks]) + " > " + out.path,
         mnemonic = "PkMemLearn",
         progress_message = "Τ·mem·learn " + ctx.label.name,
@@ -239,7 +282,7 @@ def _mutate_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset(ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" paperkit/mutate.py ' +
+        command = cell_pypath(py) + '"$(command -v python3)" paperkit/mutate.py ' +
                   ctx.attr.module + " '" + ctx.attr.site + "' > " + o.path,
         mnemonic = "PkMutate",
         progress_message = "Ζ·mutate " + ctx.label.name,
@@ -291,6 +334,77 @@ def _pyc_impl(ctx):
         pyc = depset([o], transitive = [d[PycInfo].pyc for d in ctx.attr.deps]),
         py = depset([ctx.file.src], transitive = [d[PycInfo].py for d in ctx.attr.deps]),
     )]
+
+def _backend_root(ctx):
+    """The staged backend's site-packages root — its `setuptools/__init__.py`'s grandparent."""
+    for f in ctx.attr._backend[DefaultInfo].default_runfiles.files.to_list():
+        if f.path.endswith("/setuptools/__init__.py"):
+            # f.dirname is `.../setuptools`; the IMPORT ROOT is its parent.
+            return f.dirname.rsplit("/", 1)[0]
+    fail("Ζ·wheel·backend: @pk_build//setuptools:pkg staged no setuptools/__init__.py — " +
+         "the declared PEP 517 backend is not in the action's inputs, so the build would " +
+         "silently fall back to a HOST setuptools (or fail), which is the undeclared input " +
+         "this rule exists to remove.")
+
+PkWheel = provider(
+    doc = "Ζ·venv·install — the built engine wheel a cell venv installs the engine FROM.",
+    fields = {"whl": "the .whl File"},
+)
+
+def _wheel_impl(ctx):
+    o = ctx.actions.declare_file(ctx.label.name + ".whl")
+    # ⚑ Ζ·wheel·phantom — THIS RULE WAS LOADED AND CALLED FOR FIVE DAYS WITHOUT EXISTING.
+    # paperkit/BUILD.bazel:1 loaded `pk_wheel` and :37 instantiated it while no definition existed
+    # anywhere — not here, not at HEAD, not in any stash — and nothing noticed, because HEAD was
+    # frozen and every build served a warm output base that never re-derived the load.  Bazel
+    # reported it as `no such target '//paperkit:dag.bzl'` (the package failed to LOAD, so every
+    # target in it read as undeclared) — a symptom naming a file that was never the problem.
+    #
+    # ⚑⚑ AND THE DOCS ASSERTED IT EXISTED, with a `pk_wheel = rule(` code block at
+    # docs/bazel-architecture.md:316 listing attrs this file did not have.  A document holding its
+    # own copy of a definition is a copy that can be right about a thing that is not there.
+    #
+    # THROUGH THE DECLARED BACKEND (Ζ·wheel·backend): wheel.py imports setuptools.build_meta from
+    # the staged @pk_build hub rather than shelling to a host `uv`, so the action is hermetic and
+    # the remote executor can run it (`uv` is MISSING from the executor image, measured).
+    ctx.actions.run_shell(
+        outputs = [o],
+        inputs = depset(
+            [ctx.file._tool, ctx.file.pyproject] + ctx.files.srcs,
+            transitive = [ctx.attr._backend[DefaultInfo].default_runfiles.files],
+        ),
+        # `build <out> <pyproject>` — wheel.py roots the PEP 517 build at pyproject's own directory.
+        # PYTHONPATH names the STAGED backend's import roots, so `from setuptools import
+        # build_meta` resolves to the declared, hashed copy rather than to whatever the host has.
+        # ⚑ `-P` IS LOAD-BEARING, NOT TIDINESS.  The tool is `tools/wheel.py`, and python puts a
+        # script's OWN directory on sys.path — so `tools/` shadowed the real `wheel` distribution
+        # that setuptools imports, and the action died on `No module named 'wheel.wheelfile';
+        # 'wheel' is not a package`.  That is bnd-package-shadow, reproduced by this rule: a local
+        # file eclipsing an installed package because of where the entry point happens to live.
+        # -P drops the script directory, leaving PYTHONPATH to name only the STAGED backend.
+        command = ('PYTHONPATH="' + _backend_root(ctx) + '" ' +
+                   '"$(command -v python3)" -P ' + ctx.file._tool.path +
+                   " build " + o.path + " " + ctx.file.pyproject.path),
+        mnemonic = "PkWheel",
+        progress_message = "Ζ·wheel " + ctx.label.name,
+        use_default_shell_env = False,
+    )
+    return [DefaultInfo(files = depset([o])), PkWheel(whl = o)]
+
+pk_wheel = rule(
+    implementation = _wheel_impl,
+    doc = "Ζ·venv·install — build the engine's wheel: the artifact a cell installs the engine FROM.",
+    attrs = {
+        "srcs": attr.label_list(allow_files = True, mandatory = True,
+                                doc = "ENGINE_SRCS + the package data the wheel must carry — " +
+                                      "setuptools cannot include data absent from the tree it builds from"),
+        "pyproject": attr.label(allow_single_file = True, mandatory = True,
+                                doc = "the metadata that SELECTS what ships (packages, package-data)"),
+        "_backend": attr.label(default = "@pk_build//setuptools:pkg",
+                               doc = "Ζ·wheel·backend — the declared PEP 517 backend, pinned and hashed"),
+        "_tool": attr.label(default = "//tools:wheel.py", allow_single_file = True),
+    },
+)
 
 pk_pyc = rule(
     implementation = _pyc_impl,
@@ -344,7 +458,8 @@ def _eval_impl(ctx):
         carg = " --content-path " + ctx.attr.content_path + " --content-textfile " + cf.path
     ctx.actions.run_shell(
         outputs = [o, pk],
-        inputs = depset(mut + [ctx.file._cap] + ctx.files.project,
+        # ctx.info_file: the default pool's image digest (STABLE_EXECUTOR_IMAGE) — see pk_calc.
+        inputs = depset(mut + [ctx.file._cap, ctx.info_file] + ctx.files.project,
                         transitive = [closure_pyc, closure_py]),
         # ⚑ Ζ·cell·wire — `tools`, NOT `inputs`, AND THE DIFFERENCE IS THE RUNFILES TREE.
         # A first cut staged the launcher and its runfiles FILES through `inputs` and the cell
@@ -440,7 +555,7 @@ def _sens_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset([ctx.file._tool, ctx.file.baseline] + ctx.files.evals, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --baseline " + ctx.file.baseline.path + " " + evals + " > " + o.path,
         mnemonic = "PkSens",
         progress_message = "Ζ·sens " + ctx.label.name,
@@ -472,7 +587,7 @@ def _decisions_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset([ctx.file._tool] + ctx.files.flips + ctx.files.reach, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --flips " + flips + " --reach " + reach + " > " + o.path,
         mnemonic = "PkDecisions",
         progress_message = "Μ·decisions " + ctx.label.name,
@@ -503,7 +618,7 @@ def _decisions_summary_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset([ctx.file._tool] + ctx.files.decisions, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " --summary " + recs + " > " + o.path,
         mnemonic = "PkDecisionsSummary",
         progress_message = "Μ·decisions·summary " + ctx.label.name,
@@ -531,9 +646,10 @@ def _mutant_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset(ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + 'export PAPERKIT_ROOT="$PWD"; ' +
+        command = cell_pypath(py) + 'export PAPERKIT_ROOT="$PWD" PAPERKIT_SCRATCH="${PWD}.pk-scratch"; ' +  # Ζ·scratch·per-action (see pk_calc)
                   '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
-                  " --mutant '" + ctx.attr.site + "' " + ctx.attr.project + " > " + o.path,
+                  " --mutant '" + ctx.attr.site + "' " + ctx.attr.project + " > " + o.path +
+                  '; rm -rf "$PAPERKIT_SCRATCH"',
         mnemonic = "PkMutant",
         progress_message = "Ζ·mutant " + ctx.label.name,
         resource_set = _RS[512],
@@ -562,7 +678,7 @@ def _cohere_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " cohere cohere " + ctx.attr.project + " " + v.path + " " + calcs,
         mnemonic = "PkCohere",
         progress_message = "Ζ·emerge·gate cohere " + ctx.label.name,
@@ -589,7 +705,7 @@ def _verdict_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool, calc], transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " calc verdict " + calc.path + " " + v.path,
         mnemonic = "PkVerdict",
         progress_message = "Ζ·calc verdict " + ctx.label.name,
@@ -617,7 +733,7 @@ def _canary_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool, ctx.file.pos, ctx.file.nul], transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
                   " canary " + ctx.file.pos.path + " " + ctx.file.nul.path + " " + v.path,
         mnemonic = "PkCanary",
         progress_message = "Ζ·canary " + ctx.label.name,
@@ -642,7 +758,7 @@ def _grade_impl(ctx):
     ctx.actions.run_shell(
         outputs = [g],
         inputs = depset([calc] + ctx.files.data, transitive = [py.files]),
-        command = _pypath(py) + '"$(command -v python3)" tools/read_grade.py ' + calc.path + " > " + g.path,
+        command = cell_pypath(py) + '"$(command -v python3)" tools/read_grade.py ' + calc.path + " > " + g.path,
         mnemonic = "PkGradeRead",
         progress_message = "Ζ·calc grade " + ctx.label.name,
     )

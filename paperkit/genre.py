@@ -275,7 +275,7 @@ def partition(records, gamma: float = 1.0) -> dict:
             "groups": len(set(part.values()))}
 
 
-def run_declared(spec: dict, groups, records, cwd=None) -> list:
+def run_declared(spec: dict, groups, records, cwd=None, spawn=None) -> list:
     """Ρ·deck·genre·cmd — invoke a PROJECT-DECLARED objective and validate what comes back.
 
     The open half of the registry was only half-open: a project could REGISTER an objective it
@@ -284,21 +284,79 @@ def run_declared(spec: dict, groups, records, cwd=None) -> list:
 
     The protocol is the smallest thing that can carry a partition: the groups go in on stdin, one
     per line, keys tab-separated; the units come back on stdout in the same shape.  No JSON schema
-    to version, and the format is the one the CLI already prints.
+    to version.
+
+    ⚑ IT IS *NOT* THE FORMAT THE CLI PRINTS, AND THIS DOCSTRING USED TO SAY IT WAS.  The wire
+    format here is KEYS ONLY.  `--observe` prints a leading SECTION column
+    (`project.py:639`: `f"{u['section']}\t" + "\t".join(u["keys"])`), so an author who develops a
+    declared objective by round-tripping the CLI's own output feeds section LABELS back as if they
+    were claim keys — and `is_total` then refuses them as INVENTED KEYS, an error that names
+    totality when the fault is a column offset.  Strip column 0 when adapting `--observe` output.
+
+    The wire format is the correct half: a section label is not a claim key, and a pagination is a
+    partition OF KEYS.  The prose was wrong, not the protocol.
 
     WHAT IT DOES NOT RELAX.  The result is held to the SAME totality invariant a built-in is: every
     key in exactly one unit.  A declared objective that drops or duplicates a claim is refused with
     the same message, because the invariant is a property of what a pagination IS, not of who wrote
     it.  Running arbitrary code here is the same trust posture `cmd:` already establishes — a
-    warrant set is trusted code — and it inherits the environment sanitization gating already does.
+    warrant set is trusted code.
+
+    ⚑ THE RECORDS CHANNEL (Κ, 2026-09-10) — closing `PK-GENRE-BLIND`.  `records` used to reach
+    `is_total` and NOTHING ELSE: the subprocess got keys and no way to ask what a claim SAYS, while
+    the built-in `_talk` reads `r["claim"]` for its 84-word budget and `_collection` reads
+    `rests-on`.  Every length-, term- or difficulty-dependent genre was therefore inexpressible as
+    a declared genre — four residual genres collapsed onto that one obstacle.
+
+    The records are written as JSONL to a temp file and its path exported as
+    `PAPERKIT_GENRE_RECORDS`.  Three properties, each chosen against a measured alternative:
+      · A FILE, not argv — 62,579 paths once exceeded ARG_MAX (`errno 7`) in this repo's own
+        tooling, and a corpus is exactly the thing that grows.
+      · JSONL, not a flat table — `structured-not-flat`: a claim carries nested `emit`/`items`,
+        and a tab-separated projection would force every consumer to re-invent an escaping rule.
+        One record per line keeps it streamable without a schema version.
+      · An ENV VAR under the `PAPERKIT_` prefix, which `resolver._ENV_KEEP_PREFIX` already
+        allow-lists — the same "set by the ENGINE rather than inherited" pattern
+        `PAPERKIT_PYTHONPATH` uses, rather than a new positional argument that would break the
+        `cmd` templates already in the wild.
+
+    ⚑ OPTIONAL BY CONSTRUCTION.  A genre that ignores the variable is unaffected: stdin is
+    BYTE-IDENTICAL to before.  `brief` reads nothing and still works; the three fixtures at
+    `paper/checks/claims.py:1031-1046` pass `records=[]` positionally and parse keys-only stdin.
+
+    ⚑⚑ AND THE ENVIRONMENT IS NOW ACTUALLY SANITIZED, WHICH THIS DOCSTRING FALSELY CLAIMED
+    (Κ-F1).  It read "it inherits the environment sanitization gating already does" — and
+    `subprocess.run` passed no `env=` at all, so a declared genre ran with the FULL ambient
+    environment: `LD_PRELOAD`, `PYTHONPATH`, a `PATH` with relative entries resolving to the
+    project being gated.  `resolver.clean_env` had ELEVEN callers and none was this one.  The
+    claim is now true rather than deleted.
     """
-    import subprocess
     cmd = spec.get("cmd")
     if not cmd:
         raise Unregistered("a declared genre with no `cmd` names no pagination at all")
     payload = "".join("\t".join(g) + "\n" for g in groups)
-    r = subprocess.run(cmd, shell=True, cwd=cwd, input=payload,
-                       capture_output=True, text=True)
+
+    # ⚑ Ζ·spawn·owner — THE SPAWN IS RESOLVER'S, AND SO WAS THE UPWARD EDGE.
+    #
+    # This built the sanitized env, the temp-file records channel, the `shell=True` call and the
+    # cleanup here, reaching `resolver.clean_env` through `import resolver as _resolver` — an
+    # UPWARD import (`DEPS["project"]` is `["model", "kernel"]`).  MEASURED 2026-09-13: the edge
+    # was live in source while `paperkit/dag.bzl` was STALE, so the component guard could not see
+    # it; regenerating the DAG surfaced it and reddened seven boundary claims at once.
+    #
+    # The environment helper was the wrong thing to reach for.  "Run a command a DOCUMENT declared,
+    # under the engine's rules" is resolver's capability by ownership — so the SPAWN moved there
+    # (`resolver.spawn_declared`) and `clean_env` stayed where its two Ω·config knobs are declared.
+    # What is left here is genre's own semantics: the totality invariant over the units returned.
+    #
+    # The dependency is INVERTED, not declared away: `spawn` is injected by the caller
+    # (project.py, which may import resolver) and defaults to None, so this module names no
+    # resolver symbol and the partition's `project → {model, kernel}` stays true.
+    if spawn is None:
+        raise Unregistered("a declared genre needs a spawn: pass resolver.spawn_declared — the "
+                           "engine's owner of running a document-declared command (project may "
+                           "not import resolver, so the caller injects it)")
+    r = spawn(cmd, cwd, payload, records)
     if r.returncode != 0:
         raise SystemExit(f"genre: declared objective exited {r.returncode} — {r.stderr.strip()[-300:]}")
     units = [ln.split("\t") for ln in r.stdout.splitlines() if ln.strip()]
@@ -381,7 +439,15 @@ def is_total(objective, groups, records=()) -> tuple[bool, str]:
     return True, "every key lands in exactly one unit"
 
 
-def main(argv: list) -> int:
+def main(argv: list, spawn=None) -> int:
+    """⚑ Ζ·spawn·owner — the CLI takes the spawn as a PARAMETER, resolved at the entry point.
+
+    `--check` exercises the declared-genre seam, which needs `resolver.spawn_declared`; importing
+    it here would re-create the upward `project → resolver` edge the seam exists to remove (a
+    function-local import is still an import, and dagderive reads the AST, not the indentation).
+    The engine's entry point (`_cli`) supplies it; an in-process caller that has no resolver
+    passes None and `--check` then reports the declared genres as unrunnable rather than crashing.
+    """
     proj = Path([a for a in argv if not a.startswith("-")][0]) if [
         a for a in argv if not a.startswith("-")] else None
     reg = registry(proj)
@@ -389,6 +455,7 @@ def main(argv: list) -> int:
         # A fixture whose shape the invariant is stated over — two clusters, one singleton.
         groups = [["a", "b"], ["c"]]
         bad = 0
+        declared = 0
         for name, spec in sorted(reg.items()):
             obj = spec.get("objective")
             if obj is None:                      # a project-declared genre: its objective is a cmd
@@ -396,6 +463,31 @@ def main(argv: list) -> int:
                     print(f"genre --check: {name!r} declares neither a built-in objective nor a "
                           f"`cmd` — the registry entry names no pagination at all", file=sys.stderr)
                     bad += 1
+                    continue
+                # ⚑ RUN IT.  This branch used to `continue` here, checking only that a `cmd` STRING
+                # was present — and the success message then said "every objective is total over
+                # the grouping", quantifying over a set it had only half examined.  Measured cost
+                # (Ν-F6, 2026-09-10): two genres declared `python3 -Ichecks checks/…` (`-I` is
+                # ISOLATED MODE, not an include path, so it parsed as `-c hecks` → NameError) and
+                # `--check` reported all 8 registered and TOTAL while neither could execute.
+                #
+                # A declared objective's totality is not a property of its declaration; it is a
+                # property of what the command DOES, and the only way to know is to run it.  That
+                # is what the seam already exists for, so this reuses `run_declared` rather than
+                # re-implementing the protocol — the check and the live path cannot then diverge.
+                try:
+                    run_declared(spec, groups, [], cwd=proj, spawn=spawn)
+                except SystemExit as e:
+                    # run_declared raises SystemExit for BOTH a non-zero exit and a non-total
+                    # result; its message already says which, so it is passed through verbatim.
+                    print(f"genre --check: {name!r} (declared) {e}", file=sys.stderr)
+                    bad += 1
+                except Exception as e:           # noqa: BLE001 — a check reports, never crashes
+                    print(f"genre --check: {name!r} (declared) could not run: "
+                          f"{type(e).__name__}: {e}", file=sys.stderr)
+                    bad += 1
+                else:
+                    declared += 1
                 continue
             ok, why = is_total(obj, groups)
             if not ok:
@@ -412,8 +504,12 @@ def main(argv: list) -> int:
             pass
         if bad:
             return 1
-        print(f"genre --check: {len(reg)} registered ({', '.join(sorted(reg))}) — every objective "
-              f"is total over the grouping, and an unregistered name refuses loudly")
+        # ⚑ THE MESSAGE NAMES WHAT WAS ACTUALLY RUN.  "every objective is total" was true of the
+        # built-ins and asserted of the declared ones without running them; a reader cannot tell a
+        # universal that was verified from one that was assumed, so the counts are stated.
+        print(f"genre --check: {len(reg)} registered ({', '.join(sorted(reg))}) — "
+              f"{len(reg) - declared} built-in objective(s) and {declared} declared `cmd`(s) each "
+              f"INVOKED and total over the grouping, and an unregistered name refuses loudly")
         return 0
     print("genre registry — pagination objectives over a grouping:\n")
     for name, spec in sorted(reg.items()):
@@ -423,4 +519,9 @@ def main(argv: list) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    # Ζ·spawn·owner — the SCRIPT entry is outside the module's import graph (`__main__` is not
+    # `genre`), so resolving the spawn here adds no component edge: dagderive attributes imports
+    # to the module, and this block only runs when the file IS the program.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from resolver import spawn_declared
+    raise SystemExit(main(sys.argv[1:], spawn=spawn_declared))

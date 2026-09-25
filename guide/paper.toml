@@ -5,5 +5,10 @@ subtitle = "Every sentence below is certified by a concept the library authored 
 warrants = ["guide.bib"]
 rubric = "rubric.tsv"
 out = "GUIDE.md"
+
+# Γ·delta·root — the Δ sandbox root, declared because the engine is a sibling and
+# layout._sandbox_root refuses to infer.  The bound is the REPO: the guide imports concept
+# certificates from the library, which lives under paperkit/.  See paper/paper.toml.
+root = ".."
 numbered = false
 references = false

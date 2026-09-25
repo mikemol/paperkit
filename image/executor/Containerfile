@@ -1,0 +1,157 @@
+# paperkit's BuildBuddy executor: the render toolchain, IN the executor (Ζ·render·hermetic).
+#
+# Shape is luthen-observability's images/buildbuddy-executor/Containerfile (the base arrives as a
+# build-arg from THEIR images.json, so the digest has one declaration — never written here).
+# The base is the raw VENDOR image, a sibling of luthen's thin executor, not a child of it: what
+# their wrapper installs (curl, python3) is not inherited and must be listed below if needed.
+# This image backs a SECOND executor pool, `paperkit`, that render's targets select by
+# `exec_properties = {"Pool": "paperkit"}`; the thin default pool keeps the sweep cells.
+#
+# ⚑ WHY THIS EXISTS.  Operator, 2026-09-21: "The remote executors were created because of
+# integrity problems with paperkit's local sandbox runs" and "the remote executor is what grants
+# you integrity by construction."  render's 29 tool-dependent claims (28 `toolchain` + 1 `local`
+# of 34) carried `no-remote: 1` — an escape to the HOST toolchain, resolved from $HOME and version
+# banners.  Under no-fallback they cannot run at all until their tools are in here.  Measured on
+# luthen's executor 2026-09-21T03:07Z by a remote genrule: pandoc, lualatex, kpsewhich, soffice,
+# verapdf, pikepdf/PIL/docx ALL ABSENT.  This is the declaration that puts them in.
+#
+# ⚑ EVERY PACKAGE BELOW IS TRACED TO A BINARY render/checks INVOKES (measured 2026-09-21 by
+# grepping the nine names across 35 files).  Nothing speculative; a check that needs more will
+# NAME it, which is the executor's own stated policy ("Let a failing action NAME what is missing").
+ARG BASE
+FROM ${BASE}
+
+USER root
+# ⚑ THE TOOLCHAIN IS PINNED UPSTREAM, NOT DEBIAN'S.  Operator ruling 2026-09-21 ("sgtm" on: TeX Live
+# via install-tl on a frozen tlnet snapshot, pandoc and LibreOffice by release tarball + sha256, each
+# in its own layer).  Measured cause: with Debian 13's texlive/pandoc/libreoffice the pool produced
+# 8 reds that were NOT paper defects — lualatex's tagged deliverable did not build, pandoc's pptx
+# failed validation, LibreOffice's UA export tagged 0 /Formula elements for 21 equations, a
+# font-metric selftest arm flipped.  The checks were validated against ONE toolchain, recovered from
+# the old host's own STABLE_TOOLCHAIN_* stamps: pandoc 3.8.3, TeX Live 2025 (LuaHBTeX 1.22.0),
+# LibreOffice 26.2.5.2, veraPDF 1.30.2.  Those are what this image carries.  Each pinned tool is its
+# OWN RUN layer above apt (peer's advice), so an edit to one does not rebuild the others.
+#
+# apt layer, isolated and --no-install-recommends, matching the wrapper's discipline.
+#   poppler-utils          pdfinfo, pdftotext, pdffonts, pdftoppm
+#   tesseract-ocr          ocr.py
+#   python3-pikepdf, python3-pil, python3-docx
+#                          the three DIRECT deps of tools/requirements_render.txt (pikepdf,
+#                          pillow, python-docx); lxml/packaging/typing-extensions follow as
+#                          Debian deps.  Debian's builds rather than pip, so the apt layer stays
+#                          the one package source and the image needs no network at action time.
+#   default-jre-headless   veraPDF is a JAR (not in Debian); installed below from its release
+#                          zip, and STABLE_TOOLCHAIN_VERAPDF_JAR already keys the cache on its
+#                          sha256 — the one tool paperkit was already hashing by content.
+#   fonts-dejavu           latex.py's per-codepoint fallback font (_FALLBACK_FONT = "DejaVu Sans"),
+#                          found through fontconfig by luaotfload; fontconfig itself for the same
+#   perl                   install-tl is perl (the base has none)
+#   the libx*/libcairo2/libcups2/libnss3/... set
+#                          LibreOffice's runtime, headless included (upstream's debs declare no
+#                          Depends, so the apt layer supplies what `soffice --headless` links)
+#   unzip, curl, ca-certificates, xz-utils
+#                          build-time only, for the pinned fetches.  ⚑ BASE is the RAW vendor
+#                          image (buildbuddy-executor-base), NOT luthen's curl-wrapped executor:
+#                          measured 2026-09-21 by the first build — `/bin/sh: 1: curl: not found`,
+#                          exit 127.  Nothing the wrapper installs is in here unless listed here.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      poppler-utils \
+      tesseract-ocr \
+      python3-pikepdf python3-pil python3-docx \
+      fonts-dejavu fontconfig \
+      perl \
+      libx11-6 libxext6 libxrender1 libxinerama1 libxrandr2 libxcursor1 libxi6 libxt6 \
+      libcairo2 libcups2 libdbus-1-3 libglib2.0-0 libnss3 libnspr4 libsm6 libice6 \
+      libfreetype6 libharfbuzz0b libxslt1.1 libgl1 libglu1-mesa \
+      default-jre-headless unzip curl ca-certificates xz-utils \
+ && rm -rf /var/lib/apt/lists/*
+
+# ── pandoc 3.8.3 — upstream release deb, pinned by sha256 (measured 2026-09-21 from this URL).
+ARG PANDOC_VERSION=3.8.3
+ARG PANDOC_SHA256=d7fac78b58b8c8da39254955eff321233ab97d74e8b2d461c0f0719a1fb5f357
+RUN curl -fsSL -o /tmp/pandoc.deb \
+      "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb" \
+ && echo "${PANDOC_SHA256}  /tmp/pandoc.deb" | sha256sum -c - \
+ && dpkg -i /tmp/pandoc.deb \
+ && rm /tmp/pandoc.deb \
+ && pandoc --version | head -1 | grep -qx "pandoc ${PANDOC_VERSION}"
+
+# ── TeX Live 2025 — install-tl from the FROZEN tlnet-final on the historic archive (the 2025
+# release is closed; the archive is the one place its bytes cannot move under the name).  The
+# installer tarball is pinned by sha256 (measured 2026-09-21), the package set by the profile
+# beside this file, and -repository points every package fetch at the same frozen tree.
+# Installed to /opt/texlive/2025 (see texlive.profile); binaries symlinked onto the ACTION PATH
+# (/usr/local/bin — a bazel action does not see image ENV, measured earlier in this arc).
+ARG TL_REPO=https://ftp.math.utah.edu/pub/tex/historic/systems/texlive/2025/tlnet-final
+ARG TL_INSTALLER_SHA256=311df9f1477fd90c520159d1feddc2d6270f010d8349d1f6bdb9461a93b48a5c
+COPY texlive.profile /tmp/texlive.profile
+RUN curl -fsSL -o /tmp/install-tl-unx.tar.gz "${TL_REPO}/install-tl-unx.tar.gz" \
+ && echo "${TL_INSTALLER_SHA256}  /tmp/install-tl-unx.tar.gz" | sha256sum -c - \
+ && mkdir -p /tmp/install-tl && tar -xzf /tmp/install-tl-unx.tar.gz -C /tmp/install-tl --strip-components=1 \
+ && /tmp/install-tl/install-tl -profile /tmp/texlive.profile -repository "${TL_REPO}" \
+ && rm -rf /tmp/install-tl /tmp/install-tl-unx.tar.gz /tmp/texlive.profile \
+ && for b in lualatex luatex luahbtex kpsewhich tlmgr fmtutil-sys mktexlsr; do ln -s "/opt/texlive/2025/bin/x86_64-linux/$b" "/usr/local/bin/$b"; done \
+ && lualatex --version | head -1 | grep -q "TeX Live 2025" \
+ && kpsewhich unicode-math.sty && kpsewhich luaotfload.sty && kpsewhich luamml.sty \
+ && kpsewhich nicematrix.sty && kpsewhich lualatex-math.sty
+
+# ── LibreOffice 26.2.5.2 — The Document Foundation's own deb bundle from their ARCHIVE (the
+# stable/ tree rotates on each point release; old/ does not), pinned by sha256 (measured
+# 2026-09-21).  Installs under /opt/libreoffice26.2.  Only the members render needs: ure + core,
+# writer + impress (+ math, draw: the formula and graphic filters writer's export loads), the
+# en-us UI (soffice refuses to start without a language pack), pyuno (the UNO bridge lo-export.py
+# drives — via the BUNDLED program/python, pyuno is built against it, not against /usr/bin/python3),
+# ooofonts (the export's fallback faces).  Symlinks put `soffice` on the action PATH and satisfy
+# lo-export.py's `_LO = /usr/lib/libreoffice/program`, so the check's path stays one declaration.
+ARG LO_VERSION=26.2.5.2
+ARG LO_SHA256=2f03bfb2ac9f33ea7c77331b4b7a23300fb0ed7443566046bf8b5bc51c1bed1e
+RUN curl -fsSL -o /tmp/lo.tar.gz \
+      "https://downloadarchive.documentfoundation.org/libreoffice/old/${LO_VERSION}/deb/x86_64/LibreOffice_${LO_VERSION}_Linux_x86-64_deb.tar.gz" \
+ && echo "${LO_SHA256}  /tmp/lo.tar.gz" | sha256sum -c - \
+ && mkdir -p /tmp/lo && tar -xzf /tmp/lo.tar.gz -C /tmp/lo --strip-components=1 \
+ && cd /tmp/lo/DEBS \
+ && dpkg -i libreoffice26.2-ure_*.deb libobasis26.2-core_*.deb libobasis26.2-images_*.deb \
+      libobasis26.2-writer_*.deb libobasis26.2-impress_*.deb libobasis26.2-math_*.deb libobasis26.2-draw_*.deb \
+      libobasis26.2-graphicfilter_*.deb libobasis26.2-xsltfilter_*.deb libobasis26.2-ooofonts_*.deb \
+      libobasis26.2-en-us_*.deb libobasis26.2-pyuno_*.deb \
+      libreoffice26.2_*.deb libreoffice26.2-writer_*.deb libreoffice26.2-impress_*.deb libreoffice26.2-math_*.deb libreoffice26.2-draw_*.deb libreoffice26.2-en-us_*.deb \
+ && cd / && rm -rf /tmp/lo /tmp/lo.tar.gz \
+ && ln -s /opt/libreoffice26.2 /usr/lib/libreoffice \
+ && ln -s /opt/libreoffice26.2/program/soffice /usr/local/bin/soffice \
+ && ln -s /opt/libreoffice26.2/program/soffice /usr/local/bin/libreoffice \
+ && soffice --headless --version | grep -q "LibreOffice ${LO_VERSION}" \
+ && /opt/libreoffice26.2/program/python -c "import uno"
+
+# veraPDF: pinned by the operator's validated set (render/checks/latex.py:22 — "veraPDF 1.30.2").
+# sha256 MEASURED 2026-09-21 on luthen from this exact URL (32,923,960 bytes), independently by
+# luthen-observability and by paperkit; both agree.
+# ⚑ THE ZIP IS AN IzPack INSTALLER, NOT A DISTRIBUTION (measured: 4 entries — verapdf-install,
+# verapdf-install.bat, verapdf-izpack-installer-1.30.2.jar — and NO `verapdf`).  A plain unzip
+# builds green and puts nothing on PATH, so the installer must RUN, unattended, from the
+# auto-install record beside this file (pack names + panel ids read out of the jar's own
+# resources/packs.info + panelsOrder).  The CLI pack writes $INSTALL_PATH/verapdf; the final
+# `test -x` is what makes a layout drift FAIL the build instead of surfacing as ABSENT later.
+# The record is a bare POSITIONAL argument: IzPack's Installer.class (strings, measured from this
+# jar) routes `-options <file>` to CONSOLE_FROM_TEMPLATE, a properties file — build 2 fed it the
+# XML and got "Missing mandatory target path! [ Console installation FAILED! ]"; the positional
+# form is INSTALLER_AUTO → launchAutomatedInstaller, which reads AutomatedInstallation XML.
+ARG VERAPDF_VERSION=1.30.2
+ARG VERAPDF_SHA256=6cc6341cb1af644044054b81f00a6590a7918abb18f762243de115258bcad838
+COPY verapdf-auto-install.xml /tmp/verapdf-auto-install.xml
+RUN curl -fsSL -o /tmp/verapdf.zip \
+      "https://software.verapdf.org/releases/${VERAPDF_VERSION%.*}/verapdf-greenfield-${VERAPDF_VERSION}-installer.zip" \
+ && echo "${VERAPDF_SHA256}  /tmp/verapdf.zip" | sha256sum -c - \
+ && cd /tmp && unzip -q /tmp/verapdf.zip \
+ && java -jar "/tmp/verapdf-greenfield-${VERAPDF_VERSION}/verapdf-izpack-installer-${VERAPDF_VERSION}.jar" \
+      /tmp/verapdf-auto-install.xml \
+ && rm -rf /tmp/verapdf.zip "/tmp/verapdf-greenfield-${VERAPDF_VERSION}" /tmp/verapdf-auto-install.xml \
+ && test -x /opt/verapdf/verapdf \
+ && ln -s /opt/verapdf/verapdf /usr/local/bin/verapdf \
+ && /usr/local/bin/verapdf --version
+# ⚑ No `ENV PATH` here, deliberately.  A bazel action does NOT inherit the image's ENV: its PATH
+# is what the CLIENT forwards (measured 2026-09-21 in the `paperkit` pool: /usr/local/sbin:
+# /usr/local/bin:/usr/bin + the bazelisk dir), so an `ENV PATH=/opt/verapdf:…` made `verapdf`
+# resolve in the BUILD shell — where the earlier `test -x` guard passed — and ABSENT in every
+# action.  The symlink puts it where the action PATH already looks; the version call above runs
+# by that path so the guard witnesses the same route an action takes.

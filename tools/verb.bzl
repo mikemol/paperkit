@@ -17,6 +17,8 @@ ARBITRARY command (pk_cmd's `sh -c cmd`, pk_agree's producers).  bazel = the pro
 record = the artifact downstream proofs depend on.
 """
 
+load("@@//tools:cell.bzl", "cell_builds_env", "cell_pypath")
+
 _PY = "@bazel_tools//tools/python:toolchain_type"
 _VERDICT = "//tools:verdict.py"
 
@@ -30,10 +32,6 @@ def _basekey(f):
     # a consumed record file is "<key>.verdict.json" → recover <key> (the sibling warrant's name)
     return f.basename[:-len(".verdict.json")] if f.basename.endswith(".verdict.json") else f.basename
 
-def _pypath(py):
-    # prepend the hermetic interpreter's dir so `command -v python3` resolves to it (absolute path ⇒
-    # sys.executable is populated for any subprocess the tool spawns — see tools/eval.py).
-    return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
 def _engine_importable():
     """Ζ·env·bootstrap — make the staged engine importable AS A PACKAGE, from any cwd.
@@ -60,27 +58,34 @@ def _engine_importable():
     return 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"; '
 
 def _verdict_tool(py, tool):
-    return _pypath(py) + '"$(command -v python3)" ' + tool.path + " "
+    return cell_pypath(py) + '"$(command -v python3)" ' + tool.path + " "
 
 def _tier_exec(ctx, py, tier):
     """Ζ·tier — resolve a warrant's enforcement tier to the action's (execution_requirements,
-    use_default_shell_env, python-PATH-prefix, stamp inputs).  A `toolchain` check must run under the
-    HOST toolchain IN FULL — host binaries (pandoc/veraPDF/soffice/lualatex) AND the host python + its
-    site-packages (pikepdf, …) — so it inherits the client env (use_default_shell_env) and drops the
-    hermetic `_pypath` prepend so `python3` resolves to the host interpreter.  Sound: the check is
-    deterministic given a PINNED toolchain, and ctx.info_file (STABLE_TOOLCHAIN_*) keys the cache on
-    the toolchain identity — the same argument covers host binaries and host python packages alike."""
+    use_default_shell_env, python-PATH-prefix, stamp inputs).  A `toolchain` check runs in the
+    executor pool whose IMAGE carries the toolchain IN FULL — pandoc/veraPDF/soffice/lualatex AND a
+    python with the render deps (pikepdf, …) — so it inherits the forwarded env (use_default_shell_env,
+    which is how the action gets a PATH at all) and drops the hermetic `_pypath` prepend so `python3`
+    resolves to the image's interpreter.  Sound: the check is deterministic given a PINNED image; the
+    cache key carries the image identity (ctx.info_file: STABLE_TOOLCHAIN_IMAGE, the pool's digest)."""
     er = {}
-    stamp_inputs = []
+    # Ζ·toolchain·declare — EVERY tier stamps: a sandbox check runs in the DEFAULT pool and its verdict
+    # is a function of that image (STABLE_EXECUTOR_IMAGE), a toolchain check of the paperkit pool's
+    # (STABLE_TOOLCHAIN_IMAGE); both keys ride ctx.info_file.  Measured 2026-09-21: a default-image
+    # rebuild left every sandbox verdict cached.
+    stamp_inputs = [ctx.info_file]
     host_env = False
-    pyprefix = _pypath(py)
+    pyprefix = cell_pypath(py)
     if tier == "local":
         er = {"local": "1", "no-sandbox": "1", "no-cache": "1", "no-remote": "1"}
     elif tier == "toolchain":
-        er = {"local": "1", "no-sandbox": "1", "no-remote": "1"}   # cacheable (no no-cache)
-        stamp_inputs = [ctx.info_file]   # depend on the stable toolchain fingerprint → precise invalidation
-        host_env = True
-        pyprefix = ""
+        # Ζ·render·pool — the toolchain is the EXECUTOR IMAGE in TOOLCHAIN_POOL (tools/pool.bzl), which
+        # the generator selects per target via exec_properties.  No `local`/`no-sandbox`/`no-remote`:
+        # those pinned the check to the HOST toolchain, resolved off $HOME and version banners, which
+        # is the escape the executor exists to close (operator 2026-09-21: the executors were CREATED
+        # because local sandbox runs had integrity problems).  Cacheable — the image is the toolchain.
+        host_env = True     # the client-forwarded env (PATH) is what an action sees in the pool — measured
+        pyprefix = ""       # `python3` = the image's Debian interpreter, carrying the pk_render deps
     return er, host_env, pyprefix, stamp_inputs
 
 def _cmd_impl(ctx):
@@ -97,6 +102,11 @@ def _cmd_impl(ctx):
     if ctx.files.consumes:
         pairs = " ".join([_basekey(f) + "=$PWD/" + f.path for f in ctx.files.consumes])
         consume_prefix = 'export PAPERKIT_CONSUMED_RECORDS="' + pairs + '"; '
+    # Ζ·builds·path — the same $PWD-before-the-cd idiom, for BUILT ARTIFACTS.  A declared artifact is
+    # staged at its execroot-relative path (bazel-out/<cfg>/bin/...), and the check runs with
+    # cwd=<project>, so export the ABSOLUTE path under a basename key: the check reads what it was
+    # HANDED rather than guessing a layout.  Empty when the warrant declares no `builds`.
+    consume_prefix += cell_builds_env(ctx.files.builds)
     if ctx.attr.project and ctx.attr.project != ".":
         inner = "cd " + _sq(ctx.attr.project) + " && " + inner  # cwd = the project dir (relative paths)
     # Ζ·tier — the check's enforcement tier decides how it runs and whether it is cached/swept:
@@ -105,10 +115,10 @@ def _cmd_impl(ctx):
     #     hermetic AND NOT a function of declared inputs (the machine is unpinned), so run on the host
     #     unsandboxed AND UNCACHED (a cached verdict would bank a host-dependent die-roll).
     #   toolchain: a TOOLCHAIN-COUPLED check (render's veraPDF/lualatex/soffice/pandoc) — needs a real
-    #     toolchain the sandbox lacks, so run on the host unsandboxed, BUT it is DETERMINISTIC given a
-    #     PINNED toolchain, so it is CACHED and STAMPED with the toolchain fingerprint (ctx.info_file,
-    #     the STABLE_TOOLCHAIN_* keys): a toolchain change invalidates it precisely, an unchanged
-    #     toolchain is a cache hit — enforceable every commit AND fast.  Cacheable = omit no-cache.
+    #     toolchain the thin sandbox lacks, so it runs REMOTELY in the executor pool whose image carries
+    #     it (Ζ·render·pool: exec_properties Pool, stamped by the generator).  DETERMINISTIC given a
+    #     PINNED image, so it is CACHED and STAMPED with that image's digest (ctx.info_file,
+    #     STABLE_TOOLCHAIN_IMAGE).  Cacheable = omit no-cache.
     er, host_env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
     # The ONE irreducibly-shell oracle: run the arbitrary `cmd` and read its exit code → $V; the
     # record itself is emitted by verdict.py (no JSON built in shell).
@@ -138,9 +148,29 @@ def _cmd_impl(ctx):
                   # bazel captures it per-action and prints it on failure.  The verdict is still
                   # `$?` alone (a verdict is $? — never parsed from a transcript), so this widens
                   # only what a human can READ, never what the gate DECIDES.
-                  "( " + inner + " ) >/dev/null; rc=$?; " +
+                  # ⚡ Ζ·cell·account — TEE stderr to a file so the RECORD can carry it.
+                  # Ζ·rungate·why (above) stopped discarding stderr, and that was half the fix: a
+                  # pk_* cell EXITS 0 and reports via a RECORD, so bazel never sees a failed action
+                  # and never prints the stderr it captured.  Four boundary suites went RED in the
+                  # cell while green on the host, with `{"verdict":"fail"}` and nothing else.
+                  # ⚡⚡ NOT `$TMPDIR`: the sandbox inherits the host's TMPDIR, which does not exist
+                  # inside it.  `$PWD` is the execroot, which always does.  Still `cat`-ed to stderr
+                  # afterwards, so the build log keeps what it had — the record is a WIDENING.
+                  'PK_ACCT="$PWD/.pk-account.$$"; ' +
+                  # ⚑ Ζ·account·stdout — BOTH STREAMS, and the first draft captured only stderr.
+                  # MEASURED: bnd-cpuweight reddened in the cell with an EMPTY account while
+                  # passing on the host, printing eighteen diagnostic lines — to STDOUT.  The note
+                  # above keeps stdout off the ACTION's stream (a check's stdout is its own
+                  # protocol and would interleave); writing it to a FILE interleaves with nothing,
+                  # and eval.py's own _run already merges the pair for exactly this reason: "a
+                  # stderr-only capture once reported 'no stderr' for a check that had explained
+                  # itself perfectly well one stream over."  The `cat` below still replays only
+                  # this file, so the action's stream is unchanged.
+                  "( " + inner + ' ) >"$PK_ACCT" 2>&1; rc=$?; ' +
                   'if [ "$rc" = 0 ]; then V=pass; elif [ "$rc" = 3 ]; then V=cannot-run; else V=fail; fi; ' +
-                  '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path,
+                  'cat "$PK_ACCT" >&2; ' +
+                  '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path +
+                  ' --account "$PK_ACCT"; rm -f "$PK_ACCT";',
         # Ρ·check·resource·set — a check action declares NO resource_set, so per-claim checks are
         # scheduled by job count alone while the sweep grid (pk_calc) is memory-bounded per cell.
         # MEASURED before concluding this is a defect: a live check peaks at 16-68MB (discriminate
@@ -168,6 +198,18 @@ pk_cmd = rule(
         # they run once, memoized; their verdict.json is staged + their paths exported in
         # PAPERKIT_CONSUMED_RECORDS as key=abspath, so the check reads the cached verdict, never re-runs it).
         "consumes": attr.label_list(allow_files = True),
+        # ⚑ Ζ·builds·path — BUILT ARTIFACTS GET THEIR OWN ATTR, for the same reason `consumes` does:
+        # a rule cannot export what it cannot distinguish.  A `builds` label used to be merged into
+        # `data` by the generator, so pk_cmd saw a staged SOURCE and a built ARTIFACT as the same
+        # thing — and a source lands at its own repo-relative path while an artifact lands under
+        # bazel-out, which a project-relative cwd cannot reach.  MEASURED: bnd-wheel globbed
+        # `bazel-out/*/bin/paperkit/wheel.whl` and reported cannot-run WITH THE ARTIFACT STAGED IN
+        # ITS OWN CELL, because the check runs with cwd=<project>.  Its own comment had already
+        # learned the lesson one layer out ("bazel-bin/ is a convenience symlink in the WORKSPACE;
+        # it does not exist inside a hermetic sandbox") and then globbed another workspace-relative
+        # path.  Operator: "you want build artifacts, not symlinks — and config=remote to force
+        # these to the surface."  So the path is HANDED to the check, never reconstructed.
+        "builds": attr.label_list(allow_files = True),
         "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),
     },
@@ -243,9 +285,14 @@ def _agree_impl(ctx):
     for i in range(len(ctx.attr.producers)):
         prod = ctx.attr.producers[i]
         o = ctx.actions.declare_file(ctx.label.name + ".prod" + str(i) + ".out")
+        # Ζ·render·hermetic — the producers STAGE `data` exactly as pk_cmd does.  Before 2026-09-21
+        # they staged only the stamp + python: on the host (`no-sandbox`) the live tree was simply
+        # there, so nothing noticed; in the executor pool the `cd render` had no render to cd into
+        # and the first in-pool run named it (b7193e0b: PkProducer rnd-agree.prod0 was the failing
+        # action).  A tier that runs somewhere real is what made the missing declaration visible.
         ctx.actions.run_shell(  # each producer's output is an agglomerated INTERMEDIATE artifact
             outputs = [o],
-            inputs = depset(stamp_inputs, transitive = [py.files]),
+            inputs = depset(stamp_inputs + ctx.files.data, transitive = [py.files]),
             use_default_shell_env = host_env,
             command = pyprefix + 'O="$PWD/' + o.path + '"; if ( ' + prefix + "sh -c " + _sq(prod) +
                       ' ) > "$O" 2>/dev/null; then :; else echo __FAIL__ > "$O"; fi',
@@ -268,6 +315,7 @@ pk_agree = rule(
     toolchains = [_PY],
     attrs = {
         "producers": attr.string_list(mandatory = True),
+        "data": attr.label_list(allow_files = True),   # Ζ·render·hermetic — what the producers read (staged)
         "project": attr.string(default = "."),
         "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),

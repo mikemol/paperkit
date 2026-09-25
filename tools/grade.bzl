@@ -10,13 +10,13 @@ Proof: baseline + ONE mutant (a sensitive engine file) for a real check.  The fu
 fan-out + ladder + rests_on clamp is the scaled version.
 """
 
+load("@@//tools:cell.bzl", "cell_pypath")
+
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
-def _pypath(py):
-    return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
 def _verdict_tool(py, tool):
-    return _pypath(py) + '"$(command -v python3)" ' + tool.path + " "
+    return cell_pypath(py) + '"$(command -v python3)" ' + tool.path + " "
 
 def _rerun(ctx, tag, mutate):
     """A Bazel action: stage the inputs, optionally corrupt `mutate`, run `gate.py --only` under

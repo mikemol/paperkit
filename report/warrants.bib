@@ -1,9 +1,29 @@
 % warrants.bib — the verification REPORT's claims.  Each figure is a markdown table
 % RENDERED from machine-readable pipeline data (discriminate --json + gate exit
 % codes), not scraped from human output.  The tables are emitted assets, kept
-% fresh-by-construction (check = fresh:all, i.e. report/gen.py --check, which
-% re-derives every figure and fails if the committed copy has drifted).  Refresh
+% fresh-by-construction: `fresh:<asset>` runs report/gen.py --check <asset>, which
+% re-derives THAT figure and fails if the committed copy has drifted.  Refresh
 % with `python3 report/gen.py`.
+%
+% ⚑ EACH CLAIM NAMES ITS OWN WITNESS.  Seven claims here once carried `fresh:all` —
+% and "all" is not an asset: gen.py filtered it to [] and fell through to checking
+% everything, so seven distinct claims ran one identical, maximally-broad check and
+% none discriminated its own asset.  --without-K exists to catch exactly that and
+% could not, because report/ is not wired into MODULE.bazel (no :invariants target
+% ever ran over it).  The fallthrough is now a refusal (gen.py: unknown asset → 2).
+%
+% The split also separated claims that assert a PROPERTY from claims that assert an
+% emitted FILE.  A freshness check witnesses that the committed asset matches its
+% generator — it cannot fail when the property the prose claims has become false,
+% because the generator renders whatever it is given.  So rpt-proof (--without-K is
+% clean), rpt-delta (Δ grades by falsifiability) and rpt-dag (the grounding graph is
+% a walkable DAG) carry their own witnesses --- distinct.py, grades.py, grounding.py
+% --- while the `-out` claims, which really are about the emitted table, keep fresh:.
+%
+% Those three return exit 3 (_CANNOT_RUN) when the grader could not run here, never
+% a FAIL: gen.py's _delta swallows discriminate's exit code, so an unrunnable grader
+% and an empty corpus arrive as the same empty list.  A cannot-run is not a
+% refutation.
 
 @misc{rpt-status,
   section = {status},
@@ -14,7 +34,7 @@
   section = {status}, from = {rpt-status}, join = { — },
   claim   = {the verdict per document, each project discovered, not hand-listed},
   emit    = {assets/gate.md},
-  check   = {fresh:all}
+  check   = {fresh:gate.md}
 }
 
 @misc{rpt-reproducible,
@@ -32,47 +52,50 @@
 @misc{rpt-delta,
   section = {adequacy},
   claim   = {Δ grades each cited claim's check by whether it can actually fail},
-  check   = {fresh:all}
+  check   = {cmd:python3 grades.py}
 }
 @misc{rpt-delta-out,
   section = {adequacy}, from = {rpt-delta}, join = { — },
   claim   = {the grade of every cited claim in every document, with why this grade and why not a higher or lower one},
   emit    = {assets/delta.md},
-  check   = {fresh:all}
+  check   = {fresh:delta.md}
 }
 
 @misc{rpt-proof,
   section = {proof},
   claim   = {in every document, every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another)},
-  check   = {fresh:all}
+  check   = {cmd:python3 distinct.py}
 }
 @misc{rpt-proof-out,
   section = {proof}, from = {rpt-proof}, join = { — },
   claim   = {as the proof-relevance check reports},
   emit    = {assets/without-k.md},
-  check   = {fresh:all}
+  check   = {fresh:without-k.md}
 }
 
 @misc{rpt-dag,
   section = {dag},
   claim   = {walking the paper's GROUNDING DAG (rests-on, distinct from prose order; the paper is the one document with grounding edges) from foundational atoms to the theses they support, each claim's adequacy grade plots against its grounding depth},
-  check   = {fresh:all}
+  check   = {cmd:python3 grounding.py}
 }
 @misc{rpt-dag-fig,
   section = {dag}, from = {rpt-dag}, join = { — },
   claim   = {the foundational atoms on the left, the theses they ground on the right, the effective grade on the vertical axis},
   emit    = {assets/dag.svg},
-  check   = {fresh:all}
+  check   = {fig:shows-layout},
+  tier     = {sandbox}
 }
 @misc{rpt-clamp,
   section = {dag}, from = {rpt-dag-fig}, join = {. },
   claim   = {a claim is no better grounded than its weakest premise, so each node sits at its effective (clamped) grade, with a ghost rising to its self-check grade wherever premises drag it down},
-  check   = {fig:shows-clamp}
+  check   = {fig:shows-clamp},
+  tier     = {sandbox}
 }
 @misc{rpt-terminal,
   section = {dag}, from = {rpt-clamp}, join = {, and },
   claim   = {the terminal theses --- the claims nothing else rests on, the document's payload --- are ringed},
-  check   = {fig:shows-terminal}
+  check   = {fig:shows-terminal},
+  tier     = {sandbox}
 }
 @misc{rpt-fig-data,
   section = {dag}, from = {rpt-dag-fig}, join = {. },
@@ -82,15 +105,18 @@
 @misc{rpt-fig-palette,
   section = {dag}, from = {rpt-fig-data}, join = {, and is mechanically accessible: },
   claim   = {its colours are the Okabe-Ito colour-blind-safe palette},
-  check   = {fig:okabe-ito}
+  check   = {fig:okabe-ito},
+  tier     = {sandbox}
 }
 @misc{rpt-fig-contrast,
   section = {dag}, from = {rpt-fig-palette}, join = {, },
   claim   = {all its text is dark on a light ground},
-  check   = {fig:dark-on-light}
+  check   = {fig:dark-on-light},
+  tier     = {sandbox}
 }
 @misc{rpt-fig-svg,
   section = {dag}, from = {rpt-fig-contrast}, join = {, and },
   claim   = {it is well-formed vector SVG},
-  check   = {fig:well-formed}
+  check   = {fig:well-formed},
+  tier     = {sandbox}
 }

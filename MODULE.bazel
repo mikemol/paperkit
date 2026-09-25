@@ -16,10 +16,47 @@ bazel_dep(name = "rules_python", version = "1.0.0")
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = "3.13", is_default = True)
 
+# ⚑ Ζ·wheel·backend — THE BUILD BACKEND IS A DECLARED INPUT, so the wheel action is hermetic.
+#
+# `//paperkit:wheel` shelled out to `uv`, a HOST binary at ~/.local/bin that no sandbox stages —
+# so the action had to run no-sandbox, and even staged it would not have been hermetic: uv
+# materializes `requires = ["setuptools>=68"]` from its OWN cache (~/.cache/uv/builds-v0), an
+# undeclared input.  The one thing uv supplied us was the backend; declaring THAT removes the
+# tool, the host cache and the no-sandbox exemption together, and the wheel becomes an ordinary
+# action the remote executor can run (Ζ·rbe measured `uv` MISSING from the executor image — the
+# gap this closes by not needing it).
+#
+# ⚑⚑ AND IT DOES NOT CONTRADICT `dependencies = []`.  pyproject states STDLIB ONLY, deliberately,
+# and that stance is about what a CONSUMER installs — the engine's runtime supply chain, which is
+# still empty.  setuptools is a BUILD-TIME backend, present only while the wheel is produced and
+# absent from the wheel it produces; the alternative (vendoring the wheel as a committed blob, as
+# the veraPDF JAR is) buys the same hermeticity for a binary in the tree and a hand-rolled
+# freshness story.  Pinned exactly, because a floating backend is a build input that changes
+# under a cache key that cannot see it.
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(hub_name = "pk_build", python_version = "3.13", requirements_lock = "//tools:requirements_build.txt")
+# Ζ·render·pydeps — a `pk_render` hub for render's three Python deps WAS declared here (2026-09)
+# and is REMOVED, 2026-09-21: nothing ever consumed it (measured: no .bzl/BUILD named @pk_render),
+# and the deps are delivered by the executor image the toolchain tier runs in
+# (image/executor/Containerfile — python3-pikepdf/pil/docx; render's checks import them from the
+# image's interpreter, measured green in the pool).  A second, unread delivery of the same deps
+# is a declaration that only looks like hermeticity (Λ·reduce).
+use_repo(pip, "pk_build")
+
 # Ζ·starlark — the bib IS the build graph: a module extension reads each project's warrants.bib
 # during the fetch phase and projects each claim into a target (no checked-in BUILD projection).
 bib = use_extension("//tools:bibtex.bzl", "bib")
-bib.project(name = "paperkit_boundaries", bib = "//boundaries:warrants.bib", project = "boundaries", compose = True)  # Ζ·compose (root imports its :proof)
+# Ζ·boundaries·adequacy — the 49 witnesses that gate the ENGINE'S OWN TOOLS are now mutation-SWEPT,
+# not merely run.  They were gated (does the check pass?) and never graded (CAN the check fail?),
+# which is the one hole a boundary suite must not have: a vacuous ⟨P,F,δ⟩ lint would pass forever
+# and the tools it certifies would be uncertified while every build read green.  `calc = True` is
+# required alongside — bibtex.bzl:735 gates pk_calc emission on it, and adequacy's pk_grade READS
+# those calc records, so adequacy without calc emits grade rules with nothing to read.
+#
+# ⚑ EXPECT RED ON THE FIRST SWEEP, AND THAT RED IS THE MEASUREMENT.  These witnesses have never
+# been graded, so any `vacuous`/`indeterminate` is a finding about a witness that cannot fail —
+# recorded per claim with its reason, never waived.
+bib.project(name = "paperkit_boundaries", bib = "//boundaries:warrants.bib", project = "boundaries", adequacy = True, calc = True, compose = True)  # Ζ·compose (root imports its :proof)
 bib.project(name = "paperkit_config", bib = "//config:warrants.bib", project = "config", adequacy = True, calc = True)  # Ζ·config·adequacy
 # Ζ·consumer-fields·demo — the ONE project that DECLARES a consumer field (provenance) and carries it, so
 # the capability paperkit documents + proves is also DEMONSTRATED in-tree; without it the declared-field
@@ -30,7 +67,7 @@ bib.project(name = "paperkit_paper", bib = "//paper:model.bib", project = "paper
 bib.project(name = "paperkit_root", bib = "//:warrants.bib", project = ".", adequacy = True, compose = True, calc = True, emerge = True)  # Ζ·emerge·gate
 # Λ·witness — the concept LIBRARY owns each concept's witness + self-graded certificate; views import
 # it via concept: checks.  owns_concepts ⇒ its per-concept verdict + def-cert records are PUBLIC.
-bib.project(name = "paperkit_library", bib = "//library:concepts.bib", project = "library", adequacy = True, calc = True, emerge = True, owns_concepts = True)
+bib.project(name = "paperkit_library", bib = "//paperkit/library:concepts.bib", project = "paperkit/library", adequacy = True, calc = True, emerge = True, owns_concepts = True)
 bib.project(name = "paperkit_guide", bib = "//guide:guide.bib", project = "guide", adequacy = True, calc = True)  # Σ·step5: a view composed from library certificates — zero witness code
 # Ρ·talk·hook·wire — the conference talk as a paperkit project.  adequacy=True because its
 # witnesses assert things about OTHER projects' bibs (render's warrants, its own figure
@@ -42,4 +79,37 @@ bib.project(name = "paperkit_setup", bib = "//setup:warrants.bib", project = "se
 # owns_warrants ⇒ render EXPORTS its per-claim verdict records: the talk cites SPECIFIC render
 # guarantees (rnd-a11y, rnd-slides, rnd-agree, rnd-wcag-entail) and delegates to each by name.
 bib.project(name = "paperkit_render", bib = "//render:warrants.bib", project = "render", adequacy = True, calc = True, owns_warrants = True)
-use_repo(bib, "paperkit_boundaries", "paperkit_config", "paperkit_demo", "paperkit_guide", "paperkit_library", "paperkit_paper", "paperkit_render", "paperkit_root", "paperkit_setup", "paperkit_talk")
+# Α·wired·scope — report and image were the two projects with a paper.toml and NO bib.project at
+# all: 21 claims (16 + 5) that no generated target gated, graded or ran --without-K over.
+#
+# ⚑ THAT ABSENCE WAS LOAD-BEARING, NOT COSMETIC.  report/ carried SEVEN claims collapsed onto one
+# `fresh:all` check string — "all" is not an asset name, so gen.py's filter fell through to
+# checking everything and no claim discriminated its own.  --without-K exists to name exactly that
+# and could not, because an unwired project emits no `:invariants` target to run it.  The defect
+# and the reason it survived are the same fact: a gate that does not reach a project reports
+# nothing about it, and nothing is indistinguishable from clean.
+#
+# Ζ·tier — both are `local` (host-coupled), the disposition setup already carries:
+#   * image's checks shell podman (repro.sh / serve.sh / stable.sh — stable.sh runs two --no-cache
+#     builds and compares digests), which no hermetic sandbox stages.
+#   * report is host-coupled TRANSITIVELY: rpt-status shells gate.py across sibling projects and
+#     _gate_once runs each with a 300s timeout, so report inherits whatever those documents need
+#     (pandoc, podman, systemd).  Its own checks are pure python; what it GRADES is not.
+# `local` means GATED but not GRADED (bibtex.bzl:948 drops a non-sandbox warrant from the adequacy
+# record, :998 skips its footprint) — which is the honest reading for a check whose verdict varies
+# with build-cache and network state.  rpt-reproducible already CHARACTERIZES that split rather
+# than scoping around it.
+#
+# What wiring buys even at `local`: :invariants is emitted for EVERY project regardless of tier
+# (bibtex.bzl:920-924) and carries --without-K, and pk_gate aggregates it into :gate.  So the
+# collapse above becomes machine-refutable here for the first time.
+bib.project(name = "paperkit_report", bib = "//report:warrants.bib", project = "report", tier = "local")
+bib.project(name = "paperkit_image", bib = "//image:warrants.bib", project = "image", tier = "local")
+
+# Λ·arch — ARCHITECTURE.md as a PROJECTION.  Its structural counts ("17 modules", "eight projects"
+# stated three times) were prose nothing re-derived, and every one was wrong; they are now witnesses
+# that read each count from the manifest that OWNS it.  ⚑ `adequacy = True`: these witnesses are
+# pure-python manifest reads with no toolchain, so they are cheap to mutation-grade — unlike
+# render's OCR claim (Β-F3, 98s of a 164s sweep).  Sandbox tier, the default, for the same reason.
+bib.project(name = "paperkit_arch", bib = "//arch:warrants.bib", project = "arch", adequacy = True, calc = True)
+use_repo(bib, "paperkit_arch", "paperkit_boundaries", "paperkit_config", "paperkit_demo", "paperkit_guide", "paperkit_image", "paperkit_library", "paperkit_paper", "paperkit_render", "paperkit_report", "paperkit_root", "paperkit_setup", "paperkit_talk")

@@ -76,6 +76,24 @@ def _build_deliverable(d: Path) -> Path:
 
 
 def main() -> int:
+    # Ζ·tier·exit — the toolchain (pikepdf, via linkalt.describe_links) is absent here: CANNOT-RUN
+    # (exit 3), never a FAIL.
+    #
+    # ⚑ Σ-F3 — WITHOUT THIS, THE SAME MISSING LIBRARY PRODUCED TWO DIFFERENT VERDICTS.  `linkalt`
+    # and `mathalt` guard it in their own `main` and report `cannot-run`; this file and `pdf.py`
+    # call `describe_links` ACROSS the module boundary, bypassing that guard, and died with
+    # `AttributeError: 'NoneType' object has no attribute 'open'` — read by the gate as a FAILED
+    # verification.  Measured in the tick-41 full-graph run: `rnd-link-alt`/`rnd-math-alt`
+    # cannot-run, `rnd-a11y`/`rnd-pdf` fail, one absent dependency.
+    #
+    # That is the tristate collapse this repo refuses everywhere else (`Ζ·rests·unresolved`,
+    # Γ.2's `CannotGrade`, Α-F3's verdict plumbing): "the toolchain is missing" and "the claim is
+    # false" MUST NOT render identically.  `verdict.py` maps rc 3 → cannot-run, and `pk_gate`
+    # aggregates on `fail` only, so a cannot-run does not red the gate — which is the point.
+    if linkalt.pikepdf is None:
+        print("a11y-own: pikepdf absent — CANNOT VERIFY the deliverable's link descriptions "
+              "(not a pass, not a failure)", file=sys.stderr)
+        return 3
     with tempfile.TemporaryDirectory() as t:
         pdf = _build_deliverable(Path(t))
         r = a11y.Result()

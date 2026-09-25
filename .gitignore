@@ -60,6 +60,13 @@ paperkit/scratch/
 # selftest leaves a mkdtemp per run.  Build residue by construction — never a source.
 .tmp/
 
+# Zeta-scratch-ignore — the REPO-ROOT scratch dir, distinct from `paperkit/scratch/` above.
+# `tools/edit_snapshot.py` writes `scratch/edit_snapshot.journal.tsv` + `scratch/.edit-snapshots/`
+# here, and a peer's hook mirrors summit's floor into `scratch/summit/floor/`.  Untracked build
+# residue that `hook_index.py` refuses a commit over — so an unignored scratch dir turns every
+# commit into a manual cleanup, which is how a guard against dirt becomes a guard against work.
+scratch/
+
 # ⚑ Ζ·summit·recur — ANOTHER REPO'S COORDINATION DATA, WRITTEN INTO THIS TREE BY A PEER'S HOOK.
 # `paperkit/summit/floor/` appeared twice on 2026-08-31 holding summit's floor bibs — first one
 # file (142 friction reports, 331 KB), then three (719 KB, +asks +corroboration).  It is NOT
@@ -76,3 +83,7 @@ paperkit/scratch/
 # commit`) without pretending the write has been prevented.
 /summit/
 paperkit/summit/
+# paths-forward loop state — an agent session's working queue and ledger, not repository content;
+# untracked, they made hook-index refuse a green commit (worktree ≠ index) over bytes no bazel
+# target reads.
+/.claude/paths-forward.*

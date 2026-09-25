@@ -4,5 +4,13 @@ subtitle = "Each tool's ⟨P, F, δ⟩ lint suite, as a claim — this bib is a 
 rubric = "rubric.tsv"
 warrants = ["warrants.bib"]
 out = "BOUNDARIES.md"
+
+# Γ·delta·root — the Δ sandbox root, DECLARED because the engine is a sibling (../paperkit) and
+# layout._sandbox_root refuses to infer rather than guess (the inference once copied ~/github, 53
+# repos / 29 GB, ten times while every build read green — and entitled the sweep to mutate 52
+# unrelated repos and report it as this project's sensitivity).  The bound is the REPO: these
+# witnesses lint the engine's own tools, so paperkit/*.py are inputs the mutation surface must
+# contain.  See paper/paper.toml for the full account.
+root = ".."
 numbered = false       # a reference page reads better unnumbered
 references = false     # no bibliography section

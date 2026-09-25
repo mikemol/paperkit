@@ -170,12 +170,22 @@ COMPONENTS = {
         "tests/boundaries_env.py",
         "tests/boundaries_footprint.py",
         "tests/boundaries_gate_json.py",
+        "tests/boundaries_genre_emit.py",
+        "tests/boundaries_env_facts.py",
+        "tests/boundaries_generator.py",
+        "tests/boundaries_genre_census.py",
+        "tests/boundaries_genre_pure.py",
         "tests/boundaries_grounding.py",
         "tests/boundaries_hook_index.py",
         "tests/boundaries_jobs.py",
         "tests/boundaries_ladder.py",
         "tests/boundaries_logs_push.py",
         "tests/boundaries_mem_db.py",
+        # Ζ·cell·account — bnd-wheel reddened with `can't open file '...boundaries_wheel.py'`,
+        # UNDECLARED here while its warrant existed: a file on disk that no manifest names is
+        # invisible to the build, and the cell could not say so until the verdict record
+        # started carrying the check's stderr.
+        "tests/boundaries_wheel.py",
         "tests/boundaries_memoize.py",
         "tests/boundaries_mutate_atom.py",
         "tests/boundaries_mutable.py",
@@ -186,6 +196,8 @@ COMPONENTS = {
         "tests/boundaries_prove_envelope.py",
         "tests/boundaries_references.py",
         "tests/boundaries_result_addr.py",
+        "tests/boundaries_roster_sync.py",
+        "tests/boundaries_roster_wired.py",
         "tests/boundaries_sandbox.py",
         "tests/boundaries_scope.py",
         "tests/boundaries_surface.py",
@@ -201,7 +213,28 @@ DEPS = {
     "kernel": [],
     "model": ["kernel"],
     "resolver": ["kernel"],
-    "project": ["model", "kernel"],
+    # ⚑ Ζ·spawn·owner — project MAY import resolver, and the edge is DECLARED rather than hidden.
+    #
+    # `genre.py` runs a command a DOCUMENT declared (a registered genre's `cmd`), which is the same
+    # act `resolver` exists for: run a thing a document declared, under the engine's rules.  It had
+    # been reaching `resolver.clean_env` directly to build a sanitized environment — an undeclared
+    # upward import that `paperkit/dag.bzl` was too STALE to show.  MEASURED 2026-09-13:
+    # regenerating the DAG surfaced it and reddened seven boundary claims at once.
+    #
+    # ⚑ THE FIX WAS NOT THE DECLARATION, IT WAS THE OWNERSHIP.  The spawn itself moved to its owner
+    # (`resolver.spawn_declared`: sanitized env + the temp-file records channel + the rc check),
+    # `genre.run_declared` now takes it as an injected parameter, and `project.py` supplies it — so
+    # the LIVE path carries no genre→resolver call at all.  What remains is `genre --check`, the
+    # module's own CLI arm exercising the declared-genre seam; `genre.py` is not a console script,
+    # so it has no entry point outside its own AST to resolve a spawn in, and dagderive reads the
+    # AST rather than the indentation (a function-local or __main__-guarded import is still an edge).
+    #
+    # So the edge is real, minimal, and at a NAMED seam.  Declaring it is what this file is for:
+    # the partition's purpose is that an import crossing the architecture cannot land SILENTLY,
+    # not that no such import may exist.  The alternative — `clean_env` pushed into the kernel —
+    # was refused at the artifact: it resolves two Ω·config knobs (`PATH`, `ENGINE_PATH`) that
+    # resolver DECLARES, and this repo's rule is "the kernel hosts the mechanism only".
+    "project": ["model", "kernel", "resolver"],
     "gate": ["project", "model", "resolver", "kernel"],
     "library_kernel": ["delta", "gate", "project", "model", "resolver", "kernel"],
     "delta": ["gate", "project", "model", "resolver", "kernel"],

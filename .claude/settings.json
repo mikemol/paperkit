@@ -107,5 +107,10 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(/home/mikemol/github/paperkit/.venv/bin/paperkit-project:*)"
+    ]
   }
 }

@@ -31,7 +31,16 @@ from pathlib import Path
 import config
 
 _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
-_LIBRARY = Path(__file__).resolve().parent.parent / "library"  # the ENGINE's own concept library
+# ⚑ Ζ·lib·land — ONE `.parent`, LIKE `_GATE` ABOVE, because the library now lives INSIDE the
+# package.  This read `.parent.parent / "library"` — walking UP out of `paperkit/` to a sibling
+# directory — which is the exact defect pyproject.toml:6 records as the open question the move was
+# made to answer: "the engine's concept library lives OUTSIDE the package ... walks UP out of the
+# package", so an INSTALLED paperkit could resolve no concept at all.  `library/` moved to
+# `paperkit/library/` and this line did not follow, which emptied the old path in the working tree
+# while HEAD still had it — and a downstream consumer's gate went UNRESOLVABLE on
+# `FileNotFoundError: .../paperkit/library` composed HERE, not on their side.  Their board was
+# hostage to my uncommitted worktree.  `_GATE` one line up already had the right shape.
+_LIBRARY = Path(__file__).resolve().parent / "library"  # the ENGINE's own concept library
 
 
 class Verdict:
@@ -125,11 +134,41 @@ def unavailable(why: str = "", owner: str = "") -> Verdict:
     return Verdict("UNAVAILABLE", why, owner) if (why or owner) else UNAVAILABLE
 
 
-def _pf(ok: bool) -> Verdict:
+def _pf(ok: bool, why: str = "", owner: str = "") -> Verdict:
     """A check that RAN and decided: True → PASS, False → FAIL.  (Never UNAVAILABLE — that is the
     could-not-evaluate seam, returned explicitly at each such site.)
+
+    ⚑ Ζ·fail·why — A FAILING CHECK MAY CARRY ITS LAST LINE, exactly as a cannot-run does.  Bare
+    (no reason) returns the interned singleton, so `is FAIL` keeps holding — the same non-breaking
+    widening `unavailable()` took above, and `_why` was already a Verdict slot rather than an
+    UNAVAILABLE one, so nothing new is introduced.
+
+    ⚑⚑ FOUND BY A CONSUMER, MEASURED NOT READ.  gcalculus ran three commands through run_ok
+    differing only in exit code and stream:
+
+        rc=1, message on stdout   -> Verdict.FAIL                    message LOST
+        rc=1, message on stderr   -> Verdict.FAIL                    message LOST
+        rc=3, message on stderr   -> Verdict.UNAVAILABLE(?: <msg>)   message KEPT
+
+    Ζ·unavailable·why captured stderr on its own handle and read it ONLY inside `if rc ==
+    _CANNOT_RUN`; the fail arm returned `_pf(rc == 0)` and let the local go out of scope unread.
+    That is not "stdout is muted" — stdout is deliberately DEVNULL and the comment says why.  It is
+    that a captured artefact was discarded on one of two arms.
+
+    ⚑⚑⚑ THE COST, MEASURED DOWNSTREAM: a consumer's witness failed under the gate SIX times, each
+    printing `paperkit-gate: check FAILED for [...]` and nothing else — for a probe that
+    distinguishes FIVE outcomes, each with its own message.  They spent three ticks on hypotheses
+    (concurrency, CPU-budget-on-the-parent, CPU-budget-misattributed) and retracted all three:
+    "guesses standing in for an artefact that existed and was thrown away."
     """
-    return PASS if ok else FAIL
+    # ⚑ INTERN ON `why` ALONE, NOT ON `why or owner` — measured, and the first draft got it wrong.
+    # run_ok's fail arm always passes `owner`, so a check that failed SILENTLY (no stderr, empty
+    # `why`) still built a distinct object: repr read `Verdict.FAIL` while `is FAIL` was False.
+    # bnd-dispatch caught it — "identity-hashable so the determinism set works" — and my first
+    # probe MISSED it because I called resolves() on a path that passes no owner, so the singleton
+    # came back and I withdrew a correct hypothesis on a bad measurement.  An owner with nothing to
+    # say adds no information; only a REASON justifies leaving the interned value.
+    return (PASS if ok else FAIL) if not why else Verdict("PASS" if ok else "FAIL", why, owner)
 
 
 def _sibling_for(project_dir: Path | None, name: str) -> Path:
@@ -376,6 +415,48 @@ ENGINE_PATH = config.Param(
     help="the directory `paperkit` is importable from, exported to every check as PAPERKIT_PYTHONPATH — a DECLARED passthrough across clean_env's default-deny, which drops the ambient PYTHONPATH (unset: the engine's own location)")
 
 
+def spawn_declared(cmd: str, cwd, payload: str, records=None) -> "subprocess.CompletedProcess":
+    """⚑ Ζ·spawn·owner — RUN A PROJECT-DECLARED COMMAND AS A GATED CHECK.  The ONE owner of
+    "spawn something a document declared, under the engine's rules".
+
+    `genre.py` re-implemented this shape — sanitized env, a temp-file side channel for the
+    records, `shell=True`, an rc check — and to do so it did `import resolver as _resolver`,
+    an UPWARD edge (`DEPS["project"]` is `["model", "kernel"]`).  MEASURED 2026-09-13: the edge
+    was real and live in source, and `paperkit/dag.bzl` was STALE, so the component guard could
+    not see it; regenerating the DAG surfaced it and reddened seven boundary claims at once.
+
+    ⚑ The edge was the SYMPTOM.  What `genre` actually needed was not an environment helper but
+    this whole capability, which is resolver's by ownership: resolver is the module that runs a
+    thing a document declared and decides what that thing may see.  Lifting the SPAWN (rather
+    than pushing `clean_env` down into the kernel) keeps `clean_env` where its two Ω·config knobs
+    are DECLARED — `PATH` and `ENGINE_PATH`, per this module's own rule that "the kernel hosts
+    the mechanism only" — and leaves `genre` holding only its own semantics: the totality
+    invariant over the units that come back.
+
+    The records channel is a FILE, not an argv or an env value: a corpus can exceed both limits,
+    and `PAPERKIT_GENRE_RECORDS` names it under the `PAPERKIT_` prefix `clean_env` already
+    passes through.  The engine unlinks it even when the child crashes — a declared objective
+    that dies must not leave a copy of the corpus in /tmp.
+    """
+    import json
+    import tempfile
+    env = clean_env()
+    fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", prefix="pk-genre-records-",
+                                     delete=False, encoding="utf-8")
+    try:
+        with fh:
+            for rec in (records or ()):
+                fh.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+        env["PAPERKIT_GENRE_RECORDS"] = fh.name
+        return subprocess.run(cmd, shell=True, cwd=cwd, input=payload,   # noqa: S602
+                              capture_output=True, text=True, env=env)
+    finally:
+        try:
+            os.unlink(fh.name)
+        except OSError:
+            pass
+
+
 def clean_env(env: dict | None = None) -> dict:
     """A sanitized environment for running a check: the controlled allow-list only, so
     no LD_PRELOAD/IFS/BASH_ENV/PYTHONPATH and the like reach the command.  PATH's relative
@@ -496,14 +577,29 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
     # start_new_session so a hang kills the WHOLE process group — a `shell=True` timeout otherwise
     # reaps only the shell and orphans the real child (the hanging witness), which then spins on.
     try:
-        # Ζ·unavailable·why — CAPTURE stderr (stdout stays muted: a check's stdout is its own
-        # chatter and nothing parses it).  A check that exits 3 has just explained WHAT it needs
+        # Ζ·unavailable·why — CAPTURE stderr.  A check that exits 3 has just explained WHAT it needs
         # ("its veraPDF validator CANNOT RUN here (toolchain absent)"); with both streams to
         # DEVNULL that account was destroyed at the moment of execution and the seam three layers
         # up printed a disjunction naming nothing.  Kept on its OWN handle, never merged
-        # ([[separate-filehandles]]), and read ONLY on the cannot-run arm.
+        # ([[separate-filehandles]]).
+        #
+        # ⚡ Ζ·account·stdout — AND STDOUT TOO, BECAUSE THE OLD PREMISE HERE WAS FALSE.  This read
+        # `stdout=subprocess.DEVNULL` justified as "a check's stdout is its own chatter and nothing
+        # parses it".  Every ⟨P, F, δ⟩ suite in this repo prints its ARMS AND OPERANDS to stdout by
+        # convention — `XX F: no paper.toml ON DISK is missing from ... -> ['//x:paper.toml']` — so
+        # the one artifact naming WHICH member diverged was sent to /dev/null at the moment of
+        # execution.  MEASURED: arch-roster-wired reddened in the cell and passed on the host, and
+        # its record held `{"baseline": false, "sens": []}` — one bit — while the suite had printed
+        # five arms with their differences.  Two successive diagnoses built on that one bit were
+        # both wrong.
+        #
+        # The SAME false premise was already measured one layer up and fixed there (verb.bzl's
+        # Ζ·account·stdout: "the first draft captured only stderr ... printing eighteen diagnostic
+        # lines — to STDOUT"), and this site — the one that actually RUNS the check — kept it.  The
+        # two streams stay on SEPARATE handles and are never merged; stdout is appended after
+        # stderr only when composing the account, so a parse of either is unaffected.
         p = subprocess.Popen(cmd, shell=True, cwd=cwd, env=clean_env(),
-                             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              start_new_session=True, preexec_fn=_cpu_rlimit(cpu))
         try:
             # ⚑ communicate(), NEVER wait() — a PIPE that nothing drains DEADLOCKS the child the
@@ -513,7 +609,7 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
             # stalled on its last action, and `wchan` named both halves of the deadlock.  The
             # stderr capture (Ζ·unavailable·why) is right and the wait() paired with it was not;
             # communicate() drains and waits in one call, so the timeout still bounds the run.
-            _out, _err = p.communicate(timeout=wall)   # stdout is DEVNULL; _out is None
+            _out, _err = p.communicate(timeout=wall)   # both PIPEs; communicate() drains both
             rc = p.returncode
             # SIGXCPU (‑signal 24) / SIGKILL from the CPU rlimit ⇒ negative returncode ⇒ FAIL, not PASS.
             #
@@ -529,12 +625,31 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
             # asked wrong; this rc comes from an EXTERNAL check process reporting it could not reach
             # its toolchain, which is the "could not evaluate" arm by definition.  The two share a
             # number across a process boundary, not a meaning.
+            # Ζ·account·stdout — ONE composer for both arms: stderr first (where a crash speaks),
+            # then stdout (where a ⟨P, F, δ⟩ suite prints its arms).  Separate handles, appended
+            # only here, so neither stream's own parse is disturbed.
+            def _account() -> list:
+                lines = []
+                for raw in (_err, _out):
+                    if raw:
+                        lines += [ln for ln in raw.decode("utf-8", "replace").splitlines()
+                                  if ln.strip()]
+                return lines
+
             if rc == _CANNOT_RUN:
                 # the check's own last words are the direction of the fix
-                err = (_err.decode("utf-8", "replace").strip() if _err else "")
-                last = err.splitlines()[-1].strip() if err else ""
-                return unavailable(last[:400], owner)
-            return _pf(rc == 0)
+                acct = _account()
+                return unavailable(acct[-1].strip()[:400] if acct else "", owner)
+            # Ζ·fail·why — hand the FAIL arm the account the cannot-run arm already gets.
+            if rc == 0:
+                return PASS
+            # ⚑ A FAILING SUITE'S LAST LINE IS ITS SUMMARY ("BOUNDARIES: FAIL (1)"), which names
+            # a COUNT and not the member.  Prefer the last line that MARKS a failed arm, so the
+            # account carries the operand that diverged rather than the tally.
+            acct = _account()
+            marked = [ln for ln in acct if ln.lstrip().startswith("XX")]
+            pick = (marked[-1] if marked else (acct[-1] if acct else ""))
+            return _pf(False, pick.strip()[:400], owner)
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(os.getpgid(p.pid), signal.SIGKILL)   # kill the whole tree, no orphans

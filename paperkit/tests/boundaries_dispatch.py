@@ -145,8 +145,16 @@ def main() -> int:
               resolver.resolves("concept:claim-is-record", far / "doc", {}).passed)
         check("a key owned NOWHERE is UNAVAILABLE (exit 2 everywhere = cannot witness, not refuted)",
               resolver.resolves("concept:no-such-concept", far / "doc", {}).is_unavailable())
-    check("in-repo resolution is UNCHANGED by the seam (every project here shares the root library)",
-          resolver._library_for(ROOT / "paper") == ROOT / "library")
+    # ⚑ THE EXPECTED VALUE IS THE ENGINE'S OWN ANSWER, NOT A PATH SPELLED HERE.  This read
+    # `== ROOT / "library"` — a second copy of where the library lives — and RED when Ζ·cite·resolve
+    # moved it inside the package (guard-must-not-copy: the arm carried its own copy of the location
+    # it was checking).  The PROPERTY is that an in-repo project with no library of its own resolves
+    # to THE ENGINE'S, whatever the engine says that is; `resolver._LIBRARY` is the owner of that
+    # answer, so the arm asks the owner.  It still discriminates: a project that DID own a library
+    # would resolve elsewhere, which the far-tree arms above measure directly.
+    check("in-repo resolution is UNCHANGED by the seam (a project with no library of its own "
+          "resolves to the ENGINE's, wherever the engine declares that to be)",
+          resolver._library_for(ROOT / "paper") == resolver._LIBRARY)
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # The exact drift that shipped: a new crossing verb whose skip-set was never updated.  F is
@@ -170,11 +178,28 @@ def main() -> int:
     cmd_ran_failed = resolver.resolves("cmd:false", ENGINE, {})
     cmd_ran_passed = resolver.resolves("cmd:true", ENGINE, {})
     no_bool = not hasattr(resolver.Verdict, "__bool__")
-    arm_ok = (absent.is_unavailable() and unknown.is_unavailable()
-              and cmd_ran_failed is resolver.FAIL and cmd_ran_passed is resolver.PASS
-              and not resolver.UNAVAILABLE.passed and no_bool
-              # the determinism set needs three DISTINGUISHABLE outcomes, identity-hashable
-              and len({resolver.PASS, resolver.FAIL, resolver.UNAVAILABLE}) == 3)
+    # ⚑ Ζ·arm·operands — SEVEN TERMS REPORTED ONE BIT, and that is why a cell's disagreement
+    # with the host was unreadable.  This arm went XX in the sandbox while every term passed on
+    # the host, measured one by one; the record could say only `tristate-arm`.  PRINT THE
+    # COMPONENTS applies inside a boundary suite too: a conjunction that discards its operands
+    # is an assertion, and the operands are the evidence.  (Same fix that resolved bnd-cpuweight,
+    # whose `[δ operands]` line showed build_f and self_f resolving to ONE path in a cell.)
+    terms = [
+        ("absent.is_unavailable()", absent.is_unavailable(), repr(absent)),
+        ("unknown.is_unavailable()", unknown.is_unavailable(), repr(unknown)),
+        ("cmd:false is FAIL", cmd_ran_failed is resolver.FAIL, repr(cmd_ran_failed)),
+        ("cmd:true is PASS", cmd_ran_passed is resolver.PASS, repr(cmd_ran_passed)),
+        ("not UNAVAILABLE.passed", not resolver.UNAVAILABLE.passed, repr(resolver.UNAVAILABLE.passed)),
+        ("no __bool__", no_bool, repr(hasattr(resolver.Verdict, "__bool__"))),
+        # the determinism set needs three DISTINGUISHABLE outcomes, identity-hashable
+        ("set{PASS,FAIL,UNAVAILABLE} == 3",
+         len({resolver.PASS, resolver.FAIL, resolver.UNAVAILABLE}) == 3,
+         repr(len({resolver.PASS, resolver.FAIL, resolver.UNAVAILABLE}))),
+    ]
+    arm_ok = all(ok for _, ok, _ in terms)
+    if not arm_ok:
+        for name, ok, got in terms:
+            print(f"      [{'ok' if ok else 'XX'}] {name} -> {got}")
     fails.append("tristate-arm") if not arm_ok else None
     print(f"  {'ok ' if arm_ok else 'XX '}an UNREACHABLE crossing check is UNAVAILABLE, not FAIL")
     print("      P (arm):     result:absent → UNAVAILABLE, unknown verb → UNAVAILABLE (cannot evaluate)")

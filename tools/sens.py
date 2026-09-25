@@ -43,7 +43,16 @@ def main(argv):
                          "leaked: %s\n" % flips)
         return 1
     sens = [r["site"] for r in records if r["flipped"]]
-    print(json.dumps({"claim": base["claim"], "baseline": baseline, "sens": sorted(sens)}))
+    # Ζ·sens·attempted — record the ATTEMPTED sites, not only the killed ones.  `sens` alone cannot
+    # distinguish a site that SURVIVED from one that was never swept: both are simply absent, so a
+    # claim whose grid emitted fewer cells than declared reads identically to one whose cells all
+    # survived, and the survivor set (attempted - sens) — the object mutation testing is actually
+    # about — is not derivable downstream.  The ∅-baseline guard above catches the degenerate
+    # ALL-flip; this catches its dual, a silently SHORT sweep.  Additive: readers keying on
+    # {claim, baseline, sens} are untouched.
+    attempted = [r["site"] for r in records]
+    print(json.dumps({"claim": base["claim"], "baseline": baseline, "sens": sorted(sens),
+                      "attempted": sorted(attempted)}))
     return 0
 
 

@@ -84,6 +84,17 @@ def toplevel_reads(text, names):
     return found
 
 
+
+def _has_claim_check(project_dir):
+    """True iff `project_dir`'s paper.toml declares a [checks.claim] — the thing that puts a project
+    in the witness-module population at all (Ζ·library·grid).  Read from the declaration, so the
+    population has ONE owner: the paper.tomls."""
+    cfg = ROOT / project_dir / "paper.toml" if project_dir != "." else ROOT / "paper.toml"
+    if not cfg.is_file():
+        return False
+    return "[checks.claim]" in cfg.read_text()
+
+
 def main() -> int:
     fails = []
 
@@ -106,7 +117,21 @@ def main() -> int:
           # shape paper and root declare; the undeclared spelling cost it the def-sweep GRID (42
           # monolithic ~10-minute sweeps instead of 48,011 parallel cells).  Its top level was
           # already read-free, so the membership pin is the only thing that had to move.
-          set(mods) == {"checks/readme.py", "library/concepts.py", "paper/checks/claims.py"})
+          # ⚑ Ζ·cite·resolve — PINNED TO THE POPULATION, NOT TO A LIST OF PATHS.  This carried the
+          # literal set {checks/readme.py, library/concepts.py, paper/checks/claims.py} and RED when
+          # the library moved inside the package — the third arm in this suite family to break on a
+          # path it kept its own copy of, and the comment above already recorded having to edit it
+          # once before ("the membership pin is the only thing that had to move").  A set literal
+          # that must be edited whenever the derivation legitimately changes is not measuring the
+          # derivation; it is measuring whether someone remembered to edit it.
+          #
+          # The anti-vacuity concern it was defending is REAL: a broken derivation returning ∅ would
+          # pass every per-module arm below.  But ∅ is what needs refusing, and the honest pin is
+          # AGREEMENT BETWEEN THE TWO SIDES — every emerge project that declares a [checks.claim]
+          # contributes exactly one witness module.  That fails loud on a derivation returning ∅, on
+          # one dropping a project, and on one inventing a module, while staying silent when a path
+          # legitimately moves.
+          bool(mods) and len(mods) == len([d for d in emerge_dirs() if _has_claim_check(d)]))
     for rel, p in sorted(mods.items()):
         r = toplevel_reads(p.read_text(), names)
         check(f"{rel}: top-level engine-source reads == ∅"

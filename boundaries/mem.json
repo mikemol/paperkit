@@ -1,0 +1,28 @@
+{
+  "claims": {
+    "bnd-check": 4,
+    "bnd-clamp": 4,
+    "bnd-closure-script": 4,
+    "bnd-components": 4,
+    "bnd-corroboration": 4,
+    "bnd-dag-regen": 4,
+    "bnd-data-atom": 4,
+    "bnd-decisions": 4,
+    "bnd-degrade": 4,
+    "bnd-emit": 4,
+    "bnd-env": 4,
+    "bnd-generator": 4,
+    "bnd-genre-census": 4,
+    "bnd-genre-pure": 4,
+    "bnd-grounding": 4,
+    "bnd-mem-db": 4,
+    "bnd-mutate-atom": 4,
+    "bnd-parallel": 4,
+    "bnd-path": 4,
+    "bnd-prove-envelope": 4,
+    "bnd-references": 4,
+    "bnd-result-addr": 4,
+    "bnd-verdict": 4
+  },
+  "file": 8
+}

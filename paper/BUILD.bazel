@@ -1,8 +1,33 @@
 # Hand-maintained file manifest (Ζ·sunset) — a data dep of the Ζ·starlark-generated
 # @paperkit_paper check graph; the bib is the source, this just lists the files.
+# ⚑ Ζ·reads·file — paper.toml and this file EXPORTED AS LABELS, so bnd-roster-sync can depend on
+# the two rosters it compares rather than on `//paper:files` (which stages ~40 paths and would
+# re-key the comparison on every unrelated edit).  Operator's ruling: "I don't like directories as
+# read targets.  That's a flattening of what's actually going on under the hood."
+# ⚑ Ζ·exports·visible — PUBLIC, because exports_files DEFAULTS TO PRIVATE and the bib-generated
+# repos are EXTERNAL (@@+bib+paperkit_arch).  Measured: the twelfth gate attempt died in
+# ANALYSIS with "target '//:paper.toml' is not visible from @@+bib+paperkit_arch//:...", 0
+# of 2 tests run.  Every filegroup here already says visibility=public; the exports_files
+# calls never did, and nothing cross-repo depended on them until per-file `builds` labels.
+exports_files(["paper.toml", "BUILD.bazel"], visibility = ["//visibility:public"])
+
 filegroup(name = "files", srcs = [
         "checks/claims.py",
         "checks/gen_formulas.py",   # generates assets/formulas.md from the formula-bearing claims (edge-formulas fresh)
+        # Ν-F8 — the DECLARED GENRE scripts, staged because `:genres` RUNS them.  A `[genres.X] cmd`
+        # names a file the build graph cannot otherwise know is an input: deriving it by scanning
+        # the cmd string for a `.py` token is exactly the inference `Ζ·entry·point` retired (a
+        # command's only contract is to be runnable — `cmd = "./run-witness {target}"` names no
+        # .py at all).  So the inputs are DECLARED here, where a manifest already lists them.
+        # ⚑ Measured before this line existed: `bazel build @paperkit_paper//:genres` failed with
+        # four `[Errno 2] No such file or directory`, one per genre — the check ran correctly and
+        # the SANDBOX was right; the manifest was incomplete (Α-F2's shape, one project over).
+        "checks/genrekit.py",       # the shared core all four import (Ν-F4)
+        "checks/brief.py",
+        "checks/catalog.py",
+        "checks/quickref.py",
+        "checks/serial.py",
+        "checks/tutorial.py",
         "assets/formulas.md",       # the generated formula table (placed by edge-formulas, as=raw)
         "paper.md",
         "paper.toml",

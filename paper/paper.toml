@@ -6,6 +6,25 @@ rubric = "rubric.tsv"
 warrants = ["model.bib", "engine.bib", "resolver.bib", "projection.bib", "gate.bib", "adequacy.bib", "liveness.bib", "rhetoric.bib", "composition.bib", "implications.bib", "conclusion.bib", "references.bib"]
 out = "paper.md"
 
+# ⚑ Γ·delta·root — THE Δ SANDBOX ROOT IS DECLARED, BECAUSE IT CANNOT BE INFERRED.  The engine is a
+# SIBLING (../paperkit), not inside this project, so layout._sandbox_root has nothing to infer a
+# bounded root from and REFUSES rather than guessing.  That refusal is right and hard-won:
+# assuming the parent once copied ~/github (53 repos, 29 GB) ten times — 95.8 GB of abandoned
+# sweep copies — while every build read green, and worse, entitled the sweep to MUTATE 52
+# unrelated repos and report the result as this project's sensitivity.
+#
+# The bound is the REPO, because this paper's witnesses read the engine they describe: checks/
+# claims.py asserts propositions about paperkit/*.py, so the engine's sources are inputs the
+# mutation surface must contain.  Nothing above the repo is read, and the guard refuses anything
+# that does not CONTAIN the project.
+#
+# Measured cost of NOT declaring it: `discriminate --json paper` exited 1 with empty stdout, and
+# report/gen.py's _delta swallowed that into `[]` (it reads stdout, never returncode), so four
+# generated assets rendered degenerate and read as STALE.  Two report claims (rpt-dag, rpt-delta)
+# graded `cannot-run` under Bazel for the same reason — an unrunnable grader wearing a staleness
+# verdict.  A declaration here is what the engine asked for, in the place it named.
+root = ".."
+
 # Ζ·bib·declare — the standard BibTeX metadata `references.bib` carries.  The engine consumes
 # NONE of it (the projector reads title/author/year); declaring it here CARRIES it on the parsed
 # record, engine-inert, the way `note` is.  This is a declaration and not a courtesy: paperkit
@@ -28,3 +47,62 @@ consumer_fields = ["journal", "volume", "number", "pages", "booktitle", "doi"]
 [checks.claim]
 cmd = "python3 checks/claims.py {target}"
 witness = "checks/claims.py"
+
+# Ι·genre·brief — the OPEN half of the genre registry, exercised against a real project for the
+# first time.  `genre.registry()` merges this table over the engine's BUILTIN set per-project
+# (`genre.py:331-346`), and `run_declared` invokes `cmd` with cwd = THIS directory, so the path is
+# project-relative.  Nothing in the engine changes to add a genre; that is the property being
+# demonstrated.
+#
+# ⚑ γ IS NOT COSMETIC HERE.  `observe` feeds γ to `genre.partition` BEFORE the objective runs, so
+# γ chooses the CLUSTERING and this objective is the identity on whatever arrives.  4.0 is coarse
+# — a brief wants few, large clusters.  This is the GENRE'S DECLARED DEFAULT; `[paper] gamma` (or
+# --gamma / PAPERKIT_GAMMA) overrides it, which is what `GAMMA = Param(…, default=None)` means by
+# "whatever the genre asks for".  On a corpus with no `rests-on` the partition is degenerate by
+# construction and the section cut stands, so a brief there is one line per SECTION — still a brief.
+#
+# ⚑ Declaring it here was REFUSED by `bib._misplaced_paper_key` until Ι-F1 (2026-09-10): the guard
+# tested key NAMES against the [paper] set and read this genre-spec key as a misplaced [paper] key.
+# `[genres.*]` is now exempt BY OWNERSHIP (`bib._SCHEMA_TABLES`) — `genre.registry` owns the table
+# and its {what, cmd, gamma} schema.
+[genres.brief]
+what = "one line per cluster — the brief cut"
+cmd = "python3 checks/brief.py"
+gamma = 4.0
+
+# Ν·genre·serial — one unit per SOURCE BIB: the serial / issue-based cut.  The first genre to read
+# Κ's records channel for STRUCTURE (`_src`) rather than text, and the first whose partition no
+# built-in produces at any γ — 2 of paper/'s 12 warrant files span more than one section, so the
+# file cut is not a bracketing of the section grouping.
+#
+# γ is irrelevant to this objective BY CONSTRUCTION and is therefore not declared: the units are
+# determined by `_src`, and γ only moves the bracketing this genre merges across.  Declaring one
+# would imply a dial that does nothing — the `_atomic` γ-invariance of Ν-F3, stated instead of
+# left for a reader to discover.
+[genres.serial]
+what = "one unit per source bib — the issue cut"
+cmd = "python3 checks/serial.py"
+
+# Ν.2 — the two genres `PK-GENRE-BLIND` made impossible, cashed after Κ opened the records channel
+# and tick 25 re-verdicted them UNBLOCKED.  Both read CLAIM TEXT, where `serial` reads structure.
+# ⚑ They import a shared `checks/genrekit.py`, which resolves because python puts the SCRIPT'S OWN
+# DIRECTORY on sys.path — `python3 checks/quickref.py` therefore finds `checks/genrekit.py` with no
+# path flag and no PYTHONPATH (which `resolver.clean_env` drops as an injection vector anyway).
+# ⚑ An earlier `-Ichecks` here was WRONG and the seam caught it: `-I` is ISOLATED MODE, so it
+# parsed as `-I` plus `-c hecks` → `NameError: name 'hecks' is not defined`.
+[genres.quickref]
+what = "one unit per length band, terse first — the quick-reference cut"
+cmd = "python3 checks/quickref.py"
+
+[genres.catalog]
+what = "one unit per initial letter of the significant term — the index cut"
+cmd = "python3 checks/catalog.py"
+
+# Ν.3 — the prerequisite cut.  Reads `rests-on` through Κ's channel (structure, like `serial`) and
+# groups by GROUNDING DEPTH, so nothing appears before what it rests on.  ⚑ Five sibling proposals
+# were REFUTED by the pre-write novelty check rather than written: cookbook ≡ atomic, procedure ≡
+# staged@γ=1.0 (the plan's own worked example), and example-collection / effective / service-manual
+# are degenerate on this corpus (99% / 71% / 100% in one unit).  See Ν-F9.
+[genres.tutorial]
+what = "one unit per grounding depth, atoms first — the prerequisite cut"
+cmd = "python3 checks/tutorial.py"

@@ -21,6 +21,7 @@ breaks; anything else the sort changed is harmless reordering within one group.
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -67,6 +68,41 @@ def bootstrap_index(lines: list[str]) -> int:
     return hits[-1] if hits else -1
 
 
+def _bootstrap_names(text: str) -> set:
+    """⚑ Ζ·sortaudit·selfdep — THE NAMES THE BOOTSTRAP LINE ITSELF USES.
+
+    An import that moved above the sys.path mutation is only load-bearing-in-the-wrong-place if
+    the mutation does NOT depend on it.  `sys.path.insert(0, str(Path(__file__).resolve()...))`
+    REQUIRES `Path` to already be bound, so `from pathlib import Path` sitting above it is
+    CORRECT — moving it below would be the actual breakage.
+
+    MEASURED 2026-09-13: this reported `paperkit/tests/boundaries_cpuweight.py` as
+    "a ModuleNotFoundError waiting for something to run it"; the file runs green
+    (`CPUWEIGHT BOUNDARIES: PASS`, rc=0), because `Path` is exactly such a name.
+
+    The old predicate carried ONE hand-written exclusion — `not s.startswith("import sys")` —
+    which is this same insight applied to a single name and left to drift.  `sys` is excluded
+    because the bootstrap uses it; every other name the bootstrap uses needs the same treatment,
+    so ASK THE LINE instead of keeping a roster (guard-must-not-copy: a hardcoded member list
+    for a property with an owner)."""
+    names = set()
+    for ln in text.splitlines():
+        if "sys.path" not in ln:
+            continue
+        names |= set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", ln))
+    return names
+
+
+def _binds_only(stmt: str, selfdep: set) -> bool:
+    """True when every name `stmt` binds is one the bootstrap line uses (so it BELONGS above)."""
+    bound = re.findall(r"import\s+(.+)$", stmt)
+    if not bound:
+        return False
+    names = {n.split(" as ")[-1].strip().split(".")[0]
+             for n in bound[0].split(",") if n.strip()}
+    return bool(names) and names <= selfdep
+
+
 def main(argv: list[str]) -> int:
     """Report files whose import order changed relative to a sys.path bootstrap."""
     tree = argv[0] if argv else "paperkit/tests"
@@ -83,9 +119,11 @@ def main(argv: list[str]) -> int:
         if b_now < 0 and b_was < 0:
             continue
         # an import that USED to sit after the bootstrap and now sits before it
+        # Ζ·sortaudit·selfdep — an import the BOOTSTRAP ITSELF uses must sit above it.
+        selfdep = _bootstrap_names((ROOT / f).read_text())
         moved = [s for s in now
                  if s in was
-                 and not s.startswith("import sys")
+                 and not _binds_only(s, selfdep)
                  and now.index(s) < b_now <= was.index(s)]
         if moved:
             risky += 1

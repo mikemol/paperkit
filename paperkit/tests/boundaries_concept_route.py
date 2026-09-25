@@ -113,7 +113,7 @@ def main() -> int:
         # above — this suite does not declare and the sandbox does not stage.  Assert the arm
         # only where the terminal owner exists; elsewhere say so.  `cannot-run` there is the
         # ENGINE being right (no library can witness the key), not the seam misbehaving.
-        if (ROOT / "library" / "concepts.py").is_file():
+        if (resolver._LIBRARY / "concepts.py").is_file():   # the ENGINE's library, wherever it declares it
             check("F: a consumer that DISCLAIMS the key falls through to the engine's library",
                   _verdict("concept:rm-pitch", none) == "pass")
         else:
@@ -209,9 +209,22 @@ def main() -> int:
 
     check("the Bazel emitter's concept branch is reachable to read, and builds a label",
           bool(branch) and bool(m))
-    check("...and that label names ONE fixed library repo — the owner is a STRING LITERAL, "
-          f"not a variable (owner={owner_arg or '<none>'})",
-          owner_arg == '"library"')
+    # ⚑ THE PROPERTY IS ANALYSIS-TIME RESOLUTION, AND THIS ARM USED TO TEST A PROXY FOR IT.  It
+    # asserted the owner argument is a STRING LITERAL (`owner == '"library"'`) — which held only
+    # while the library sat at the repo root under a name somebody typed here.  Ζ·cite·resolve moved
+    # it into the engine package and derived the owner from `owns_concepts` in the module extension,
+    # and this arm RED: the proxy broke while the property it stood for was untouched.
+    #
+    # What the claim actually says is that the BUILD decides ownership AT ANALYSIS TIME from a label
+    # built from the key alone, and cannot probe per-key the way the CLI's exit-2 fallthrough does.
+    # A literal satisfies that; so does an attr resolved ONCE in the extension. What would REFUTE it
+    # is the owner varying per key — a probe, a dict lookup on `key`, a conditional. So the arm now
+    # asserts THAT: the owner expression is key-INDEPENDENT.  (guard-must-not-copy, one level up: a
+    # literal-equality arm carries its own copy of the answer and reds when the answer legitimately
+    # changes spelling.)
+    check("...and that label's owner is resolved ONCE, independent of the key — an analysis-time "
+          f"constant, never a per-key probe (owner={owner_arg or '<none>'})",
+          bool(owner_arg) and "key" not in owner_arg)
     # ⚑ AND THIS ARM ASSERTS AN ABSENCE, DELIBERATELY.  An earlier draft of it also matched
     # `_import_label`'s RETURN LINE verbatim — which would have been the defect above committed
     # inside its own repair, one function further away.  What this suite may honestly say about

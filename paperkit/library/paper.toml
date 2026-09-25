@@ -5,6 +5,16 @@ subtitle = "Each concept's witness is authored and GRADED here once; every view 
 warrants = ["concepts.bib"]
 rubric = "rubric.tsv"
 out = "library.md"
+
+# ⚑ Ζ·cite·resolve — THE Δ SANDBOX ROOT IS DECLARED, BECAUSE IT CAN NO LONGER BE INFERRED.  The
+# def-sweep copies a BOUNDED tree per cell, and it used to infer that bound from the project's
+# parent: the library sat at the repo root beside the engine, so "the parent" was the repo.  The
+# library now lives INSIDE the engine (paperkit/library), so its parent IS the engine and there is
+# nothing to infer a repo-shaped bound from — layout._sandbox_root refuses rather than guessing,
+# which is the right refusal: assuming the parent once copied ~/github (53 repos, 29 GB) ten times
+# while every build read green.  The bound is two up — the repo — because the witness reads
+# repo-level projects on its domain walk.
+root = ".."
 numbered = false
 references = false
 
@@ -25,7 +35,11 @@ references = false
 # be inferred by taking the first `.py` token out of `cmd`, which worked only while the command
 # happened to name a python file.  This entry point does not.
 [checks.claim]
-cmd = "./run-witness {target}"
+# ⚑ `sh`, NOT `./` — THE WHEEL DOES NOT CARRY THE EXEC BIT.  Measured: package-data files install
+# as -rw-rw-r--, so `./run-witness` from an INSTALLED paperkit fails with Permission denied while
+# working perfectly in a checkout, where git preserves the mode.  Naming the interpreter makes the
+# invocation independent of a file mode the distribution format does not transport.
+cmd = "sh ./run-witness {target}"
 witness = "concepts.py"
 
 # Ζ·library·grid — the per-claim WITNESS type, declared so the def-sweep runs as a CELL GRID

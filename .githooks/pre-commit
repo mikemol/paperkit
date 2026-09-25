@@ -9,6 +9,11 @@
 # Enable once per clone:   git config core.hooksPath .githooks
 set -eu
 cd "$(git rev-parse --show-toplevel)"
+# Ζ·hook·portable — resolve the interpreter through the PROJECT env, not a runtime manager.  Every
+# step used to run under `mise exec`, and a host without mise (luthen) failed the hook at its first
+# line — before any check ran — on a GREEN tree.  The venv is what uv built from the pin, so it is
+# the pinned interpreter wherever it exists; bare python3 is the fallback for an un-synced checkout.
+PY="$PWD/.venv/bin/python"; [ -x "$PY" ] || PY=python3
 # Ρ·telemetry — optional per-clone local config (gitignored): a machine's OTLP endpoint etc.  The
 # endpoint is a POINTER a machine sets at another machine's store; it is NOT tracked (each clone's
 # operator points at their own), so it lives here, sourced if present, absent by default.
@@ -52,7 +57,21 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
 # any path outside the allowlist (cotype/ — bazel-invisible AND index-gated by its own check
 # below).  Refusal is instant, BEFORE any build cost, and NAMES the paths;
 # PK_HOOK_ALLOW_DIRTY=1 downgrades it to a loud advisory for a deliberate split commit.
-run "hook-index (worktree ≡ index)"   mise exec -- python3 tools/hook_index.py
+run "hook-index (worktree ≡ index)"   "$PY" tools/hook_index.py
+
+# Η·hook·grid (H3) — //:hook's member list is a per-project x per-kind GRID that tools/bibtex.bzl
+# already knows and that is transcribed BY HAND into BUILD.bazel, in a file the generator cannot
+# see.  BUILD.bazel:186-193 records the class ("all 23 members can fall out this way, silently")
+# and three instances: Ζ·hook-rot (config), Ρ·talk·hook·wire (the talk), and boundaries' adequacy
+# (2026-09-09, caught by bnd-check).  This gate compares the transcription against MODULE.bazel's
+# declarations and reds on either direction — a target the generator emits that the hook never
+# runs, or a member nothing emits.
+#
+# ⚑ IT REMOVES THE **SILENTLY**, NOT THE HAND-MAINTENANCE, AND THAT IS DELIBERATE.  The duplication
+# is what makes bnd-check's completeness proof sound: it compares two INDEPENDENT textual sources,
+# and generating the list would let the audited graph supply its own audit ([[instrument-vs-gate]]).
+# Cheap and text-only, so it lands here beside hook-index — before any build cost.
+run "hook-grid (//:hook ≡ MODULE)"    "$PY" tools/hook_grid.py
 
 # Ζ·cell·admit — the grid's CPU share is governed by ONE lever: a proportional cpu.weight on the
 # build's own cgroup (set below, next to the RAM budget).  The per-cell SCHED_BATCH + nice 19 +
@@ -164,7 +183,7 @@ PK_T0=$(date +%s)
 # in a `finally`, which is correct and does not run on SIGKILL; three interrupted hooks in one
 # session left 42 husks.  Only touches directories older than the window, so a concurrent sweep's
 # copy is never taken out from under it.  Best-effort: never fails a commit.
-python3 -c "import sys; sys.path.insert(0, 'paperkit'); import grader; n = grader.reap_sandboxes(); print(f'[pre-commit] reaped {n} stale sweep sandbox(es)') if n else None" || true
+"$PY" -c "import sys; sys.path.insert(0, 'paperkit'); import grader; n = grader.reap_sandboxes(); print(f'[pre-commit] reaped {n} stale sweep sandbox(es)') if n else None" || true
 # Ζ·mem·project·gate — mem.json is a PROJECTION of mem.sqlite (the observation store), and the
 # bib generator reads it at fetch time to size every sweep cell.  A drifted projection means the
 # build sized itself from a number the store does not support, which is derived state trusted
@@ -174,10 +193,10 @@ python3 -c "import sys; sys.path.insert(0, 'paperkit'); import grader; n = grade
 for _p in library paper .; do
   _j="${_p%/}/mem.json"; [ "$_p" = "." ] && _j="mem.json"
   [ -f "$_j" ] && [ -f mem.sqlite ] && \
-    python3 tools/mem_project.py mem.sqlite "$([ "$_p" = "." ] && echo root || echo "$_p")" "$_j" --check \
+    "$PY" tools/mem_project.py mem.sqlite "$([ "$_p" = "." ] && echo root || echo "$_p")" "$_j" --check \
     || true
 done
-PK_SWEEP_RAM=$(python3 tools/sweep_budget.py)
+PK_SWEEP_RAM=$("$PY" tools/sweep_budget.py)
 # Ζ·cell·admit — the sweep budget above bounds RAM; nothing bounded CPU SHARE.  Bazel's scheduler
 # sees only its own actions, so a concurrent build in ANOTHER repo is invisible to it and the two
 # oversubscribe together (measured: 4.7-5.4 runnable/core on 10 cores with procs_blocked=0 — pure
@@ -215,17 +234,26 @@ set +e
 PK_COORDLOG="$PK_TMPDIR/pk-coord-$$.jsonl"   # Ζ·execlog·leak — was ${TMPDIR:-/tmp}, i.e. tmpfs,
                                              # and was removed by NO path at all (not even the
                                              # happy one); the trap owns it now.
-( _cpid=$(mise exec -- bazel info server_pid 2>/dev/null | tail -1)
+( _cpid=$(bazel info server_pid 2>/dev/null | tail -1)
   case "$_cpid" in ''|*[!0-9]*) : ;; *)
-    python3 tools/coord_sample.py "$_cpid" "$PK_COORDLOG" --interval=1 >/dev/null 2>&1 &
+    "$PY" tools/coord_sample.py "$_cpid" "$PK_COORDLOG" --interval=1 >/dev/null 2>&1 &
     echo $! > "$PK_COORDLOG.pid" ;; esac ) || true
+# ⚑ Ζ·execlog·sort — --noexecution_log_sort.  Bazel SORTS the JSON execution log by default, which
+# buffers every spawn record in the server heap and sorts them at the END of the invocation — its
+# own help: "Set to false to avoid potentially significant CPU and memory usage at the end of the
+# invocation".  MEASURED 2026-09-25 on luthen: the same //:hook at -Xmx16g completed three times
+# WITHOUT this log, and the one run WITH it printed `Build completed successfully, 136576 total
+# actions` and then died `OutOfMemoryError: Java heap space` — the end-of-build signature the rc's
+# Ζ·jvm ladder was climbing after.  The consumers (otlp_push, logs_push) read each record's own
+# absolute startTime, so execution order costs them nothing.
 # shellcheck disable=SC2086  # $PK_BES is EITHER empty OR two flags (--bes_backend=… and
 # --bes_upload_mode=…); word-splitting is how it expands to two arguments.  Quoted, an unset
 # endpoint would pass "" as a bazel argument and a set one would pass both flags as a single
 # malformed token.  The empty-by-default case is the common one, which is why this is unquoted.
-python3 tools/cpuweight.py --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
-    --exec mise exec -- bazel test //:hook --config=mutant \
+"$PY" tools/cpuweight.py --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
+    --exec bazel test //:hook --config=mutant --config=remote \
     --local_resources=memory="$PK_SWEEP_RAM" --execution_log_json_file="$PK_EXECLOG" \
+    --noexecution_log_sort \
     $PK_BES > "$PK_HOOKLOG" 2>&1
 PK_HOOK_RC=$?
 # Ζ·execlog·leak — the samplers are stopped HERE so their output is complete before the pushers
@@ -247,19 +275,46 @@ fi
 # crossed the first time (making mem_learn DEPEND on the cells was measured at 41,468 deps).
 # Runs on RED as well as green: a failed build still measured whatever cells it got through.
 for _p in library paper .; do
-  python3 tools/mem_harvest.py "$_p" --run "${PK_T0}-$$" >/dev/null 2>&1 || true
+  "$PY" tools/mem_harvest.py "$_p" --run "${PK_T0}-$$" >/dev/null 2>&1 || true
 done
 
 if [ -n "${PAPERKIT_LOGS_URL:-}" ]; then
   # --execlog carries the SPAWN TIMELINE (bazel's own metrics.startTime, absolute), so the store
   # can interleave "what happened" with "what was running".  Pushed BEFORE the rm below: the
   # execution log is a temp file, and a red run's timeline is the half worth keeping.
-  python3 tools/logs_push.py "$PK_HOOKLOG" --rc "$PK_HOOK_RC" --seconds "$PK_SECS" \
+  "$PY" tools/logs_push.py "$PK_HOOKLOG" --rc "$PK_HOOK_RC" --seconds "$PK_SECS" \
       --execlog "$PK_EXECLOG" --run-id "${PK_T0}-$$" || true
 fi
 # Ζ·execlog·leak — the `rm -f "$PK_EXECLOG" "$PK_HOOKLOG"` that stood here is GONE, and its
 # absence is the fix: it ran only when control reached this line, which a killed or crashed run
 # never does.  The trap installed at the top removes them on every route out that can run code.
+# ⚑ Ζ·exit·infra — AN INFRASTRUCTURE CODE IS NOT A DEFECT, AND `-ne 0` COULD NOT TELL THEM APART.
+# bazel CLASSIFIES its own exit codes in ExitCode.java (8.7.0), and the classification is a typed
+# property rather than something to infer from prose:
+#
+#     34  REMOTE_ENVIRONMENTAL_ERROR                       createInfrastructureFailure
+#     36  LOCAL_ENVIRONMENTAL_ERROR                        createInfrastructureFailure
+#     37  BLAZE_INTERNAL_ERROR                             createInfrastructureFailure
+#     38  TRANSIENT_BUILD_EVENT_SERVICE_UPLOAD_ERROR       createInfrastructureFailure
+#     39  REMOTE_CACHE_EVICTED                             createInfrastructureFailure
+#     45  PERSISTENT_BUILD_EVENT_SERVICE_UPLOAD_ERROR      create   (NOT infrastructure)
+#
+# ⚑⚑ 38 AND 45 ARE ONE EVENT WITH OPPOSITE PROGNOSES — a BEP upload failure, transient vs
+# persistent — and only the transient one is classed infrastructure.  A peer MEASURED 38 in this
+# fleet with bazel printing `1 test passes` above it: the upload runs AFTER the build's verdict is
+# decided (bes_upload_mode blocks build COMPLETION, and this hook uses fully_async), so both
+# statements are true about different phases.  Refusing a commit there rejects a green build for a
+# telemetry hiccup, which is the failure `logs_push` exists to be best-effort about.
+#
+# ⚑⚑⚑ 39 IS NEWLY REACHABLE.  The shared CAS is armed with no local fallback, so REMOTE_CACHE_EVICTED
+# is a code this hook can now see that it could not before — in the same class as 38, and in the
+# predicate before it fires rather than after.
+case "$PK_HOOK_RC" in
+  34|36|37|38|39)
+    echo "[pre-commit] INFRASTRUCTURE (bazel exit $PK_HOOK_RC), not a claim failure — see $PK_HOOKLOG" >&2
+    echo "[pre-commit] the build's own verdict is above this line; re-run when the endpoint is back." >&2
+    exit 1 ;;
+esac
 if [ "$PK_HOOK_RC" -ne 0 ]; then
   echo "[pre-commit] FAIL: bazel test //:hook" >&2
   exit 1
@@ -274,7 +329,7 @@ echo "[pre-commit] ok: bazel test //:hook"
 # remediation ("add X to the claim's `reads` field") instead of a cryptic sandbox file-not-found —
 # or, as with bnd-prove's nonzero-F-arm, a red the hook MASKS.  Sound by construction: the audit's
 # coverage model (own ∪ engine ∪ declared-filegroups ∪ imports) is gated by bnd-otlp-adjacent tests.
-run "footprint audit (reads ⊇ Φ)"   mise exec -- python3 paperkit/footdeps.py
+run "footprint audit (reads ⊇ Φ)"   "$PY" paperkit/footdeps.py
 
 # Σ·cotype — cotype-monotone: ledger entry keys never vanish (append-only, retirement-logged).
 # A commit-DELTA property: its truth-maker is HEAD's ledger vs the STAGED one, which only this
@@ -289,7 +344,7 @@ if git rev-parse -q --verify HEAD:cotype/ledger.md >/dev/null 2>&1; then
   _pk_extra="$old $new"
   git show HEAD:cotype/ledger.md > "$old"
   git show :cotype/ledger.md > "$new"
-  run "cotype-monotone"    mise exec -- python3 cotype/check.py "$old" "$new"
+  run "cotype-monotone"    "$PY" cotype/check.py "$old" "$new"
   rm -f "$old" "$new"; _pk_extra=""
 fi
 echo "[pre-commit] all checks passed"

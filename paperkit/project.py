@@ -537,8 +537,15 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
 
     # a BUILT-IN runs in-process; a project-DECLARED one runs its `cmd` through the registry's
     # seam (Ρ·deck·genre·cmd), which validates the result against the same totality invariant.
-    units = (objective(groups, recs) if objective is not None
-             else genre_mod.run_declared(spec, groups, recs, cwd=project_dir))
+    # Ζ·spawn·owner — the spawn is INJECTED: `genre` may not import `resolver` (project →
+    # resolver is an upward edge the partition forbids), so the caller that legitimately may
+    # supplies the engine's owner of running a document-declared command.
+    if objective is not None:
+        units = objective(groups, recs)
+    else:
+        from resolver import spawn_declared
+        units = genre_mod.run_declared(spec, groups, recs, cwd=project_dir,
+                                       spawn=spawn_declared)
 
     # which section a unit came from — a unit never spans sections (the objective splits within a
     # group, never merges across), so the first key's section names the whole unit.
@@ -612,7 +619,28 @@ CHECK = config.Param("check", "PAPERKIT_CHECK", flag=True,
 # The projector CLI's composed registry: exactly the Params its import cone hosts
 # (bnd-config asserts this completeness — a cone-resolved Param missing here would be
 # a silently ignored flag).
-REGISTRY = [TARGET, GENRE, GAMMA, OBSERVE, CHECK]
+#
+# ⚑ Ζ·config·cone — `path` AND `engine-path` JOINED THE CONE WHEN THE SPAWN DID, AND THEY ARE
+# COMPOSED BY QUALIFIED REFERENCE, NEVER IMPORTED.
+#
+# Ζ·spawn·owner moved "run a command a document declared" to `resolver.spawn_declared`, which the
+# `--observe` path injects; `spawn_declared` calls `clean_env()`, which resolves BOTH of
+# resolver's knobs (`config.resolve(PATH)` / `config.resolve(ENGINE_PATH)`, resolver.py:509,511).
+# So this CLI's cone now HOSTS them, and bnd-config said so exactly:
+# `project.REGISTRY == the Params its import cone hosts (7) — missing=['engine-path', 'path']`.
+# Without them, `paperkit-project --path=...` parses as an unknown flag and the pin is silently
+# ignored — the precise defect that guard exists to catch.
+#
+# ⚑⚑ THE FIRST FIX WAS `from resolver import PATH as _PATH`, AND IT BROKE THREE OTHER ARMS.
+# `_hosted()` reads a module's own attributes, so an imported Param is a SECOND HOST: the suite
+# went 1 drifted → 3, newly failing "every Param has exactly ONE host module", "knob names are
+# globally unique" and "env vars are globally unique".  COMPOSING a knob and HOSTING one are two
+# different relations, and satisfying the first with the second's mechanism violates ownership.
+# `discriminate.py:158` already had the right form — `resolver.PATH, resolver.ENGINE_PATH`, a
+# qualified reference that composes without binding.  Same here.
+import resolver as _resolver   # noqa: E402  — qualified, so the knobs stay HOSTED by resolver
+
+REGISTRY = [TARGET, GENRE, GAMMA, OBSERVE, CHECK, _resolver.PATH, _resolver.ENGINE_PATH]
 
 
 def main(argv: list) -> int:

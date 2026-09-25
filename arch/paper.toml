@@ -1,0 +1,38 @@
+[paper]
+title = "Paperkit Architecture"
+subtitle = "The engine's own structure, projected from claims that COUNT rather than assert."
+warrants = ["warrants.bib"]
+rubric = "rubric.tsv"
+# ⚑⚑ `out` IS NOT ../ARCHITECTURE.md, AND THAT IS THE FINDING (Λ-F1, 2026-09-10).
+# The plan said "convert ARCHITECTURE.md to a projection, §3.6 preserved".  MEASURED: projecting
+# these six claims yields **316 words**; the authored document is **27 KB**.  A projector emits
+# exactly what its claims say and nothing else, so pointing `out` at ARCHITECTURE.md DELETES ~98%
+# of it — architecture narrative, module tables, rationale — none of which is claim-shaped.
+#
+# ⚑ I RAN THE WRITER TO "MEASURE" AND IT OVERWROTE THE DOCUMENT.  `--check` had already reported
+# the difference; the writer is destructive BY DESIGN.  Restored with `git checkout`.  The lesson
+# is `--check` first, always: it answers the question the writer answers by doing it.
+#
+# So this project's `out` is its OWN document.  ARCHITECTURE.md keeps its prose and GAINS gated
+# counts beside it — the honest split, since the claims cover the CHECKABLE parts (counts,
+# tensions) and the prose covers what no witness can assert.  Whether the narrative should ever be
+# claim-ified is an owner's call, not a tick's.
+out = "ARCH.md"
+numbered = false
+references = false
+
+# Γ·delta·root — the Δ sandbox root, declared because the engine is a SIBLING and
+# layout._sandbox_root refuses to infer rather than guessing (it once copied ~/github, 53 repos /
+# 29 GB, ten times while every build read green).  The bound is the REPO: every witness here reads
+# the engine's own manifests — components.bzl, MODULE.bazel, tools/*.bzl.
+root = ".."
+
+# ⚑ Λ — THE COUNTS ARE WITNESSES, NOT PROSE.  ARCHITECTURE.md asserted "17 modules" and "eight
+# projects" (the latter THREE times); measured 2026-09-10, the true figures are 26 non-test files
+# and 12 wired projects.  ⚑ And "eight" IS the COMPONENT count, so the prose had conflated
+# COMPONENTS with PROJECTS — a bare number-refresh would have preserved the category error while
+# looking correct.  Each claim below therefore names WHICH count it asserts and reads it from the
+# manifest that OWNS it.
+[checks.claim]
+cmd = "python3 checks/arch.py {target}"
+witness = "checks/arch.py"

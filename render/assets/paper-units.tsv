@@ -56,8 +56,9 @@ implications	genre-collection
 implications	observe-second-shape
 implications	observe-regroups-on-grounding
 implications	partition-merges
-implications	gamma-is-reachable
 implications	genre-declared-runs
+implications	genre-declared-gated
+implications	gamma-is-reachable
 implications	observe-bounded-by-adoption
 implications	forward-direction
 implications	from-and-rests-on-are-distinct

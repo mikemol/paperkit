@@ -8,8 +8,8 @@ Every VIEW that cites the concept (paper, deep; README, pitch; later a guide) re
 parallel — and often weaker — witness.  (The README's old rm_delta GREPPED engine source; this witness
 RUNS the real grader, so importing the concept also upgrades the pitch's proof.)
 
-The library runs the witness as a plain `cmd:python3 concepts.py <key>` (cwd = library/).  Paths derive
-from __file__: ROOT = the repo root (parents[1]), ENGINE = ROOT/paperkit.  PAPERKIT_ENGINE (a paperkit
+The library runs its witness through `run-witness` (cwd = the library).  Paths derive from __file__:
+the library lives INSIDE the engine (Ζ·cite·resolve), so ENGINE = parents[1] and ROOT = its parent.  PAPERKIT_ENGINE (a paperkit
 knob, survives clean_env) points the engine at a mutated variant during Δ's def-sweep, so mutating an
 engine def-site flips the witness → the certificate's sensitivity fingerprint IS the engine.
 """
@@ -22,8 +22,13 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or ROOT / "paperkit")
+# ⚑ Ζ·cite·resolve — THE LIBRARY LIVES INSIDE THE ENGINE NOW, so the engine is its PARENT rather
+# than a sibling reached through the repo root.  `parents[1]` was the repo root and `ROOT /
+# "paperkit"` the engine beside this directory; after the move `parents[1]` IS the engine, and the
+# old spelling composed to `paperkit/paperkit` — an ENGINE that does not exist, so the flat
+# `_fixture_model` import below found nothing and the witness could not establish its baseline.
+ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or Path(__file__).resolve().parents[1])
+ROOT = ENGINE.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # this library — for its own domain walk)
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests"))

@@ -1,60 +1,32 @@
 #!/bin/sh
-# Ζ·tier·toolchain — the toolchain fingerprint, emitted as Bazel STABLE workspace-status keys.
+# Ζ·tier·toolchain — the toolchain fingerprint, emitted as a Bazel STABLE workspace-status key.
 #
-# A `toolchain`-tier check (verb.bzl) runs on the host under a real toolchain (pandoc, veraPDF,
-# lualatex, LibreOffice) rather than in the hermetic sandbox — deterministic GIVEN A PINNED
-# toolchain, but not hermetic.  Its verdict is only trustworthy if the toolchain it ran under is
-# pinned, and it should re-run exactly when that toolchain CHANGES and be cached otherwise.
+# A `toolchain`-tier check (verb.bzl) runs in the executor pool whose IMAGE carries its tools
+# (tools/pool.bzl, image/executor/Containerfile) — deterministic GIVEN THAT IMAGE.  Its verdict
+# should re-run exactly when the image CHANGES and be cached otherwise, and Bazel's stamping gives
+# precisely that: a STABLE_ key whose value changes invalidates every stamped action depending on
+# it (`bazel-out/stable-status.txt`), an unchanged value is a cache hit — measured, not assumed
+# (the Ζ·tier·toolchain probe).  So the ONE key is the image digest.
 #
-# Bazel's stamping mechanism provides precisely that: a STABLE_ key whose value changes invalidates
-# every stamped action that depends on it (`bazel-out/stable-status.txt`), while an unchanged value
-# is a cache hit — measured, not assumed (the Ζ·tier·toolchain probe).  So this script emits each
-# render-toolchain tool's version as a stable key.  A tool upgrade changes its key → the toolchain
-# checks re-run; an unchanged toolchain → they stay cached.
+# ⚑ WHAT THIS REPLACED, 2026-09-21.  Until today this script emitted the CLIENT HOST's pandoc /
+# veraPDF / lualatex / soffice version banners plus a sha256 of a jar under $HOME.  Those keyed a
+# verdict on the box the `bazel` command was typed on, while the verdict itself ran in the pool:
+# an image rebuild left every toolchain verdict cached (measured: rnd-pdf/rnd-a11y did not
+# invalidate on the python3-uno re-declare by any key of ours), and a host without the tools
+# stamped `absent` over verdicts that had run somewhere else entirely.  The digest is what the
+# pool's pod template rolls on, so "the image my verdict ran in" and "the image the pool runs now"
+# compare on the same value.
 #
-# The SAME keys are the fingerprint a downstream consumer needs to trust "which environment proved
-# this claim" (the VPAT's per-claim enforcement disclosure): the cache key IS the toolchain digest.
-# An ABSENT tool emits `absent` (a stable value) rather than failing — so a box without the toolchain
-# has a well-defined fingerprint (and its toolchain checks are honestly "not currently provable"),
-# never a broken status command that would abort every build.
+# `absent` is a STABLE value, never a failing status command (which would abort every build,
+# sandbox cells included): on a host without the pool the toolchain checks cannot run at all
+# under --noremote_local_fallback, so nothing is ever cached under it.
 #
 #   bazel build --stamp --workspace_status_command=tools/toolchain_status.sh …
-# (wired in .bazelrc; the script emits `STABLE_TOOLCHAIN_<tool> <version>` lines to stdout).
+# (wired in .bazelrc).
+# ⚑ TWO KEYS, ONE PER POOL (tools/pool.bzl).  STABLE_EXECUTOR_IMAGE is the DEFAULT pool's thin
+# image — the sweep's substrate, which every sandbox cell depends on (calc.bzl stages
+# ctx.info_file).  Measured 2026-09-21: strace was added to it and the refuted footprint
+# baselines came back as 113 cache hits, because nothing in a cell's key named the image.
 set -u
-
-# Emit `STABLE_TOOLCHAIN_<name> <version-or-absent>`.  `$2…` is the version command; its FIRST line
-# is the fingerprint (version banners are multi-line; the first line carries the version).
-emit() {
-    name="$1"
-    shift
-    if command -v "$1" >/dev/null 2>&1; then
-        v=$("$@" 2>/dev/null | head -1 | tr -s ' ' | tr -d '\r')
-        [ -n "$v" ] || v="present-unversioned"
-    else
-        v="absent"
-    fi
-    echo "STABLE_TOOLCHAIN_${name} ${v}"
-}
-
-emit PANDOC   pandoc --version
-emit VERAPDF  verapdf --version
-emit LUALATEX lualatex --version
-emit SOFFICE  soffice --version
-
-# veraPDF's PDF/UA verdict is a pure function of its JAR, so its content sha256 is a finer key than
-# the banner (a rebuilt-same-version JAR with a different ruleset would otherwise cache-collide).
-# ⚑ SC2012 FIXED, NOT SUPPRESSED — and the fix is SIMPLER than the flagged form.  This was
-# `ls …/cli-*.jar | head -1`, which parses ls output and, when the glob matches nothing, takes
-# ls's ERROR path: the pipeline yields empty and the `-n` below reads that as "absent" for the
-# right reason by accident.  A shell glob needs no subprocess at all: it expands to the matches,
-# or to the UNEXPANDED PATTERN when there are none — which `-f` then rejects, so absence is
-# tested rather than inferred from a swallowed error.
-jar=""
-for _j in "$HOME"/.local/opt/verapdf/bin/cli-*.jar; do
-    [ -f "$_j" ] && { jar="$_j"; break; }
-done
-if [ -n "$jar" ] && command -v sha256sum >/dev/null 2>&1; then
-    echo "STABLE_TOOLCHAIN_VERAPDF_JAR $(sha256sum "$jar" | cut -d' ' -f1)"
-else
-    echo "STABLE_TOOLCHAIN_VERAPDF_JAR absent"
-fi
+echo "STABLE_TOOLCHAIN_IMAGE $(python3 tools/image_digest.py paperkit-executor)"
+echo "STABLE_EXECUTOR_IMAGE $(python3 tools/image_digest.py buildbuddy-executor)"

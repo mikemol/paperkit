@@ -503,6 +503,25 @@ def _deliverable(paper_md="../paper/paper.md"):
 
 
 def main():
+    # ⚑ Σ-F5 — THE GUARD RUNS FIRST FOR THE CLAIM-INVOKED PATHS.  `--selftest` and `--deliverable`
+    # branched ABOVE `_deps_absent()` (still below, for the copy-through path), so both correctly
+    # DETECTED the missing toolchain, said so loudly — "SKIP (loud) — the method is present but
+    # unrunnable on this box", "DELIVERABLE unmeasurable — render deps absent" — and then returned
+    # a FAILING exit code anyway.  The gate recorded `{"verdict":"fail"}` for a run that had
+    # explicitly declined to judge.
+    #
+    # ⚑ THAT IS WORSE THAN AN UNGUARDED IMPORT, not better: `latex.py` at least crashed visibly
+    # (Σ-F4).  Here the honest message and the dishonest verdict shipped together, so the account
+    # read "cannot run" while the verdict read "refuted" — the two-readings-one-record collapse
+    # `Ζ·rests·unresolved` names, with the evidence for the correct reading already printed.
+    #
+    # `rnd-widen` is graded by exactly these two flags, so this is the whole claim's verdict.
+    if "--selftest" in sys.argv or "--deliverable" in sys.argv:
+        absent = _deps_absent()
+        if absent:
+            print(f"widen_tables: {absent} absent — CANNOT MEASURE column widths (not a pass)",
+                  file=sys.stderr)
+            return 3                                        # Ζ·tier·exit — cannot-run, not a fail
     if "--selftest" in sys.argv:
         return _selftest()
     if "--deliverable" in sys.argv:

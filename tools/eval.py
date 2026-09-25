@@ -65,6 +65,171 @@ def _cap_cpu(cpu: int) -> None:
     resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + CPU_GRACE))
 
 
+def _cap_mem(mb: int) -> None:
+    """Cap ADDRESS SPACE for this process and everything it forks — the memory twin of _cap_cpu.
+
+    ⚑ Ζ·cell·rlimit — KEPT, BUT IT DID NOT FIX THE CASE IT WAS BUILT FOR, and saying so is the
+    point of this note.  The theory was: a flip: mutant that loops WHILE APPENDING burns memory
+    rather than CPU, so _cap_cpu never fires.  Proven to BIND in isolation (a runaway allocation
+    raises MemoryError under it; a real witness passes), and REFUTED against the live cell —
+    `concept-views__config__flip_positionals_arm_2` still exhausted the 4→8192MB climb with no
+    MemoryError anywhere in the log.
+
+    ⚑⚑ TWO REASONS IT CANNOT REACH THAT CELL, both of which the tree already documented:
+      · calc.bzl:107 — cgroup-scope caps the cell with memory.max AND memory.swap.max=0, and its
+        first rung is 4MB.  The cgroup OOM-kills the tree long before any process's ADDRESS SPACE
+        reaches 2048MB, so RLIMIT_AS is never the binding constraint.  A second memory cap was
+        added to a system that already had one.
+      · config.positionals is a BOUNDED `for` over argv — it cannot spin.  Inverting its condition
+        changes WHICH tokens survive, and gate.py:133 reads `pos[0]` with an empty-pos fallback to
+        `Path.cwd()`.  So the flip does not make one process allocate; it makes the gate target a
+        DIFFERENT project, resolve its concepts, and spawn another gate.  The runaway is PROCESS
+        RECURSION, and neither a per-process RLIMIT nor a per-process CPU cap bounds a tree that
+        grows by forking.
+
+    This cap stays because it is correct for the case it names — a single process that allocates
+    without bound is still worth stopping, and it costs one setrlimit.  It is NOT the fix for
+    Ζ·mem·ceiling, and recording that here is cheaper than the next reader re-deriving it.
+
+    MEASURED: `concept-views__config__flip_positionals_arm_2` inverts a condition in
+    config.positionals (an argv-stripping loop) and exhausted the whole membudget climb TWICE —
+    4→8→…→4096MB, then again to 8192MB after the ceiling was raised — killing a full //:hook run
+    each time.  Neither the witness nor the closure explains it: the witness peaks at 28 MB against
+    a 22 MB control, and the cell's cone is 10 of 26 engine modules, not the flat engine.
+
+    ⚑⚑ THE CLIMB IS STILL THE WRONG INSTRUMENT, THOUGH NOT FOR THE REASON FIRST WRITTEN HERE.
+    membudget doubles to DISCOVER a cell's honest footprint, and a RECURSING PROCESS TREE has no
+    footprint to discover: every rung re-runs the recursion and dies the same way, so the climb
+    turns a detectable flip into an exhausted ceiling reported as `not all outputs were created or
+    valid` — a HARNESS verdict wearing a claim verdict's clothes.  ⚑ The first draft of this note
+    said "a runaway allocation has no footprint" and proposed MemoryError as the honest answer.
+    That was the refuted theory: no single process allocates without bound, so no per-process limit
+    of any kind — memory or CPU — can convert this into a verdict.  What the sweep needs to see it
+    is a bound on the TREE (a process count or a pids cgroup controller), which cgroup-scope
+    already has the shape for and does not currently set.
+
+    RLIMIT_AS rather than RLIMIT_DATA: it bounds mmap too, which is where a large list's realloc
+    actually lands.  Set on the parent so the child inherits it across fork+exec — no preexec_fn,
+    for the reason _cap_cpu records.
+    """
+    b = mb * 1024 * 1024
+    resource.setrlimit(resource.RLIMIT_AS, (b, b))
+
+
+# ⚑ Ζ·cell·tree — THE BOUND ON THE TREE THAT _cap_mem's DOCSTRING SAYS IS MISSING, WITHOUT A CGROUP.
+# `concept-views__config__flip_positionals_arm_2` is a fork-bomb mutant: flipping config.positionals
+# makes the gate spawn gates recursively, and no per-process rlimit bounds a tree that grows by
+# forking (see _cap_mem).  On the old host the per-cell cgroup held it.  In the REMOTE EXECUTOR
+# (BuildBuddy, isolation `none`) there is NO per-action cgroup, so the tree grew until the whole
+# executor pod OOM-killed — MEASURED 2026-09-23 by luthen-observability: pids.peak 15,491 against
+# a normal 219, OOMKilled at 4Gi and again at 25Gi, the same action in flight both times, and every
+# other tenant's work on that executor lost with it.
+# The check already runs in its own process group (process_group=0), so the tree is countable from
+# /proc — the pgrp field of each process's stat.  Counting between communicate() slices and killing
+# the group past TREE_MAX turns the runaway into a FLIP with its reason, the same fold this file
+# makes for a hang.  TREE_MAX sits far above a legitimate check's tree (a witness that runs a
+# sibling gate is a handful of processes); the ∅ baseline cell FAILS LOUD if it is ever too low.
+# The executor's pod pids limit (luthen's, pending) is the floor under every tenant; this is the
+# bound that makes paperkit's own runaway a verdict instead of relying on that floor.
+# ⚑ TREE_MAX IS A TRIGGER, NOT A HARD CAP — MEASURED 2026-09-23 on the live fork-bomb cell (inv
+# 5a06cf57): the harness counted 279 at the poll that fired, but the executor pod's pids.peak was
+# 562 (luthen-observability's 2 s sampler), because the recursion keeps forking for up to one
+# TREE_POLL_S interval and during the kill sweeps.  So the real ceiling is "TREE_MAX + one poll of
+# growth + kill latency" — a few hundred here, far below any pod limit, and nothing survived
+# (pids back to 33).  Tighten the poll or lower the trigger only if that margin ever matters.
+TREE_MAX = 256
+# ⚑ 0.2s, NOT 0.05s — MEASURED 2026-09-23 (inv 00930313): at 50ms the harness's OWN /proc scans,
+# made costlier by the growing tree, tripped the 60s RLIMIT_CPU that _cap_cpu sets on THIS process
+# (the limit is inherited, and the parent's own time counts too), killing eval.py before it could
+# write a verdict.  The bound fires early, while the tree is still small, so a slower poll costs
+# little detection latency and keeps the scan's CPU well inside the cap.
+TREE_POLL_S = 0.2
+
+# ⚑⚑ BY ANCESTRY, NOT BY PROCESS GROUP — THE FIRST VERSION COUNTED THE PGID AND THE REAL BOMB
+# ESCAPED IT.  The recursing gates run their own checks with process_group=0 (resolver.py does
+# exactly what this file does), so every level of the recursion starts a NEW group: a pgrp count
+# stayed tiny, the bound never fired, and killpg on one group orphaned the rest INSIDE THE SHARED
+# EXECUTOR.  My local probe had used a flat single-group tree — it tested the shape I assumed, not
+# the shape that exists.  So: count every DESCENDANT of this process by walking ppid, and register
+# this process as a CHILD SUBREAPER so an orphaned descendant reparents to US (not to the pod's
+# init), stays countable, and stays killable.  setsid/process_group changes a process's group and
+# session; neither changes who its parent is.
+_PR_SET_CHILD_SUBREAPER = 36
+
+
+def _become_subreaper() -> None:
+    """Make orphaned descendants reparent to this process (Linux prctl), so none escape the count.
+
+    Best-effort: on a kernel or libc without it, orphans reparent to init and would escape — the
+    count then still covers every descendant whose parent is alive, which is the recursion's shape.
+    """
+    import ctypes  # noqa: PLC0415 — Linux-only, used once, at the one site that needs it
+    with contextlib.suppress(OSError, AttributeError):
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.prctl(_PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
+
+
+def _descendants(root: int) -> list[int]:
+    """Return every live descendant pid of `root`, from one /proc scan — no cgroup needed.
+
+    A process that exits between listing and reading is simply not counted: vanished is gone.
+    """
+    # ⚑ ZOMBIES ARE NOT COUNTED.  As subreaper we inherit orphans, and one that exits becomes a
+    # zombie under us until reaped — still a /proc entry.  Counting them would let a LEGITIMATE
+    # check whose grandchildren outlive their parents creep toward TREE_MAX.  And they are NOT
+    # reaped while the check runs: waitpid(-1) could reap the check itself out from under
+    # communicate(), which would then report a wrong exit code.  Reaping happens in _kill_tree.
+    children: dict[int, list[tuple[int, bool]]] = {}
+    try:
+        entries = os.listdir("/proc")
+    except OSError:
+        return []
+    for name in entries:
+        if not name.isdigit():
+            continue
+        try:
+            with open(f"/proc/{name}/stat", "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            continue
+        # fields after the comm's closing ')': state ppid …  (comm may contain spaces/parens)
+        rest = raw.rsplit(b")", 1)[-1].split()
+        if len(rest) > 1:
+            children.setdefault(int(rest[1]), []).append((int(name), rest[0] == b"Z"))
+    out: list[int] = []
+    frontier = [root]
+    while frontier:
+        nxt: list[int] = []
+        for pid in frontier:
+            for c, zombie in children.get(pid, ()):
+                if not zombie:
+                    out.append(c)
+                nxt.append(c)
+        frontier = nxt
+    return out
+
+
+def _kill_tree(p: subprocess.Popen[bytes]) -> None:
+    """SIGKILL every descendant of this process until none survive, then reap them all.
+
+    Repeated because a fork bomb can create members between one sweep and the next; reaped
+    because, as subreaper, orphans are OUR children and would otherwise linger as zombies.
+    """
+    me = os.getpid()
+    for _ in range(50):
+        victims = _descendants(me)
+        if not victims:
+            break
+        for pid in victims:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.kill(pid, signal.SIGKILL)
+        with contextlib.suppress(ChildProcessError):
+            while os.waitpid(-1, os.WNOHANG)[0] > 0:
+                pass
+    with contextlib.suppress(Exception):
+        p.wait(timeout=5)
+
+
 def _last_line(raw: bytes | None) -> str:
     """Return the final non-empty output line — the check's own account of what happened."""
     if not raw:
@@ -100,20 +265,44 @@ def _run(check: str, claim: str, wall: int) -> tuple[bool, str]:
     "concept X: …" there) — a stderr-only capture once reported "no stderr" for a check that had
     explained itself perfectly well one stream over.
     """
-    p = subprocess.Popen(
-        [sys.executable, check, claim],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, process_group=0)
+    # ⚑ Ζ·cell·pids — A FORK THAT CANNOT HAPPEN IS A FLIP, and this Popen sat OUTSIDE the try.
+    # The pids bound (cgroup-scope) stops a mutant that recurses by forking — measured: the bound
+    # FIRED, `BlockingIOError: [Errno 11] Resource temporarily unavailable` at _fork_exec.  But the
+    # budget is exhausted by the CHECK's own recursion, so the next process that cannot fork is
+    # EVAL.PY ITSELF, one frame above: the harness died before writing .eval.json and bazel reported
+    # `not all outputs were created or valid` — a HARNESS verdict, the exact fold this file refuses
+    # for the non-terminating case one function up ("A mutant that never answers HAS flipped the
+    # check").  Same argument, the other resource: a mutant that exhausts the process budget has
+    # flipped it too, and the harness must SAY so rather than die of it.
+    _become_subreaper()  # Ζ·cell·tree — orphaned descendants must stay countable and killable
     try:
-        # ⚑ communicate(), NEVER wait() — a PIPE nothing drains DEADLOCKS the child the moment it
-        # writes past the 64KB buffer.  Measured 2026-08-26 on the in-process path: a cell sat at
-        # 0.0% CPU for 11+ minutes and `wchan` named both halves.  Capturing output and wait()ing
-        # is exactly that bug; communicate() drains and waits in one call.
-        out, _ = p.communicate(timeout=wall)
-    except subprocess.TimeoutExpired:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(os.getpgid(p.pid), signal.SIGKILL)  # the whole tree, no orphan spinning on
-        p.wait()
-        return True, f"did not terminate within {wall}s (killed) — the mutation flipped it"
+        p = subprocess.Popen(
+            [sys.executable, check, claim],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, process_group=0)
+    except OSError as e:
+        return True, f"could not spawn the check ({e.__class__.__name__}: {e}) — the mutation exhausted the cell's process budget, which is a flip"
+    # ⚑ communicate(), NEVER wait() — a PIPE nothing drains DEADLOCKS the child the moment it
+    # writes past the 64KB buffer.  Measured 2026-08-26 on the in-process path: a cell sat at
+    # 0.0% CPU for 11+ minutes and `wchan` named both halves.  Capturing output and wait()ing
+    # is exactly that bug; communicate() drains and waits in one call.  It is called in short
+    # SLICES so the tree can be counted between them (communicate() may be re-called after a
+    # TimeoutExpired without losing output).
+    tree_max = _env_int("PAPERKIT_CHECK_TREE", TREE_MAX)
+    waited = 0.0
+    while True:
+        try:
+            out, _ = p.communicate(timeout=TREE_POLL_S)
+            break
+        except subprocess.TimeoutExpired:
+            waited += TREE_POLL_S
+        size = len(_descendants(os.getpid()))
+        if size > tree_max:
+            _kill_tree(p)
+            return True, (f"process tree reached {size} > {tree_max} (killed) — the mutation "
+                          "recursed by forking, which is a flip")
+        if waited >= wall:
+            _kill_tree(p)
+            return True, f"did not terminate within {wall}s (killed) — the mutation flipped it"
     # `Popen.returncode` is `int | Any` in typeshed (it is None before the child exits), so the
     # narrowing is at the read, not downstream: after communicate() it is always an int.
     rc: int = p.returncode
@@ -141,6 +330,9 @@ def main(argv: list[str]) -> int:
                        a.content_path, a.content_textfile), tag)
 
     _cap_cpu(_env_int("PAPERKIT_CHECK_CPU", 60))
+    # Ζ·cell·rlimit — 2048MB: an order of magnitude above the 28 MB a real witness peaks at,
+    # and well under the 4096MB rung that a runaway allocation blew through.
+    _cap_mem(_env_int("PAPERKIT_CHECK_MEM_MB", 2048))
     before = cellcgroup.oom_counts()
     flipped, why = _run(a.check, a.claim, _env_int("PAPERKIT_CHECK_TIMEOUT", 600))
 

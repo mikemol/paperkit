@@ -4,6 +4,12 @@ subtitle = "Mike Mol — parts 1 and 2"
 rubric = "rubric.tsv"
 warrants = ["warrants.bib"]
 out = "TALK.md"
+
+# Γ·delta·root — the Δ sandbox root, declared because the engine is a sibling and
+# layout._sandbox_root refuses to infer.  The bound is the REPO: the talk's witnesses assert
+# things about OTHER projects' bibs (render's warrants, its own figure family).  See
+# paper/paper.toml.
+root = ".."
 numbered = false
 references = false
 

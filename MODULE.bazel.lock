@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "bz1lxW4m3O0UPgVbEphif+LmlDMpRyWRdKUEMVmalJ8=",
+        "bzlTransitiveDigest": "wkx9oUBUqxSj/rD66CH+xSyIhSRPkuVmIdTnsUd+oVo=",
         "usagesDigest": "ZTg9qMWPSyxGY6veR9abcyw/0JPtpp/F+2wGOcH1xGY=",
         "recordedFileInputs": {
           "@@//arch/paper.toml": "430eccadfd174196bf9cf0fd54a51b0b552b66ed1e761c34fd4f9ea8da878995",
@@ -161,7 +161,7 @@
           "@@//paperkit/bib.py": "b649d19fd4e3c85f3498c83d3a51680294fede8efdbf5a620cf805497a5be047",
           "@@//paperkit/bibfidelity.py": "27ebde39e8ab6f37a4137ed24df0cf9e33cbe79bea714ab1cb6314354adfe3c4",
           "@@//paperkit/bibparse.py": "8ad19f4d6d77ce6174f306f9a3a770346a3379064d5b520f2c3c98d80fb649cb",
-          "@@//paperkit/cache.py": "9c86c16dbb587d84f03a618f8aa3fc817aad9a78f5791eea35178257674d1d16",
+          "@@//paperkit/cache.py": "c4c56ed00cba13ac4d61e9c77c80c6ed102fc98938e23356e8a76b17fe85ff89",
           "@@//paperkit/checkcache.py": "02868ac97c6fcf9d8692e0aa23b8b783fb44963b216ec8c2dc47f7a2c1070983",
           "@@//paperkit/coherence.py": "577c090791b0975ca2301a1cc655a43a732520536fa4827d9e54fbbb62267121",
           "@@//paperkit/components.bzl": "30c3688ebd14a0bec01d6852b2639eec752a8e2da0ba861f432eb9207fc19323",
@@ -170,13 +170,13 @@
           "@@//paperkit/discriminate.py": "97dd9706bfc04806221cb38751e8d3a7682f1facb803a0d30ac0ade9e929a4c5",
           "@@//paperkit/driver.py": "61ae747450ee33ccf85855b89521e83cff9bba15ed5a1d4a929668fdf01ece20",
           "@@//paperkit/durable.py": "b13cd5e38a4a30767b22b13081b8872a1cdf85ad5cb728e37fa9d15c080af42e",
-          "@@//paperkit/footdeps.py": "c8f2ae4133301623a415aad96b7ba5556dc6111133d43dd0cbf8985877d53f11",
+          "@@//paperkit/footdeps.py": "70aea98da6ec75d3dce5e7c15c710b39a053f4d64b5aa9d9e7095c05b0b64490",
           "@@//paperkit/gate.py": "cd9544d443e6effc0e55f1844d73adb5b19d995dff5e6830016740b9605722cb",
           "@@//paperkit/genre.py": "d689dbb76e5a5dfd4eb4eabd03dba0674f673adb48ba3dfa5cb819c6b500e662",
           "@@//paperkit/grade.py": "481fe342d8c685d60c1b28e4b0c9b314e2fe666dfbfa4c817b0316c06be5bf1e",
-          "@@//paperkit/grader.py": "ef15f396f741a8b377ef4b8163974d46b48b27a3ef729db2ffb5b19c12f48e6b",
+          "@@//paperkit/grader.py": "88878a1d6e0345c8ee614c1e69cb37efba07dffeb97caa849e4f11121b938f2c",
           "@@//paperkit/labelmap.py": "8aa563fdc27470c7f591d9b168839bba2b33a21e674f3c8679057edd53d3ccf9",
-          "@@//paperkit/layout.py": "1cc7f29cc91a6bb0d6e14ca41d5f35593d754124c98b5023d61a8214618c37e6",
+          "@@//paperkit/layout.py": "3a0d1a3a4ace6a6d6fe76251b5549516110302ce489a7f18daefd772686c21db",
           "@@//paperkit/library/concepts.bib": "cefe3d8de1b1fde8ab04859b44b8b6d2ef665090542a65102818783b0011299a",
           "@@//paperkit/library/concepts.py": "f902f56574a769728740842af0cf88d22701ea8db12fcbf570de259502ac334f",
           "@@//paperkit/library/paper.toml": "3c459605a91f8d5451063149ed89c915def584eebd28590902ec024aebdd69a0",
@@ -184,7 +184,7 @@
           "@@//paperkit/project.py": "b8ecd263000ae3b085efcd9a3b81272506c4db90b5c6e4ffd14c812d3f7c83fc",
           "@@//paperkit/prove.py": "04441db4c185b574ffe958de0efa552552e7703471fa796030bf414f5ab13b11",
           "@@//paperkit/rematch.py": "1b0b8fd534021a2ea3d953cfe73a43c46c941e51230b8213d3da956835e1b62d",
-          "@@//paperkit/resolver.py": "8e36733eea441fc5ef176b03886c82a843fe02624b557e522c23592c8fdec27d",
+          "@@//paperkit/resolver.py": "6966d3c94e6b4794f6a74df796549d31a3cdb2a7b9355fa918227c2b81386950",
           "@@//paperkit/rhetoric.py": "8402652d5bbcd178cd454f7fa307531c55bd94c3655122ea377b6274c1c8ec30",
           "@@//paperkit/routes.py": "e54d9e93b6e6e17a60f284cd15b3668c429be8a368eed7aa50d9b885b0178514",
           "@@//paperkit/tests/__init__.py": "d77b5665d57d8e97270f041a26e686569e49e8686b907dd206300490fd09d3fc",
@@ -315,6 +315,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -427,6 +439,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -539,6 +563,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -1706,11 +1742,14 @@
                 "paperkit/footdeps.py\t_root_files",
                 "paperkit/footdeps.py\t_covering",
                 "paperkit/footdeps.py\t_imported",
+                "paperkit/footdeps.py\t_label_path",
                 "paperkit/footdeps.py\t_missing",
+                "paperkit/footdeps.py\t_uncovered",
                 "paperkit/footdeps.py\t_engine",
                 "paperkit/footdeps.py\tbuild",
                 "paperkit/footdeps.py\tbuild.deps",
                 "paperkit/footdeps.py\t_declared",
+                "paperkit/footdeps.py\t_built",
                 "paperkit/footdeps.py\taudit",
                 "paperkit/footdeps.py\taudit_one",
                 "paperkit/footdeps.py\t_strace_works",
@@ -1726,9 +1765,13 @@
                 "paperkit/footdeps.py\tbranch:_imported#0",
                 "paperkit/footdeps.py\tbranch:_imported#1",
                 "paperkit/footdeps.py\tbranch:_imported#2",
-                "paperkit/footdeps.py\tbranch:_missing#0",
-                "paperkit/footdeps.py\tbranch:_missing#1",
-                "paperkit/footdeps.py\tbranch:_missing#2",
+                "paperkit/footdeps.py\tbranch:_label_path#0",
+                "paperkit/footdeps.py\tbranch:_uncovered#0",
+                "paperkit/footdeps.py\tbranch:_uncovered#1",
+                "paperkit/footdeps.py\tbranch:_uncovered#2",
+                "paperkit/footdeps.py\tbranch:_uncovered#3",
+                "paperkit/footdeps.py\tbranch:_uncovered#4",
+                "paperkit/footdeps.py\tbranch:_uncovered#5",
                 "paperkit/footdeps.py\tbranch:_engine#0",
                 "paperkit/footdeps.py\tbranch:_engine#1",
                 "paperkit/footdeps.py\tbranch:_engine#2",
@@ -1755,8 +1798,12 @@
                 "paperkit/footdeps.py\tflip:_covering#0",
                 "paperkit/footdeps.py\tflip:_covering#1",
                 "paperkit/footdeps.py\tflip:_covering#2",
-                "paperkit/footdeps.py\tflip:_missing#0",
-                "paperkit/footdeps.py\tflip:_missing#1",
+                "paperkit/footdeps.py\tflip:_label_path#0",
+                "paperkit/footdeps.py\tflip:_uncovered#0",
+                "paperkit/footdeps.py\tflip:_uncovered#1",
+                "paperkit/footdeps.py\tflip:_uncovered#2",
+                "paperkit/footdeps.py\tflip:_uncovered#3",
+                "paperkit/footdeps.py\tflip:_uncovered#4",
                 "paperkit/footdeps.py\tflip:_engine#0",
                 "paperkit/footdeps.py\tflip:_engine#1",
                 "paperkit/footdeps.py\tflip:_engine#2",
@@ -2532,6 +2579,14 @@
                 "paperkit/layout.py\t_nested_roots",
                 "paperkit/layout.py\t_suffixless_text",
                 "paperkit/layout.py\t_mutable",
+                "paperkit/layout.py\t_gi_regex",
+                "paperkit/layout.py\t_gi_rules",
+                "paperkit/layout.py\t_Scope.__init__",
+                "paperkit/layout.py\t_Scope.for_path",
+                "paperkit/layout.py\t_Scope._stack",
+                "paperkit/layout.py\t_Scope.excluded",
+                "paperkit/layout.py\t_Scope.ignore",
+                "paperkit/layout.py\t_Scope.files",
                 "paperkit/layout.py\t_copy_sandbox",
                 "paperkit/layout.py\tbranch:_root_override#0",
                 "paperkit/layout.py\tbranch:_root_override#1",
@@ -2548,6 +2603,41 @@
                 "paperkit/layout.py\tbranch:_suffixless_text#3",
                 "paperkit/layout.py\tbranch:_suffixless_text#4",
                 "paperkit/layout.py\tbranch:_suffixless_text#5",
+                "paperkit/layout.py\tbranch:_gi_regex#0",
+                "paperkit/layout.py\tbranch:_gi_regex#1",
+                "paperkit/layout.py\tbranch:_gi_regex#2",
+                "paperkit/layout.py\tbranch:_gi_regex#3",
+                "paperkit/layout.py\tbranch:_gi_regex#4",
+                "paperkit/layout.py\tbranch:_gi_regex#5",
+                "paperkit/layout.py\tbranch:_gi_regex#6",
+                "paperkit/layout.py\tbranch:_gi_regex#7",
+                "paperkit/layout.py\tbranch:_gi_regex#8",
+                "paperkit/layout.py\tbranch:_gi_regex#9",
+                "paperkit/layout.py\tbranch:_gi_regex#10",
+                "paperkit/layout.py\tbranch:_gi_regex#11",
+                "paperkit/layout.py\tbranch:_gi_regex#12",
+                "paperkit/layout.py\tbranch:_gi_regex#13",
+                "paperkit/layout.py\tbranch:_gi_regex#14",
+                "paperkit/layout.py\tbranch:_gi_rules#0",
+                "paperkit/layout.py\tbranch:_gi_rules#1",
+                "paperkit/layout.py\tbranch:_gi_rules#2",
+                "paperkit/layout.py\tbranch:_gi_rules#3",
+                "paperkit/layout.py\tbranch:_gi_rules#4",
+                "paperkit/layout.py\tbranch:_gi_rules#5",
+                "paperkit/layout.py\tbranch:_Scope.for_path#0",
+                "paperkit/layout.py\tbranch:_Scope.for_path#1",
+                "paperkit/layout.py\tbranch:_Scope._stack#0",
+                "paperkit/layout.py\tbranch:_Scope._stack#1",
+                "paperkit/layout.py\tbranch:_Scope._stack#2",
+                "paperkit/layout.py\tbranch:_Scope._stack#3",
+                "paperkit/layout.py\tbranch:_Scope.excluded#0",
+                "paperkit/layout.py\tbranch:_Scope.excluded#1",
+                "paperkit/layout.py\tbranch:_Scope.excluded#2",
+                "paperkit/layout.py\tbranch:_Scope.excluded#3",
+                "paperkit/layout.py\tbranch:_Scope.excluded#4",
+                "paperkit/layout.py\tbranch:_Scope.excluded#5",
+                "paperkit/layout.py\tbranch:_Scope.files#0",
+                "paperkit/layout.py\tbranch:_Scope.files#1",
                 "paperkit/layout.py\tflip:_root_override#0",
                 "paperkit/layout.py\tflip:_root_override#1",
                 "paperkit/layout.py\tflip:_root_override#2",
@@ -2556,6 +2646,25 @@
                 "paperkit/layout.py\tflip:_nested_roots#0",
                 "paperkit/layout.py\tflip:_suffixless_text#0",
                 "paperkit/layout.py\tflip:_suffixless_text#1",
+                "paperkit/layout.py\tflip:_gi_regex#0",
+                "paperkit/layout.py\tflip:_gi_regex#1",
+                "paperkit/layout.py\tflip:_gi_regex#2",
+                "paperkit/layout.py\tflip:_gi_regex#3",
+                "paperkit/layout.py\tflip:_gi_regex#4",
+                "paperkit/layout.py\tflip:_gi_regex#5",
+                "paperkit/layout.py\tflip:_gi_regex#6",
+                "paperkit/layout.py\tflip:_gi_regex#7",
+                "paperkit/layout.py\tflip:_gi_rules#0",
+                "paperkit/layout.py\tflip:_gi_rules#1",
+                "paperkit/layout.py\tflip:_gi_rules#2",
+                "paperkit/layout.py\tflip:_Scope.for_path#0",
+                "paperkit/layout.py\tflip:_Scope._stack#0",
+                "paperkit/layout.py\tflip:_Scope._stack#1",
+                "paperkit/layout.py\tflip:_Scope.excluded#0",
+                "paperkit/layout.py\tflip:_Scope.excluded#1",
+                "paperkit/layout.py\tflip:_Scope.excluded#2",
+                "paperkit/layout.py\tflip:_Scope.excluded#3",
+                "paperkit/layout.py\tflip:_Scope.files#0",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#0",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#1",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#2",
@@ -4565,6 +4674,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -5732,11 +5853,14 @@
                 "paperkit/footdeps.py\t_root_files",
                 "paperkit/footdeps.py\t_covering",
                 "paperkit/footdeps.py\t_imported",
+                "paperkit/footdeps.py\t_label_path",
                 "paperkit/footdeps.py\t_missing",
+                "paperkit/footdeps.py\t_uncovered",
                 "paperkit/footdeps.py\t_engine",
                 "paperkit/footdeps.py\tbuild",
                 "paperkit/footdeps.py\tbuild.deps",
                 "paperkit/footdeps.py\t_declared",
+                "paperkit/footdeps.py\t_built",
                 "paperkit/footdeps.py\taudit",
                 "paperkit/footdeps.py\taudit_one",
                 "paperkit/footdeps.py\t_strace_works",
@@ -5752,9 +5876,13 @@
                 "paperkit/footdeps.py\tbranch:_imported#0",
                 "paperkit/footdeps.py\tbranch:_imported#1",
                 "paperkit/footdeps.py\tbranch:_imported#2",
-                "paperkit/footdeps.py\tbranch:_missing#0",
-                "paperkit/footdeps.py\tbranch:_missing#1",
-                "paperkit/footdeps.py\tbranch:_missing#2",
+                "paperkit/footdeps.py\tbranch:_label_path#0",
+                "paperkit/footdeps.py\tbranch:_uncovered#0",
+                "paperkit/footdeps.py\tbranch:_uncovered#1",
+                "paperkit/footdeps.py\tbranch:_uncovered#2",
+                "paperkit/footdeps.py\tbranch:_uncovered#3",
+                "paperkit/footdeps.py\tbranch:_uncovered#4",
+                "paperkit/footdeps.py\tbranch:_uncovered#5",
                 "paperkit/footdeps.py\tbranch:_engine#0",
                 "paperkit/footdeps.py\tbranch:_engine#1",
                 "paperkit/footdeps.py\tbranch:_engine#2",
@@ -5781,8 +5909,12 @@
                 "paperkit/footdeps.py\tflip:_covering#0",
                 "paperkit/footdeps.py\tflip:_covering#1",
                 "paperkit/footdeps.py\tflip:_covering#2",
-                "paperkit/footdeps.py\tflip:_missing#0",
-                "paperkit/footdeps.py\tflip:_missing#1",
+                "paperkit/footdeps.py\tflip:_label_path#0",
+                "paperkit/footdeps.py\tflip:_uncovered#0",
+                "paperkit/footdeps.py\tflip:_uncovered#1",
+                "paperkit/footdeps.py\tflip:_uncovered#2",
+                "paperkit/footdeps.py\tflip:_uncovered#3",
+                "paperkit/footdeps.py\tflip:_uncovered#4",
                 "paperkit/footdeps.py\tflip:_engine#0",
                 "paperkit/footdeps.py\tflip:_engine#1",
                 "paperkit/footdeps.py\tflip:_engine#2",
@@ -6558,6 +6690,14 @@
                 "paperkit/layout.py\t_nested_roots",
                 "paperkit/layout.py\t_suffixless_text",
                 "paperkit/layout.py\t_mutable",
+                "paperkit/layout.py\t_gi_regex",
+                "paperkit/layout.py\t_gi_rules",
+                "paperkit/layout.py\t_Scope.__init__",
+                "paperkit/layout.py\t_Scope.for_path",
+                "paperkit/layout.py\t_Scope._stack",
+                "paperkit/layout.py\t_Scope.excluded",
+                "paperkit/layout.py\t_Scope.ignore",
+                "paperkit/layout.py\t_Scope.files",
                 "paperkit/layout.py\t_copy_sandbox",
                 "paperkit/layout.py\tbranch:_root_override#0",
                 "paperkit/layout.py\tbranch:_root_override#1",
@@ -6574,6 +6714,41 @@
                 "paperkit/layout.py\tbranch:_suffixless_text#3",
                 "paperkit/layout.py\tbranch:_suffixless_text#4",
                 "paperkit/layout.py\tbranch:_suffixless_text#5",
+                "paperkit/layout.py\tbranch:_gi_regex#0",
+                "paperkit/layout.py\tbranch:_gi_regex#1",
+                "paperkit/layout.py\tbranch:_gi_regex#2",
+                "paperkit/layout.py\tbranch:_gi_regex#3",
+                "paperkit/layout.py\tbranch:_gi_regex#4",
+                "paperkit/layout.py\tbranch:_gi_regex#5",
+                "paperkit/layout.py\tbranch:_gi_regex#6",
+                "paperkit/layout.py\tbranch:_gi_regex#7",
+                "paperkit/layout.py\tbranch:_gi_regex#8",
+                "paperkit/layout.py\tbranch:_gi_regex#9",
+                "paperkit/layout.py\tbranch:_gi_regex#10",
+                "paperkit/layout.py\tbranch:_gi_regex#11",
+                "paperkit/layout.py\tbranch:_gi_regex#12",
+                "paperkit/layout.py\tbranch:_gi_regex#13",
+                "paperkit/layout.py\tbranch:_gi_regex#14",
+                "paperkit/layout.py\tbranch:_gi_rules#0",
+                "paperkit/layout.py\tbranch:_gi_rules#1",
+                "paperkit/layout.py\tbranch:_gi_rules#2",
+                "paperkit/layout.py\tbranch:_gi_rules#3",
+                "paperkit/layout.py\tbranch:_gi_rules#4",
+                "paperkit/layout.py\tbranch:_gi_rules#5",
+                "paperkit/layout.py\tbranch:_Scope.for_path#0",
+                "paperkit/layout.py\tbranch:_Scope.for_path#1",
+                "paperkit/layout.py\tbranch:_Scope._stack#0",
+                "paperkit/layout.py\tbranch:_Scope._stack#1",
+                "paperkit/layout.py\tbranch:_Scope._stack#2",
+                "paperkit/layout.py\tbranch:_Scope._stack#3",
+                "paperkit/layout.py\tbranch:_Scope.excluded#0",
+                "paperkit/layout.py\tbranch:_Scope.excluded#1",
+                "paperkit/layout.py\tbranch:_Scope.excluded#2",
+                "paperkit/layout.py\tbranch:_Scope.excluded#3",
+                "paperkit/layout.py\tbranch:_Scope.excluded#4",
+                "paperkit/layout.py\tbranch:_Scope.excluded#5",
+                "paperkit/layout.py\tbranch:_Scope.files#0",
+                "paperkit/layout.py\tbranch:_Scope.files#1",
                 "paperkit/layout.py\tflip:_root_override#0",
                 "paperkit/layout.py\tflip:_root_override#1",
                 "paperkit/layout.py\tflip:_root_override#2",
@@ -6582,6 +6757,25 @@
                 "paperkit/layout.py\tflip:_nested_roots#0",
                 "paperkit/layout.py\tflip:_suffixless_text#0",
                 "paperkit/layout.py\tflip:_suffixless_text#1",
+                "paperkit/layout.py\tflip:_gi_regex#0",
+                "paperkit/layout.py\tflip:_gi_regex#1",
+                "paperkit/layout.py\tflip:_gi_regex#2",
+                "paperkit/layout.py\tflip:_gi_regex#3",
+                "paperkit/layout.py\tflip:_gi_regex#4",
+                "paperkit/layout.py\tflip:_gi_regex#5",
+                "paperkit/layout.py\tflip:_gi_regex#6",
+                "paperkit/layout.py\tflip:_gi_regex#7",
+                "paperkit/layout.py\tflip:_gi_rules#0",
+                "paperkit/layout.py\tflip:_gi_rules#1",
+                "paperkit/layout.py\tflip:_gi_rules#2",
+                "paperkit/layout.py\tflip:_Scope.for_path#0",
+                "paperkit/layout.py\tflip:_Scope._stack#0",
+                "paperkit/layout.py\tflip:_Scope._stack#1",
+                "paperkit/layout.py\tflip:_Scope.excluded#0",
+                "paperkit/layout.py\tflip:_Scope.excluded#1",
+                "paperkit/layout.py\tflip:_Scope.excluded#2",
+                "paperkit/layout.py\tflip:_Scope.excluded#3",
+                "paperkit/layout.py\tflip:_Scope.files#0",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#0",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#1",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#2",
@@ -8066,6 +8260,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -9233,11 +9439,14 @@
                 "paperkit/footdeps.py\t_root_files",
                 "paperkit/footdeps.py\t_covering",
                 "paperkit/footdeps.py\t_imported",
+                "paperkit/footdeps.py\t_label_path",
                 "paperkit/footdeps.py\t_missing",
+                "paperkit/footdeps.py\t_uncovered",
                 "paperkit/footdeps.py\t_engine",
                 "paperkit/footdeps.py\tbuild",
                 "paperkit/footdeps.py\tbuild.deps",
                 "paperkit/footdeps.py\t_declared",
+                "paperkit/footdeps.py\t_built",
                 "paperkit/footdeps.py\taudit",
                 "paperkit/footdeps.py\taudit_one",
                 "paperkit/footdeps.py\t_strace_works",
@@ -9253,9 +9462,13 @@
                 "paperkit/footdeps.py\tbranch:_imported#0",
                 "paperkit/footdeps.py\tbranch:_imported#1",
                 "paperkit/footdeps.py\tbranch:_imported#2",
-                "paperkit/footdeps.py\tbranch:_missing#0",
-                "paperkit/footdeps.py\tbranch:_missing#1",
-                "paperkit/footdeps.py\tbranch:_missing#2",
+                "paperkit/footdeps.py\tbranch:_label_path#0",
+                "paperkit/footdeps.py\tbranch:_uncovered#0",
+                "paperkit/footdeps.py\tbranch:_uncovered#1",
+                "paperkit/footdeps.py\tbranch:_uncovered#2",
+                "paperkit/footdeps.py\tbranch:_uncovered#3",
+                "paperkit/footdeps.py\tbranch:_uncovered#4",
+                "paperkit/footdeps.py\tbranch:_uncovered#5",
                 "paperkit/footdeps.py\tbranch:_engine#0",
                 "paperkit/footdeps.py\tbranch:_engine#1",
                 "paperkit/footdeps.py\tbranch:_engine#2",
@@ -9282,8 +9495,12 @@
                 "paperkit/footdeps.py\tflip:_covering#0",
                 "paperkit/footdeps.py\tflip:_covering#1",
                 "paperkit/footdeps.py\tflip:_covering#2",
-                "paperkit/footdeps.py\tflip:_missing#0",
-                "paperkit/footdeps.py\tflip:_missing#1",
+                "paperkit/footdeps.py\tflip:_label_path#0",
+                "paperkit/footdeps.py\tflip:_uncovered#0",
+                "paperkit/footdeps.py\tflip:_uncovered#1",
+                "paperkit/footdeps.py\tflip:_uncovered#2",
+                "paperkit/footdeps.py\tflip:_uncovered#3",
+                "paperkit/footdeps.py\tflip:_uncovered#4",
                 "paperkit/footdeps.py\tflip:_engine#0",
                 "paperkit/footdeps.py\tflip:_engine#1",
                 "paperkit/footdeps.py\tflip:_engine#2",
@@ -10059,6 +10276,14 @@
                 "paperkit/layout.py\t_nested_roots",
                 "paperkit/layout.py\t_suffixless_text",
                 "paperkit/layout.py\t_mutable",
+                "paperkit/layout.py\t_gi_regex",
+                "paperkit/layout.py\t_gi_rules",
+                "paperkit/layout.py\t_Scope.__init__",
+                "paperkit/layout.py\t_Scope.for_path",
+                "paperkit/layout.py\t_Scope._stack",
+                "paperkit/layout.py\t_Scope.excluded",
+                "paperkit/layout.py\t_Scope.ignore",
+                "paperkit/layout.py\t_Scope.files",
                 "paperkit/layout.py\t_copy_sandbox",
                 "paperkit/layout.py\tbranch:_root_override#0",
                 "paperkit/layout.py\tbranch:_root_override#1",
@@ -10075,6 +10300,41 @@
                 "paperkit/layout.py\tbranch:_suffixless_text#3",
                 "paperkit/layout.py\tbranch:_suffixless_text#4",
                 "paperkit/layout.py\tbranch:_suffixless_text#5",
+                "paperkit/layout.py\tbranch:_gi_regex#0",
+                "paperkit/layout.py\tbranch:_gi_regex#1",
+                "paperkit/layout.py\tbranch:_gi_regex#2",
+                "paperkit/layout.py\tbranch:_gi_regex#3",
+                "paperkit/layout.py\tbranch:_gi_regex#4",
+                "paperkit/layout.py\tbranch:_gi_regex#5",
+                "paperkit/layout.py\tbranch:_gi_regex#6",
+                "paperkit/layout.py\tbranch:_gi_regex#7",
+                "paperkit/layout.py\tbranch:_gi_regex#8",
+                "paperkit/layout.py\tbranch:_gi_regex#9",
+                "paperkit/layout.py\tbranch:_gi_regex#10",
+                "paperkit/layout.py\tbranch:_gi_regex#11",
+                "paperkit/layout.py\tbranch:_gi_regex#12",
+                "paperkit/layout.py\tbranch:_gi_regex#13",
+                "paperkit/layout.py\tbranch:_gi_regex#14",
+                "paperkit/layout.py\tbranch:_gi_rules#0",
+                "paperkit/layout.py\tbranch:_gi_rules#1",
+                "paperkit/layout.py\tbranch:_gi_rules#2",
+                "paperkit/layout.py\tbranch:_gi_rules#3",
+                "paperkit/layout.py\tbranch:_gi_rules#4",
+                "paperkit/layout.py\tbranch:_gi_rules#5",
+                "paperkit/layout.py\tbranch:_Scope.for_path#0",
+                "paperkit/layout.py\tbranch:_Scope.for_path#1",
+                "paperkit/layout.py\tbranch:_Scope._stack#0",
+                "paperkit/layout.py\tbranch:_Scope._stack#1",
+                "paperkit/layout.py\tbranch:_Scope._stack#2",
+                "paperkit/layout.py\tbranch:_Scope._stack#3",
+                "paperkit/layout.py\tbranch:_Scope.excluded#0",
+                "paperkit/layout.py\tbranch:_Scope.excluded#1",
+                "paperkit/layout.py\tbranch:_Scope.excluded#2",
+                "paperkit/layout.py\tbranch:_Scope.excluded#3",
+                "paperkit/layout.py\tbranch:_Scope.excluded#4",
+                "paperkit/layout.py\tbranch:_Scope.excluded#5",
+                "paperkit/layout.py\tbranch:_Scope.files#0",
+                "paperkit/layout.py\tbranch:_Scope.files#1",
                 "paperkit/layout.py\tflip:_root_override#0",
                 "paperkit/layout.py\tflip:_root_override#1",
                 "paperkit/layout.py\tflip:_root_override#2",
@@ -10083,6 +10343,25 @@
                 "paperkit/layout.py\tflip:_nested_roots#0",
                 "paperkit/layout.py\tflip:_suffixless_text#0",
                 "paperkit/layout.py\tflip:_suffixless_text#1",
+                "paperkit/layout.py\tflip:_gi_regex#0",
+                "paperkit/layout.py\tflip:_gi_regex#1",
+                "paperkit/layout.py\tflip:_gi_regex#2",
+                "paperkit/layout.py\tflip:_gi_regex#3",
+                "paperkit/layout.py\tflip:_gi_regex#4",
+                "paperkit/layout.py\tflip:_gi_regex#5",
+                "paperkit/layout.py\tflip:_gi_regex#6",
+                "paperkit/layout.py\tflip:_gi_regex#7",
+                "paperkit/layout.py\tflip:_gi_rules#0",
+                "paperkit/layout.py\tflip:_gi_rules#1",
+                "paperkit/layout.py\tflip:_gi_rules#2",
+                "paperkit/layout.py\tflip:_Scope.for_path#0",
+                "paperkit/layout.py\tflip:_Scope._stack#0",
+                "paperkit/layout.py\tflip:_Scope._stack#1",
+                "paperkit/layout.py\tflip:_Scope.excluded#0",
+                "paperkit/layout.py\tflip:_Scope.excluded#1",
+                "paperkit/layout.py\tflip:_Scope.excluded#2",
+                "paperkit/layout.py\tflip:_Scope.excluded#3",
+                "paperkit/layout.py\tflip:_Scope.files#0",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#0",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#1",
                 "paperkit/layout.py\tdata-:MUTABLE_SUFFIXES#2",
@@ -11982,6 +12261,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -12094,6 +12385,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -12206,6 +12509,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -12318,6 +12633,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -12430,6 +12757,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -12542,6 +12881,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -12654,6 +13005,18 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           },
@@ -12766,11 +13129,140 @@
                 "report",
                 "setup",
                 "talk"
+              ],
+              "records": [
+                "paperkit_arch\tarch\t1",
+                "paperkit_boundaries\tboundaries\t1",
+                "paperkit_config\tconfig\t1",
+                "paperkit_demo\tdemo\t1",
+                "paperkit_guide\tguide\t1",
+                "paperkit_library\tpaperkit/library\t1",
+                "paperkit_paper\tpaper\t1",
+                "paperkit_render\trender\t1",
+                "paperkit_root\t.\t1",
+                "paperkit_talk\ttalk\t1"
               ]
             }
           }
         },
         "recordedRepoMappingEntries": []
+      }
+    },
+    "@@pybind11_bazel+//:python_configure.bzl%extension": {
+      "general": {
+        "bzlTransitiveDigest": "VhEtmxw1yzb9rBZVsKTdti7p+nDM/Fv1p9TmKdO45+Q=",
+        "usagesDigest": "fycyB39YnXIJkfWCIXLUKJMZzANcuLy9ZE73hRucjFk=",
+        "recordedFileInputs": {
+          "@@pybind11_bazel+//MODULE.bazel": "88af1c246226d87e65be78ed49ecd1e6f5e98648558c14ce99176da041dc378e"
+        },
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "local_config_python": {
+            "repoRuleId": "@@pybind11_bazel+//:python_configure.bzl%python_configure",
+            "attributes": {}
+          },
+          "pybind11": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "build_file": "@@pybind11_bazel+//:pybind11.BUILD",
+              "strip_prefix": "pybind11-2.11.1",
+              "urls": [
+                "https://github.com/pybind/pybind11/archive/v2.11.1.zip"
+              ]
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "pybind11_bazel+",
+            "bazel_tools",
+            "bazel_tools"
+          ]
+        ]
+      }
+    },
+    "@@rules_fuzzing+//fuzzing/private:extensions.bzl%non_module_dependencies": {
+      "general": {
+        "bzlTransitiveDigest": "CYUiFDCnL2VGx3uotIu/VuGabgObnZra2zzRUJCX0sU=",
+        "usagesDigest": "wy6ISK6UOcBEjj/mvJ/S3WeXoO67X+1llb9yPyFtPgc=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "platforms": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "urls": [
+                "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
+                "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz"
+              ],
+              "sha256": "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74"
+            }
+          },
+          "rules_python": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "sha256": "d70cd72a7a4880f0000a6346253414825c19cdd40a28289bdf67b8e6480edff8",
+              "strip_prefix": "rules_python-0.28.0",
+              "url": "https://github.com/bazelbuild/rules_python/releases/download/0.28.0/rules_python-0.28.0.tar.gz"
+            }
+          },
+          "bazel_skylib": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "sha256": "cd55a062e763b9349921f0f5db8c3933288dc8ba4f76dd9416aac68acee3cb94",
+              "urls": [
+                "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz",
+                "https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz"
+              ]
+            }
+          },
+          "com_google_absl": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "urls": [
+                "https://github.com/abseil/abseil-cpp/archive/refs/tags/20240116.1.zip"
+              ],
+              "strip_prefix": "abseil-cpp-20240116.1",
+              "integrity": "sha256-7capMWOvWyoYbUaHF/b+I2U6XLMaHmky8KugWvfXYuk="
+            }
+          },
+          "rules_fuzzing_oss_fuzz": {
+            "repoRuleId": "@@rules_fuzzing+//fuzzing/private/oss_fuzz:repository.bzl%oss_fuzz_repository",
+            "attributes": {}
+          },
+          "honggfuzz": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "build_file": "@@rules_fuzzing+//:honggfuzz.BUILD",
+              "sha256": "6b18ba13bc1f36b7b950c72d80f19ea67fbadc0ac0bb297ec89ad91f2eaa423e",
+              "url": "https://github.com/google/honggfuzz/archive/2.5.zip",
+              "strip_prefix": "honggfuzz-2.5"
+            }
+          },
+          "rules_fuzzing_jazzer": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_jar",
+            "attributes": {
+              "sha256": "ee6feb569d88962d59cb59e8a31eb9d007c82683f3ebc64955fd5b96f277eec2",
+              "url": "https://repo1.maven.org/maven2/com/code-intelligence/jazzer/0.20.1/jazzer-0.20.1.jar"
+            }
+          },
+          "rules_fuzzing_jazzer_api": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_jar",
+            "attributes": {
+              "sha256": "f5a60242bc408f7fa20fccf10d6c5c5ea1fcb3c6f44642fec5af88373ae7aa1b",
+              "url": "https://repo1.maven.org/maven2/com/code-intelligence/jazzer-api/0.20.1/jazzer-api-0.20.1.jar"
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "rules_fuzzing+",
+            "bazel_tools",
+            "bazel_tools"
+          ]
+        ]
       }
     },
     "@@rules_kotlin+//src/main/starlark/core/repositories:bzlmod_setup.bzl%rules_kotlin_extensions": {

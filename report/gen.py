@@ -12,6 +12,7 @@ regenerates and diffs, so a stale report fails its own gate.
     python3 report/gen.py --check    # exit 1 if any committed asset is stale
 """
 import json
+import os
 import re
 import subprocess
 import sys
@@ -29,6 +30,43 @@ _DELTA, _GATE = {}, {}
 
 class CannotGrade(RuntimeError):
     """Γ·delta·tristate — the grader could not RUN.  Distinct from "it graded nothing"."""
+
+
+def _repo(project: str) -> str:
+    """The generated repo's apparent name — MODULE.bazel names it the path's LAST segment
+    (`bib.project(name = "paperkit_library", project = "paperkit/library")`), `paperkit_root` for `.`."""
+    return "paperkit_" + ("root" if project == "." else project.split("/")[-1])
+
+
+def _record(name: str, project: str) -> str:
+    """Ζ·report·records — the TEXT of one of a project's records, staged by Bazel via `consumes` and
+    named in PAPERKIT_CONSUMED_RECORDS as `<repo>/<name>` (tools/verb.bzl _consume_key) — in a check,
+    and in the refresh (tools/report_refresh.py builds the same records and hands them here).
+    `name` ∈ gate_rec (the //:hook verdict), rec_struct.json (the structure-only gate run),
+    rec_grades.json (the per-claim Δ table).
+
+    ⚑ WHY THE REPORT NO LONGER SPAWNS THE GATE INSIDE ITS CHECKS.  Every rpt-* witness used to run
+    gate.py / discriminate.py over sibling projects in-process, so its footprint was the whole
+    working tree — 80-620 files per claim, caches and agent state included, measured 2026-09-25
+    once strace reached luthen — and no declaration could cover it.  Bazel's per-claim graph
+    already computes each verdict and grade; this reads them (tools/bibtex.bzl, pk_json/pk_grades).
+
+    ⚑⚑ AND THERE IS NO SILENT FALLBACK TO THE LIVE RUN.  A check that finds no record (the footprint
+    audit traces checks on the host, where nothing is staged) raises CannotGrade → exit 3, never a
+    verdict.  A fallback would re-create exactly the undeclared read this exists to remove, and it
+    would do it only in the one environment the audit measures.
+    """
+    env = os.environ.get("PAPERKIT_CONSUMED_RECORDS")
+    if env is None:
+        raise CannotGrade(f"no consumed {name} record for {project} — these tables read "
+                          "Bazel-built records only; refresh with `python3 tools/report_refresh.py`")
+    recs = dict(p.partition("=")[::2] for p in env.split())
+    key = f"{_repo(project)}/{name}"
+    if key not in recs:
+        kind = name.split(".")[0]
+        raise CannotGrade(f"no consumed record {key} — the warrant must declare "
+                          f"`consumes = {{*#{kind}}}`")
+    return Path(recs[key]).read_text()
 
 
 def _delta(project):
@@ -52,12 +90,8 @@ def _delta(project):
     (resolver._CANNOT_RUN), never a refutation.
     """
     if project not in _DELTA:
-        r = subprocess.run([sys.executable, "paperkit/discriminate.py", "--json", project],
-                           cwd=ROOT, capture_output=True, text=True)
-        if r.returncode != 0:
-            why = (r.stderr.strip() or "no output").splitlines()[-1][:300]
-            raise CannotGrade(f"discriminate --json {project} exited {r.returncode}: {why}")
-        _DELTA[project] = json.loads(r.stdout or "[]")
+        # Ζ·report·records — the project's Δ table over its per-claim grade records (pk_grades).
+        _DELTA[project] = json.loads(_record("rec_grades.json", project) or "[]")
     return _DELTA[project]
 
 
@@ -66,14 +100,22 @@ def _gate_once(project, *flags):
     (podman/pandoc/systemd) or a runaway check is caught and reported as an ERROR, distinct from a
     verification FAIL — so an on-demand document is never falsely accused of failing verification
     when the real cause is the environment."""
+    # ⚑ Ζ·report·records — STRUCTURE from the structure-only run, VERDICT from gate_rec.  The first
+    # construction ran the whole gate in one cell, where cross-project checks cannot resolve: six
+    # projects read FAIL while //:hook was green.  The table's PASS/FAIL is now exactly //:hook's.
+    if flags not in ((), ("--safe",)):
+        raise ValueError(f"no record exists for gate flags {flags}")
+    out = _record("rec_struct.json", project)
     try:
-        r = subprocess.run([sys.executable, "paperkit/gate.py", "--json", *flags, project],
-                           cwd=ROOT, capture_output=True, text=True, timeout=300)
-        return json.loads(r.stdout) if r.stdout.strip() else {"error": (r.stderr.strip() or "no output").splitlines()[-1][:60]}
-    except subprocess.TimeoutExpired:
-        return {"error": "timed out (>300s)"}
+        struct = json.loads(out) if out.strip() else {"error": "no structure record output"}
     except json.JSONDecodeError:
         return {"error": "no verdict"}
+    if not flags or "error" in struct:
+        return struct                        # --without-K collapses: structure only
+    verdict = json.loads(_record("gate_rec", project) or "{}").get("verdict")
+    if verdict == "cannot-run":
+        return {**struct, "error": "cannot run here"}
+    return {**struct, "pass": verdict == "pass"}
 
 
 def _gate(project, *flags):
@@ -107,12 +149,22 @@ def _all_docs():
     report itself.  The gate-status table covers all of them with their REAL status on THIS machine —
     so the report is environment-dependent for the on-demand documents (render/image/setup need
     pandoc/podman/systemd), BY DESIGN: it reports what this run could actually verify, honestly, and
-    the CI-tier column says which documents the reproducible local CI gates vs which gate on-demand."""
-    tomls = sorted(p.parent for p in ROOT.rglob("paper.toml")
-                   if ".git" not in p.parts and not _ignored(p.parent))
+    the CI-tier column says which documents the reproducible local CI gates vs which gate on-demand.
+
+    ⚑ Ζ·census·roster — READ FROM THE ROSTER, NOT DISCOVERED BY WALKING.  This used to be
+    `ROOT.rglob("paper.toml")` filtered by `git check-ignore`, and once strace reached luthen
+    (2026-09-25) the footprint audit showed what that costs: the walk descends EVERYTHING before
+    filtering (.mypy_cache, .claude/, agent worktrees, .githooks/local.env), and the git call reads
+    the live repository (.git/HEAD) rather than anything staged — so the census depended on the
+    disk, not on declared inputs, and no `builds` list could declare it.  The document set already
+    has an owner: MODULE.bazel's `bib.project` roster, which bnd-roster-wired gates in BOTH
+    directions against the tracked paper.toml files.  A new document that is not wired therefore
+    reds that gate instead of silently entering or leaving this census.
+    """
     out = []
-    for d in tomls:
-        if d == HERE or any(o not in (d, ROOT) and o in d.parents for o in tomls):
+    for rel in sorted(_project_paths()):
+        d = ROOT if rel == "." else ROOT / rel
+        if d == HERE or not (d / "paper.toml").is_file():
             continue
         # ⚑ THE NAME IS THE REPO-RELATIVE PATH, NOT `d.name` (Β / A2-F2).  `d.name` is the LAST
         # SEGMENT, which is not an identity: `paperkit/library` and a stale wheel copy at
@@ -126,31 +178,17 @@ def _all_docs():
     return out
 
 
-def _ignored(d: Path) -> bool:
-    """Is this directory inside a gitignored tree?
+def _project_paths() -> set:
+    """The repo-relative project paths MODULE.bazel wires (`bib.project(project = ...)`), `.` for
+    the root — the census's input.
 
-    ⚑ Β / A2-F2 — `rglob` WALKS THE FILESYSTEM, NOT THE REPOSITORY.  `build/` is gitignored and a
-    wheel build leaves a full stale copy of the concept library there, `paper.toml` included.  The
-    report's document set therefore DEPENDED ON WHETHER A WHEEL BUILD HAD BEEN RUN LOCALLY — clean
-    CI and a developer's checkout produced different REPORT.md.  The prose says "every document in
-    the repository"; what it enumerated was every paper.toml on this disk right now.
-
-    `git check-ignore` is the authority (it reads every .gitignore, global excludes and negations);
-    a hand-rolled matcher would be a second, drifting reading of the same rules.  If git is not
-    available the census FALLS BACK to walking everything and says so — an unverifiable exclusion
-    is not silently applied.
+    ⚑ Β / A2-F2, kept for the record: the census once walked the filesystem, so a gitignored
+    `build/` copy of the concept library (a wheel build's leftover) entered REPORT.md, and clean CI
+    and a developer checkout disagreed.  `git check-ignore` was added to exclude it.  Reading the
+    roster removes the walk that needed the exclusion: a stale copy is not in MODULE.bazel.
     """
-    import subprocess
-    try:
-        r = subprocess.run(["git", "-C", str(ROOT), "check-ignore", "-q", str(d)],
-                           capture_output=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        if not getattr(_ignored, "_warned", False):
-            _ignored._warned = True
-            print("report/gen.py: `git check-ignore` unavailable — the document census includes "
-                  "gitignored trees (a stale build/ copy will appear)", file=sys.stderr)
-        return False
-    return r.returncode == 0
+    return set(re.findall(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"',
+                          (ROOT / "MODULE.bazel").read_text()))
 
 
 def _hook_names():
@@ -175,15 +213,22 @@ def _hook_names():
 
 
 def _wired_names():
-    return {"README" if p == "." else p
-            for p in re.findall(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"', (ROOT / "MODULE.bazel").read_text())}
+    return {"README" if p == "." else p for p in _project_paths()}
 
 
 def _local_names():
+    """The host-coupled projects: `bib.project(..., tier = "local")`.
+
+    ⚑ Ζ·report·records — this matched `local = True`, an attribute bib.project does not have (the
+    declaration is `tier = "local"`), so it ALWAYS returned the empty set: nothing was on-demand,
+    and the gate table ran image's podman and setup's systemd-run gates on the host — the exact
+    non-reproducible runs rpt-reproducible says the report lists but does not run.  Found while
+    moving the table onto run-once records, which exclude `local` projects by the same rule.
+    """
     out = set()
-    for line in (ROOT / "MODULE.bazel").read_text().splitlines():
-        m = re.search(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"', line)
-        if m and "local = True" in line:
+    for call in re.findall(r"bib\.project\([^)]*\)", (ROOT / "MODULE.bazel").read_text(), re.S):
+        m = re.search(r'project\s*=\s*"([^"]+)"', call)
+        if m and re.search(r'tier\s*=\s*"local"', call):
             out.add("README" if m.group(1) == "." else m.group(1))
     return out
 
@@ -276,7 +321,10 @@ def without_k_md():
 def dag_svg():
     # The figure is the PAPER's grounding DAG — it is the only project with rests-on
     # (grounding) edges; the others have flat claim sets, nothing to plot.
-    return figure.svg(_delta("paper"))
+    # Ζ·report·records — the figure plots a claim at its GRADE; a claim with no grade record (gated,
+    # never Δ-swept — rec_grades lists it as "not graded") has no position on that axis, so it is
+    # left off the plot rather than invented a band.  delta.md still lists it.
+    return figure.svg([r for r in _delta("paper") if r["grade"] in grade.rungs()])
 
 
 GENERATORS = {"gate.md": gate_md, "delta.md": delta_md, "without-k.md": without_k_md,
@@ -323,6 +371,12 @@ def main(argv):
             return 1
         print(f"report fresh ({', '.join(names)})")
         return 0
+    # ⚑ Ζ·report·records — THE REFRESH READS THE SAME RECORDS THE CHECKS DO.  It used to run
+    # gate.py/discriminate.py live on the host, and the first refresh after the records existed
+    # showed why that is wrong: boundaries, render and talk read FAIL from the host run while
+    # //:hook was green in the executors — a different environment answering a different question,
+    # and assets the in-cell `fresh:` checks would then call stale.  Run tools/report_refresh.py,
+    # which builds the records through Bazel and hands them here.
     # ⚑ Γ·delta·tristate — GENERATE ALL, THEN WRITE.  This wrote each asset as it was produced,
     # so an unrunnable grader (discriminate refusing for want of a declared Δ root) silently
     # OVERWROTE the committed assets with the degenerate rendering of an empty record list — the

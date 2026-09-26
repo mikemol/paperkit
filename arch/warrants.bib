@@ -39,18 +39,19 @@
   section = {tensions}, from = {arch-two-pk-grade},
   claim   = {the report's document census now covers every wired project rather than three --- this entry RETIRES a tension that read that the committed report covered only paper, README and boundaries while render, image, config and setup were unrepresented, and it is gated so the retirement goes red if the scope narrows again},
   check   = {claim:arch-report-scope},
-  % ⚑ Ζ·reads·file — THE DISCOVERED SET.  This witness imports report/gen.py, whose _all_docs()
-  % does ROOT.rglob("paper.toml") — the projects are DISCOVERED by walking the tree, not declared.
-  % Enumerated as labels anyway (every one is an exported file) and gated by bnd-roster-wired, so
-  % a project appearing on disk without reaching this list reds rather than silently narrowing the
-  % census this claim asserts.  guide/assets/starter is EXCLUDED and that is deliberate: it has no
-  % BUILD.bazel because it is a starter FIXTURE, not a project — gen.py's own filter drops it.
-  builds   = {@@//report:gen.py, @@//report:figure.py, @@//:paper.toml, @@//arch:paper.toml, @@//boundaries:paper.toml, @@//config:paper.toml, @@//demo:paper.toml, @@//guide:paper.toml, @@//image:paper.toml, @@//paper:paper.toml, @@//paperkit/library:paper.toml, @@//render:paper.toml, @@//report:paper.toml, @@//setup:paper.toml, @@//talk:paper.toml}
+  % ⚑ Ζ·reads·file — THE ROSTERED SET.  This witness imports report/gen.py, whose _all_docs()
+  % now READS MODULE.bazel's bib.project roster (Ζ·census·roster) instead of rglob-walking the tree
+  % and asking `git check-ignore` — the walk read caches, agent state and .git/HEAD, which no
+  % declaration could cover.  So MODULE.bazel is an input, and each wired project's paper.toml is
+  % stat'ed.  Gated by bnd-roster-wired, so a project on disk that is not wired reds there rather
+  % than silently narrowing the census this claim asserts.  guide/assets/starter is not wired and
+  % not a project (a starter FIXTURE with no BUILD.bazel), so it is outside the roster by owner.
+  builds   = {@@//:MODULE.bazel, @@//report:gen.py, @@//report:figure.py, @@//:paper.toml, @@//arch:paper.toml, @@//boundaries:paper.toml, @@//config:paper.toml, @@//demo:paper.toml, @@//guide:paper.toml, @@//image:paper.toml, @@//paper:paper.toml, @@//paperkit/library:paper.toml, @@//render:paper.toml, @@//report:paper.toml, @@//setup:paper.toml, @@//talk:paper.toml}
 }
 
 @misc{arch-two-tiers,
   section = {tensions}, from = {arch-report-scope}, rests-on = {arch-report-scope},
-  claim   = {no document is on-demand any more --- this entry RETIRES a tension that read that render, image and report gated on-demand so the hook did not exercise their presentation and reproducibility claims; the retirement is a witness rather than a deletion, because a tensions ledger whose entries go stale SILENTLY is the defect claims exist to prevent},
+  claim   = {only the HOST-COUPLED documents are on-demand --- every document not declared tier = local is exercised by the hook, render included --- which retires the part of a tension that read that render, image and report gated on-demand; image and setup remain on-demand BY DECLARATION, because their gates shell podman and systemd and cannot run reproducibly, and an earlier form of this claim asserting that NOTHING was on-demand was green only through a census bug that never saw the tier declaration; the retirement is a witness rather than a deletion, because a tensions ledger whose entries go stale SILENTLY is the defect claims exist to prevent},
   check   = {claim:arch-two-tiers},
   reads    = {., report}
 }

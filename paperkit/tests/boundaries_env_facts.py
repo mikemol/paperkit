@@ -39,16 +39,23 @@ def wired_projects() -> int:
 
 
 def rooted_projects() -> list:
+    """The wired projects whose paper.toml declares a `root`.
+
+    ⚑ Ζ·census·roster — iterates MODULE.bazel's roster, NOT `ROOT.rglob("paper.toml")`.  The walk
+    descended every directory before filtering (caches, agent worktrees, the starter fixture), which
+    the footprint audit showed once strace reached luthen (2026-09-25), and which no declared input
+    could cover.  Measured before switching: both give the same ten projects.
+    """
     out = []
-    for toml in sorted(ROOT.rglob("paper.toml")):
-        if ".git" in toml.parts or "build" in toml.parts:
-            continue
+    for rel in sorted(re.findall(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"',
+                                 (ROOT / "MODULE.bazel").read_text())):
+        toml = (ROOT if rel == "." else ROOT / rel) / "paper.toml"
         try:
             p = tomllib.loads(toml.read_text()).get("paper", {})
-        except Exception:                                    # noqa: BLE001
+        except (OSError, tomllib.TOMLDecodeError):
             continue
         if "root" in p:
-            out.append(str(toml.parent.relative_to(ROOT)))
+            out.append(rel)
     return out
 
 

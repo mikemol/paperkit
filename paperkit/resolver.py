@@ -558,6 +558,8 @@ def _cpu_rlimit(seconds: int):
     def _set():
         import resource
         resource.setrlimit(resource.RLIMIT_CPU, (seconds, seconds + 3))
+        # Ζ·core·off — SIGXCPU's default action dumps core; the verdict reads the exit, never a core.
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     return _set
 
 

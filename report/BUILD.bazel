@@ -23,6 +23,7 @@ filegroup(name = "files", srcs = [
         "mitigation.py",    # rpt-mitigation
         "paper.toml",
         "rubric.tsv",
+        "status.py",        # rpt-status     — Ζ·report·records: reads gate records, runs no gate
         "warrants.bib",
     ], visibility = ["//visibility:public"])
 

@@ -388,13 +388,19 @@
   % guards.  So paper/ is declared as the project whose manifest owns that list, and cotype's single
   % file is declared as a file.
   reads    = {paper},
-  % ⚑⚑ cotype/leverage-ledger.md IS NOT DECLARED, and that is a FINDING rather than an omission:
-  % the file is UNTRACKED (git ls-files cotype/ lists README.md, check.py, ledger.md only) and
-  % cotype/ has no BUILD.bazel, so no label can name it and no sandbox can stage it.  A witness
-  % reading an untracked file is reading something no other party can see — the read must move to a
-  % tracked artifact, or the witness must declare the read UNAVAILABLE.  Left undeclared so the cell
-  % reds on it rather than a label failing analysis.
-  builds   = {@@//:MODULE.bazel}
+  % ⚑⚑ Ζ·foot·builds (2026-09-25) — cotype/leverage-ledger.md IS NOW DECLARED.  The note that stood
+  % here said the file was untracked and predicted the cell would RED on the missing read.  Both
+  % were wrong by the time strace reached luthen: the ledger is tracked (it landed in 88e535d), and
+  % the witness does not red on absence — it takes its "ledger is absent — nothing quotes these
+  % figures here" branch and PASSES, so every sandboxed run of this claim checked nothing.  The
+  % root package now exports the file, so the sandbox holds it and the figures are really gated.
+  % The paper.toml labels are the wired roster rooted_projects() now reads (Ζ·census·roster)
+  % instead of rglob-walking the tree; bnd-roster-wired keeps this list in sync with MODULE.bazel.
+  builds   = {@@//:MODULE.bazel, @@//:cotype/leverage-ledger.md, @@//:paper.toml,
+              @@//arch:paper.toml, @@//boundaries:paper.toml, @@//config:paper.toml,
+              @@//demo:paper.toml, @@//guide:paper.toml, @@//image:paper.toml,
+              @@//paperkit/library:paper.toml, @@//render:paper.toml, @@//report:paper.toml,
+              @@//setup:paper.toml, @@//talk:paper.toml}
 }
 
 @misc{bnd-roster-sync,

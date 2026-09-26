@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import fnmatch
 import os
+import re
 import shutil
 import tempfile
 import tomllib
@@ -132,11 +133,12 @@ def _nested_roots(base: Path) -> list:
     into the GB cache is never traversed (Ζ·skip).
     """
     out = []
+    scope = _Scope.for_path(base)          # Ζ·sandbox·declared — same pruning as the copy
     for dirpath, dirnames, filenames in os.walk(base):
-        dirnames[:] = [d for d in dirnames
-                       if not any(fnmatch.fnmatch(d, s) for s in SKIP_DIRS)]
-        if "paper.toml" in filenames and Path(dirpath) != base:
-            out.append(Path(dirpath))
+        d = Path(dirpath)
+        dirnames[:] = [n for n in dirnames if not scope.excluded(d.resolve(), n)]
+        if "paper.toml" in filenames and d != base:
+            out.append(d)
     return out
 
 
@@ -176,13 +178,169 @@ def _mutable(f: Path) -> bool:
             and (f.suffix in MUTABLE_SUFFIXES or _suffixless_text(f)))
 
 
+def _gi_regex(pat: str) -> re.Pattern:
+    """One gitignore glob → a regex over a '/'-separated relative path.  `*` and `?` do not cross
+    '/', `**` does; bracket classes pass through."""
+    out, i = [], 0
+    while i < len(pat):
+        c = pat[i]
+        if pat.startswith("**/", i):
+            out.append(r"(?:.*/)?")
+            i += 3
+        elif pat.startswith("/**", i) and i + 3 == len(pat):
+            out.append(r"/.*")
+            i += 3
+        elif pat.startswith("**", i):
+            out.append(r".*")
+            i += 2
+        elif c == "*":
+            out.append(r"[^/]*")
+            i += 1
+        elif c == "?":
+            out.append(r"[^/]")
+            i += 1
+        elif c == "[":
+            j = pat.find("]", i + 1)
+            if j == -1:
+                out.append(re.escape(c))
+                i += 1
+            else:
+                cls = pat[i + 1:j]
+                out.append("[" + ("^" + cls[1:] if cls.startswith("!") else cls) + "]")
+                i = j + 1
+        else:
+            out.append(re.escape(c))
+            i += 1
+    return re.compile("".join(out) + r"\Z")
+
+
+def _gi_rules(gitignore: Path) -> list:
+    """Parse one .gitignore into (negate, dir_only, anchored, regex) rules, in file order."""
+    rules = []
+    try:
+        lines = gitignore.read_text(errors="replace").splitlines()
+    except OSError:
+        return rules
+    for raw in lines:
+        line = raw.rstrip()
+        if not line or line.startswith("#"):
+            continue
+        neg = line.startswith("!")
+        if neg:
+            line = line[1:]
+        if line.startswith("\\"):
+            line = line[1:]
+        dir_only = line.endswith("/")
+        line = line.rstrip("/")
+        anchored = "/" in line
+        rules.append((neg, dir_only, anchored, _gi_regex(line.lstrip("/"))))
+    return rules
+
+
+class _Scope:
+    """Ζ·sandbox·declared — WHAT BELONGS IN THE Δ SANDBOX: the repository's own tracked-shaped
+    content, and nothing else.  One predicate, shared by every site that enumerates the root
+    (`_copy_sandbox`, `_nested_roots`, and the grader/cache surface walks), so "in the sandbox"
+    has exactly one definition.
+
+    ⚑ WHY (W36, measured 2026-09-25 once strace reached luthen).  The copy used to take the root
+    whole minus a fixed SKIP_DIRS, so it carried everything a working tree accumulates: .ruff_cache
+    (117 files) and .mypy_cache (34), a stale build/ wheel copy (94), inbox/ (54), .tmp/, agent
+    state under .claude/, and in a consumer repo whole agent worktrees (40,044 files for
+    el-openglo) plus a scratch tree another gate was deleting mid-copy (shutil.Error).  Each of
+    those is content the repository itself declares NOT part of it.  A fixed skip list is a guard
+    carrying its own copy of the set it guards; the repository already owns that set.
+
+    Excluded, by OWNERSHIP rather than by listing:
+      · anything the repository's .gitignore files exclude — the root's AND every nested one,
+        each applied relative to its own directory, as git does (.mypy_cache and .ruff_cache
+        ignore THEMSELVES with an inner `*`; a root-only reading would still copy them);
+      · a directory holding its own `.git` (file or dir) below the root — another repository,
+        the mirror of how a paper.toml marks another project;
+      · SKIP_DIRS and *.pyc, as always (bytecode and caches that may not be gitignored).
+
+    PARSED, NOT SHELLED: `git check-ignore` inside a cell reads the live repository's index and
+    .git, not the staged copy ([[gate-that-shells-git]]).  Consequently NOT honoured: the user's
+    global excludes and .git/info/exclude — those are one clone's private settings, not something
+    the repository declares, and a sandbox must not depend on who is running it.
+    """
+
+    def __init__(self, root: Path):
+        self.root = root.resolve()
+        self._rules: dict = {}
+
+    @classmethod
+    def for_path(cls, base: Path) -> "_Scope":
+        """A scope rooted at the REPOSITORY that holds `base` — the nearest ancestor containing a
+        `.git` (existence only; git is never run) — so the root's .gitignore applies to a walk of a
+        subdirectory.  In a Δ sandbox copy there is no .git (it is never copied), so the scope
+        roots at `base` itself, which is correct: the copy was already pruned by the same rules."""
+        base = base.resolve()
+        for d in (base, *base.parents):
+            if (d / ".git").exists():
+                return cls(d)
+        return cls(base)
+
+    def _stack(self, d: Path) -> list:
+        """[(dir, rules)] for every .gitignore from the root down to `d`."""
+        rel = d.relative_to(self.root)
+        chain, cur = [self.root], self.root
+        for part in rel.parts:
+            cur = cur / part
+            chain.append(cur)
+        out = []
+        for c in chain:
+            if c not in self._rules:
+                self._rules[c] = _gi_rules(c / ".gitignore")
+            if self._rules[c]:
+                out.append((c, self._rules[c]))
+        return out
+
+    def excluded(self, parent: Path, name: str) -> bool:
+        path = parent / name
+        is_dir = path.is_dir() and not path.is_symlink()
+        if any(fnmatch.fnmatch(name, s) for s in SKIP_DIRS) or name.endswith(".pyc"):
+            return True
+        if is_dir and path != self.root and (path / ".git").exists():
+            return True                                  # another repository
+        ignored = False
+        for base, rules in self._stack(parent):
+            rel = (path.relative_to(base)).as_posix()
+            for neg, dir_only, anchored, rx in rules:
+                if dir_only and not is_dir:
+                    continue
+                if rx.match(rel if anchored else name):
+                    ignored = not neg
+        return ignored
+
+    def ignore(self, dirpath, names) -> set:
+        """shutil.copytree's `ignore` callback."""
+        d = Path(dirpath).resolve()
+        return {n for n in names if self.excluded(d, n)}
+
+    def files(self, base: Path):
+        """Every file under `base` that belongs in the sandbox, sorted — the ONE walk the grader and
+        cache use instead of `base.rglob("*")` (which enumerated the whole working tree)."""
+        base = base.resolve()
+        if base != self.root and base in self.root.parents:
+            raise ValueError(f"{base} is above the scope root {self.root}")
+        out = []
+        for dirpath, dirnames, filenames in os.walk(base):
+            d = Path(dirpath)
+            dirnames[:] = sorted(n for n in dirnames if not self.excluded(d, n))
+            out.extend(d / f for f in filenames if not self.excluded(d, f))
+        return sorted(out)
+
+
 def _copy_sandbox(root: Path, dest: Path) -> None:
-    """Copy the sandbox `root` whole into `dest` (SKIP_DIRS + *.pyc pruned as always).
+    """Copy the sandbox `root` into `dest`, keeping only what belongs to the repository (_Scope:
+    its .gitignore files, nested repositories and SKIP_DIRS/*.pyc excluded).
 
     The root is GUARANTEED bounded by the time we get here — it is either DECLARED
     (PAPERKIT_ROOT / --root / paper.toml [paper] root) or inferred-and-guarded against being
-    $HOME-or-above (_sandbox_root).  So a whole copy cannot escape into an unbounded home
-    directory (a clone, a package cache): the bound lives on the ROOT, declared once, rather
-    than in a lossy per-dir skip (which once dropped .githooks — a real input the paper reads).
+    $HOME-or-above (_sandbox_root).  So a copy cannot escape into an unbounded home directory:
+    the bound lives on the ROOT, declared once.  (A per-dir skip once dropped .githooks — a real
+    input the paper reads; _Scope drops only what the repository itself declares is not content,
+    and .githooks is tracked.)
     """
-    shutil.copytree(root, dest, ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"), dirs_exist_ok=True)
+    shutil.copytree(root, dest, ignore=_Scope(root).ignore, dirs_exist_ok=True)

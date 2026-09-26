@@ -14,8 +14,14 @@
 #
 # What this asserts, each independently falsifiable:
 #   1. grading REACHED every cited claim (no unmeasured records)
-#   2. the grade is DISCRIMINATING — more than one distinct value over the corpus, so the ladder
-#      is being used rather than a constant stamped
+#   2. every behavioral grade is BACKED BY MEASUREMENT — a non-empty sensitivity set (`tests`: the
+#      inputs whose corruption flips the check), so the rung was reached by flips, not stamped.
+#      ⚑ Ζ·report·records — this was "more than one distinct value over the corpus", and it went
+#      red the moment the report read the build graph's grades: every paper claim is `behavioral`,
+#      because //:hook's adequacy gate REQUIRES every graded claim to reach behavioral and it is
+#      green.  Variety was never evidence of grading — a floor makes uniformity the healthy state,
+#      and the old variety came from discriminate's separate in-process grading disagreeing with
+#      the graph (W49).  A stamping grader would carry grades with NO measured flips behind them.
 #   3. every grade is a rung on the DECLARED ladder, not an ad-hoc string
 #   4. every record carries its justification (why / not_higher / not_lower) — the evidence that
 #      the grade was reasoned per claim rather than defaulted
@@ -48,7 +54,7 @@ def main() -> int:
               "no instances, so the claim is vacuous rather than witnessed", file=sys.stderr)
         return 1
 
-    unmeasured = [r["key"] for r in records if not r.get("grade")]
+    unmeasured = [r["key"] for r in records if not r.get("grade") or r["grade"] == "not graded"]
     if unmeasured:
         print(f"{len(unmeasured)} cited claim(s) carry NO grade "
               f"({', '.join(sorted(unmeasured)[:5])}…) — Δ did not reach them, so rpt-delta's "
@@ -62,12 +68,12 @@ def main() -> int:
               f"known rungs are {', '.join(RANK_C)}", file=sys.stderr)
         return 1
 
-    if len(grades) < 2:
-        only = next(iter(grades))
-        print(f"every one of the {len(records)} cited claims graded `{only}` — a constant is a "
-              "LABEL, not a grade by whether the check can actually fail.  Either the corpus is "
-              "genuinely uniform (then rpt-delta needs a stronger witness) or the grader "
-              "regressed to stamping.", file=sys.stderr)
+    unbacked = [r["key"] for r in records if r["grade"] == "behavioral" and not r.get("tests")]
+    if unbacked:
+        print(f"{len(unbacked)} claim(s) graded behavioral with NO measured sensitivity "
+              f"({', '.join(sorted(unbacked)[:5])}…) — a behavioral grade no corruption was shown "
+              "to flip is a LABEL, not a grade by whether the check can actually fail",
+              file=sys.stderr)
         return 1
 
     unjustified = [r["key"] for r in records

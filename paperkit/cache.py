@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 import durable
-from layout import _ENGINE, SKIP_DIRS, _mutable, _nested_roots
+from layout import _ENGINE, SKIP_DIRS, _mutable, _nested_roots, _Scope
 
 
 def content_key(project_dir: Path) -> str:
@@ -25,7 +25,9 @@ def content_key(project_dir: Path) -> str:
     parts = []
     for tag, base in (("proj", project_dir), ("engine", _ENGINE)):
         nested = _nested_roots(base) if tag == "proj" else []
-        for f in sorted(base.rglob("*")):
+        # Ζ·sandbox·declared — hash the repository's own content (layout._Scope), not every file
+        # on disk: a cache or stale build copy in the tree must not change a soundness key.
+        for f in _Scope.for_path(base).files(base):
             if (_mutable(f) and not any(p in SKIP_DIRS for p in f.parts)
                     and not any(nr in f.parents for nr in nested)):
                 parts.append(f"{tag}/{f.relative_to(base)}:{hashlib.sha256(f.read_bytes()).hexdigest()}")
@@ -40,7 +42,7 @@ def engine_hash() -> str:
     only the checks whose footprint touched it.
     """
     parts = [f"{f.relative_to(_ENGINE)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
-             for f in sorted(_ENGINE.rglob("*"))
+             for f in _Scope.for_path(_ENGINE).files(_ENGINE)      # Ζ·sandbox·declared
              if _mutable(f) and not any(p in SKIP_DIRS for p in f.parts)]
     return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
 

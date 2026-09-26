@@ -87,3 +87,7 @@ paperkit/summit/
 # untracked, they made hook-index refuse a green commit (worktree ≠ index) over bytes no bazel
 # target reads.
 /.claude/paths-forward.*
+# the harness's scheduler lock — agent session state, and until it was declared HERE it was
+# excluded only by this clone's .git/info/exclude, which the Δ sandbox (layout._Scope) does not
+# read, since a sandbox must not depend on whose clone it is.
+/.claude/scheduled_tasks.lock

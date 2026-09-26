@@ -24,4 +24,5 @@ filegroup(name = "files", srcs = [
 # repo can depend on THIS FILE rather than on this package's whole filegroup.  exports_files
 # defaults to PRIVATE; a filegroup here already declares visibility=public, and the export did
 # not, which is why the twelfth gate attempt died in analysis rather than on a claim.
-exports_files(["paper.toml"], visibility = ["//visibility:public"])
+exports_files(["paper.toml", "checks/stable.sh", "warrants.bib"],   # the last two: rpt-mitigation
+              visibility = ["//visibility:public"])

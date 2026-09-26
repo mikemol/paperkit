@@ -102,15 +102,28 @@ def arch_tension_report_scope():
 
 
 def arch_tension_two_tiers():
-    # ⚑ §3.6's FOURTH bullet is now FALSE too: "render/image/report are on-demand ... the hook does
-    # not exercise the render/image/report claims."  Measured: _ondemand_names() is EMPTY.
+    # §3.6's FOURTH bullet read: "render/image/report are on-demand ... the hook does not exercise
+    # the render/image/report claims."  What is RESOLVED is narrower than "nothing is on-demand".
+    #
+    # ⚑ Ζ·report·records — THIS WITNESS WAS A FALSE GREEN.  It asserted `_ondemand_names()` is
+    # EMPTY ("Measured: … EMPTY"), and it was — only because gen._local_names() matched
+    # `local = True`, an attribute bib.project does not have, so the host-coupled set was always
+    # empty.  Fixed (it reads `tier = "local"`), image and setup are on-demand, as they are by
+    # declaration: host-coupled gates the hook cannot run reproducibly.  So the claim now asserts
+    # what is true: on-demand is EXACTLY the declared-local documents — nothing else is left out of
+    # the hook — and render, the one that moved, is in it.  The owner of "which are host-coupled"
+    # is the tier declaration in MODULE.bazel, read through gen, never a list written here.
     sys.path.insert(0, str(ROOT / "report"))
     import gen
-    ondemand = gen._ondemand_names()
-    assert not ondemand, (
-        f"{sorted(ondemand)} are on-demand again — §3.6's two-tier tension has returned and the "
-        f"claim retiring it must be withdrawn")
-    assert "render" in gen._hook_names(), "render left //:hook — the tension has returned"
+    ondemand, local, hook = gen._ondemand_names(), gen._local_names(), gen._hook_names()
+    docs = {n for n, _ in gen._all_docs()}
+    stray = sorted(ondemand - local)
+    assert not stray, (
+        f"{stray} are on-demand without being declared tier = \"local\" — a reproducible document "
+        f"has left //:hook, which is the two-tier tension returning")
+    missed = sorted(d for d in docs - local if d not in hook)
+    assert not missed, f"{missed} are not host-coupled yet //:hook does not exercise them"
+    assert "render" in hook, "render left //:hook — the tension has returned"
 
 
 CHECKS = {

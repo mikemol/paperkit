@@ -32,6 +32,16 @@ def _basekey(f):
     # a consumed record file is "<key>.verdict.json" → recover <key> (the sibling warrant's name)
     return f.basename[:-len(".verdict.json")] if f.basename.endswith(".verdict.json") else f.basename
 
+def _consume_key(ctx, f):
+    """Ζ·report·records — the PAPERKIT_CONSUMED_RECORDS key for a consumed file.  A sibling in THIS
+    package keeps its bare key (every existing consumer).  A record from ANOTHER repo is prefixed
+    with that repo's apparent name (`paperkit_paper/gate_rec`): every project emits a `gate_rec`,
+    so a bare basename would collide the moment a consumer reads more than one project."""
+    repo = f.owner.workspace_name if f.owner else ""
+    if not repo or repo == ctx.label.workspace_name:
+        return _basekey(f)
+    return repo.split("+")[-1] + "/" + _basekey(f)
+
 
 def _engine_importable():
     """Ζ·env·bootstrap — make the staged engine importable AS A PACKAGE, from any cwd.
@@ -100,7 +110,7 @@ def _cmd_impl(ctx):
     # PAPERKIT_CONSUMED_RECORDS as `key=abspath` pairs, so the check finds each record regardless of cwd.
     consume_prefix = ""
     if ctx.files.consumes:
-        pairs = " ".join([_basekey(f) + "=$PWD/" + f.path for f in ctx.files.consumes])
+        pairs = " ".join([_consume_key(ctx, f) + "=$PWD/" + f.path for f in ctx.files.consumes])
         consume_prefix = 'export PAPERKIT_CONSUMED_RECORDS="' + pairs + '"; '
     # Ζ·builds·path — the same $PWD-before-the-cd idiom, for BUILT ARTIFACTS.  A declared artifact is
     # staged at its execroot-relative path (bazel-out/<cfg>/bin/...), and the check runs with
@@ -234,6 +244,73 @@ pk_file = rule(
         "path": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),
+    },
+)
+
+def _json_impl(ctx):
+    """Ζ·report·records — run a command ONCE, as a cached cell with declared inputs, and keep its
+    STDOUT as a record another project consumes (records-as-deps), instead of that consumer
+    re-running the command inside its own check.  The report's gate/Δ tables were built that way —
+    each rpt-* check spawned gate.py/discriminate.py over sibling projects, so its footprint was
+    the whole working tree and no declaration could cover it (measured 2026-09-25 once strace
+    reached luthen: 620 files per claim, caches and agent state included).
+
+    The exit code is NOT the action's: gate.py exits 1 on a failing project and 3 when it cannot
+    run, and still prints its JSON, which the consumer needs either way.  So the rc goes to a
+    sidecar (`<name>.rc`) and the action always succeeds; the consumer tells "ran and reported"
+    from "could not run" by the pair, exactly as it did from the subprocess before."""
+    py = ctx.toolchains[_PY].py3_runtime
+    out = ctx.actions.declare_file(ctx.label.name + ".json")
+    rc = ctx.actions.declare_file(ctx.label.name + ".rc")
+    er, host_env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
+    ctx.actions.run_shell(
+        outputs = [out, rc],
+        inputs = depset(ctx.files.data + stamp_inputs, transitive = [py.files]),
+        use_default_shell_env = host_env,
+        command = pyprefix + _engine_importable() + 'O="$PWD/' + out.path + '"; R="$PWD/' + rc.path +
+                  '"; ( sh -c ' + _sq(ctx.attr.cmd) + ' ) > "$O" 2>/dev/null; echo "$?" > "$R"',
+        mnemonic = "PkJson",
+        execution_requirements = er,
+    )
+    return [DefaultInfo(files = depset([out, rc]))]
+
+pk_json = rule(
+    implementation = _json_impl,
+    doc = "RECORDS — run `cmd` once (cwd = execroot) and keep its stdout as <name>.json plus its " +
+          "exit code as <name>.rc; always succeeds, so a consumer reads the pair (Ζ·report·records).",
+    toolchains = [_PY],
+    attrs = {
+        "cmd": attr.string(mandatory = True),
+        "data": attr.label_list(allow_files = True),
+        "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
+    },
+)
+
+def _grades_impl(ctx):
+    """Ζ·report·records — a project's Δ table assembled from its per-claim `__grade` records
+    (tools/grades_rec.py; see its docstring for why not one whole-project discriminate cell)."""
+    py = ctx.toolchains[_PY].py3_runtime
+    out = ctx.actions.declare_file(ctx.label.name + ".json")
+    meta = ctx.actions.declare_file(ctx.label.name + ".meta.json")
+    ctx.actions.write(meta, ctx.attr.meta)
+    ctx.actions.run_shell(
+        outputs = [out],
+        inputs = depset([ctx.file._tool, meta] + ctx.files.grades + ctx.files._engine, transitive = [py.files]),
+        command = cell_pypath(py) + _engine_importable() + '"$(command -v python3)" ' + ctx.file._tool.path +
+                  " " + meta.path + " " + " ".join([g.path for g in ctx.files.grades]) + ' > "' + out.path + '"',
+        mnemonic = "PkGrades",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+pk_grades = rule(
+    implementation = _grades_impl,
+    doc = "GRADES — a project's Δ table from its per-claim grade records + the engine's clamp.",
+    toolchains = [_PY],
+    attrs = {
+        "grades": attr.label_list(allow_files = True),
+        "meta": attr.string(mandatory = True),     # JSON list, bib order: {key, check, section, rests-on, tier}
+        "_tool": attr.label(default = "//tools:grades_rec.py", allow_single_file = True),
+        "_engine": attr.label(default = "//paperkit:engine"),
     },
 )
 

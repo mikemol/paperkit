@@ -20,7 +20,15 @@
 # ANALYSIS with "target '//:paper.toml' is not visible from @@+bib+paperkit_arch//:...", 0
 # of 2 tests run.  Every filegroup here already says visibility=public; the exports_files
 # calls never did, and nothing cross-repo depended on them until per-file `builds` labels.
-exports_files(["pyproject.toml", "MODULE.bazel", "paper.toml"], visibility = ["//visibility:public"])
+# Ζ·foot·builds (2026-09-25) — Containerfile.base (img-pinned greps it) and the cotype ledger
+# (bnd-env-facts gates the figures it quotes).  The ledger is NOT a :files member and cotype/ has no
+# BUILD by design (index-gated by the hook's own cotype check), so without this export no label
+# could stage it — and bnd-env-facts took its "ledger is absent" branch in EVERY sandboxed run,
+# passing without checking the prose it exists to check.
+# BUILD.bazel itself: report/gen.py derives the //:hook set (the CI-gated documents) from it, so
+# the report's record-reading claims declare it rather than staging the whole root filegroup.
+exports_files(["pyproject.toml", "MODULE.bazel", "paper.toml", "Containerfile.base",
+               "cotype/leverage-ledger.md", "BUILD.bazel"], visibility = ["//visibility:public"])
 
 filegroup(name = "files", srcs = [
         ".containerignore",

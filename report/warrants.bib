@@ -28,55 +28,85 @@
 @misc{rpt-status,
   section = {status},
   claim   = {every document the local CI gates passes the gate with zero postulates},
-  check   = {cmd:for d in ../paper .. ../boundaries; do python3 ../paperkit/gate.py --safe "$d" >/dev/null 2>&1 || exit 1; done}
+  % ⚑ Ζ·report·records — reads each CI-gated project's gate VERDICT (its gate_rec, what //:hook
+  % asserts) and its structure record (status.py) instead of a shell loop that RE-RAN three
+  % hand-listed sibling gates inside this check; the set is the //:hook documents, derived from
+  % BUILD.bazel, not listed here.
+  check    = {cmd:python3 status.py},
+  consumes = {*#gate_rec, *#rec_struct},
+  builds   = {@@//:MODULE.bazel, @@//:BUILD.bazel}
 }
 @misc{rpt-status-out,
   section = {status}, from = {rpt-status}, join = { — },
   claim   = {the verdict per document, each project discovered, not hand-listed},
   emit    = {assets/gate.md},
-  check   = {fresh:gate.md}
+  check    = {fresh:gate.md},
+  consumes = {*#gate_rec, *#rec_struct},
+  builds   = {@@//:MODULE.bazel, @@//:BUILD.bazel}
 }
 
 @misc{rpt-reproducible,
   section = {status}, from = {rpt-status-out}, join = {. },
   claim   = {gate reproducibility splits the documents, and the report CHARACTERIZES the split rather than merely scoping around it --- the sandbox-clean set gates deterministically and is run above, while render, image, and setup gate non-reproducibly because named checks shell named external toolchains: render's shell pandoc and libreoffice, image's shell podman whose build fetches over the network, and setup's shell systemd-run, so each on-demand verdict varies with build-cache and network state --- determinism.py names the exact command behind each, so the non-reproducibility is itself reproducible on demand},
-  check   = {cmd:python3 determinism.py}
+  check   = {cmd:python3 determinism.py},
+  % ⚑ Ζ·foot·builds — DIRECTORY reads, deliberately, against the file-labels default.  determinism.py
+  % scans EVERY *.sh/*.py in these six projects (its claim is about each project's whole check set),
+  % so the project's own file manifest IS the input.  Enumerating the ~60 files as labels would copy
+  % each project's roster into this claim (a guard carrying the set it guards); `reads` stages each
+  % project's :files filegroup, so the scan inside the sandbox measures exactly the declaration.
+  reads   = {config, image, paper, render, setup, boundaries}
 }
 
 @misc{rpt-mitigation,
   section = {status}, from = {rpt-reproducible}, join = {. },
   claim   = {and the variance is bounded and disclosed, three mitigations proven in place --- image's img-stable gates that two independent --no-cache builds yield the SAME content digest, so the artifact is reproducible even when building it is not, confining the non-determinism to build cost rather than to what is verified; the report's gate runner labels a document it cannot verify here as on-demand or n/a, never a false verification FAIL; and the cache-warmth variance is itself stabilized by retrying to a warm-cache fixpoint --- rerun while the verdict changes, return the converged warm result --- while a verdict that never converges is flagged as a non-cache clock or threshold cause for separate characterization, not laundered as reproducible},
-  check   = {cmd:python3 mitigation.py}
+  check   = {cmd:python3 mitigation.py},
+  % Ζ·foot·builds — mitigation.py reads image's stability check and its bib (named by the
+  % footprint audit once strace reached luthen, 2026-09-25).
+  builds  = {@@//image:checks/stable.sh, @@//image:warrants.bib}
 }
 
 @misc{rpt-delta,
   section = {adequacy},
   claim   = {Δ grades each cited claim's check by whether it can actually fail},
-  check   = {cmd:python3 grades.py}
+  % Ζ·report·records — the graded projects' per-claim grade records (rec_grades), the ones the
+  % adequacy gate aggregates.
+  check    = {cmd:python3 grades.py},
+  consumes = {*#rec_grades},
+  builds   = {@@//:MODULE.bazel, @@//:BUILD.bazel}
 }
 @misc{rpt-delta-out,
   section = {adequacy}, from = {rpt-delta}, join = { — },
   claim   = {the grade of every cited claim in every document, with why this grade and why not a higher or lower one},
   emit    = {assets/delta.md},
-  check   = {fresh:delta.md}
+  check    = {fresh:delta.md},
+  consumes = {*#rec_grades},
+  builds   = {@@//:MODULE.bazel, @@//:BUILD.bazel}
 }
 
 @misc{rpt-proof,
   section = {proof},
   claim   = {in every document, every cited claim carries a distinct witness, so --without-K passes (no claim is grounded only by a check it shares with another)},
-  check   = {cmd:python3 distinct.py}
+  % Ζ·report·records — the graded projects' structure records (their --without-K collapses).
+  check    = {cmd:python3 distinct.py},
+  consumes = {*#rec_struct},
+  builds   = {@@//:MODULE.bazel, @@//:BUILD.bazel}
 }
 @misc{rpt-proof-out,
   section = {proof}, from = {rpt-proof}, join = { — },
   claim   = {as the proof-relevance check reports},
   emit    = {assets/without-k.md},
-  check   = {fresh:without-k.md}
+  check    = {fresh:without-k.md},
+  consumes = {*#rec_struct},
+  builds   = {@@//:MODULE.bazel, @@//:BUILD.bazel}
 }
 
 @misc{rpt-dag,
   section = {dag},
   claim   = {walking the paper's GROUNDING DAG (rests-on, distinct from prose order; the paper is the one document with grounding edges) from foundational atoms to the theses they support, each claim's adequacy grade plots against its grounding depth},
-  check   = {cmd:python3 grounding.py}
+  check    = {cmd:python3 grounding.py},
+  consumes = {*#rec_grades},
+  builds   = {@@//:MODULE.bazel, @@//:BUILD.bazel}
 }
 @misc{rpt-dag-fig,
   section = {dag}, from = {rpt-dag}, join = { — },
@@ -100,7 +130,9 @@
 @misc{rpt-fig-data,
   section = {dag}, from = {rpt-dag-fig}, join = {. },
   claim   = {the figure is rendered from the pipeline data and gated fresh, never placed by hand},
-  check   = {fresh:dag.svg}
+  check    = {fresh:dag.svg},
+  consumes = {*#rec_grades},
+  builds   = {@@//:MODULE.bazel, @@//:BUILD.bazel}
 }
 @misc{rpt-fig-palette,
   section = {dag}, from = {rpt-fig-data}, join = {, and is mechanically accessible: },

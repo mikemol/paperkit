@@ -93,6 +93,7 @@ run "hook-grid (//:hook ≡ MODULE)"    "$PY" tools/hook_grid.py
 # (Ξ·dag·eval) run as counterfactuals in the HERMETIC linux-sandbox (else a check's resolve()
 # escapes to the source tree → the mutation is invisible → empty sens).  The gate/adequacy checks
 # pass identically under it, so the whole hook stays ONE Bazel target under one config.
+# (SUPERSEDED by Ζ·execlog·drop below — the execution log is no longer written; kept for the record.)
 # Ρ·telemetry — capture bazel's OWN per-spawn timing (--execution_log_json_file) so the
 # best-effort push below can turn cycle time into a series.  The flag is a LOG sink, NOT an
 # --action_env, so it changes no action key (cache-safe).  The push is OBSERVATION, never a
@@ -146,7 +147,6 @@ mkdir -p "$PK_TMPDIR"
 TMPDIR="$PK_TMPDIR"
 TMP="$PK_TMPDIR"
 export TMPDIR TMP
-PK_EXECLOG=$(mktemp -p "$PK_TMPDIR" execlog.XXXXXX)
 # The trap owns EVERY temp artifact this script makes, named in one place.  PK_HOOKLOG and
 # PK_COORDLOG are assigned later; the trap reads them at fire time, so an early exit that never
 # reached their assignment simply removes nothing (unset ⇒ empty ⇒ `rm -f ""`, harmless under
@@ -163,7 +163,7 @@ _pk_cleanup() {
     # shellcheck disable=SC2086  # $_pk_extra holds a SPACE-SEPARATED PATH LIST (the cotype pair);
     # word-splitting is the mechanism, and quoting it would pass "a b" as ONE filename that does
     # not exist — the leak this trap exists to prevent, reintroduced by a quote.
-    rm -f "$PK_EXECLOG" "$PK_HOOKLOG" "$PK_HOOKLOG.tailpid" \
+    rm -f "$PK_HOOKLOG" "$PK_HOOKLOG.tailpid" \
           "$PK_COORDLOG" "$PK_COORDLOG.pid" $_pk_extra 2>/dev/null || true
 }
 trap _pk_cleanup EXIT HUP INT TERM
@@ -238,22 +238,26 @@ PK_COORDLOG="$PK_TMPDIR/pk-coord-$$.jsonl"   # Ζ·execlog·leak — was ${TMPDI
   case "$_cpid" in ''|*[!0-9]*) : ;; *)
     "$PY" tools/coord_sample.py "$_cpid" "$PK_COORDLOG" --interval=1 >/dev/null 2>&1 &
     echo $! > "$PK_COORDLOG.pid" ;; esac ) || true
-# ⚑ Ζ·execlog·sort — --noexecution_log_sort.  Bazel SORTS the JSON execution log by default, which
-# buffers every spawn record in the server heap and sorts them at the END of the invocation — its
-# own help: "Set to false to avoid potentially significant CPU and memory usage at the end of the
-# invocation".  MEASURED 2026-09-25 on luthen: the same //:hook at -Xmx16g completed three times
-# WITHOUT this log, and the one run WITH it printed `Build completed successfully, 136576 total
-# actions` and then died `OutOfMemoryError: Java heap space` — the end-of-build signature the rc's
-# Ζ·jvm ladder was climbing after.  The consumers (otlp_push, logs_push) read each record's own
-# absolute startTime, so execution order costs them nothing.
+# ⚑ Ζ·execlog·drop — NO EXECUTION LOG.  This line passed --execution_log_json_file for otlp_push
+# and logs_push, and MEASURED 2026-09-25 on luthen it was the most expensive thing the hook did:
+#   · sorted (the default), it buffered every spawn in the server heap and died
+#     `OutOfMemoryError: Java heap space` right after `Build completed successfully` at -Xmx16g;
+#   · unsorted, bazel wrote it AFTER the build finished: 138,080,381,146 bytes in ~31 min,
+#     ~57 MB/s into md0, ~800 KB per spawn, because each record lists every input digest and
+#     every cell stages the whole engine — and it was still growing, blocking the commit.
+# All of it went to endpoints that did not answer.  What the pushers need (mnemonic, target,
+# runner, cache hit, exit, timings) is already STREAMED LIVE by BES, and CPU and peak memory exist
+# only in BuildBuddy's execution records, never in this log — so the log's unique content was the
+# input manifest, which telemetry never reads.  Operator: "we don't need the log."  Metrics now
+# come from BuildBuddy's records as bounded aggregates (W44); if a full log is ever wanted, it goes
+# to a btrfs-on-zram target with bees on top, retained as that store needs — never md0.
 # shellcheck disable=SC2086  # $PK_BES is EITHER empty OR two flags (--bes_backend=… and
 # --bes_upload_mode=…); word-splitting is how it expands to two arguments.  Quoted, an unset
 # endpoint would pass "" as a bazel argument and a set one would pass both flags as a single
 # malformed token.  The empty-by-default case is the common one, which is why this is unquoted.
 "$PY" tools/cpuweight.py --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
     --exec bazel test //:hook --config=mutant --config=remote \
-    --local_resources=memory="$PK_SWEEP_RAM" --execution_log_json_file="$PK_EXECLOG" \
-    --noexecution_log_sort \
+    --local_resources=memory="$PK_SWEEP_RAM" \
     $PK_BES > "$PK_HOOKLOG" 2>&1
 PK_HOOK_RC=$?
 # Ζ·execlog·leak — the samplers are stopped HERE so their output is complete before the pushers
@@ -264,10 +268,8 @@ kill "$(cat "$PK_HOOKLOG.tailpid" 2>/dev/null)" 2>/dev/null || true
 kill "$(cat "$PK_COORDLOG.pid" 2>/dev/null)" 2>/dev/null || true
 set -e
 PK_SECS=$(( $(date +%s) - PK_T0 ))
-if [ -n "${PAPERKIT_OTLP_METRICS:-}" ]; then
-  uv run --with opentelemetry-proto python3 tools/otlp_push.py "$PK_EXECLOG" \
-      --build-seconds "$PK_SECS" || true
-fi
+# (otlp_push read only the execution log, so it has no input left and is not run; W44 replaces it
+# with aggregates drawn from BuildBuddy's execution records.)
 # Ζ·mem·harvest·hook — the warm-up step.  Every cell wrote its cgroup peak as a side effect of
 # work that ran anyway; harvest folds those into mem.sqlite so the NEXT sweep is sized from
 # measurement rather than the cold-start floor.  The first pass is over-reserved and that is the
@@ -279,11 +281,10 @@ for _p in library paper .; do
 done
 
 if [ -n "${PAPERKIT_LOGS_URL:-}" ]; then
-  # --execlog carries the SPAWN TIMELINE (bazel's own metrics.startTime, absolute), so the store
-  # can interleave "what happened" with "what was running".  Pushed BEFORE the rm below: the
-  # execution log is a temp file, and a red run's timeline is the half worth keeping.
+  # Findings only: the spawn timeline came from the execution log (Ζ·execlog·drop); the live
+  # per-action stream is BES and BuildBuddy's execution records.
   "$PY" tools/logs_push.py "$PK_HOOKLOG" --rc "$PK_HOOK_RC" --seconds "$PK_SECS" \
-      --execlog "$PK_EXECLOG" --run-id "${PK_T0}-$$" || true
+      --run-id "${PK_T0}-$$" || true
 fi
 # Ζ·execlog·leak — the `rm -f "$PK_EXECLOG" "$PK_HOOKLOG"` that stood here is GONE, and its
 # absence is the fix: it ran only when control reached this line, which a killed or crashed run

@@ -11,7 +11,10 @@
 @misc{img-pinned,
   section = {toolchain},
   claim   = {the toolchain base is pinned by content digest, not a moving tag, so the proof reproduces and is not at the mercy of a re-tagged base --- the irreducibly non-deterministic package layer is isolated there, the way the python base isolates its own},
-  check   = {cmd:grep -q "python@sha256:" ../Containerfile.base}
+  check   = {cmd:grep -q "python@sha256:" ../Containerfile.base},
+  % Ζ·foot·builds — the one file this check opens, as a label (the footprint audit named it once
+  % strace reached luthen, 2026-09-25).
+  builds  = {@@//:Containerfile.base}
 }
 @misc{img-hermetic,
   section = {toolchain}, from = {img-pinned}, join = {, and },

@@ -29,7 +29,8 @@ from typing import NamedTuple
 
 import resolver
 from grade import _grade_from_sens
-from layout import _ENGINE, SKIP_DIRS, _copy_sandbox, _mutable, _nested_roots, _sandbox_root
+from layout import (_ENGINE, SKIP_DIRS, _copy_sandbox, _mutable, _nested_roots, _sandbox_root,
+                    _Scope)
 from mutate import (  # Ζ·mutant / Μ·sweep·atom — the pure AST mutation primitives (their own leaf)
     _branch_sites,
     _data_sites,
@@ -90,7 +91,9 @@ def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path 
 
     def collect(base: Path, skip_nested: bool):
         nested = _nested_roots(base) if skip_nested else []
-        for f in sorted(base.rglob("*")):
+        # Ζ·sandbox·declared — the repository's own content (layout._Scope), not `rglob("*")`,
+        # which enumerated every cache, stale build copy and nested checkout on disk.
+        for f in _Scope.for_path(base).files(base):
             if not _mutable(f) or any(part in SKIP_DIRS for part in f.parts):
                 continue
             if any(nr in f.parents for nr in nested):
@@ -131,7 +134,7 @@ def surface_of(footprint: list | None, sandbox_project: Path, root_copy: Path | 
     base = root_copy or sandbox_project
     named = {(base / p).resolve() for p in footprint}
     out, seen = [], set()
-    for f in sorted(base.rglob("*")):
+    for f in _Scope.for_path(base).files(base):          # Ζ·sandbox·declared
         if not _mutable(f) or any(part in SKIP_DIRS for part in f.parts):
             continue
         if f.suffix == ".sh" and "checks" in f.parts:

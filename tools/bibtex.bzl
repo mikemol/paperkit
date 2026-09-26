@@ -80,6 +80,66 @@ def _entries(content):
         out.append((key, check, sib, reads, rests, tier, consumes, builds))
     return out
 
+def _line_fields(s):
+    """Every `name = {value}` pair on ONE bib line, brace-matched.  Ζ·report·records — bib entries
+    put several fields on a line (`section = {x}, from = {y}, rests-on = {z}`), and `_entries` reads
+    only the FIRST name on a line, so a same-line `rests-on` is invisible to it (filed as W48).  The
+    Δ-table metadata below needs rests-on exactly, since it drives the clamp."""
+    out = {}
+    rest = s
+    for _ in range(64):
+        eq = rest.find("=")
+        if eq < 0:
+            break
+        name = rest[:eq].strip().lstrip(",").strip()
+        after = rest[eq + 1:].lstrip()
+        if not after.startswith("{"):
+            break
+        depth = 0
+        end = -1
+        for i in range(len(after)):
+            c = after[i]
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if end < 0:
+            break
+        out[name] = after[1:end]
+        rest = after[end + 1:]
+    return out
+
+def _claim_meta(content, proj_tier):
+    """Ζ·report·records — [{key, check, section, rests-on, tier}] in BIB ORDER for every claim with a
+    check AND a section: the rows of the project's Δ table (tools/grades_rec.py)."""
+    out = []
+    cur = None
+    for raw in content.splitlines():
+        s = raw.strip()
+        if s.startswith("@") and "{" in s:
+            if cur and cur["check"] and cur["section"]:
+                out.append(cur)
+            cur = {"key": s.split("{", 1)[1].split(",", 1)[0].strip(), "check": "", "section": "",
+                   "rests-on": [], "tier": proj_tier}
+            continue
+        if cur == None:
+            continue
+        f = _line_fields(s)
+        if "check" in f:
+            cur["check"] = f["check"].strip()
+        if "section" in f:
+            cur["section"] = f["section"].strip()
+        if "rests-on" in f:
+            cur["rests-on"] = [t.strip() for t in f["rests-on"].split(",") if t.strip()]
+        if "tier" in f:
+            cur["tier"] = f["tier"].strip()
+    if cur and cur["check"] and cur["section"]:
+        out.append(cur)
+    return out
+
 def _data(tokens, files, imports = [], engine = True):
     """own files + engine (always) + the IMPORTED concept-bib packages' files (a view composes bibs
     from other packages, and the runtime engine re-reads them when it gates/grades) + each DECLARED
@@ -256,7 +316,32 @@ def _import_label(verb, name, key, owner, exports, wired, hint):
     # project = "paperkit/library"), so the repo name is the LAST SEGMENT of the path.
     return "@paperkit_" + owner.split("/")[-1] + "//:" + key
 
-def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = [], vis = "", exports = [], wired = [], builds = []):
+_RECORD_KINDS = ("gate_rec", "rec_struct", "rec_grades")
+
+def _consume_labels(name, proj, consumes, records):
+    """Ζ·report·records — each `consumes` key → a record label.  A bare key is a sibling warrant in
+    THIS package (":<key>", as before).  `*#<kind>` is EVERY OTHER consumable project's record of
+    that kind (`<kind>` ∈ gate_rec — the //:hook verdict; rec_struct — the structure-only gate run;
+    rec_grades — the per-claim Δ table, only from Δ-graded projects).  The expansion is the WIRED
+    roster, read here from its owner (MODULE.bazel's bib.project tags, via the extension), so a
+    consumer never carries its own copy of the project list."""
+    out = []
+    for c in consumes:
+        if not c.startswith("*#"):
+            out.append(":" + c)
+            continue
+        kind = c[2:]
+        if kind not in _RECORD_KINDS:
+            fail(("bibtex Ζ·report·records: %s: `consumes = {%s}` names no record kind — known: %s") %
+                 (name, c, ", ".join(_RECORD_KINDS)))
+        for r in records:
+            repo, rproj, adequacy = r.split("\t")
+            if rproj == proj or (kind == "rec_grades" and adequacy != "1"):
+                continue
+            out.append("@" + repo + "//:" + kind)
+    return out
+
+def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imports = [], vis = "", exports = [], wired = [], builds = [], records = []):
     """Dispatch ONE bib check to its specific typed rule (a record), not a general `gate.py --only`
     script.  The check's TYPE selects the rule; python is dropped-to only in pk_cmd (the exit-code
     oracle), under the toolchain.  A custom type expands its [checks.X] cmd template.  `tier` is the
@@ -287,7 +372,8 @@ def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imp
     tc += "" if tier != "toolchain" else ", exec_properties = {\"Pool\": " + _lit(TOOLCHAIN_POOL) + "}"
     # Ρ·wcag·oracle-edge — each consumed sibling key → its verdict-record target label ":<key>" in the
     # same generated package (all warrants of a project are pk_* siblings here — no visibility barrier).
-    cs = "" if not consumes else ", consumes = [" + ", ".join([_lit(":" + c) for c in consumes]) + "]"
+    # Ζ·report·records — `*#<kind>` expands to other projects' run-once records (_consume_labels).
+    cs = "" if not consumes else ", consumes = [" + ", ".join([_lit(l) for l in _consume_labels(name, proj, consumes, records)]) + "]"
     if typ == "cmd":
         return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(target) + pj + tc + cs + bs + ", data = [" + dl + "]" + vis + ")"
     elif typ == "file":
@@ -324,7 +410,9 @@ def _verb_rule(name, check, proj, files, reads, custom, tier, consumes = [], imp
         return "pk_agree(name = " + _lit(name) + ", producers = [" + prods + "]" + pj + tc + ", data = [" + dl + "]" + vis + ")"
     elif typ in custom:     # a config-declared cmd template — {target} substituted, run as a cmd oracle
         cmd = custom[typ].replace("{target}", target)
-        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + tc + ", data = [" + dl + "])"
+        # Ζ·report·records — a config-declared type (the report's `fresh:`) consumes records too;
+        # this dropped `consumes`, `builds` and the visibility a cmd: warrant carries.
+        return "pk_cmd(name = " + _lit(name) + ", cmd = " + _lit(cmd) + pj + tc + cs + bs + ", data = [" + dl + "]" + vis + ")"
     else:
         fail("Ζ·verb·wire: check type '" + typ + ":' is neither builtin nor a [checks." + typ +
              "] template — claim '" + name + "'")
@@ -596,6 +684,7 @@ def _bib_repo_impl(repository_ctx):
             imports["@@//:files" if pkg == "" else "@@//%s:files" % pkg] = True
     imports = [k for k in sorted(imports) if k != files]
     parsed = []
+    meta = []   # Ζ·report·records — Δ-table rows, bib order (_claim_meta)
     for w in warrants:
         # A bare basename is a LOCAL sibling of the anchor (get_child, one segment).  A LABEL token
         # (//pkg:file, //:path/file, @repo//…) is a bib IMPORTED from another package — the composing
@@ -605,7 +694,9 @@ def _bib_repo_impl(repository_ctx):
         # every existing basename token stays on the unchanged get_child branch.
         wp = repository_ctx.path(Label(w)) if (":" in w or w.startswith("@")) else bibp.dirname.get_child(w)
         repository_ctx.watch(wp)
-        parsed = parsed + _entries(repository_ctx.read(wp))
+        wtext = repository_ctx.read(wp)
+        parsed = parsed + _entries(wtext)
+        meta = meta + _claim_meta(wtext, proj_tier)
 
     # Ζ·tier — a project is all-HOST iff EVERY checked warrant runs on the host (its effective tier is
     # local or toolchain, never sandbox).  The footprint audit (a per-sandbox-warrant declare-vs-strace
@@ -653,7 +744,7 @@ def _bib_repo_impl(repository_ctx):
     if memp.exists:
         mem = json.decode(repository_ctx.read(memp))
 
-    out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_result")']
+    out = ['load("@@//tools:verb.bzl", "pk_agree", "pk_cmd", "pk_file", "pk_gate", "pk_grades", "pk_json", "pk_result")']
     syms = []
     if repository_ctx.attr.adequacy:
         syms += ["pk_adequacy", "pk_grade_claim"]
@@ -952,7 +1043,8 @@ def _bib_repo_impl(repository_ctx):
                            (vis if owns else "") + ")")
         else:
             out.append(_verb_rule(k, check, proj, files, reads, custom, wt, consumes, imports, wvis,
-                                  repository_ctx.attr.exports, repository_ctx.attr.wired, builds))
+                                  repository_ctx.attr.exports, repository_ctx.attr.wired, builds,
+                                  repository_ctx.attr.records))
         recs.append('":%s"' % k)
 
     if calc_claims:
@@ -1032,6 +1124,27 @@ def _bib_repo_impl(repository_ctx):
                    "".join([", " + _lit(i) for i in imports]) + ', "@@//paperkit:engine"])')
         recs.append('":genres"')
 
+    # ⚑ Ζ·report·records — this project's gate and Δ, RUN ONCE as cached cells whose stdout is a record
+    # another project CONSUMES (report/'s tables), instead of that consumer spawning gate.py /
+    # discriminate.py over this tree inside its own check.  Measured 2026-09-25 once strace reached
+    # luthen: every such report claim read 80-620 files — caches, agent state, a stale build copy —
+    # because the spawned run walked the working tree, and no declaration could cover it.  Here the
+    # inputs are the union of what this project's checks declare (+ the engine), at the project's
+    # own tier, so a toolchain project's records run in its pool.  PUBLIC, and built only when
+    # something consumes them.  A consumer keys them by `<repo>/<name>` (verb.bzl _consume_key).
+    # Inputs are exactly :invariants' — a structure-only run reads the bib and the projection only.
+    rdl = ", ".join([_lit(files)] + [_lit(i) for i in imports] + ['"@@//paperkit:engine"'])
+    # ⚑ ONE STRUCTURE-ONLY RUN, NOT A WHOLE GATE.  The first form ran `gate.py --json [--safe]` and
+    # `discriminate.py --json` here, and a one-project cell cannot answer them: cross-project checks
+    # were UNRESOLVABLE (paper: 29) and toolchain checks ran in the wrong pool, so six projects read
+    # FAIL while //:hook was green.  `--invariants` executes no check — it yields the structure the
+    # tables print (sections, prose ≡ projection, cited count, --without-K collapses); the VERDICT
+    # is `gate_rec` (what //:hook asserts) and the GRADES are `rec_grades` below, per claim.
+    struct = ("\"$(command -v python3)\" paperkit/gate.py --json --invariants --safe --without-K " +
+              proj)
+    out.append("pk_json(name = \"rec_struct\", cmd = " + _lit(struct) + lc + ", data = [" + rdl +
+               '], visibility = ["//visibility:public"])')
+
     # pk_gate aggregates the records → the project verdict; the assert-test puts it in the live gate.
     out.append('pk_gate(name = "gate_rec", checks = [%s], visibility = ["//visibility:public"])' % ", ".join(recs))
     # Ζ·gate·detail — stage the PER-CLAIM records beside the aggregate, so a red names the claims
@@ -1088,6 +1201,11 @@ def _bib_repo_impl(repository_ctx):
                            ", ".join([_lit(d) for d in _data(reads, files, imports)]) + "])")
             grades.append('":%s__grade"' % k)
         out.append('pk_adequacy(name = "adequacy_rec", grades = [%s], visibility = ["//visibility:public"])' % ", ".join(grades))
+        # Ζ·report·records — the Δ TABLE over the SAME grade records adequacy aggregates (never a
+        # second grading), with each claim's check/section/rests-on from the bib (_claim_meta) and the
+        # engine's clamp applied in tools/grades_rec.py.  Public; built only when consumed.
+        out.append("pk_grades(name = \"rec_grades\", grades = [%s], meta = %s, " % (", ".join(grades), _lit(json.encode(meta))) +
+                   'visibility = ["//visibility:public"])')
         # Ζ·gate·detail — the per-claim GRADE records staged too, so a red adequacy names the
         # claims that fell below the floor (and their grade) instead of only that some did.
         out.append('sh_test(name = "adequacy", srcs = ["@@//tools:assert_pass.sh"], ' +
@@ -1173,6 +1291,8 @@ bib_repo = repository_rule(
         # and diagnosed hours later by Bazel as `missing input file` — Ζ·grid·dangling's shape.
         "exports": attr.string_list(default = []),
         "wired": attr.string_list(default = []),
+        # Ζ·report·records — "<repo>\t<project>\t<adequacy>" per consumable project (see _bib_ext_impl).
+        "records": attr.string_list(default = []),
     },
 )
 
@@ -1195,6 +1315,16 @@ def _bib_ext_impl(module_ctx):
             if tag.owns_warrants or tag.owns_concepts:
                 exports += _exports(module_ctx, tag.project, tag.bib)
     wired = sorted(wired)
+    # Ζ·report·records — the projects whose run-once records (rec_gate / rec_gate_safe / rec_delta)
+    # another project may CONSUME, as "<repo name>\t<project path>\t<adequacy 0|1>".  A `local`
+    # (host-coupled) project is excluded: its gate is not a function of declared inputs, so a
+    # consumer must not trigger it — the report lists such a project as on-demand instead.
+    records = []
+    for mod in module_ctx.modules:
+        for tag in mod.tags.project:
+            if tag.tier != "local":
+                records.append(tag.name + "\t" + tag.project + "\t" + ("1" if tag.adequacy else "0"))
+    records = sorted(records)
     for mod in module_ctx.modules:
         for tag in mod.tags.project:
             # Ζ·entry·point — `witness` is resolved HERE (only a module_ctx can read paper.toml)
@@ -1202,7 +1332,7 @@ def _bib_ext_impl(module_ctx):
             # from `cmd`.  Unconditional, not gated on emerge: _claim_script returns None for a
             # project declaring no `[checks.claim]`, and a project that HAS one owes the key
             # whether or not it builds a grid.
-            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, owns_warrants = tag.owns_warrants, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [], witness = _claim_script(module_ctx, tag.project) or "", genres = _declared_genres(module_ctx, tag.project), exports = exports, wired = wired)
+            bib_repo(name = tag.name, bib = tag.bib, project = tag.project, adequacy = tag.adequacy, tier = tag.tier, compose = tag.compose, calc = tag.calc, emerge = tag.emerge, owns_concepts = tag.owns_concepts, owns_warrants = tag.owns_warrants, sites = sites if tag.emerge else [], closures = _closures(module_ctx, tag.project, core) if tag.emerge else [], witness = _claim_script(module_ctx, tag.project) or "", genres = _declared_genres(module_ctx, tag.project), exports = exports, wired = wired, records = records)
 
 bib = module_extension(
     implementation = _bib_ext_impl,

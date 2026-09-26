@@ -8,11 +8,10 @@
 #      is confined to build COST/availability, not to WHAT is verified (the artifact is byte-
 #      reproducible even when building it is slow/network-dependent).  Proven on-demand by image's
 #      gate; here we prove the mechanism is present and intact.
-#   2. Deterministic DISCLOSURE.  the report's gate runner (gen.py) bounds every gate with a timeout
-#      and labels a document it cannot verify here (missing toolchain / cold-build timeout) as
-#      `error` → rendered `n/a`, never a false verification FAIL.  We REPRODUCE the timeout branch
-#      deterministically: a zero-budget gate subprocess always raises TimeoutExpired, which is exactly
-#      what the runner catches and labels.  cwd = report/.
+#   2. Deterministic DISCLOSURE.  the report reads each document's gate VERDICT from its gate_rec
+#      (Ζ·report·records — it runs no gate itself), and a verdict of `cannot-run` (a check whose
+#      toolchain is absent, typed rc 3) is rendered `n/a`, never a false verification FAIL.  We
+#      drive that path deterministically with synthetic staged records.  cwd = report/.
 import subprocess
 import sys
 from pathlib import Path
@@ -31,20 +30,38 @@ def _content_mitigation():
 
 
 def _disclosure_mitigation():
-    # (a) the runner SOURCE bounds each gate + labels an un-runnable one (never a FAIL):
+    # ⚑ Ζ·report·records — the report no longer RUNS gates, so there is no timeout to bound: each
+    # verdict is the project's gate_rec (what //:hook asserts), and a check that CANNOT RUN reaches
+    # it as `cannot-run` — distinct from `fail` by verb.bzl's typed exit (rc 3).  This witness used
+    # to grep gen.py for `timeout=`/`TimeoutExpired` and spawn gate.py on the host; it now drives the
+    # REAL path with synthetic staged records, both ways: cannot-run must render n/a, and fail must
+    # still render FAIL (so the arm can go red).
+    import json
+    import os
+    import tempfile
+    sys.path.insert(0, str(ROOT / "report"))
+    import gen
+    with tempfile.TemporaryDirectory() as d:
+        struct = Path(d) / "rec_struct.json"
+        struct.write_text(json.dumps({"pass": True, "project_ok": True, "verified": 1,
+                                      "sections": 1, "collapses": {}}))
+        rows = {}
+        for verdict in ("cannot-run", "fail", "pass"):
+            rec = Path(d) / f"{verdict}.verdict.json"
+            rec.write_text(json.dumps({"verdict": verdict}))
+            os.environ["PAPERKIT_CONSUMED_RECORDS"] = (f"paperkit_paper/rec_struct.json={struct} "
+                                                       f"paperkit_paper/gate_rec={rec}")
+            gen._GATE.clear()
+            g = gen._gate("paper", "--safe")
+            rows[verdict] = (f"n/a — {g['error']}" if "error" in g
+                             else ("PASS" if g.get("pass") else "FAIL"))
+        os.environ.pop("PAPERKIT_CONSUMED_RECORDS", None)
+    assert rows["cannot-run"].startswith("n/a"), \
+        f"a document that cannot run here renders {rows['cannot-run']!r}, not n/a — a false FAIL"
+    assert rows["fail"] == "FAIL", f"a failing gate renders {rows['fail']!r} — the arm cannot go red"
+    assert rows["pass"] == "PASS", f"a passing gate renders {rows['pass']!r}"
     src = (ROOT / "report" / "gen.py").read_text()
-    assert "timeout=" in src and "TimeoutExpired" in src and '{"error"' in src, \
-        "the gate runner no longer bounds each gate and labels an un-runnable one"
-    assert 'f"n/a' in src and '"on-demand"' in src, \
-        "the report no longer renders an un-runnable/non-reproducible document as n/a or on-demand"
-    # (b) REPRODUCE the timeout branch deterministically — a zero-budget gate always times out, which
-    #     is exactly the condition the runner turns into `error` (→ n/a), not a verification FAIL:
-    try:
-        subprocess.run([sys.executable, "paperkit/gate.py", "--json", "--safe", "paper"],
-                       cwd=ROOT, capture_output=True, text=True, timeout=0.001)
-        raise AssertionError("a zero-budget gate should have timed out — the disclosure branch is unreachable")
-    except subprocess.TimeoutExpired:
-        pass
+    assert '"on-demand"' in src, "the report no longer renders a non-reproducible document as on-demand"
 
 
 def _fixpoint_mitigation():
@@ -71,8 +88,9 @@ def main() -> int:
     _disclosure_mitigation()
     _fixpoint_mitigation()
     print("mitigations proven in place: (1) content digest-reproducibility (image img-stable — two "
-          "--no-cache builds → same digest); (2) deterministic disclosure (runner timeout → n/a, "
-          "reproduced here; on-demand labels; never a false FAIL) — variance confined to build cost")
+          "--no-cache builds → same digest); (2) deterministic disclosure (a gate_rec that reads "
+          "cannot-run renders n/a and a fail still renders FAIL, driven here with staged records; "
+          "on-demand labels; never a false FAIL) — variance confined to build cost")
     return 0
 
 

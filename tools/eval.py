@@ -63,6 +63,9 @@ def _cap_cpu(cpu: int) -> None:
     lets the child inherit it across fork+exec, with no callback in the unsafe window.
     """
     resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + CPU_GRACE))
+    # Ζ·core·off — SIGXCPU's default action DUMPS CORE, so every mutant this cap stops wrote a core
+    # file the verdict never reads.  The kill is the signal; the dump is only I/O and disk.
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 
 def _cap_mem(mb: int) -> None:

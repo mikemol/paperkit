@@ -11,7 +11,8 @@ unchanged one.
 ⚑ AND THE PER-FILE REMEDIATION IS WHY THIS MODULE EXISTS RATHER THAN A 46TH FIX.  Two rounds of
 "fix all N files" have run (commit 8fe18b8 converted two); four remain — `boundaries_otlp`
 ("13 behaviors, 1 delta"), `boundaries_surface` ("7 behaviors, 1 delta"), `boundaries_prove`,
-`boundaries_prove_envelope` ("6 structural, 1 delta").  They survived both passes for a reason
+`boundaries_prove_envelope` ("6 structural, 1 delta").  (`boundaries_otlp` was later deleted
+with the tool it tested — otlp_push, retired in 1d84146.)  They survived both passes for a reason
 visible only once you open them: their `check()` appends to `fails` ALONE.  It records what
 BROKE, never what RAN — so there is no accumulator a summary could derive from, and a literal is
 the only thing left to print.  Fixing the four files does not stop the 46th suite from doing the
@@ -95,9 +96,9 @@ class Suite:
         Three defaulted strings put this at six arguments (PLR0913), and collapsing them to one
         record IS the better model — nothing sensibly passes two of the three.  But it is a
         breaking change to every caller, and four (`boundaries_prove`, `_prove_envelope`,
-        `_otlp`, `_surface`) could not be migrated in the same pass: each DECLARES a dependency
-        whose own findings block any edit to it.  They ran with a TypeError until a 61,000-action
-        sweep reported ELEVEN red boundary suites.
+        `_otlp` since retired, `_surface`) could not be migrated in the same pass: each
+        DECLARES a dependency whose own findings block any edit to it.  They ran with a
+        TypeError until a 61,000-action sweep reported ELEVEN red boundary suites.
 
         ⚑ THE RULE THIS COST, WRITTEN DOWN: a shared signature cannot be migrated ahead of the
         callers that are themselves gate-blocked.  Accepting both spellings lets the model

@@ -303,7 +303,7 @@
   section  = {runtime},
   from     = {bnd-mem-db},
   join     = {. },
-  claim    = {the findings-log push splits at the same boundary as the telemetry pusher --- its PURE half (parse the findings, attribute each to its owner, aggregate) is deterministic and gated, while the live half (the POST to an endpoint that may be down) is best-effort and never gates, so an unreachable log sink degrades a build to silent rather than to red},
+  claim    = {the findings-log push splits at the observation boundary --- its PURE half (parse the hook log into typed findings in the engine's own failure vocabulary, each carrying its source line) is deterministic and gated, while the live half (the POST to an endpoint that may be down) is best-effort and never gates, so an unreachable log sink degrades a build to silent rather than to red, and an unrecognised flag is refused rather than read as a value},
   check    = {cmd:python3 ../paperkit/tests/boundaries_logs_push.py},
   reads    = {.}
 }

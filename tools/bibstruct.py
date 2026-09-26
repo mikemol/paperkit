@@ -143,7 +143,11 @@ except ImportError:               # run as a script: no parent package, sibling 
 # before: the bib of the project the tool ships inside.  A write still REQUIRES `--bib` for any
 # other target (that is what makes filing into a peer's floor possible), so this is a read-side
 # convenience and never a write-side assumption.
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# ⚑ W51 — AND THE FILE MOVED AGAIN, one level UP, to `<repo>/tools/bibstruct.py`: up-THREE now
+# overshoots to the directory ABOVE the repo, so DEFAULT named `~/github/warrants.bib` — outside
+# the repository entirely.  Measured 2026-09-25 while fixing the caller-cwd ask.  Up-TWO is the
+# repo from here; a relocation note is a claim about a location, and locations move.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT = os.path.join(ROOT, "warrants.bib")
 
 # ⚑ THE VERBS THAT WRITE, and therefore the only ones for which `--bib` names a TARGET
@@ -344,7 +348,14 @@ def _read_bib(path):
     seven classes — its own `_strip_comments` note records why: "a missing row can be
     noticed by a denominator, an invented row corroborates itself."
     """
-    r = vfs.read(path)
+    # ⚑ W51 — A PATH THE CALLER TYPED IS RELATIVE TO THE CALLER.  vfs.read joins a relative path
+    # onto the REPOSITORY root (right for its library callers, which pass repo-relative paths),
+    # so `bibstruct.py --edges floor/inbox/X.bib` run from ~/github/summit read
+    # paperkit/floor/inbox/X.bib and reported an existing file ABSENT — two filers hit it
+    # following summit's pre-filing check (ask-bibstruct-resolves-paths-against-the-callers-cwd).
+    # And the WRITE side already resolved against the caller (`open(path)` in the write verbs),
+    # so one invocation could read one file and write another.  Absolute here makes them agree.
+    r = vfs.read(os.path.abspath(path))
     if r.presence is vfs.Presence.ABSENT:
         raise SystemExit(
             f"bibstruct: no such bib {path} — ABSENT.  The file is not there; this is NOT "

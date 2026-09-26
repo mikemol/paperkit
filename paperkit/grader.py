@@ -765,14 +765,22 @@ def _perturb_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Pa
 # is invisible to it.  Rather than teach the budget a second axis, put the copies somewhere disk
 # BACKED — 80GB free there against 7.7GB of tmpfs on this box — and the two resources decouple.
 #
-# Resolution ladder (= the Ω·config ladder): PAPERKIT_SCRATCH > XDG_CACHE_HOME > ~/.cache, and
-# only then the platform default.  A machine that WANTS tmpfs sets PAPERKIT_SCRATCH=/tmp.
+# Resolution ladder (= the Ω·config ladder): PAPERKIT_SCRATCH > $TMPDIR (when SET) > XDG_CACHE_HOME
+# > ~/.cache, and only then the platform default.  A machine that WANTS tmpfs sets TMPDIR=/tmp.
+#
+# ⚑ W50 — $TMPDIR IS THE OPERATOR'S DECLARATION, NOT THE PLATFORM DEFAULT.  This ladder skipped it,
+# conflating two different things: the tmpfs trap above is the UNSET case (the platform's /tmp),
+# while a SET TMPDIR is the operator saying where temporary files belong on THIS host.  On luthen the
+# consequence was every Δ sweep landing on ~/.cache — md0, a RAID6 array — whose small-write storm
+# put md0 at 100% busy (2026-09-25, 20:15 EDT) while the operator had fast NVMe for exactly this;
+# the operator's ruling was TMPDIR=/var/tmp, which this now honours with no paperkit-specific knob.
 _SANDBOX_PREFIX = "paperkit-delta-"
 
 
 def _scratch_dir() -> str | None:
     """The parent for sweep sandboxes — disk-backed by preference.  None ⇒ platform default."""
     for cand in (os.environ.get("PAPERKIT_SCRATCH"),
+                 os.environ.get("TMPDIR"),
                  os.environ.get("XDG_CACHE_HOME"),
                  os.path.expanduser("~/.cache") if os.path.expanduser("~") != "~" else None):
         if not cand:

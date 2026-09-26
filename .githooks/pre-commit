@@ -136,8 +136,12 @@ run "hook-grid (//:hook ≡ MODULE)"    "$PY" tools/hook_grid.py
 # takes the WHOLE process tree off tmpfs rather than the files this script names.  ~/.tmp persists
 # between runs (it is not cleared at boot the way /tmp is), so a crashed run's log survives for
 # diagnosis instead of being both un-freed AND un-inspectable.
-# ⚑ THE OPERATOR'S SETTING WINS, AND THE FALLBACK IS LAST.  Measured on this machine: TMP is set
-# to ~/.tmp and TMPDIR is UNSET.  A first cut read only `${PAPERKIT_TMPDIR:-$HOME/.tmp}` and so
+# ⚑ THE OPERATOR'S SETTING WINS, AND THE FALLBACK IS LAST.  Measured on the PREVIOUS host: TMP was
+# set to ~/.tmp and TMPDIR was UNSET.  (On luthen, measured 2026-09-25: TMP is NOT set, so the last
+# fallback, $HOME/.tmp — md0, a RAID6 array — is what put the hook's sweeps there; the operator's
+# ruling is TMPDIR=/var/tmp, declared host-wide, which this ladder now picks up before any fallback.
+# A host fact recorded as "this machine" outlives the machine.)  A first cut read only
+# `${PAPERKIT_TMPDIR:-$HOME/.tmp}` and so
 # arrived at the right directory BY COINCIDENCE rather than by deference — it would have ignored
 # an operator who pointed TMP or TMPDIR somewhere else entirely.  Read what is declared, in
 # specificity order, and only then fall back.  (TMP is the variable set here; TMPDIR is the one

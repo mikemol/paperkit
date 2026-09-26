@@ -174,7 +174,7 @@
           "@@//paperkit/gate.py": "cd9544d443e6effc0e55f1844d73adb5b19d995dff5e6830016740b9605722cb",
           "@@//paperkit/genre.py": "d689dbb76e5a5dfd4eb4eabd03dba0674f673adb48ba3dfa5cb819c6b500e662",
           "@@//paperkit/grade.py": "481fe342d8c685d60c1b28e4b0c9b314e2fe666dfbfa4c817b0316c06be5bf1e",
-          "@@//paperkit/grader.py": "88878a1d6e0345c8ee614c1e69cb37efba07dffeb97caa849e4f11121b938f2c",
+          "@@//paperkit/grader.py": "169717201a9f7643f52e24108303457daa4148e1919da8256d033b981fe5505f",
           "@@//paperkit/labelmap.py": "8aa563fdc27470c7f591d9b168839bba2b33a21e674f3c8679057edd53d3ccf9",
           "@@//paperkit/layout.py": "3a0d1a3a4ace6a6d6fe76251b5549516110302ce489a7f18daefd772686c21db",
           "@@//paperkit/library/concepts.bib": "cefe3d8de1b1fde8ab04859b44b8b6d2ef665090542a65102818783b0011299a",

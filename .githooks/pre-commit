@@ -14,6 +14,23 @@ cd "$(git rev-parse --show-toplevel)"
 # line — before any check ran — on a GREEN tree.  The venv is what uv built from the pin, so it is
 # the pinned interpreter wherever it exists; bare python3 is the fallback for an un-synced checkout.
 PY="$PWD/.venv/bin/python"; [ -x "$PY" ] || PY=python3
+# W59 — THE HOOK OWNS THE ENVIRONMENT IT RUNS IN, NOT THE CALLER'S SHELL.  A daemon restart left a
+# session with this repo's venv ACTIVE (VIRTUAL_ENV set, <root>/.venv/bin first on PATH): every check
+# the footprint audit traced resolved `python3` to the venv's 3.13 instead of the host's, read .venv/
+# as its own input, and the audit went red on a green tree.  $PY above is already explicit, so what
+# leaks is only what the CHECKS inherit.  Drop the activation and every PATH entry under this root —
+# the Τ·path rule (a tool must not resolve into the gated tree), applied at the invocation the hook
+# owns.  The engine-level fix belongs in resolver.clean_env and waits on that file's decomposition.
+unset VIRTUAL_ENV
+_pk_path=""
+_pk_ifs=$IFS; IFS=:
+for _pk_d in $PATH; do
+    case "$_pk_d" in "$PWD"|"$PWD"/*) continue ;; esac
+    _pk_path="${_pk_path:+$_pk_path:}$_pk_d"
+done
+IFS=$_pk_ifs
+PATH=$_pk_path; export PATH
+unset _pk_path _pk_ifs _pk_d
 # Ρ·telemetry — optional per-clone local config (gitignored): a machine's OTLP endpoint etc.  The
 # endpoint is a POINTER a machine sets at another machine's store; it is NOT tracked (each clone's
 # operator points at their own), so it lives here, sourced if present, absent by default.

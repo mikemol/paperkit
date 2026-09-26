@@ -286,8 +286,8 @@ kill "$(cat "$PK_HOOKLOG.tailpid" 2>/dev/null)" 2>/dev/null || true
 kill "$(cat "$PK_COORDLOG.pid" 2>/dev/null)" 2>/dev/null || true
 set -e
 PK_SECS=$(( $(date +%s) - PK_T0 ))
-# (otlp_push read only the execution log, so it has no input left and is not run; W44 replaces it
-# with aggregates drawn from BuildBuddy's execution records.)
+# (otlp_push read only the execution log, so it had no input left and is RETIRED — deleted with its
+# bnd-otlp claim; W44b replaces it with aggregates drawn from BuildBuddy's execution records.)
 # Ζ·mem·harvest·hook — the warm-up step.  Every cell wrote its cgroup peak as a side effect of
 # work that ran anyway; harvest folds those into mem.sqlite so the NEXT sweep is sized from
 # measurement rather than the cold-start floor.  The first pass is over-reserved and that is the

@@ -164,7 +164,7 @@
           "@@//paperkit/cache.py": "c4c56ed00cba13ac4d61e9c77c80c6ed102fc98938e23356e8a76b17fe85ff89",
           "@@//paperkit/checkcache.py": "02868ac97c6fcf9d8692e0aa23b8b783fb44963b216ec8c2dc47f7a2c1070983",
           "@@//paperkit/coherence.py": "577c090791b0975ca2301a1cc655a43a732520536fa4827d9e54fbbb62267121",
-          "@@//paperkit/components.bzl": "30c3688ebd14a0bec01d6852b2639eec752a8e2da0ba861f432eb9207fc19323",
+          "@@//paperkit/components.bzl": "6d233bdb7c6510c3ce80f120abc19f809d9a0cf376b3cf194867a69557554e4a",
           "@@//paperkit/conclusiongate.py": "515b4a84478ea4d2aaed58272b32b81d03e2f4d5bfe9c8ab9dd742f08d06ab93",
           "@@//paperkit/config.py": "45075a2454cfc2852a25349807f181a9ef23cb7ceb6b2d6a6fc256cfea5a487a",
           "@@//paperkit/discriminate.py": "97dd9706bfc04806221cb38751e8d3a7682f1facb803a0d30ac0ade9e929a4c5",

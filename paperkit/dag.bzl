@@ -50,7 +50,6 @@ IMPORTS = {
     "tests/boundaries_memoize.py": ["discriminate.py", "tests/_fixture_model.py"],
     "tests/boundaries_mutable.py": ["layout.py"],
     "tests/boundaries_mutate_atom.py": ["mutate.py"],
-    "tests/boundaries_otlp.py": ["tests/_boundary.py"],
     "tests/boundaries_path.py": ["config.py", "resolver.py"],
     "tests/boundaries_prove.py": ["tests/_boundary.py"],
     "tests/boundaries_prove_envelope.py": ["tests/_boundary.py"],

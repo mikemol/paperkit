@@ -189,7 +189,6 @@ COMPONENTS = {
         "tests/boundaries_memoize.py",
         "tests/boundaries_mutate_atom.py",
         "tests/boundaries_mutable.py",
-        "tests/boundaries_otlp.py",
         "tests/boundaries_package_shadow.py",
         "tests/boundaries_path.py",
         "tests/boundaries_prove.py",

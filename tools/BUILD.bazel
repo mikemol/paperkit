@@ -5,7 +5,7 @@ load("//tools:calc.bzl", "observe_setting")
 # tool is validated and runnable (python3 tools/lint_bzl.py tools/*.bzl); ENFORCEMENT in //:hook is
 # Ξ·lint·wire — it must be authored as a project WARRANT (bnd-check requires hook members be uniform
 # @proj//:{gate,adequacy}), which also projects its prose.  Not a bolted-on py_test.
-exports_files(["assert_pass.sh", "bibtex.bzl", "cgroup-scope", "mem_db.py", "mem_harvest.py", "mem_project.py", "read_grade.py", "mem_learn.py", "sens.py", "decisions.py", "eval.py", "verdict.py", "lint_bzl.py", "pyc.py", "imports.py", "closure.py", "hook_index.py", "otlp_push.py", "ratchet.py", "wheel.py", "logs_push.py", "grades_rec.py"], visibility = ["//visibility:public"])
+exports_files(["assert_pass.sh", "bibtex.bzl", "cgroup-scope", "mem_db.py", "mem_harvest.py", "mem_project.py", "read_grade.py", "mem_learn.py", "sens.py", "decisions.py", "eval.py", "verdict.py", "lint_bzl.py", "pyc.py", "imports.py", "closure.py", "hook_index.py","ratchet.py", "wheel.py", "logs_push.py", "grades_rec.py"], visibility = ["//visibility:public"])
 
 # ⚑ Ζ·pyc·package — `tools` REACHED AS A PACKAGE, not as loose files.  A boundary suite that names
 # its dependency honestly (`from tools import dagderive`) needs the package MARKER staged beside

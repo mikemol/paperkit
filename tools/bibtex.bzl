@@ -38,8 +38,7 @@ def _entries(content):
     builds = []     # Ζ·wheel·dep — Bazel LABELS of BUILT ARTIFACTS this check reads (not dirs, not keys)
                     # (records-as-deps within a project: the sibling runs ONCE, memoized, and its
                     # verdict.json is a declared bazel input here — freshness by the action graph)
-    for raw in content.splitlines():
-        s = raw.strip()
+    for s in _logical_lines(content):
         if s.startswith("@") and "{" in s:
             if key != None:
                 out.append((key, check, sib, reads, rests, tier, consumes, builds))
@@ -51,33 +50,63 @@ def _entries(content):
             tier = ""
             consumes = []
         elif key != None and "=" in s:
-            name = s.split("=", 1)[0].strip()
-            if name == "check":
-                check = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
+            # ⚑ W48 — EVERY FIELD ON THE LINE, NOT THE FIRST.  This read `s.split("=", 1)[0]` as THE
+            # field name, so a line carrying several (`section = {x}, from = {y}, rests-on = {z}`, the
+            # shape paper/implications.bib uses throughout) yielded only `section`, and its `rests-on`
+            # never reached the generator — every Ζ·compose premise dep and grounding edge built from
+            # `rests` silently lost those edges.  _line_fields brace-matches each `name = {value}`.
+            f = _line_fields(s)
+            if "check" in f:
+                check = f["check"].strip()
                 if check.startswith("result:"):
                     sib = check.split(":", 1)[1].strip()
-            elif name == "reads":
-                inner = s.split("{", 1)[1].rsplit("}", 1)[0]
-                reads = [t.strip() for t in inner.split(",") if t.strip()]
-            elif name == "rests-on" and "{" in s and "}" in s:
-                inner = s.split("{", 1)[1].rsplit("}", 1)[0]
-                rests = [t.strip() for t in inner.split(",") if t.strip()]
-            elif name == "tier" and "{" in s and "}" in s:
-                tier = s.split("{", 1)[1].rsplit("}", 1)[0].strip()
-            elif name == "builds" and "{" in s and "}" in s:
+            if "reads" in f:
+                reads = [t.strip() for t in f["reads"].split(",") if t.strip()]
+            if "rests-on" in f:
+                rests = [t.strip() for t in f["rests-on"].split(",") if t.strip()]
+            if "tier" in f:
+                tier = f["tier"].strip()
+            if "builds" in f:
                 # ⚑ Ζ·wheel·dep — A CLAIM ABOUT AN ARTIFACT MUST BE ABLE TO NAME THAT ARTIFACT.
                 # `reads` stages DIRECTORY PATHS and `consumes` names sibling warrant KEYS; neither
                 # can say "the built wheel".  bnd-wheel tried `reads = {., wheel}` and analysis
                 # failed with `no such package 'wheel'` — the field it needed did not exist, so the
                 # warrant named a package that never could.  These are Bazel labels, staged as
                 # action inputs alongside the read directories.
-                inner = s.split("{", 1)[1].rsplit("}", 1)[0]
-                builds = [t.strip() for t in inner.split(",") if t.strip()]
-            elif name == "consumes" and "{" in s and "}" in s:
-                inner = s.split("{", 1)[1].rsplit("}", 1)[0]
-                consumes = [t.strip() for t in inner.split(",") if t.strip()]
+                builds = [t.strip() for t in f["builds"].split(",") if t.strip()]
+            if "consumes" in f:
+                consumes = [t.strip() for t in f["consumes"].split(",") if t.strip()]
     if key != None:
         out.append((key, check, sib, reads, rests, tier, consumes, builds))
+    return out
+
+def _logical_lines(content):
+    """Stripped lines, with a FIELD whose braces open on one line and close on a later one JOINED
+    into a single logical line.  ⚑ W48 — a multi-line value (`builds = {@@//:a,` … `@@//b:c}`) was
+    read as its FIRST physical line only: the old parser took everything after `{` to the last `}`
+    on that line, found none, and kept the first line's labels while the continuation lines — no
+    `=` on them — were skipped.  Measured on bnd-env-facts' 14-label `builds`: the generator staged
+    the first three.  An entry header (`@type{key,`) is never joined: its brace closes the ENTRY.
+    `%` comment lines pass through untouched (they carry no fields)."""
+    out = []
+    buf = ""
+    depth = 0
+    for raw in content.splitlines():
+        s = raw.strip()
+        if buf:
+            buf = buf + " " + s
+        elif s.startswith("@") or s.startswith("%") or "=" not in s:
+            out.append(s)
+            continue
+        else:
+            buf = s
+        depth += s.count("{") - s.count("}")
+        if depth <= 0:
+            out.append(buf)
+            buf = ""
+            depth = 0
+    if buf:
+        out.append(buf)
     return out
 
 def _line_fields(s):

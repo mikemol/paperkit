@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "wkx9oUBUqxSj/rD66CH+xSyIhSRPkuVmIdTnsUd+oVo=",
+        "bzlTransitiveDigest": "6+nfamIkkgP2nczYIFtbtHmtFMG1hV5aGvXbJ/WYCyQ=",
         "usagesDigest": "ZTg9qMWPSyxGY6veR9abcyw/0JPtpp/F+2wGOcH1xGY=",
         "recordedFileInputs": {
           "@@//arch/paper.toml": "430eccadfd174196bf9cf0fd54a51b0b552b66ed1e761c34fd4f9ea8da878995",
@@ -184,7 +184,7 @@
           "@@//paperkit/project.py": "b8ecd263000ae3b085efcd9a3b81272506c4db90b5c6e4ffd14c812d3f7c83fc",
           "@@//paperkit/prove.py": "04441db4c185b574ffe958de0efa552552e7703471fa796030bf414f5ab13b11",
           "@@//paperkit/rematch.py": "1b0b8fd534021a2ea3d953cfe73a43c46c941e51230b8213d3da956835e1b62d",
-          "@@//paperkit/resolver.py": "6966d3c94e6b4794f6a74df796549d31a3cdb2a7b9355fa918227c2b81386950",
+          "@@//paperkit/resolver.py": "2802d82df056c236924dc192a3610fac4a472e55cf8afe835d5fe8678409ba5b",
           "@@//paperkit/rhetoric.py": "8402652d5bbcd178cd454f7fa307531c55bd94c3655122ea377b6274c1c8ec30",
           "@@//paperkit/routes.py": "e54d9e93b6e6e17a60f284cd15b3668c429be8a368eed7aa50d9b885b0178514",
           "@@//paperkit/tests/__init__.py": "d77b5665d57d8e97270f041a26e686569e49e8686b907dd206300490fd09d3fc",

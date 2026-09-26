@@ -100,11 +100,11 @@ def flat_only(pop: dict[str, set[str]], owners: dict[str, str]) -> dict[str, set
     """Keep only the unresolvable names THIS REPO owns — the ones a full name would fix.
 
     ⚑ THE FIRST CUT OVER-REPORTED, BECAUSE "mypy cannot resolve it" IS WIDER THAN "it is flat".
-    Measured: `paperkit/tools/vfs.py` was listed for `pygit2` and `tools/otlp_push.py` for three
-    `opentelemetry.proto.*` modules.  Those are genuine third-party dependencies — pygit2 is not
-    installed, and the otlp protos are fetched on demand by the hook's `uv run --with`.  Neither
-    is fixable by naming an import in full; they need a stub or a declared dependency, which is a
-    different job with a different owner.
+    Measured: `paperkit/tools/vfs.py` was listed for `pygit2` and `tools/otlp_push.py` (since
+    retired, 1d84146) for three `opentelemetry.proto.*` modules.  Those were genuine third-party
+    dependencies — pygit2 is not installed, and the otlp protos were fetched on demand by the
+    hook's `uv run --with`.  Neither is fixable by naming an import in full; they need a stub or
+    a declared dependency, which is a different job with a different owner.
 
     Counting them inflated the population by two files and 386 ruff findings — 13% of the total —
     and the two are the 1st and 2nd most expensive files in the whole set, so the distortion fell

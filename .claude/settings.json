@@ -78,7 +78,14 @@
     "real and accepted — a symlink adopter inherits upstream's bugs as well as its fixes, and",
     "substrate's tree is red and uncommitted as this lands.",
     "",
-    "VERIFY BY MAKING IT FIRE, NEVER BY READING THIS FILE."
+    "VERIFY BY MAKING IT FIRE, NEVER BY READING THIS FILE.",
+    "",
+    "⚑ W22 (2026-09-26): THE PYCHECK HOOK IS NOW THIS REPO'S PINNED CONSOLE SCRIPT,",
+    ".venv/bin/mikemol-hook-pycheck, from mikemol-hooks declared in pyproject's dev group at an mtools",
+    "sha (not a symlink into substrate's working tree). The symlink inherited upstream's fixes AND its",
+    "breakage live; a pin moves only when this repo moves it, and its ruff/mypy versions are the",
+    "locked ones rather than whatever substrate's tree holds that minute. The other hooks stay",
+    "symlinks until the same move is made for each."
   ],
   "hooks": {
     "PreToolUse": [
@@ -95,7 +102,7 @@
         "hooks": [
           {"type": "command", "command": "GATE_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_gate_running.py\""},
           {"type": "command", "command": "SHELLCHECK_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_shellcheck.py\""},
-          {"type": "command", "command": "PYCHECK_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_pycheck.py\""}
+          {"type": "command", "command": "PYCHECK_HOOK_BLOCK=1 \"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-pycheck\""}
         ]
       }
     ],

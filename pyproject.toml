@@ -323,4 +323,14 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 dev = [
     "ruff",
     "mypy>=1.8",
+    # W22 — the PreToolUse pycheck hook (.claude/settings.json runs .venv/bin/mikemol-hook-pycheck).
+    # A REAL dependency, pinned to an mtools sha on GitHub: not a symlink into a sibling checkout
+    # (which moved with substrate's working tree), not `git+file` (which resolves only on a machine
+    # holding that checkout), and not an override-only entry (an override re-versions a package
+    # without adding it — linux-sources measured that dropping the dep that pulled it in would
+    # silently uninstall every armed hook).  The MARKER is required, not decoration: mikemol-hooks
+    # needs Python >= 3.13 while paperkit's floor is 3.11 (what a CONSUMER installs against), and
+    # uv refuses the lock outright otherwise.  Raising the ENGINE's floor for a DEV hook would change
+    # the consumer contract for a tool no consumer runs; the dev venv is 3.13, so the hook is there.
+    "mikemol-hooks @ git+https://github.com/mikemol/mtools.git@fca9db7b508ebf84c6e7664de35f658e4ff36c8f#subdirectory=hooks ; python_full_version >= '3.13'",
 ]

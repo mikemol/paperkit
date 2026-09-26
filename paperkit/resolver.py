@@ -551,13 +551,15 @@ CHECK_TIMEOUT = 600     # wall-clock BACKSTOP for a stuck-waiting (zero-CPU) pro
 
 
 def _cpu_rlimit(seconds: int):
-    """A preexec_fn that caps the child's (and its tree's) CPU time — SIGXCPU at `seconds`, SIGKILL a
-    few seconds later.  Runs in the forked child before exec, so the whole check subprocess is bounded
+    """A preexec_fn that caps the child's (and its tree's) CPU time — SIGKILL at `seconds` (soft ==
+    hard since W42, so no SIGXCPU and no coredump record for an expected cap kill).  Runs in the forked child before exec, so the whole check subprocess is bounded
     by WORK DONE, not wall time.
     """
     def _set():
         import resource
-        resource.setrlimit(resource.RLIMIT_CPU, (seconds, seconds + 3))
+        # W42 — soft == hard: the first action is SIGKILL, so an expected CPU-cap kill leaves no
+        # coredump record (soft < hard sent SIGXCPU first, which systemd-coredump logs as a crash).
+        resource.setrlimit(resource.RLIMIT_CPU, (seconds, seconds))
         # Ζ·core·off — SIGXCPU's default action dumps core; the verdict reads the exit, never a core.
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     return _set

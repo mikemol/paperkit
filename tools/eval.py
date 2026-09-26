@@ -44,7 +44,6 @@ from tools import cellargs, cellcgroup, cellstage
 
 CANNOT_RUN = 3
 WHY_CHARS = 300
-CPU_GRACE = 3
 BASELINE = "0"
 
 
@@ -62,7 +61,15 @@ def _cap_cpu(cpu: int) -> None:
     and "happens to be safe" is what the rule exists to catch.  Setting the limit on the parent
     lets the child inherit it across fork+exec, with no callback in the unsafe window.
     """
-    resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + CPU_GRACE))
+    # ⚑ W42 — SOFT == HARD.  With soft < hard the kernel sends SIGXCPU at the soft limit, whose
+    # default action is a core dump: even at RLIMIT_CORE=0 each one reached systemd-coredump as a
+    # crash record ("terminated abnormally with signal 24/XCPU"), so every mutant this cap stopped
+    # — the EXPECTED outcome — read on luthen as a crash (62 in six hours).  Measured by luthen:
+    # `prlimit --cpu=1 --core=0` → exit 137 (SIGKILL) and NO record; `--cpu=1:3` → exit 152 and a
+    # record.  With soft == hard the first action is SIGKILL, so a coredump means a real crash.
+    # The verdict does not change (_run folds any nonzero rc into a flip, -9 as -24 before); the
+    # grace seconds did nothing a spinning mutant needed.
+    resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
     # Ζ·core·off — SIGXCPU's default action DUMPS CORE, so every mutant this cap stops wrote a core
     # file the verdict never reads.  The kill is the signal; the dump is only I/O and disk.
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
@@ -309,6 +316,20 @@ def _run(check: str, claim: str, wall: int) -> tuple[bool, str]:
     # `Popen.returncode` is `int | Any` in typeshed (it is None before the child exits), so the
     # narrowing is at the read, not downstream: after communicate() it is always an int.
     rc: int = p.returncode
+    # ⚑ W42/W32 — A CAP KILL SAYS SO.  A child killed at the CPU cap (SIGKILL now that soft ==
+    # hard; SIGXCPU before) left only its last output line, which says nothing about why it died —
+    # the same blindness that let a deterministic CPU kill read as a "flake" in a consumer.  The
+    # verdict is unchanged (any nonzero rc is a flip); only the RECORDED reason gains the cause.
+    if rc in (-signal.SIGKILL, -signal.SIGXCPU):
+        cap = resource.getrlimit(resource.RLIMIT_CPU)[1]
+        used = resource.getrusage(resource.RUSAGE_CHILDREN)
+        cpu_s = used.ru_utime + used.ru_stime
+        # 90%, not ≥: the kernel kills AT the limit and the reaped child's accounted time lands just
+        # under it (measured: a 2s cap reported <2.0).  An OOM kill (-9 too) burns far less, so
+        # the margin still separates the two.
+        if cap != resource.RLIM_INFINITY and cpu_s >= 0.9 * cap:
+            return True, (f"exceeded its {cap}s CPU cap ({cpu_s:.1f}s used; killed by "
+                          f"{signal.Signals(-rc).name}) — the mutation made it spin, which is a flip")
     return rc != 0, _last_line(out)
 
 

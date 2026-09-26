@@ -20,13 +20,32 @@ PY="$PWD/.venv/bin/python"; [ -x "$PY" ] || PY=python3
 # shellcheck source=/dev/null  # per-clone, gitignored, absent by default — there is no file to
 # follow at analysis time, and pointing at an example would check the wrong content.
 [ -f .githooks/local.env ] && . .githooks/local.env
+# ⚑ W44 — THE LOGS SINK BY SERVICE NAME, NOT BY A COPIED ADDRESS.  local.env's pointers are per-clone
+# COPIES of an address, and copies rot: all three went dead with the host move and pushed nowhere for
+# a day.  So the default is QUERIED from luthen's endpoint directory by NAME (the same directory
+# tools/project_endpoints.py projects .bazelrc from), at the moment of use.  An operator's explicit
+# setting still WINS — local.env is theirs — and this is only the fallback when it is unset.  The
+# query failing leaves it empty, which the push below already treats as "no sink" (never fatal).
+: "${PAPERKIT_LOGS_URL:=$("$PY" tools/project_endpoints.py --get victorialogs-http /insert/jsonline 2>/dev/null || true)}"
+# W44 — a best-effort step that FAILS says so.  `|| true` is what hid a killed otlp_push (a whole-file
+# read of a 139 GB log, the likely trigger of a host-wide OOM): the log went from `[killed]` straight
+# to `ok: bazel test //:hook`.  Still never fatal — telemetry must not block a commit — but LOUD.
+_pk_best_effort() {
+  _pk_desc=$1; shift
+  if "$@"; then :; else
+    echo "[pre-commit] best-effort step FAILED (rc=$?): $_pk_desc — not fatal, but not silent" >&2
+  fi
+}
 # Ρ·telemetry·share — NAME a configured endpoint that does not answer.  These are per-clone
 # pointers and they go stale silently: VM/VLogs moved to k8s NodePorts and this clone pushed at
 # the retired ports for a day, losing every run's telemetry, because a best-effort pusher cannot
 # fail a commit and so said nothing.  The pushers stay best-effort — that is right — but a dead
 # pointer is now VISIBLE at the top of the run instead of a shrug in the middle of it.  Probe
 # only, never fatal: an unreachable sink must not stop a commit.
-for _pk_ep in "${PAPERKIT_OTLP_METRICS:-}" "${PAPERKIT_LOGS_URL:-}" "${PAPERKIT_BES:-}"; do
+# (W44: PAPERKIT_BES is no longer consulted — the `cas` config's BES applies — so it is not probed.
+# PAPERKIT_OTLP_METRICS is probed though nothing pushes to it now: a dead pointer left in local.env
+# should still be SEEN, so the operator can clean it up.)
+for _pk_ep in "${PAPERKIT_OTLP_METRICS:-}" "${PAPERKIT_LOGS_URL:-}"; do
   [ -n "$_pk_ep" ] || continue
   _pk_hp=$(printf '%s' "$_pk_ep" | sed -e 's|^[a-z+]*://||' -e 's|/.*$||')
   case "$_pk_hp" in *:*) : ;; *) continue ;; esac
@@ -218,10 +237,10 @@ PK_SWEEP_RAM=$("$PY" tools/sweep_budget.py)
 # survive only in whatever /tmp file the next run overwrote.  Measured this session: a 4-hour red
 # hook's entire diagnosis existed in one such file.
 PK_HOOKLOG=$(mktemp -p "$PK_TMPDIR" hooklog.XXXXXX)   # Ζ·execlog·leak — off tmpfs, trap-owned
-# Ρ·telemetry·bes — Bazel's FIRST-PARTY event stream, when a machine points at one.  Per-target
-# results and per-action timing straight from bazel, so it cannot drift from a text format.
-PK_BES=""
-[ -n "${PAPERKIT_BES:-}" ] && PK_BES="--bes_backend=${PAPERKIT_BES} --bes_upload_mode=fully_async"
+# Ρ·telemetry·bes — Bazel's FIRST-PARTY event stream.  ⚑ W44: NO OVERRIDE HERE ANY MORE.  This line
+# passed --bes_backend=$PAPERKIT_BES from local.env, which OVERRODE .bazelrc's `cas` config — whose
+# address tools/project_endpoints.py keeps current by name — with a per-clone copy that went dead
+# (a loopback NodePort from the previous host).  The `cas` config's BES applies to every build.
 # NOT wrapped in run(): run() exits on failure, and telemetry that only fires on success loses
 # exactly the builds worth keeping.  Capture the rc, push either way, THEN decide.
 # Redirect to the file and TAIL it to fd 3, rather than piping through tee: this hook is
@@ -255,14 +274,9 @@ PK_COORDLOG="$PK_TMPDIR/pk-coord-$$.jsonl"   # Ζ·execlog·leak — was ${TMPDI
 # input manifest, which telemetry never reads.  Operator: "we don't need the log."  Metrics now
 # come from BuildBuddy's records as bounded aggregates (W44); if a full log is ever wanted, it goes
 # to a btrfs-on-zram target with bees on top, retained as that store needs — never md0.
-# shellcheck disable=SC2086  # $PK_BES is EITHER empty OR two flags (--bes_backend=… and
-# --bes_upload_mode=…); word-splitting is how it expands to two arguments.  Quoted, an unset
-# endpoint would pass "" as a bazel argument and a set one would pass both flags as a single
-# malformed token.  The empty-by-default case is the common one, which is why this is unquoted.
 "$PY" tools/cpuweight.py --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
     --exec bazel test //:hook --config=mutant --config=remote \
-    --local_resources=memory="$PK_SWEEP_RAM" \
-    $PK_BES > "$PK_HOOKLOG" 2>&1
+    --local_resources=memory="$PK_SWEEP_RAM" > "$PK_HOOKLOG" 2>&1
 PK_HOOK_RC=$?
 # Ζ·execlog·leak — the samplers are stopped HERE so their output is complete before the pushers
 # read it; the trap repeats these kills for the paths that never reach this line (a `kill` on an
@@ -281,14 +295,14 @@ PK_SECS=$(( $(date +%s) - PK_T0 ))
 # crossed the first time (making mem_learn DEPEND on the cells was measured at 41,468 deps).
 # Runs on RED as well as green: a failed build still measured whatever cells it got through.
 for _p in library paper .; do
-  "$PY" tools/mem_harvest.py "$_p" --run "${PK_T0}-$$" >/dev/null 2>&1 || true
+  _pk_best_effort "mem_harvest $_p" "$PY" tools/mem_harvest.py "$_p" --run "${PK_T0}-$$"
 done
 
 if [ -n "${PAPERKIT_LOGS_URL:-}" ]; then
   # Findings only: the spawn timeline came from the execution log (Ζ·execlog·drop); the live
   # per-action stream is BES and BuildBuddy's execution records.
-  "$PY" tools/logs_push.py "$PK_HOOKLOG" --rc "$PK_HOOK_RC" --seconds "$PK_SECS" \
-      --run-id "${PK_T0}-$$" || true
+  _pk_best_effort "logs_push" "$PY" tools/logs_push.py "$PK_HOOKLOG" --rc "$PK_HOOK_RC" \
+      --seconds "$PK_SECS" --run-id "${PK_T0}-$$"
 fi
 # Ζ·execlog·leak — the `rm -f "$PK_EXECLOG" "$PK_HOOKLOG"` that stood here is GONE, and its
 # absence is the fix: it ran only when control reached this line, which a killed or crashed run

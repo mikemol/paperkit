@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""The check RESOLVER — paperkit's check-resolution core, factored out of the gate so it
-can be imported and tested with a SMALL blast radius (no projector, no parallel gate loop,
-no config/CLI).  A verifier is named `type:target`; this module is the registry that
+"""The check RESOLVER — paperkit's check-resolution core, factored out of the gate.
+
+Can be imported and tested with a SMALL blast radius (no projector, no parallel gate loop, no
+config/CLI). A verifier is named `type:target`; this module is the registry that
 dispatches it, one branch per VERB.
 
 The built-in verb SET is not written in this docstring: it is the DATA in VERBS below, the one
@@ -88,6 +89,9 @@ class Verdict:
     """
 
     __slots__ = ("_name", "_owner", "_why")
+    _name: str
+    _owner: str
+    _why: str
 
     def __init__(self, name: str, why: str = "", owner: str = "") -> None:
         object.__setattr__(self, "_name", name)
@@ -128,14 +132,18 @@ UNAVAILABLE = Verdict("UNAVAILABLE")
 
 
 def unavailable(why: str = "", owner: str = "") -> Verdict:
-    """A cannot-run that CARRIES what would fix it.  Bare (no reason) returns the interned
+    """A cannot-run that CARRIES what would fix it.
+
+    Bare (no reason) returns the interned
     singleton, so existing `is UNAVAILABLE` checks keep holding for the reasonless case.
     """
     return Verdict("UNAVAILABLE", why, owner) if (why or owner) else UNAVAILABLE
 
 
 def _pf(ok: bool, why: str = "", owner: str = "") -> Verdict:
-    """A check that RAN and decided: True → PASS, False → FAIL.  (Never UNAVAILABLE — that is the
+    """A check that RAN and decided: True → PASS, False → FAIL.
+
+    (Never UNAVAILABLE — that is the
     could-not-evaluate seam, returned explicitly at each such site.)
 
     ⚑ Ζ·fail·why — A FAILING CHECK MAY CARRY ITS LAST LINE, exactly as a cannot-run does.  Bare
@@ -201,7 +209,9 @@ def _sibling_for(project_dir: Path | None, name: str) -> Path:
 
 
 def _library_for(project_dir: Path | None) -> Path:
-    """Λ·library·seam — WHOSE concept library resolves a `concept:<key>`?  The CONSUMING project's,
+    """Λ·library·seam — WHOSE concept library resolves a `concept:<key>`?
+
+    The CONSUMING project's,
     if it has one; only then the engine's.
 
     This was engine-relative alone, which is invisible from inside this repo (every project here
@@ -344,11 +354,13 @@ VERBS = {
     "cmd":     {"arg": "<script>",    "verb": "execs",   "crosses": False,
                 "passes": "the script exits `0`"},
     "result":  {"arg": "<project>[#<claim>]", "verb": "parses", "crosses": True,
-                "passes": "the sibling project's gate verdict parses green --- for the whole project, or for the ONE named warrant"},
+                "passes": "the sibling project's gate verdict parses green --- for the whole "
+                          "project, or for the ONE named warrant"},
     "agree":   {"arg": "<p>|||<q>",   "verb": "concurs", "crosses": False,
                 "passes": "the independent producers all exit `0` and emit identical output"},
     "concept": {"arg": "<key>",       "verb": "imports", "crosses": True,
-                "passes": "the project's concept library --- else the engine's --- certifies that key"},
+                "passes": "the project's concept library --- else the engine's --- certifies "
+                          "that key"},
 }
 
 # The `type:` prefixes of the boundary-crossing verbs — startswith()-ready, DERIVED so a consumer
@@ -377,7 +389,9 @@ _ENV_DROP = {"PAPERKIT_ROOT"}
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel hosts
 # the mechanism only).
 PATH = config.Param("path", "PAPERKIT_PATH",
-                    help="pin tool resolution to these absolute dirs (colon-separated) instead of the host PATH — reproducibility, and dropping user-writable shadow dirs")
+                    help="pin tool resolution to these absolute dirs (colon-separated) instead "
+                         "of the host PATH — reproducibility, and dropping user-writable "
+                         "shadow dirs")
 
 # ⚑ Ζ·dispatch·pythonpath — THE DECLARED PASSTHROUGH FOR "WHERE IS THE ENGINE IMPORTABLE FROM".
 #
@@ -412,11 +426,15 @@ PATH = config.Param("path", "PAPERKIT_PATH",
 # (arg > env > paper.toml), and the table renders `—` like every other unset knob.
 ENGINE_PATH = config.Param(
     "engine-path", "PAPERKIT_PYTHONPATH",
-    help="the directory `paperkit` is importable from, exported to every check as PAPERKIT_PYTHONPATH — a DECLARED passthrough across clean_env's default-deny, which drops the ambient PYTHONPATH (unset: the engine's own location)")
+    help="the directory `paperkit` is importable from, exported to every check as "
+         "PAPERKIT_PYTHONPATH — a DECLARED passthrough across clean_env's default-deny, "
+         "which drops the ambient PYTHONPATH (unset: the engine's own location)")
 
 
-def spawn_declared(cmd: str, cwd, payload: str, records=None) -> "subprocess.CompletedProcess":
-    """⚑ Ζ·spawn·owner — RUN A PROJECT-DECLARED COMMAND AS A GATED CHECK.  The ONE owner of
+def spawn_declared(cmd: str, cwd, payload: str, records=None) -> subprocess.CompletedProcess:
+    """⚑ Ζ·spawn·owner — RUN A PROJECT-DECLARED COMMAND AS A GATED CHECK.
+
+    The ONE owner of
     "spawn something a document declared, under the engine's rules".
 
     `genre.py` re-implemented this shape — sanitized env, a temp-file side channel for the
@@ -458,8 +476,9 @@ def spawn_declared(cmd: str, cwd, payload: str, records=None) -> "subprocess.Com
 
 
 def clean_env(env: dict | None = None) -> dict:
-    """A sanitized environment for running a check: the controlled allow-list only, so
-    no LD_PRELOAD/IFS/BASH_ENV/PYTHONPATH and the like reach the command.  PATH's relative
+    """A sanitized environment for running a check: the controlled allow-list only.
+
+    No LD_PRELOAD/IFS/BASH_ENV/PYTHONPATH and the like reach the command.  PATH's relative
     and empty entries are dropped (Τ·path) — they would resolve a tool to the cwd (the
     project dir being gated), so a document could shadow a tool by planting it beside itself.
     """
@@ -522,57 +541,80 @@ def clean_env(env: dict | None = None) -> dict:
     # keep ABSOLUTE entries only (a relative/empty one resolves a tool to the gated cwd), and
     # DEDUPE keeping the first occurrence (first-match resolution is unchanged; the host PATH
     # carries the same dir many times — ~/.lmstudio/bin six times here).
+    # W126/W59 — engine-level counterpart of the hook's PATH-leak fix: drop every entry under
+    # the repo root, so an active repo venv on PATH cannot shadow a system tool for ANY caller,
+    # not just the pre-commit hook's own invocation.
+    root = Path(__file__).resolve().parent.parent
     seen, dirs = set(), []
     for p in raw:
-        if p and os.path.isabs(p) and p not in seen:
-            seen.add(p)
-            dirs.append(p)
+        if not (p and os.path.isabs(p) and p not in seen):
+            continue
+        rp = Path(p).resolve()
+        if rp == root or root in rp.parents:
+            continue
+        seen.add(p)
+        dirs.append(p)
     out["PATH"] = os.pathsep.join(dirs)
     return out
 
 
-# A check must TERMINATE to pass.  A mutation can make a witness non-terminating — a flip: inverting a
-# `while` condition (bib._unescaped_braces' escaped-backslash loop is the live example), a branch: that
-# removes a loop's exit — and without a bound the sweep spins forever on that one cell instead of
-# recording the flip.  So a check that does not finish reads FAIL (the mutation changed behaviour — the
-# pristine check terminates, the mutant does not, which IS the sensitivity the sweep measures).
+# A check must TERMINATE to pass.  A mutation can make a witness non-terminating — a flip:
+# inverting a `while` condition (bib._unescaped_braces' escaped-backslash loop is the live
+# example), a branch: that removes a loop's exit — and without a bound the sweep spins forever on
+# that one cell instead of recording the flip.  So a check that does not finish reads FAIL (the
+# mutation changed behaviour — the pristine check terminates, the mutant does not, which IS the
+# sensitivity the sweep measures).
 #
-# The bound is CPU TIME, not wall clock — this is the honest measure under paperkit's own scheduling.
-# A mutation-induced hang is a BUSY loop at 100% CPU, so it trips a CPU limit almost immediately; a
-# check that is merely SLOW because it is lease-QUEUED (the membudget semaphore) or descheduled under
-# load burns little CPU and is NOT false-failed, which a wall-clock timeout would do (it was descheduled,
-# not looping).  RLIMIT_CPU is kernel-enforced (SIGXCPU at the soft limit, SIGKILL at the hard) and
-# INHERITED by the child tree, set in a preexec_fn before exec.  A generous WALL BACKSTOP still catches
-# the rare stuck-WAITING process that burns no CPU (a deadlocked I/O wait a CPU limit would never trip).
-# Ample for any single real check (a def-sweep's minutes are MANY checks, not one CPU-heavy one);
-# PAPERKIT_CHECK_CPU / PAPERKIT_CHECK_TIMEOUT override.
-CHECK_CPU = 60          # seconds of CPU time — a busy hang trips this; a lease-queued check does not
+# The bound is CPU TIME, not wall clock — this is the honest measure under paperkit's own
+# scheduling. A mutation-induced hang is a BUSY loop at 100% CPU, so it trips a CPU limit almost
+# immediately; a check that is merely SLOW because it is lease-QUEUED (the membudget semaphore) or
+# descheduled under load burns little CPU and is NOT false-failed, which a wall-clock timeout would
+# do (it was descheduled, not looping).  RLIMIT_CPU is kernel-enforced (SIGXCPU at the soft limit,
+# SIGKILL at the hard) and INHERITED by the child tree, set in a preexec_fn before exec.  A
+# generous WALL BACKSTOP still catches the rare stuck-WAITING process that burns no CPU (a
+# deadlocked I/O wait a CPU limit would never trip). Ample for any single real check (a def-sweep's
+# minutes are MANY checks, not one CPU-heavy one); PAPERKIT_CHECK_CPU / PAPERKIT_CHECK_TIMEOUT
+# override.
+CHECK_CPU = 60          # seconds of CPU time — a busy hang trips this; a lease-queued check
+                        # does not
 CHECK_TIMEOUT = 600     # wall-clock BACKSTOP for a stuck-waiting (zero-CPU) process
 
 
 def _cpu_rlimit(seconds: int):
-    """A preexec_fn that caps the child's (and its tree's) CPU time — SIGKILL at `seconds` (soft ==
-    hard since W42, so no SIGXCPU and no coredump record for an expected cap kill).  Runs in the forked child before exec, so the whole check subprocess is bounded
-    by WORK DONE, not wall time.
+    """A preexec_fn that caps the child's (and its tree's) CPU time.
+
+    SIGKILL at `seconds` (soft == hard since W42, so no SIGXCPU and no coredump record for an
+    expected cap kill).  Runs in the forked child before exec, so the whole check subprocess is
+    bounded by WORK DONE, not wall time.
     """
     def _set():
         import resource
+        # W78/W127 — setrlimit can LOWER but never RAISE a hard limit, so a NESTED invocation
+        # (already running under a tighter parent-imposed hard limit, e.g. inside a mutant sweep
+        # executor) must clamp to the inherited hard limit rather than assume `seconds` is
+        # reachable.
+        _, inherited_hard = resource.getrlimit(resource.RLIMIT_CPU)
+        cap = seconds if inherited_hard == resource.RLIM_INFINITY else min(seconds, inherited_hard)
         # W42 — soft == hard: the first action is SIGKILL, so an expected CPU-cap kill leaves no
         # coredump record (soft < hard sent SIGXCPU first, which systemd-coredump logs as a crash).
-        resource.setrlimit(resource.RLIMIT_CPU, (seconds, seconds))
-        # Ζ·core·off — SIGXCPU's default action dumps core; the verdict reads the exit, never a core.
+        resource.setrlimit(resource.RLIMIT_CPU, (cap, cap))
+        # Ζ·core·off — SIGXCPU's default action dumps core; the verdict reads the exit, never a
+        # core.
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     return _set
 
 
 def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
-    """Run a shell command: it RAN and exited 0 → PASS, ran and exited non-zero (or exceeded its CPU
-    budget / the wall backstop) → FAIL, could not be SPAWNED at all → UNAVAILABLE.  The last arm is the
-    same could-not-evaluate seam as the crossing verbs, one verb down: an un-spawnable cmd is not a
-    refuted claim, it is an unchecked one, and folding it into FAIL would be the exact bug this change
-    removes for the most-used verb.  A cmd that BURNS its CPU budget (a mutation-induced busy loop), by
-    contrast, IS a fail — a check that never answers has not passed, and the hang is a real behavioural
-    flip the sweep must see; measuring CPU not wall keeps a lease-queued check from a false FAIL.
+    """Run a shell command: it RAN and exited 0, or it did not.
+
+    Exited 0 → PASS, ran and exited non-zero (or exceeded its CPU budget / the wall backstop)
+    → FAIL, could not be SPAWNED at all → UNAVAILABLE.  The last arm is the
+    same could-not-evaluate seam as the crossing verbs, one verb down: an un-spawnable cmd is
+    not a refuted claim, it is an unchecked one, and folding it into FAIL would be the exact bug
+    this change removes for the most-used verb.  A cmd that BURNS its CPU budget (a
+    mutation-induced busy loop), by contrast, IS a fail — a check that never answers has not
+    passed, and the hang is a real behavioural flip the sweep must see; measuring CPU not wall
+    keeps a lease-queued check from a false FAIL.
     """
     import os
     import signal
@@ -615,7 +657,8 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
             # communicate() drains and waits in one call, so the timeout still bounds the run.
             _out, _err = p.communicate(timeout=wall)   # both PIPEs; communicate() drains both
             rc = p.returncode
-            # SIGXCPU (‑signal 24) / SIGKILL from the CPU rlimit ⇒ negative returncode ⇒ FAIL, not PASS.
+            # SIGXCPU (‑signal 24) / SIGKILL from the CPU rlimit ⇒ negative returncode ⇒ FAIL,
+            # not PASS.
             #
             # Ζ·tier·exit — rc 3 is CANNOT-RUN, not a failure.  pk_cmd (verb.bzl) has typed the exit
             # this way since the tier work ("rc 0 → pass · rc 3 → cannot-run · any other nonzero →
@@ -660,7 +703,8 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
             except ProcessLookupError:
                 pass
             p.wait()
-            return _pf(False)                            # did not terminate → FAIL (the mutation flipped it)
+            return _pf(False)                            # did not terminate → FAIL (the mutation
+                                                           # flipped it)
     except Exception:
         return UNAVAILABLE
 
@@ -668,7 +712,8 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
 def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
     typ, _, target = check.partition(":")
     if typ == "file":
-        return _pf((project_dir / target).exists())   # EXISTS — no subprocess → no lease; absent = FAIL
+        return _pf((project_dir / target).exists())   # EXISTS — no subprocess → no lease;
+                                                        # absence is FAIL
     if typ == "result":
         # Ξ·seam — result PARSES (VERBS names every verb; no ordinal here, an ordinal would
         # hardcode the set's size).  It imports a sibling project's gate VERDICT (gate --json) and
@@ -677,11 +722,11 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         # target is the sibling's path relative to it.  Δ grades it "imported" (run once),
         # never mutation-sweeping a whole sub-gate.
         #
-        # TWO unavailables (ask-result-tristate): the sibling gate RAN but reports it could not set
-        # ITSELF up (`--json.available` false, since the typed-gate-exit work) → UNAVAILABLE; and the
-        # subprocess could not run at all (sibling UNREACHABLE — absent path, mid-refactor) → also
-        # UNAVAILABLE.  Neither is a REFUTATION of the importing claim; only a sibling that RAN and
-        # reported not-pass is FAIL.
+        # TWO unavailables (ask-result-tristate): the sibling gate RAN but reports it could not
+        # set ITSELF up (`--json.available` false, since the typed-gate-exit work) →
+        # UNAVAILABLE; and the subprocess could not run at all (sibling UNREACHABLE — absent
+        # path, mid-refactor) → also UNAVAILABLE.  Neither is a REFUTATION of the importing
+        # claim; only a sibling that RAN and reported not-pass is FAIL.
         #
         # Λ·reduce — `project#claim` addresses ONE of the sibling's warrants.  Bare `project` keeps
         # whole-project semantics unchanged.  The finer form exists because a claim that names a
@@ -724,11 +769,12 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
                                target)
     if typ == "concept":
         # Λ·witness — a concept: check IMPORTS a concept authored and GRADED once in the library.
-        # For the LIVE verdict (the direct-CLI gate path; the Bazel //:hook path reads the library's
-        # records via pk_result/pk_grade), RUN the library witness by ABSOLUTE path — the concept is
-        # OWNED and separately gated by the library, so this is COMPOSITION (like result:), not
-        # re-authoring.  The witness resolves its own engine via __file__, so the importing view needs
-        # nothing staged; its adequacy is the imported certificate (verdict + engine fingerprint).
+        # For the LIVE verdict (the direct-CLI gate path; the Bazel //:hook path reads the
+        # library's records via pk_result/pk_grade), RUN the library witness by ABSOLUTE path —
+        # the concept is OWNED and separately gated by the library, so this is COMPOSITION (like
+        # result:), not re-authoring.  The witness resolves its own engine via __file__, so the
+        # importing view needs nothing staged; its adequacy is the imported certificate (verdict
+        # + engine fingerprint).
         try:
             lib = _library_for(project_dir)
             r = subprocess.run(_library_cmd(lib, target),
@@ -771,8 +817,9 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
             return _pf(r.returncode == 0)
         except Exception as e:
             # The library is unreachable — the concept analogue of the sibling case above.
-            return unavailable(f"the concept library could not be run: {type(e).__name__}: {e}"[:400],
-                               target)
+            return unavailable(
+                f"the concept library could not be run: {type(e).__name__}: {e}"[:400],
+                target)
     if typ == "agree":
         # Δ·agree (Ε·agree) — agree CONCURS (see VERBS; no ordinal, no count).
         # The SAME fact established by N INDEPENDENT producers (split on |||) that
@@ -781,14 +828,16 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         # single check cannot catch: stronger evidence, a distinct KIND.
         producers = [p.strip() for p in target.split("|||") if p.strip()]
         if len(producers) < 2:
-            return FAIL                               # agreement needs ≥2 producers — a real defect, not unavailable
+            return FAIL                               # agreement needs ≥2 producers — a real
+                                                        # defect, not unavailable
         outs = set()
         for prod in producers:
             try:
                 r = subprocess.run(prod, shell=True, cwd=project_dir, env=clean_env(),
                                    capture_output=True, text=True)
             except Exception:
-                return UNAVAILABLE                    # a producer could not be SPAWNED — cannot evaluate
+                return UNAVAILABLE                    # a producer could not be SPAWNED — cannot
+                                                       # evaluate
             # ⚑ Ε·fold — rc 3 IS CANNOT-RUN HERE TOO, and `!= 0` was scoring it as a refutation.
             # `run_ok` has carried this arm since the tier work ("rc 0 → pass · rc 3 → cannot-run ·
             # any other nonzero → fail"), and its comment names the exact hazard: ONE check
@@ -828,6 +877,7 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
 
 def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str | None:
     """The shell command a check RUNS — or None for file:, which opens only its target.
+
     The single source of the command behind cmd:/custom/result:, so footprint() traces
     exactly what resolves() runs.
     """
@@ -869,9 +919,10 @@ _OPEN_RE = re.compile(
     r'\s*=\s*(?P<rc>-?\d+)')
 
 
-def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> "list | None":
-    """Φ·footprint PARSE (pure) — the READ files in an strace openat/open trace, `scope`-relative:
-    a successful open (rc≥0) that is not write-only, of a real file under `scope`.  SPLIT from the
+def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> list | None:
+    """Φ·footprint PARSE (pure) — the READ files in an strace openat/open trace, `scope`-relative.
+
+    A successful open (rc≥0) that is not write-only, of a real file under `scope`.  SPLIT from the
     CAPTURE (the strace subprocess — a process op = Bazel's job, Φ·spawn·foot), so the parse (the
     paperkit-owned logic: which opens count as inputs) is testable IN-PROCESS over a canned trace,
     not by running strace.  Returns the sorted read set; None if the trace shows NO opens at all
@@ -882,13 +933,16 @@ def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> "list | None
         m = _OPEN_RE.search(line)
         if not m:
             continue                                  # unparsed line
-        traced = True                                 # an open logged — strace DID attach (any real process opens libc)
+        traced = True                                 # an open logged — strace DID attach (any
+                                                        # real process opens libc)
         if m.group("rc").startswith("-") or "O_WRONLY" in m.group("flags"):
-            continue                                  # failed open, or write-only = output, not an input
+            continue                                  # failed open, or write-only = output, not
+                                                        # an input
         raw = m.group("path")
         p = (Path(raw) if raw.startswith("/") else project_dir / raw).resolve()
         if not p.is_file():
-            continue                                  # directories (O_DIRECTORY), /dev nodes, gone — not a hashable input
+            continue                                  # directories (O_DIRECTORY), /dev nodes,
+                                                        # gone — not a hashable input
         try:
             reads.add(str(p.relative_to(scope)))
         except ValueError:
@@ -897,7 +951,7 @@ def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> "list | None
 
 
 def producer_footprints(check: str, project_dir: Path, custom: dict,
-                        scope: "Path | None" = None) -> "dict | None":
+                        scope: Path | None = None) -> dict | None:
     """Ε·corro·phi — Φ per PRODUCER, for an `agree:` check.  {producer: [reads]}, or None.
 
     `footprint()` traces the whole check and returns ONE list; for `agree:` the traced command is
@@ -937,7 +991,7 @@ def producer_footprints(check: str, project_dir: Path, custom: dict,
 
 
 def corroboration_of(check: str, project_dir: Path, custom: dict,
-                     scope: "Path | None" = None) -> "tuple | None":
+                     scope: Path | None = None) -> tuple | None:
     """Ε·corro·phi — the CORROBORATION verdict for an `agree:`, from measured footprints.
 
     Returns (value, shared) where value is `independent` (pairwise-disjoint reads — no shared
@@ -957,9 +1011,10 @@ def corroboration_of(check: str, project_dir: Path, custom: dict,
     return ("correlated", sorted(shared)) if shared else ("independent", [])
 
 
-def footprint(check: str, project_dir: Path, custom: dict, scope: "Path | None" = None) -> list:
-    """Φ·footprint — the READ footprint: the files this check OPENS for reading when it runs
-    (traced with strace), relative to `scope` (default the project dir).  A SOUND basis for
+def footprint(check: str, project_dir: Path, custom: dict, scope: Path | None = None) -> list:
+    """Φ·footprint — the READ footprint: the files this check OPENS for reading when it runs.
+
+    (Traced with strace), relative to `scope` (default the project dir).  A SOUND basis for
     caching: a check is a pure function of its inputs, so if a diff touches none of these the
     verdict cannot change.  Distinct from the SENSITIVITY footprint (Δ's `tests` = files a single
     mutation flips) — a negative-assertion check reads inputs no corruption flips, so reads ⊇
@@ -986,10 +1041,11 @@ def footprint(check: str, project_dir: Path, custom: dict, scope: "Path | None" 
                             "sh", "-c", cmd], cwd=project_dir, env=clean_env(), capture_output=True)
         except FileNotFoundError:
             return None                                   # Φ·degrade: strace not installed
-        # Φ·degrade: when strace cannot trace — absent (above) or unable to ATTACH (no ptrace, e.g. a
-        # hardened container → an EMPTY trace) — parse_reads returns None, never [].  [] means "reads
-        # nothing": it hashes stable (the cache would over-reuse a grade whose inputs we never saw) and
-        # scopes the sweep to nothing (a wrong vacuous grade).  None ⇒ don't-cache + full-surface sweep.
+        # Φ·degrade: when strace cannot trace — absent (above) or unable to ATTACH (no ptrace,
+        # e.g. a hardened container → an EMPTY trace) — parse_reads returns None, never [].  []
+        # means "reads nothing": it hashes stable (the cache would over-reuse a grade whose
+        # inputs we never saw) and scopes the sweep to nothing (a wrong vacuous grade).  None ⇒
+        # don't-cache + full-surface sweep.
         return parse_reads(trace.read_text(errors="replace"), project_dir, scope)
     finally:
         trace.unlink(missing_ok=True)

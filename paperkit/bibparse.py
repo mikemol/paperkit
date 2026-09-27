@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
-"""Ζ·bib·parser — a REAL parser for paperkit's bibliography format.
+r"""Ζ·bib·parser — a REAL parser for paperkit's bibliography format.
 
 ⚑ WHY THIS EXISTS, AND WHY A SCANNER WAS NOT ENOUGH.  `bib.parse` read entries with a regex
-(`@\\w+\\{...(.*?)\\n\\}`), which TRUNCATED an entry at the first line-initial `}`: an entry whose
+(`@\w+\{...(.*?)\n\}`), which TRUNCATED an entry at the first line-initial `}`: an entry whose
 value held a brace at column 0 parsed with ZERO FIELDS while a reader reported `2 of 2 entries`.
 A claim with no `check` is excluded from gate.py's `warrants` set, so the defect DISARMED a claim
 while the gate stayed green.  Replacing the regex with brace-counting fixed that — and then had
@@ -53,7 +52,8 @@ class BibSyntaxError(SyntaxError):
     permissive behaviour must ask for it explicitly rather than getting it by accident.
     """
 
-    def __init__(self, msg: str, path, line: int, col: int, excerpt: str = ""):
+    def __init__(self, msg: str, path: str, line: int, col: int, excerpt: str = "") -> None:
+        """Record the message and the position it was found at."""
         self.path, self.lineno, self.offset = str(path), line, col
         detail = f"{path}:{line}:{col}: {msg}"
         if excerpt:
@@ -67,7 +67,7 @@ class Entry:
 
     typ: str
     key: str
-    fields: dict = _dcfield(default_factory=dict)
+    fields: dict[str, str] = _dcfield(default_factory=dict)
     line: int = 0
 
     # Field ORDER is preserved (dicts are ordered): the projector renders in the file's order,
@@ -78,7 +78,7 @@ class Entry:
 class _Lexer:
     """Position-tracking character reader.  Owns line/col so every error can name its place."""
 
-    def __init__(self, text: str, path="<bib>"):
+    def __init__(self, text: str, path: str = "<bib>") -> None:
         self.t, self.path, self.i = text, path, 0
         self.line, self.col = 1, 1
 
@@ -104,7 +104,7 @@ class _Lexer:
                               self.t[nl:end if end >= 0 else len(self.t)])
 
     def skip_trivia(self) -> None:
-        """Whitespace and `%` comments — the only things allowed between entries.
+        """Consume whitespace and `%` comments — the only things allowed between entries.
 
         ⚑ A `%` comment is consumed HERE, in the lexer, so the entry grammar never sees one.
         That is what makes `% … [@key] …` harmless to THIS parser while a conforming BibTeX
@@ -122,7 +122,7 @@ class _Lexer:
                 return
 
     def escaped(self) -> bool:
-        """True if the char at `i` is preceded by an ODD run of backslashes (LaTeX-escaped)."""
+        """Return True if `i` is preceded by an ODD run of backslashes (LaTeX-escaped)."""
         n, j = 0, self.i - 1
         while j >= 0 and self.t[j] == "\\":
             n += 1
@@ -131,17 +131,18 @@ class _Lexer:
 
 
 def _name(lx: _Lexer, what: str) -> str:
-    """An identifier: entry type, key, or field name."""
+    """Parse an identifier: entry type, key, or field name."""
     start = lx.i
     while not lx.eof() and (lx.peek().isalnum() or lx.peek() in "-_.:/+"):
         lx.next()
     if lx.i == start:
-        raise lx.err(f"expected {what}")
+        msg = f"expected {what}"
+        raise lx.err(msg)
     return lx.t[start:lx.i]
 
 
 def _brace_value(lx: _Lexer) -> str:
-    """A `{…}` value, brace-counted, LaTeX-escapes skipped.
+    """Parse a `{…}` value, brace-counted, LaTeX-escapes skipped.
 
     ⚑ THIS IS WHERE THE RUNAWAY CASE IS DECIDED.  If the braces never balance we reach EOF, and
     that is a syntax error naming the line the value OPENED on — not a value that silently
@@ -150,7 +151,7 @@ def _brace_value(lx: _Lexer) -> str:
     the file is broken and where.
     """
     open_line, open_col = lx.line, lx.col
-    assert lx.next() == "{"
+    lx.next()  # the caller already confirmed this is `{` via peek()
     depth, start = 1, lx.i
     while not lx.eof():
         c = lx.peek()
@@ -164,59 +165,67 @@ def _brace_value(lx: _Lexer) -> str:
                     lx.next()
                     return v
         lx.next()
-    raise BibSyntaxError(
-        "unterminated value — the `{` opened here is never closed, so every field after it is "
-        "swallowed into this one", lx.path, open_line, open_col)
+    msg = ("unterminated value — the `{` opened here is never closed, so every field after it is "
+           "swallowed into this one")
+    raise BibSyntaxError(msg, lx.path, open_line, open_col)
 
 
-def _entry(lx: _Lexer) -> Entry:
-    assert lx.next() == "@"
-    line = lx.line
+def _entry_header(lx: _Lexer) -> tuple[str, str]:
+    """Parse `@type{key,` and return `(type, key)`, lowercasing and validating the type."""
+    lx.next()  # the caller already confirmed this is `@` via peek()
     typ = _name(lx, "an entry type after `@`")
     lx.skip_trivia()
     if lx.peek() == "(":
-        raise lx.err("paren-delimited entries `@type(...)` are not supported — no bib in this "
-                     "corpus uses one; write `@%s{...}` instead" % typ)
+        msg = (f"paren-delimited entries `@type(...)` are not supported — no bib in this "
+               f"corpus uses one; write `@{typ}{{...}}` instead")
+        raise lx.err(msg)
     if lx.peek() != "{":
-        raise lx.err(f"expected `{{` after `@{typ}`")
+        msg = f"expected `{{` after `@{typ}`"
+        raise lx.err(msg)
     lx.next()
     lx.skip_trivia()
     low = typ.lower()
     if low in ("string", "preamble", "comment"):
-        raise lx.err(f"`@{low}` is not supported — no bib in this corpus uses one, and "
-                     "supporting it silently would inherit a BibTeX feature paperkit has never "
-                     "needed; remove it or state the case for it")
+        msg = (f"`@{low}` is not supported — no bib in this corpus uses one, and "
+               "supporting it silently would inherit a BibTeX feature paperkit has never "
+               "needed; remove it or state the case for it")
+        raise lx.err(msg)
     key = _name(lx, "an entry key")
     lx.skip_trivia()
     if lx.peek() != ",":
-        raise lx.err(f"expected `,` after the key `{key}`")
+        msg = f"expected `,` after the key `{key}`"
+        raise lx.err(msg)
     lx.next()
+    return low, key
 
-    e = Entry(typ=low, key=key, line=line)
+
+def _entry_fields(lx: _Lexer, e: Entry, line: int) -> None:
+    """Parse the `name = {value},` list up to the entry's closing `}`, filling `e.fields`."""
     while True:
         lx.skip_trivia()
         if lx.eof():
-            raise BibSyntaxError(f"unterminated entry `{key}` — no closing `}}`",
-                                 lx.path, line, 1)
+            msg = f"unterminated entry `{e.key}` — no closing `}}`"
+            raise BibSyntaxError(msg, lx.path, line, 1)
         if lx.peek() == "}":
             lx.next()
-            return e
+            return
         fline, fcol = lx.line, lx.col
-        fname = _name(lx, f"a field name in `{key}`")
+        fname = _name(lx, f"a field name in `{e.key}`")
         lx.skip_trivia()
         if lx.peek() != "=":
-            raise lx.err(f"expected `=` after field `{fname}` in `{key}`")
+            msg = f"expected `=` after field `{fname}` in `{e.key}`"
+            raise lx.err(msg)
         lx.next()
         lx.skip_trivia()
         if lx.peek() != "{":
-            raise lx.err(
-                f"field `{fname}` in `{key}` must have a `{{…}}` value — quoted, bare and "
-                "concatenated values are not supported (no bib in this corpus uses one)")
+            msg = (f"field `{fname}` in `{e.key}` must have a `{{…}}` value — quoted, bare and "
+                   "concatenated values are not supported (no bib in this corpus uses one)")
+            raise lx.err(msg)
         val = _brace_value(lx)
         if fname in e.fields:
-            raise BibSyntaxError(
-                f"field `{fname}` is given twice in `{key}` — the second would silently replace "
-                "the first", lx.path, fline, fcol)
+            msg = (f"field `{fname}` is given twice in `{e.key}` — the second would silently "
+                   "replace the first")
+            raise BibSyntaxError(msg, lx.path, fline, fcol)
         # ⚑ THE VALUE IS CARRIED VERBATIM — no whitespace normalisation.  A first cut did
         # `" ".join(val.split())`, which strips trailing space, and `join = {. }` MEANS the
         # trailing space: it is the connector rendered between two clauses.  Normalising would
@@ -227,19 +236,29 @@ def _entry(lx: _Lexer) -> Entry:
         if lx.peek() == ",":
             lx.next()          # trailing comma before `}` is fine (34 in the corpus)
         elif lx.peek() != "}":
-            raise lx.err(f"expected `,` or `}}` after field `{fname}` in `{key}`")
+            msg = f"expected `,` or `}}` after field `{fname}` in `{e.key}`"
+            raise lx.err(msg)
 
 
-def parse(text: str, path="<bib>") -> list:
+def _entry(lx: _Lexer) -> Entry:
+    line = lx.line
+    low, key = _entry_header(lx)
+    e = Entry(typ=low, key=key, line=line)
+    _entry_fields(lx, e, line)
+    return e
+
+
+def parse(text: str, path: str = "<bib>") -> list[Entry]:
     """Every entry in `text`, in file order.  Raises BibSyntaxError on any malformed input."""
     lx = _Lexer(text, path)
-    out = []
+    out: list[Entry] = []
     while True:
         lx.skip_trivia()
         if lx.eof():
             return out
         if lx.peek() != "@":
-            raise lx.err("expected `@` to start an entry — text between entries must be a `%` "
-                         "comment (paperkit's extension) or whitespace; a bare `@` in prose "
-                         "starts an entry for a conforming BibTeX parser (Ζ·bib·strict)")
+            msg = ("expected `@` to start an entry — text between entries must be a `%` "
+                   "comment (paperkit's extension) or whitespace; a bare `@` in prose "
+                   "starts an entry for a conforming BibTeX parser (Ζ·bib·strict)")
+            raise lx.err(msg)
         out.append(_entry(lx))

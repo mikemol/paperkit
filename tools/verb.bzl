@@ -62,29 +62,46 @@ def _engine_importable():
     ⚑ SO THE EXECROOT IS THE PACKAGE ROOT, captured as an ABSOLUTE path BEFORE the `cd` into the
     project dir (the same `$PWD` idiom PAPERKIT_CONSUMED_RECORDS uses two lines down, and for the
     same reason: a check runs with cwd=project, so a relative entry would resolve wrong).
-    Appended to any inherited PYTHONPATH rather than replacing it — a `toolchain`-tier check
-    inherits the host env deliberately.
+    Appended to any inherited PYTHONPATH rather than replacing it — a `toolchain`-tier check's
+    action env carries a pinned PATH (Ζ·tier·pin), not the whole client environment, so PYTHONPATH
+    here is normally unset and this is a pure assignment in practice; appending is still correct
+    if some future tier widens what the action inherits.
     """
     return 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"; '
 
 def _verdict_tool(py, tool):
     return cell_pypath(py) + '"$(command -v python3)" ' + tool.path + " "
 
+
+# Ζ·tier·pin — the toolchain pool's PATH, PINNED as a build-graph VALUE instead of inherited via
+# use_default_shell_env (W87).  MEASURED, not guessed: image/executor/Containerfile's closing
+# comment records that a bazel action does NOT see the image's own ENV — only what the CLIENT
+# forwards, measured 2026-09-21 as exactly this string (the bazelisk dir is a per-client detail
+# excluded here; nothing in the toolchain-tier checks resolves bazelisk itself).  Every pinned
+# tool (pandoc, lualatex+kpsewhich, soffice, verapdf) is symlinked onto /usr/local/bin specifically
+# so PATH resolution finds it here.  Read against render/checks/lo-export.py and latex.py/a11y.py
+# (the soffice and verapdf callers) before pinning: neither reads $HOME for anything PATH does not
+# already cover — soffice's user profile is an explicit `tempfile.mkdtemp()`, never $HOME, and
+# veraPDF's $HOME read is only a PATH-resolution FALLBACK that a working PATH entry pre-empts.
+_TOOLCHAIN_PATH = "/usr/local/sbin:/usr/local/bin:/usr/bin"
+
 def _tier_exec(ctx, py, tier):
     """Ζ·tier — resolve a warrant's enforcement tier to the action's (execution_requirements,
-    use_default_shell_env, python-PATH-prefix, stamp inputs).  A `toolchain` check runs in the
-    executor pool whose IMAGE carries the toolchain IN FULL — pandoc/veraPDF/soffice/lualatex AND a
-    python with the render deps (pikepdf, …) — so it inherits the forwarded env (use_default_shell_env,
-    which is how the action gets a PATH at all) and drops the hermetic `_pypath` prepend so `python3`
-    resolves to the image's interpreter.  Sound: the check is deterministic given a PINNED image; the
-    cache key carries the image identity (ctx.info_file: STABLE_TOOLCHAIN_IMAGE, the pool's digest)."""
+    env, python-PATH-prefix, stamp inputs).  A `toolchain` check runs in the executor pool whose
+    IMAGE carries the toolchain IN FULL — pandoc/veraPDF/soffice/lualatex AND a python with the
+    render deps (pikepdf, …) — so it gets an explicit, PINNED `env` (not the client's whole
+    environment) carrying exactly the PATH those tools resolve on, and drops the hermetic
+    `_pypath` prepend so `python3` resolves to the image's interpreter.  Sound: the check is
+    deterministic given a PINNED image; the cache key carries the image identity (ctx.info_file:
+    STABLE_TOOLCHAIN_IMAGE, the pool's digest) — and now also a build-graph PATH value, not a
+    client-ambient one, so the action's result no longer depends on which shell invoked bazel."""
     er = {}
     # Ζ·toolchain·declare — EVERY tier stamps: a sandbox check runs in the DEFAULT pool and its verdict
     # is a function of that image (STABLE_EXECUTOR_IMAGE), a toolchain check of the paperkit pool's
     # (STABLE_TOOLCHAIN_IMAGE); both keys ride ctx.info_file.  Measured 2026-09-21: a default-image
     # rebuild left every sandbox verdict cached.
     stamp_inputs = [ctx.info_file]
-    host_env = False
+    env = {}
     pyprefix = cell_pypath(py)
     if tier == "local":
         er = {"local": "1", "no-sandbox": "1", "no-cache": "1", "no-remote": "1"}
@@ -94,9 +111,9 @@ def _tier_exec(ctx, py, tier):
         # those pinned the check to the HOST toolchain, resolved off $HOME and version banners, which
         # is the escape the executor exists to close (operator 2026-09-21: the executors were CREATED
         # because local sandbox runs had integrity problems).  Cacheable — the image is the toolchain.
-        host_env = True     # the client-forwarded env (PATH) is what an action sees in the pool — measured
+        env = {"PATH": _TOOLCHAIN_PATH}     # pinned, not client-forwarded — see Ζ·tier·pin above
         pyprefix = ""       # `python3` = the image's Debian interpreter, carrying the pk_render deps
-    return er, host_env, pyprefix, stamp_inputs
+    return er, env, pyprefix, stamp_inputs
 
 def _cmd_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
@@ -129,13 +146,13 @@ def _cmd_impl(ctx):
     #     it (Ζ·render·pool: exec_properties Pool, stamped by the generator).  DETERMINISTIC given a
     #     PINNED image, so it is CACHED and STAMPED with that image's digest (ctx.info_file,
     #     STABLE_TOOLCHAIN_IMAGE).  Cacheable = omit no-cache.
-    er, host_env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
+    er, env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
     # The ONE irreducibly-shell oracle: run the arbitrary `cmd` and read its exit code → $V; the
     # record itself is emitted by verdict.py (no JSON built in shell).
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool] + ctx.files.data + ctx.files.consumes + stamp_inputs, transitive = [py.files]),
-        use_default_shell_env = host_env,
+        env = env,
         # Ζ·sched-batch·phase2 — the check `inner` is an arbitrary compound shell command, not a
         # single exec, so we tune the ACTION SHELL ($$, single-threaded) and inner + the emit inherit
         # (SCHED_BATCH + nice 19 + 100ms slice), matching the per-cell tuning of the grid rules.
@@ -262,11 +279,11 @@ def _json_impl(ctx):
     py = ctx.toolchains[_PY].py3_runtime
     out = ctx.actions.declare_file(ctx.label.name + ".json")
     rc = ctx.actions.declare_file(ctx.label.name + ".rc")
-    er, host_env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
+    er, env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
     ctx.actions.run_shell(
         outputs = [out, rc],
         inputs = depset(ctx.files.data + stamp_inputs, transitive = [py.files]),
-        use_default_shell_env = host_env,
+        env = env,
         command = pyprefix + _engine_importable() + 'O="$PWD/' + out.path + '"; R="$PWD/' + rc.path +
                   '"; ( sh -c ' + _sq(ctx.attr.cmd) + ' ) > "$O" 2>/dev/null; echo "$?" > "$R"',
         mnemonic = "PkJson",
@@ -343,7 +360,7 @@ def _agree_impl(ctx):
     tool = ctx.file._tool
     # Ζ·tier — the PRODUCERS are the toolchain-coupled work (render's pandoc twice, etc.), so they carry
     # the tier's exec regime exactly like a pk_cmd; the final equality action is a pure verdict.py parse.
-    er, host_env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
+    er, env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
     if len(ctx.attr.producers) < 2:
         ctx.actions.run_shell(  # agreement needs >=2 independent producers
             outputs = [v],
@@ -370,7 +387,7 @@ def _agree_impl(ctx):
         ctx.actions.run_shell(  # each producer's output is an agglomerated INTERMEDIATE artifact
             outputs = [o],
             inputs = depset(stamp_inputs + ctx.files.data, transitive = [py.files]),
-            use_default_shell_env = host_env,
+            env = env,
             command = pyprefix + 'O="$PWD/' + o.path + '"; if ( ' + prefix + "sh -c " + _sq(prod) +
                       ' ) > "$O" 2>/dev/null; then :; else echo __FAIL__ > "$O"; fi',
             mnemonic = "PkProducer",

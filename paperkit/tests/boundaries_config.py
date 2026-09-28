@@ -138,7 +138,13 @@ def main() -> int:
     check("the kernel hosts ZERO Params (config.py is the mechanism alone)",
           not _hosted(mods["config"]))
     hosts = {s: _hosted(m) for s, m in mods.items()}
-    all_params = [(s, n, p_) for s, h in hosts.items() for n, p_ in h.items()]
+    # W64 -- a re-export (`from checkenv import PATH` inside resolver.py, so callers reaching
+    # `resolver.PATH` keep working) makes the SAME Param object an attribute of two modules'
+    # vars(); that is not a second DECLARATION, so dedupe by IDENTITY before the "one host"
+    # check -- the invariant being verified is "no two DISTINCT Param objects collide", which a
+    # re-exported reference to the one true owner does not violate.
+    all_params_raw = [(s, n, p_) for s, h in hosts.items() for n, p_ in h.items()]
+    all_params = list({id(p_): (s, n, p_) for s, n, p_ in all_params_raw}.values())
     check(f"every Param has exactly ONE host module ({len(all_params)} params)",
           len({id(p_) for _, _, p_ in all_params}) == len(all_params))
     names = [p_.name for _, _, p_ in all_params]

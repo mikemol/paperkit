@@ -21,7 +21,6 @@ result:, the library's concepts.py for concept:), never the rest of the engine.
 from __future__ import annotations
 
 import json
-import os
 import re
 import shlex
 import subprocess
@@ -29,7 +28,25 @@ import sys
 import tempfile
 from pathlib import Path
 
-import config
+# W64 -- clean_env/spawn_declared (+ their _ENV_KEEP/_ENV_KEEP_PREFIX/_ENV_DROP allow-list and
+# PATH/ENGINE_PATH Omega.config Params) moved to checkenv.py (W63): resolver.py was pycheck-dirty
+# and could not be edited in place, so the extraction landed as a new clean module first.
+# Re-exported here so every one of resolver.py's 7 internal clean_env() call sites, every
+# external `resolver.clean_env`/`resolver.spawn_declared` caller (genre.py, project.py,
+# paper/checks/claims.py), gate.py's direct `from resolver import (clean_env, _ENV_KEEP,
+# _ENV_KEEP_PREFIX)`, and every direct `resolver.PATH`/`resolver.ENGINE_PATH` attribute access
+# (project.py, gate.py, discriminate.py) keep resolving unchanged. A full census (comprehensive,
+# not just the function names) found this complete set of external dependents -- over-exporting
+# here is deliberate and safe, not guesswork.
+from checkenv import (  # noqa: F401 -- re-exported, see comment above
+    _ENV_DROP,
+    _ENV_KEEP,
+    _ENV_KEEP_PREFIX,
+    ENGINE_PATH,
+    PATH,
+    clean_env,
+    spawn_declared,
+)
 
 _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
 # ⚑ Ζ·lib·land — ONE `.parent`, LIKE `_GATE` ABOVE, because the library now lives INSIDE the
@@ -366,196 +383,6 @@ VERBS = {
 # The `type:` prefixes of the boundary-crossing verbs — startswith()-ready, DERIVED so a consumer
 # never re-lists them.  A new crossing verb reaches every site by declaring crosses=True above.
 CROSSING = tuple(f"{v}:" for v, spec in VERBS.items() if spec["crosses"])
-
-
-# A check is arbitrary code (cmd: is the universal escape hatch), so it must not run in
-# whatever ambient environment the gate happened to inherit — that is both an injection
-# surface (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH, …) and a reproducibility leak (the
-# verdict would depend on the caller's shell).  Like sshd, we DON'T inherit: we build a
-# controlled environment, default-deny, keeping only what a check legitimately needs.  PATH
-# is kept so tools resolve, but its RELATIVE entries are dropped (Τ·path): a check runs with
-# cwd = the project dir, so an empty/"." PATH component would resolve a tool to the project
-# being gated — letting a document plant a tool beside itself.  Which ABSOLUTE dir resolves a
-# tool stays the host's trust (the reproducibility leak above); pinning per-tool is further.
-_ENV_KEEP = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TZ", "TMPDIR",
-             "LANG", "LANGUAGE", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}
-_ENV_KEEP_PREFIX = ("LC_", "PAPERKIT_")        # locale + paperkit's own knobs
-# ...except the Δ grader's SANDBOX ROOT, which is grader-internal and must NOT reach a check: a
-# check being graded reruns in the grader's sandbox, and a META-grading check (one that runs its
-# own grader on a fixture) would otherwise inherit the OUTER root and reject its fixture ("root
-# does not contain the project").  Recursive-check env leak (cf. Ω·config args-process-local).
-_ENV_DROP = {"PAPERKIT_ROOT"}
-
-# Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel hosts
-# the mechanism only).
-PATH = config.Param("path", "PAPERKIT_PATH",
-                    help="pin tool resolution to these absolute dirs (colon-separated) instead "
-                         "of the host PATH — reproducibility, and dropping user-writable "
-                         "shadow dirs")
-
-# ⚑ Ζ·dispatch·pythonpath — THE DECLARED PASSTHROUGH FOR "WHERE IS THE ENGINE IMPORTABLE FROM".
-#
-# Two correct mechanisms collided, and neither side was wrong.  `library/run-witness` detects a
-# hermetic cell by testing `[ -d "$PYTHONPATH/paperkit" ]` — correct, and the only way it can know
-# not to build a `.venv` full of host absolute paths inside a sandbox.  `clean_env` above DROPS
-# `PYTHONPATH` by default-deny — also correct, and named in its own comment as an injection
-# surface (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH).  So a check spawned through this resolver saw
-# no PYTHONPATH, found no `.venv`, found no `uv`, and the witness could not run.  On the DEV HOST
-# it passed anyway, because a `.venv` happens to exist there — the failure was invisible in-repo
-# and fired only under the hermetic cell, which is the regime the sandbox exists to model.
-#
-# The seam already existed: `_ENV_KEEP_PREFIX` keeps `PAPERKIT_*`, so an OWNER-DECLARED knob
-# crosses `clean_env` without widening the allowlist by one entry.  That is the whole point of a
-# declared passthrough versus a wider allowlist: the value is one this engine CHOSE to export,
-# resolved through Ω·config's one pipeline (arg > env > config > default), not whatever the
-# ambient shell happened to be carrying.  `PYTHONPATH` itself stays denied.
-#
-# ⚑ THE DEFAULT IS `None`, AND THE FALLBACK LIVES AT THE USE SITE — design-for-portability.
-#
-# The obvious spelling is `default=lambda: str(Path(__file__).resolve().parent.parent)`, and it is
-# wrong for a reason the `config` project caught immediately: that project PROJECTS the knob union
-# as a committed table (assets/knobs.md, gated fresh by byte-diff), and `gen_knobs.py` INVOKES a
-# callable default to render it.  So this knob's default row read `/home/mikemol/github/paperkit`
-# — one machine's absolute path, frozen into a document every other machine would regenerate
-# differently, reddening the freshness check for everyone but its author.  A default that varies
-# with WHERE THE ENGINE IS CHECKED OUT has no portable literal, so it must not be rendered as one.
-#
-# `None` is also the more honest resolution: it means "nothing configured this", which is exactly
-# true — the engine's own location is not a CONFIGURED value, it is a fact `clean_env` reads from
-# `__file__` at the moment it builds the environment.  The knob keeps its full override power
-# (arg > env > paper.toml), and the table renders `—` like every other unset knob.
-ENGINE_PATH = config.Param(
-    "engine-path", "PAPERKIT_PYTHONPATH",
-    help="the directory `paperkit` is importable from, exported to every check as "
-         "PAPERKIT_PYTHONPATH — a DECLARED passthrough across clean_env's default-deny, "
-         "which drops the ambient PYTHONPATH (unset: the engine's own location)")
-
-
-def spawn_declared(cmd: str, cwd, payload: str, records=None) -> subprocess.CompletedProcess:
-    """⚑ Ζ·spawn·owner — RUN A PROJECT-DECLARED COMMAND AS A GATED CHECK.
-
-    The ONE owner of
-    "spawn something a document declared, under the engine's rules".
-
-    `genre.py` re-implemented this shape — sanitized env, a temp-file side channel for the
-    records, `shell=True`, an rc check — and to do so it did `import resolver as _resolver`,
-    an UPWARD edge (`DEPS["project"]` is `["model", "kernel"]`).  MEASURED 2026-09-13: the edge
-    was real and live in source, and `paperkit/dag.bzl` was STALE, so the component guard could
-    not see it; regenerating the DAG surfaced it and reddened seven boundary claims at once.
-
-    ⚑ The edge was the SYMPTOM.  What `genre` actually needed was not an environment helper but
-    this whole capability, which is resolver's by ownership: resolver is the module that runs a
-    thing a document declared and decides what that thing may see.  Lifting the SPAWN (rather
-    than pushing `clean_env` down into the kernel) keeps `clean_env` where its two Ω·config knobs
-    are DECLARED — `PATH` and `ENGINE_PATH`, per this module's own rule that "the kernel hosts
-    the mechanism only" — and leaves `genre` holding only its own semantics: the totality
-    invariant over the units that come back.
-
-    The records channel is a FILE, not an argv or an env value: a corpus can exceed both limits,
-    and `PAPERKIT_GENRE_RECORDS` names it under the `PAPERKIT_` prefix `clean_env` already
-    passes through.  The engine unlinks it even when the child crashes — a declared objective
-    that dies must not leave a copy of the corpus in /tmp.
-    """
-    import json
-    import tempfile
-    env = clean_env()
-    fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", prefix="pk-genre-records-",
-                                     delete=False, encoding="utf-8")
-    try:
-        with fh:
-            for rec in (records or ()):
-                fh.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
-        env["PAPERKIT_GENRE_RECORDS"] = fh.name
-        return subprocess.run(cmd, shell=True, cwd=cwd, input=payload,   # noqa: S602
-                              capture_output=True, text=True, env=env)
-    finally:
-        try:
-            os.unlink(fh.name)
-        except OSError:
-            pass
-
-
-def clean_env(env: dict | None = None) -> dict:
-    """A sanitized environment for running a check: the controlled allow-list only.
-
-    No LD_PRELOAD/IFS/BASH_ENV/PYTHONPATH and the like reach the command.  PATH's relative
-    and empty entries are dropped (Τ·path) — they would resolve a tool to the cwd (the
-    project dir being gated), so a document could shadow a tool by planting it beside itself.
-    """
-    src = os.environ if env is None else env
-    out = {k: v for k, v in src.items()
-           if (k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)) and k not in _ENV_DROP}
-    # ⚑ Ζ·check·debug — GUARANTEE `__debug__` TO THE CHECK, POSITIVELY.
-    #
-    # Under `-O` / PYTHONOPTIMIZE, python DELETES every `assert`.  A witness built on asserts then
-    # exits 0 having verified NOTHING, and this gate reports it as passing — a check that cannot
-    # fail, certified by the engine whose whole claim is that a green gate means the evidence RAN.
-    # It is the same condition adequacy grading already refuses downstream (an unfalsifiable check
-    # grades `vacuous`, below the floor); a runner able to silently create it is a hole in the
-    # thing paperkit is FOR.
-    #
-    # ⚑ THE ALLOWLIST ABOVE ALREADY EXCLUDED PYTHONOPTIMIZE — BY ACCIDENT, AND THAT IS THE POINT.
-    # `_ENV_KEEP` was built against injection and reproducibility; nobody left PYTHONOPTIMIZE out
-    # *because of asserts*, nothing tested that it stayed out, and an accidental invariant with no
-    # witness is one refactor from gone — silently, since the failure mode is a GREEN gate.
-    # Setting it to "0" here makes the guarantee POSITIVE rather than a side effect of an omission:
-    # a future edit that widened the allowlist would now be overridden instead of quietly fatal.
-    #
-    # ⚑ AND IT DOES NOT COVER argv, WHICH IS STATED RATHER THAN HIDDEN.  `python -O script.py` in a
-    # `[checks.X] cmd` template is a FLAG, not an environment variable, and no environment
-    # sanitisation can strip it.  That surface is a project's own paper.toml — data this engine
-    # executes but does not author.  Closing it needs the CHILD to refuse, which is a separate rung
-    # (the witness contract), and the two are not substitutes: this closes the route an operator
-    # can trip from a shell profile, which is the one that travels between repos.
-    #
-    # Reported by gcalculus, whose entire evidence base is 2,839 asserts and whose own census then
-    # found the entrypoint THIS runner spawns (`library/concepts.py`) is the one their guard misses
-    # — so a per-consumer guard requires every consumer to notice first, and one demonstrably did
-    # not.  place-by-ownership-not-need: the claim "this check passed" is made HERE.
-    out["PYTHONOPTIMIZE"] = "0"
-    # ⚑ Ζ·dispatch·pythonpath — EXPORT THE ENGINE'S LOCATION POSITIVELY, for the same reason
-    # PYTHONOPTIMIZE is set rather than merely omitted.  The allowlist DENIES `PYTHONPATH` (an
-    # injection surface), which is right; but a check that must import the engine then had no way
-    # to be told where it is, and `library/run-witness` fell through to a host `.venv` — present
-    # on the dev box, absent in a hermetic cell.  This is the DECLARED replacement: resolved
-    # through Ω·config (so a caller can override it by arg, env, or paper.toml), carried under the
-    # `PAPERKIT_` prefix the allowlist already keeps, and set by the ENGINE rather than inherited.
-    # A check reads PAPERKIT_PYTHONPATH; nothing reads the ambient PYTHONPATH, which stays dropped.
-    # Unset (the normal case) means the engine's OWN location — read from `__file__` here rather
-    # than declared as the Param's default, because that value is per-checkout and the config
-    # project renders declared defaults into a committed table (see ENGINE_PATH above).  Under
-    # Bazel this resolves to the STAGED tree, since `__file__` is itself inside the sandbox.
-    engine_path = config.resolve(ENGINE_PATH) or str(Path(__file__).resolve().parent.parent)
-    out["PAPERKIT_PYTHONPATH"] = str(engine_path)
-    pinned = config.resolve(PATH)
-    if pinned is not None:
-        # Τ·path: PIN tool resolution to a DECLARED set of absolute, existing dirs —
-        # reproducibility (the same `grep`/`pandoc` on any host) and defence-in-depth (the host
-        # PATH here is dup-laden and full of user-writable dirs ~/bin, ~/.local/bin, .cargo/bin
-        # that could shadow a system tool).  The ambient host PATH is dropped entirely.
-        raw = [p for p in pinned.split(os.pathsep) if os.path.isdir(p)]
-    elif "PATH" in out:
-        raw = out["PATH"].split(os.pathsep)
-    else:
-        return out
-    # keep ABSOLUTE entries only (a relative/empty one resolves a tool to the gated cwd), and
-    # DEDUPE keeping the first occurrence (first-match resolution is unchanged; the host PATH
-    # carries the same dir many times — ~/.lmstudio/bin six times here).
-    # W126/W59 — engine-level counterpart of the hook's PATH-leak fix: drop every entry under
-    # the repo root, so an active repo venv on PATH cannot shadow a system tool for ANY caller,
-    # not just the pre-commit hook's own invocation.
-    root = Path(__file__).resolve().parent.parent
-    seen, dirs = set(), []
-    for p in raw:
-        if not (p and os.path.isabs(p) and p not in seen):
-            continue
-        rp = Path(p).resolve()
-        if rp == root or root in rp.parents:
-            continue
-        seen.add(p)
-        dirs.append(p)
-    out["PATH"] = os.pathsep.join(dirs)
-    return out
 
 
 # A check must TERMINATE to pass.  A mutation can make a witness non-terminating — a flip:

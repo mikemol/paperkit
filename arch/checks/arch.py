@@ -49,8 +49,8 @@ def arch_modules():
     comps, _ = _components()
     files = [f for fs in comps.values() for f in fs]
     non_test = [f for f in files if not f.startswith("tests/")]
-    assert len(non_test) == 26, (
-        f"the engine has {len(non_test)} non-test modules, not 26 — update the claim, and note "
+    assert len(non_test) == 27, (
+        f"the engine has {len(non_test)} non-test modules, not 27 — update the claim, and note "
         f"that this count is NOT the component count ({len(comps)})")
 
 

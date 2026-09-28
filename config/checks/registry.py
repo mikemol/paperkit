@@ -44,10 +44,17 @@ def union():
             break
     else:
         raise SystemExit("registry.py: no COMPONENTS literal in components.bzl")
+    # W64 -- a re-export (`from checkenv import PATH` inside resolver.py, so callers reaching
+    # `resolver.PATH` keep working) makes the SAME Param object an attribute of two modules;
+    # walking `vars()` per module would otherwise count it twice.  Dedupe by IDENTITY (the same
+    # Param object, not two Params that happen to share a name) -- a re-export is not a second
+    # declaration, and this keeps the union INTROSPECTED rather than teaching it which module
+    # "owns" a name.
     out = []
     for stem in (f[:-3] for fs in comps.values() for f in fs if "/" not in f):
         out += [v for v in vars(importlib.import_module(stem)).values() if isinstance(v, C.Param)]
-    return sorted(out, key=lambda p: p.name)
+    deduped = list({id(p): p for p in out}.values())
+    return sorted(deduped, key=lambda p: p.name)
 
 
 def precedence():

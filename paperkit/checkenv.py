@@ -39,7 +39,11 @@ def clean_env(env: dict | None = None) -> dict:
     out = {k: v for k, v in src.items()
            if (k in _ENV_KEEP or k.startswith(_ENV_KEEP_PREFIX)) and k not in _ENV_DROP}
     out["PYTHONOPTIMIZE"] = "0"
-    engine_path = config.resolve(ENGINE_PATH) or str(Path(__file__).resolve().parent)
+    # BUGFIX (found by W64's boundary test): checkenv.py sits at paperkit/checkenv.py, the SAME
+    # depth resolver.py did -- one .parent reaches the paperkit/ package dir, not the repo root
+    # a caller needs on sys.path to `import paperkit`. Two .parent, matching resolver.py's
+    # original `Path(__file__).resolve().parent.parent`.
+    engine_path = config.resolve(ENGINE_PATH) or str(Path(__file__).resolve().parent.parent)
     out["PAPERKIT_PYTHONPATH"] = str(engine_path)
     pinned = config.resolve(PATH)
     if pinned is not None:
@@ -48,7 +52,7 @@ def clean_env(env: dict | None = None) -> dict:
         raw = out["PATH"].split(os.pathsep)
     else:
         return out
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parent.parent  # the repo root -- see the engine_path note above
     seen: set[str] = set()
     dirs: list[str] = []
     for p in raw:

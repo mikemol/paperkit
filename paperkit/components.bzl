@@ -60,6 +60,7 @@ COMPONENTS = {
         "rhetoric.py",
     ],
     "resolver": [
+        "checkenv.py",
         "resolver.py",
     ],
     "project": [

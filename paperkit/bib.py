@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """paperkit.bib — the ONE parser + data model for a warrants `.bib` (the claim-DAG).
 
 A `.bib` entry is a claim: `@type{key, field = {value}, ...}`.  This module owns the
@@ -19,11 +18,17 @@ render); the edge/token fields (`from`, `rests-on`, `reads`) are lists.
 """
 from __future__ import annotations
 
+import ast as _ast
 import csv
+import inspect
 import re
 import sys
 import tomllib
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 # Ζ·bib·wire — the GRAMMAR's owner.  bib.py is the MODEL layer and bibparse is its front end;
 # the import is one-directional (bibparse knows nothing about _SCALAR, sections or the DAG), so
@@ -34,9 +39,9 @@ import bibparse
 # scalar fields carried verbatim (the projector + checks read these).  `tier` is a per-warrant
 # enforcement-tier flag consumed by the GENERATOR (bibtex.bzl), not by any engine code here —
 # tier ∈ {sandbox (hermetic, mutation-swept), local (host-coupled, uncached), toolchain (host
-# toolchain, cached + stamped)}; a non-sandbox check runs on the host, gated but not swept.  paperkit
-# parses and carries it so it is a quiet, owned field, not a loud-dropped unknown; the generator
-# reads the same bib text (Ζ·tier).
+# toolchain, cached + stamped)}; a non-sandbox check runs on the host, gated but not swept.
+# paperkit parses and carries it so it is a quiet, owned field, not a loud-dropped unknown; the
+# generator reads the same bib text (Ζ·tier).
 _SCALAR = ("title", "author", "year", "note", "section", "claim",
            "check", "glue", "join", "move", "emit", "as", "mem", "link", "depth", "tier",
            "entails")
@@ -85,12 +90,14 @@ _SCOPES = ("fragment", "full")
 # stops being a gap the engine must maintain and becomes what it always was: a field its project
 # had not declared.  A guard must not copy the set it guards, and the engine no longer claims to
 # know what standard BibTeX contains.
-_WARNED: set = set()          # (file, key, field) already reported — a build parses each bib many times
+_WARNED: set = set()          # (file, key, field) already reported — a build parses each bib
+                               # many times
 
 
-def _unescaped_braces(s: str):
-    """Yield (index, char) for every `{`/`}` in `s` that is NOT LaTeX-escaped (`\\{` `\\}`).
-    Inline math in a claim carries literal braces — set notation `\\{ x : … \\}`, `\\mathrm{}` —
+def _unescaped_braces(s: str) -> Iterator[tuple[int, str]]:
+    r"""Yield (index, char) for every `{`/`}` in `s` that is NOT LaTeX-escaped (`\{` `\}`).
+
+    Inline math in a claim carries literal braces — set notation `\{ x : … \}`, `\mathrm{}` —
     that are CONTENT, not structure; counting them as structural braces miscounts the depth and
     truncates the field.  A brace is escaped iff preceded by an odd run of backslashes.
     """
@@ -106,9 +113,11 @@ def _unescaped_braces(s: str):
 
 
 def _scalar_value(body: str, name: str) -> str | None:
-    """The value of scalar field `name` by TRUE brace-counting from its `name = {` — handles
-    arbitrary nesting depth (`\\min\\{ \\mathrm{eff}(d) : … \\}`) and skips LaTeX-escaped braces,
-    where the one-level regex it replaces would stop at the first inner `}`.  None if absent.
+    r"""Return the value of scalar field `name` by TRUE brace-counting from its `name = {`.
+
+    Handles arbitrary nesting depth (`\min\{ \mathrm{eff}(d) : … \}`) and skips LaTeX-escaped
+    braces, where the one-level regex it replaces would stop at the first inner `}`.  None if
+    absent.
     """
     m = re.search(r"\b" + re.escape(name) + r"\s*=\s*\{", body)
     if not m:
@@ -119,14 +128,14 @@ def _scalar_value(body: str, name: str) -> str | None:
         depth += 1 if ch == "{" else -1
         if depth == 0:
             return body[start:start + i]
-    return None                                  # unbalanced — no closing brace (caller sees absent)
+    return None                    # unbalanced — no closing brace (caller sees absent)
 
 
-def _entries(text: str):
-    """Ζ·bib·parser — yield (type, key, body) for every entry, by BRACE-COUNTING the entry.
+def _entries(text: str) -> Iterator[tuple[str, str, str]]:
+    r"""Ζ·bib·parser — yield (type, key, body) for every entry, by BRACE-COUNTING the entry.
 
-    ⚑ THIS REPLACES `re.finditer(r"@\\w+\\{...(.*?)\\n\\}")`, WHICH TRUNCATED AN ENTRY AT THE FIRST
-    LINE-INITIAL `}`.  The old pattern was non-greedy to the first `\\n}`, so a value containing a
+    ⚑ THIS REPLACES `re.finditer(r"@\w+\{...(.*?)\n\}")`, WHICH TRUNCATED AN ENTRY AT THE FIRST
+    LINE-INITIAL `}`.  The old pattern was non-greedy to the first `\n}`, so a value containing a
     brace at column 0 — a code example, a JSON fragment, a set-builder broken across lines — ended
     the entry early.  MEASURED: an entry whose claim held a line-initial `}` parsed with ZERO
     FIELDS while the reader reported `2 of 2 entries`.  The count was honest and the content was
@@ -139,7 +148,7 @@ def _entries(text: str):
     extraction was regex, so only it is replaced — the same `_unescaped_braces` primitive, applied
     one level up.  A smaller change than "write a parser", and it leaves the tested part alone.
 
-    ⚑ THE TYPE IS CAPTURED, NOT DISCARDED.  `@\\w+` matched and threw the type away, so `@book` and
+    ⚑ THE TYPE IS CAPTURED, NOT DISCARDED.  `@\w+` matched and threw the type away, so `@book` and
     `@misc` were indistinguishable to the engine and no reader could answer "what entry types does
     this file use" (two independent surveys reported that as unanswerable and enumerated by hand).
     It is yielded here; consumers that do not want it ignore it.
@@ -173,11 +182,12 @@ def _entries(text: str):
 
 
 def _top_fields(body: str) -> list:
-    """The TOP-LEVEL `name = {` field names in an entry body, tracking brace depth so an `=`
-    inside a value (set notation `x = {1,2}` in a claim) is not mistaken for a field.  Used to
-    catch a field the parser does not consume — which it would otherwise drop in silence.  Skips
-    LaTeX-escaped braces (`\\{` `\\}`) so inline math does not throw off the depth (same fix as
-    _scalar_value).
+    r"""Return the TOP-LEVEL `name = {` field names in an entry body.
+
+    Tracks brace depth so an `=` inside a value (set notation `x = {1,2}` in a claim) is not
+    mistaken for a field.  Used to catch a field the parser does not consume — which it would
+    otherwise drop in silence.  Skips LaTeX-escaped braces (`\{` `\}`) so inline math does not
+    throw off the depth (same fix as _scalar_value).
     """
     names, depth = [], 0
     real = dict(_unescaped_braces(body))                 # index → real brace char (escaped skipped)
@@ -234,12 +244,12 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
             for name in _LIST:
                 raw = e.fields.get(name)
                 f[name] = [a for a in re.split(r"[,\s]+", raw) if a] if raw else []
-            # Ζ·ladder·sentinel (the parser's face) — a field paperkit does not consume is DROPPED,
-            # and a silent drop is a silent failure: a downstream author's `points` (a real grounding
-            # relation) vanished on 14 entries with no signal.  Name it LOUD rather than drop it in
-            # silence.  A warning, not a refusal: the field may be deliberate human documentation,
-            # and breaking a downstream's build is not the point — being SEEN is.  Deduped, since a
-            # build parses each bib many times.
+            # Ζ·ladder·sentinel (the parser's face) — a field paperkit does not consume is
+            # DROPPED, and a silent drop is a silent failure: a downstream author's `points` (a
+            # real grounding relation) vanished on 14 entries with no signal.  Name it LOUD
+            # rather than drop it in silence.  A warning, not a refusal: the field may be
+            # deliberate human documentation, and breaking a downstream's build is not the point
+            # — being SEEN is.  Deduped, since a build parses each bib many times.
             #
             # ⚑ Ζ·bib·declare — THERE IS NO BIBTEX EXEMPTION.  This clause used to also skip a
             # 24-name `_BIBTEX` roster, which made standard reference metadata quiet AND still
@@ -254,15 +264,15 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
                     # engine field, or remove it" pushes a bibliography author toward DELETING real
                     # reference data — the engine telling a document its own citations are a
                     # mistake.  `consumer_fields` is what carries them.
-                    print(f"paperkit-bib: {path.name} @{key}: field '{n}' is not a paperkit field "
-                          f"and was DROPPED (not silently) — paperkit reads "
-                          f"{', '.join(list(_SCALAR) + list(_LIST))}"
-                          + (f" plus this project's declared {', '.join(consumer_fields)}"
-                             if consumer_fields else "")
-                          + f"; declare it in this project's paper.toml "
-                            f"[paper] consumer_fields = [\"{n}\", ...] to CARRY it "
-                            f"(engine-inert, like `note`), or use an engine field, or remove it",
-                          file=sys.stderr)
+                    sys.stderr.write(
+                        f"paperkit-bib: {path.name} @{key}: field '{n}' is not a paperkit field "
+                        f"and was DROPPED (not silently) — paperkit reads "
+                        f"{', '.join(list(_SCALAR) + list(_LIST))}"
+                        + (f" plus this project's declared {', '.join(consumer_fields)}"
+                           if consumer_fields else "")
+                        + f'; declare it in this project\'s paper.toml '
+                          f'[paper] consumer_fields = ["{n}", ...] to CARRY it '
+                          f"(engine-inert, like `note`), or use an engine field, or remove it\n")
             # Ξ·entails — REFUSE an unrecognized scope rather than warn.  The drop-warning above is
             # right for an unknown FIELD (it may be deliberate documentation), but `entails` is a
             # known field whose value gates a clamp: a typo'd `entails = {fragmnt}` would read as
@@ -275,35 +285,35 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
             # guards — so the copy is inverted instead: `_SCOPES` is the owner and grade.SCOPE_C
             # DERIVES its keys from it, one direction, checked by boundaries_scope.py.
             if "entails" in f and f["entails"] not in _SCOPES:
-                raise SystemExit(
-                    f"paperkit-bib: {path.name} @{key}: entails = {{{f['entails']}}} is not a "
-                    f"scope — use one of {', '.join(sorted(_SCOPES))}")
+                msg = (f"paperkit-bib: {path.name} @{key}: entails = {{{f['entails']}}} is not "
+                       f"a scope — use one of {', '.join(sorted(_SCOPES))}")
+                raise SystemExit(msg)
             out[key] = f
     return out
 
 
 def _bibpath(project: Path, b: str) -> Path:
-    """Resolve a warrants token to a path.  A bare basename is relative to the project dir; a Bazel
-    LABEL (//pkg:file, //:path/file, @repo//…) is a bib imported from the concept library, resolved
-    repo-root-relative — correct when the importer IS the root project (project == repo root, the
-    README-import case).  Mirrors the generator's label branch so ONE warrants list drives both.
+    """Resolve a warrants token to a path.
+
+    A bare basename is relative to the project dir; a Bazel LABEL (//pkg:file, //:path/file,
+    @repo//…) is a bib imported from the concept library, resolved repo-root-relative — correct
+    when the importer IS the root project (project == repo root, the README-import case).
+    Mirrors the generator's label branch so ONE warrants list drives both.
     """
-    if b.startswith("//") or ":" in b or b.startswith("@"):
+    if b.startswith(("//", "@")) or ":" in b:
         pkg, _, name = b.split("//", 1)[1].partition(":")
         return project / (f"{pkg}/{name}" if pkg else name)
     return project / b
 
 
 def paper_keys() -> tuple:
-    """The [paper] keys `load_config` actually reads — parsed from its OWN source.
+    """Return the [paper] keys `load_config` actually reads — parsed from its OWN source.
 
     Λ·registry — the set has ONE owner: the `p.get("k", …)` calls in load_config.  A guard that
     kept its own copy would certify a tautology the moment the two drifted, and adding a key
     would then be a two-site edit with no signal when only one site was done.  checks/gen_fields.py
     derives the documented key table the same way, from the same source.
     """
-    import inspect
-    import re
     src = inspect.getsource(load_config)
     seen = []
     for k in re.findall(r'p\.get\(\s*"([^"]+)"', src):
@@ -313,7 +323,7 @@ def paper_keys() -> tuple:
 
 
 def _param_config_keys() -> tuple:
-    """The [paper] keys owned by Ω·config Params, read from the engine's own sources via AST.
+    """Return the [paper] keys owned by Ω·config Params, read from the engine's sources via AST.
 
     Λ·registry — a Param DECLARES its paper.toml key (`Param(..., config="root")`), so the
     declarations are the owner.  Parsed rather than imported: load_config runs on every gate
@@ -325,7 +335,6 @@ def _param_config_keys() -> tuple:
     the other, and they are what makes `root` a [paper] key even though load_config never reads
     it.  A guard over only the first would have missed the very instance that prompted it.
     """
-    import ast as _ast
     out = []
     for f in sorted(Path(__file__).resolve().parent.glob("*.py")):
         try:
@@ -360,6 +369,34 @@ def _param_config_keys() -> tuple:
 # guard was built for, and its keys are NOT a closed schema owned elsewhere — a [paper] key landing
 # there is exactly the misplacement being caught.
 _SCHEMA_TABLES = frozenset({"genres"})
+
+
+def _refuse_misplaced(key: str, where: str) -> None:
+    """Exit LOUDLY: `key` belongs under [paper] but was declared `where` instead."""
+    sys.exit(f"paperkit: `{key}` is declared {where}, but it belongs under [paper].  TOML "
+             f"scoped it out of the [paper] table, so the engine reads NONE of it and the "
+             f"build would still report success.  Move it below the [paper] header.")
+
+
+def _misplaced_paper_key_top_level(raw: dict, keys: set) -> None:
+    """Refuse a [paper] key declared above any [paper] header (Ζ·toml·scope, face 3)."""
+    for k, v in raw.items():
+        if k in keys and not isinstance(v, dict):
+            _refuse_misplaced(k, "at the top level of paper.toml (above any [paper] header)")
+
+
+def _misplaced_paper_key_in_table(raw: dict, keys: set) -> None:
+    """Refuse a [paper] key declared under a non-[paper], non-schema table (faces 1-2)."""
+    for table, body in raw.items():
+        if table == "paper" or table in _SCHEMA_TABLES or not isinstance(body, dict):
+            continue
+        for k, v in body.items():
+            if k in keys and not isinstance(v, dict):
+                _refuse_misplaced(k, f"under [{table}]")
+            if isinstance(v, dict):
+                for k2 in v:
+                    if k2 in keys:
+                        _refuse_misplaced(k2, f"under [{table}.{k}]")
 
 
 def _misplaced_paper_key(cfg: Path) -> None:
@@ -415,28 +452,10 @@ def _misplaced_paper_key(cfg: Path) -> None:
     that defines what its keys mean, and this guard defers to it.  `[checks.*]` is deliberately NOT
     exempt — its trap (the `cmd` shadowing case) is one of the three faces on record above.
     """
-    import tomllib as _t
     keys = set(paper_keys()) | set(_param_config_keys())
-    raw = _t.loads(cfg.read_text())
-
-    def _refuse(key, where):
-        sys.exit(f"paperkit: `{key}` is declared {where}, but it belongs under [paper].  TOML "
-                 f"scoped it out of the [paper] table, so the engine reads NONE of it and the "
-                 f"build would still report success.  Move it below the [paper] header.")
-
-    for k, v in raw.items():                       # the TOP level: a key above [paper]
-        if k in keys and not isinstance(v, dict):
-            _refuse(k, "at the top level of paper.toml (above any [paper] header)")
-    for table, body in raw.items():                # any NON-[paper] table, and its subtables
-        if table == "paper" or table in _SCHEMA_TABLES or not isinstance(body, dict):
-            continue
-        for k, v in body.items():
-            if k in keys and not isinstance(v, dict):
-                _refuse(k, f"under [{table}]")
-            if isinstance(v, dict):
-                for k2 in v:
-                    if k2 in keys:
-                        _refuse(k2, f"under [{table}.{k}]")
+    raw = tomllib.loads(cfg.read_text())
+    _misplaced_paper_key_top_level(raw, keys)         # the TOP level: a key above [paper]
+    _misplaced_paper_key_in_table(raw, keys)          # any NON-[paper] table, and its subtables
 
 
 def _misplaced_consumer_fields(cfg: Path) -> list:
@@ -457,11 +476,10 @@ def _misplaced_consumer_fields(cfg: Path) -> list:
     A misplaced key is unambiguous — no other table has any use for it — so this REFUSES rather
     than warning.  A warning is what they already had, and it did not stop the build.
     """
-    import tomllib as _t
-    raw = _t.loads(cfg.read_text())
+    raw = tomllib.loads(cfg.read_text())
     for table, body in raw.items():
         if table != "paper" and isinstance(body, dict):
-            for sub, inner in list(body.items()) + [(table, body)]:
+            for sub, inner in [*list(body.items()), (table, body)]:
                 d = inner if isinstance(inner, dict) else body
                 if isinstance(d, dict) and "consumer_fields" in d:
                     sys.exit(f"paperkit: `consumer_fields` is declared under [{table}"
@@ -472,6 +490,7 @@ def _misplaced_consumer_fields(cfg: Path) -> list:
 
 
 def load_config(project: Path) -> dict:
+    """Read `project`'s paper.toml into the engine's resolved config dict."""
     cfg = project / "paper.toml"
     if not cfg.exists():
         sys.exit(f"paperkit: no paper.toml in {project}")
@@ -494,11 +513,13 @@ def load_config(project: Path) -> dict:
         # own paragraph; "woven" (default) joins a section into running prose.
         "paragraph": p.get("paragraph", "woven"),
         "references": p.get("references", True),
-        "adequacy": p.get("adequacy", False),   # Ζ·project: emit a Δ-adequacy Bazel test for this project
-        # Extra scalar fields THIS project declares it tolerates — a downstream consumer's vocabulary
-        # (e.g. a summit report's reporter/genre/target), carried by the parser but consumed by no
-        # paperkit invariant.  The policy (which fields) is the consumer's, declared here per project;
-        # the mechanism is the engine's.  An UNdeclared unknown field is still named loud by parse.
+        # Ζ·project: emit a Δ-adequacy Bazel test for this project
+        "adequacy": p.get("adequacy", False),
+        # Extra scalar fields THIS project declares it tolerates — a downstream consumer's
+        # vocabulary (e.g. a summit report's reporter/genre/target), carried by the parser but
+        # consumed by no paperkit invariant.  The policy (which fields) is the consumer's,
+        # declared here per project; the mechanism is the engine's.  An UNdeclared unknown field
+        # is still named loud by parse.
         "consumer_fields": tuple(p.get("consumer_fields", _misplaced_consumer_fields(cfg))),
         # Ζ·talk·tier — the check TYPES this project declares NON-MECHANICAL: gated, never graded.
         # A `premise:` ("everyone here has shipped a doc that lies") or a `definition:` ("a passing
@@ -521,13 +542,15 @@ def load_config(project: Path) -> dict:
 
 
 def parse_project(project_dir: Path) -> dict:
-    """Every entry across a project's warrant bibs, parsed with the project's DECLARED consumer
-    fields resolved from its paper.toml — the ONE place that binds "which extra fields this project
-    tolerates" to the parse, so no caller re-implements the load-config-then-parse-all loop (and
-    none can forget to pass consumer_fields, silently strict-rejecting a declared field).
+    """Return every entry across a project's warrant bibs.
+
+    Parsed with the project's DECLARED consumer fields resolved from its paper.toml — the ONE
+    place that binds "which extra fields this project tolerates" to the parse, so no caller
+    re-implements the load-config-then-parse-all loop (and none can forget to pass
+    consumer_fields, silently strict-rejecting a declared field).
     """
     cfg = load_config(project_dir)
-    F = {}
+    claims = {}
     for b in cfg["bibs"]:
         entries = parse(b, cfg["consumer_fields"])
         # Ζ·bib·shadow — A KEY MAY NOT BE DEFINED TWICE ACROSS A PROJECT'S COMPOSED BIBS.
@@ -552,30 +575,35 @@ def parse_project(project_dir: Path) -> dict:
         # entries to survive — one of them is already gone, and which one is an artifact of list
         # order.  Naming both files is the whole diagnosis.
         for k in entries:
-            if k in F:
-                raise SystemExit(
-                    f"paperkit-bib: {project_dir.name}: claim key {k!r} is defined TWICE — in "
-                    f"{Path(F[k].get('_src', '?')).name} and {b.name}.  A project's bibs compose "
-                    f"into ONE flat namespace, so the second definition would REPLACE the first "
-                    f"(silently, with its own `check` — or none, which disarms the claim while "
-                    f"leaving it cited).  Rename one, or remove it.")
-        F.update(entries)
-    return F
+            if k in claims:
+                msg = (f"paperkit-bib: {project_dir.name}: claim key {k!r} is defined TWICE — "
+                       f"in {Path(claims[k].get('_src', '?')).name} and {b.name}.  A project's "
+                       f"bibs compose into ONE flat namespace, so the second definition would "
+                       f"REPLACE the first (silently, with its own `check` — or none, which "
+                       f"disarms the claim while leaving it cited).  Rename one, or remove it.")
+                raise SystemExit(msg)
+        claims.update(entries)
+    return claims
 
 
 def load_bib(bib_path: Path, project_dir: Path) -> dict:
-    """Parse ONE bib with the consumer_fields declared by project_dir's paper.toml — the single-bib
-    analogue of parse_project, for a caller that reads a LONE bib by a narrower projection (footdeps: a
-    MODULE.bazel row's bib; gen_formulas: one of paper/*.bib) rather than a project's full warrant list.
-    It still binds the project's DECLARED consumer fields, so such a caller cannot loud-drop a field the
-    project carries — the same "none can forget" owner as parse_project, one bib at a time.  load_config
-    exits on a missing paper.toml, so a caller against an unconfigured tree must guard existence first.
+    """Parse ONE bib with the project's DECLARED consumer fields.
+
+    The single-bib analogue of parse_project, for a caller that reads a LONE bib by a narrower
+    projection (footdeps: a MODULE.bazel row's bib; gen_formulas: one of paper/*.bib) rather than
+    a project's full warrant list.  It still binds the project's DECLARED consumer fields, so
+    such a caller cannot loud-drop a field the project carries — the same "none can forget" owner
+    as parse_project, one bib at a time.  load_config exits on a missing paper.toml, so a caller
+    against an unconfigured tree must guard existence first.
     """
     return parse(bib_path, load_config(project_dir)["consumer_fields"])
 
 
+_RUBRIC_MIN_COLS = 2
+
+
 def rubric_rows(path: Path) -> list:
-    """The rubric's DATA ROWS, parsed by the csv module — the ONE reader of the .tsv format.
+    """Return the rubric's DATA ROWS, parsed by the csv module — the ONE reader of the format.
 
     Ζ·rubric·csv — this was two hand-rolled splitters: `rubric` took columns 1-2 and
     rhetoric.schemes_from_rubric took column 3, each re-implementing the same strip/comment/tab
@@ -594,9 +622,10 @@ def rubric_rows(path: Path) -> list:
         for n, row in enumerate(csv.reader(fh, delimiter="\t"), 1):
             if not row or not row[0].strip() or row[0].lstrip().startswith("#"):
                 continue
-            if len(row) < 2 or not row[1].strip():
-                raise SystemExit(f"paperkit-bib: {path.name}:{n}: rubric row '{row[0].strip()}' "
-                                 f"has no title — a row is `key<TAB>title[<TAB>scheme]`")
+            if len(row) < _RUBRIC_MIN_COLS or not row[1].strip():
+                msg = (f"paperkit-bib: {path.name}:{n}: rubric row '{row[0].strip()}' has no "
+                       f"title — a row is `key<TAB>title[<TAB>scheme]`")
+                raise SystemExit(msg)
             rows.append([c.strip() for c in row])
     return rows
 
@@ -606,14 +635,15 @@ def rubric(path: Path) -> list:
     return [(r[0], r[1]) for r in rubric_rows(path)]
 
 
-def dep_order(keys: list, F: dict) -> list:
+def dep_order(keys: list, warrants: dict) -> list:
+    """Topologically order `keys` by their `from` edges into `warrants`."""
     seen, out = set(), []
 
-    def visit(k):
+    def visit(k: str) -> None:
         if k in seen or k not in keys:
             return
         seen.add(k)
-        for a in F.get(k, {}).get("from", []):
+        for a in warrants.get(k, {}).get("from", []):
             visit(a)
         out.append(k)
 
@@ -623,28 +653,33 @@ def dep_order(keys: list, F: dict) -> list:
 
 
 def is_placed(f: dict) -> bool:
-    """A warrant projected as a block (emit:) or a figure — placed verbatim, not
-    woven into prose, and so covered by its placement rather than a citation.
+    """Return True for a warrant projected as a block (emit:) or a figure.
+
+    Placed verbatim, not woven into prose, and so covered by its placement rather than a
+    citation.
     """
     return bool(f.get("emit")) or f.get("check", "").startswith("figure:")
 
 
 def emit_anchors(cfg: dict, emit: str) -> list:
-    """The DISTINCT directories that hold a placement asset, in RESOLUTION ORDER — beside the
-    warrants (`project_dir`) FIRST, then beside the output (`out.parent`).  An index-extension,
-    NOT a choice of anchors: a project whose `out` points OUTSIDE itself keeps its assets by the
-    project dir, and a project whose assets sit BESIDE `out` (the mirror layout) keeps them there;
-    the two coincide for an in-repo project, so this returns ONE entry there.
+    """Return the DISTINCT directories that hold a placement asset, in RESOLUTION ORDER.
+
+    Beside the warrants (`project_dir`) FIRST, then beside the output (`out.parent`).  An
+    index-extension, NOT a choice of anchors: a project whose `out` points OUTSIDE itself keeps
+    its assets by the project dir, and a project whose assets sit BESIDE `out` (the mirror
+    layout) keeps them there; the two coincide for an in-repo project, so this returns ONE entry
+    there.
 
     `[]`      — the asset is at NEITHER anchor: genuinely ABSENT.
     `len 1`   — resolved unambiguously (the common case, always so in-repo).
-    `len 2`   — it is at BOTH distinct anchors, which is a LAYOUT AMBIGUITY the caller must SURFACE
-                (the gate does) rather than silently resolve — a silent patch is silent debt.
+    `len 2`   — it is at BOTH distinct anchors, which is a LAYOUT AMBIGUITY the caller must
+                SURFACE (the gate does) rather than silently resolve — a silent patch is silent
+                debt.
 
-    (629af60 keyed emit: on `project_dir` UNCONDITIONALLY — `cfg.get("project_dir") or out.parent`,
-    the `or` dead because load_config always sets project_dir — which fixed the out-outside case
-    and broke the mirror layout it did not consider.  The real fallback its message promised is
-    this ordered lookup over both.)
+    (629af60 keyed emit: on `project_dir` UNCONDITIONALLY — `cfg.get("project_dir") or
+    out.parent`, the `or` dead because load_config always sets project_dir — which fixed the
+    out-outside case and broke the mirror layout it did not consider.  The real fallback its
+    message promised is this ordered lookup over both.)
     """
     seen, hits = set(), []
     for anchor in (cfg["project_dir"], cfg["out"].parent):
@@ -658,18 +693,20 @@ def emit_anchors(cfg: dict, emit: str) -> list:
     return hits
 
 
-def emit_path(cfg: dict, emit: str) -> "Path | None":
-    """The path a placement asset RESOLVES to for READING — the first anchor that holds it
-    (project_dir before out.parent, deterministic so the projection is stable), or None when
-    neither does.  The projector reads this; the GATE surfaces the ambiguity when BOTH hold it
-    (emit_anchors, len 2), so a coin-flip the author did not intend never resolves in silence.
+def emit_path(cfg: dict, emit: str) -> Path | None:
+    """Return the path a placement asset RESOLVES to for READING.
+
+    The first anchor that holds it (project_dir before out.parent, deterministic so the
+    projection is stable), or None when neither does.  The projector reads this; the GATE
+    surfaces the ambiguity when BOTH hold it (emit_anchors, len 2), so a coin-flip the author
+    did not intend never resolves in silence.
     """
     hits = emit_anchors(cfg, emit)
     return hits[0] if hits else None
 
 
-def rests_closure(seed: set, F: dict) -> tuple:
-    """The transitive closure of `seed` under `rests-on` (grounding) edges.
+def rests_closure(seed: set, warrants: dict) -> tuple:
+    """Return the transitive closure of `seed` under `rests-on` (grounding) edges.
 
     A cited/placed claim's grounding premises are part of the argument whether or
     not a marker for them survives in the rendered prose (plain/footnote render no
@@ -680,14 +717,14 @@ def rests_closure(seed: set, F: dict) -> tuple:
     (claim, target) edges whose target is defined in no bib — a broken grounding.
     """
     seen, dangling = set(), set()
-    stack = [k for k in seed if k in F]
+    stack = [k for k in seed if k in warrants]
     while stack:
         k = stack.pop()
         if k in seen:
             continue
         seen.add(k)
-        for y in F[k].get("rests-on", []):
-            if y not in F:
+        for y in warrants[k].get("rests-on", []):
+            if y not in warrants:
                 dangling.add((k, y))
             elif y not in seen:
                 stack.append(y)

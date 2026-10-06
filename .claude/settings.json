@@ -85,32 +85,90 @@
     "sha (not a symlink into substrate's working tree). The symlink inherited upstream's fixes AND its",
     "breakage live; a pin moves only when this repo moves it, and its ruff/mypy versions are the",
     "locked ones rather than whatever substrate's tree holds that minute. The other hooks stay",
-    "symlinks until the same move is made for each."
+    "symlinks until the same move is made for each.",
+    "",
+    "W440 (2026-10-04): structural-query, no-chaining and shellcheck moved from the substrate symlinks to the pinned console scripts (mikemol-hooks at the one reference sha); SessionStart/UserPromptSubmit run inbound-asks and nemik-check. hook_gate_running.py has no console-script equivalent and stays (repo-specific); the scripts/hook_*.py symlinks are now unreferenced by settings."
   ],
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
-          {"type": "command", "command": "STRUCT_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_structural_query.py\""},
-          {"type": "command", "command": "NOCHAIN_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_no_chaining.py\""},
-          {"type": "command", "command": "SHELLCHECK_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_shellcheck.py\""}
+          {
+            "type": "command",
+            "command": "STRUCT_HOOK_BLOCK=1 \"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-structural-query\""
+          },
+          {
+            "type": "command",
+            "command": "NOCHAIN_HOOK_BLOCK=1 \"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-no-chaining\""
+          },
+          {
+            "type": "command",
+            "command": "NOVERIFY_HOOK_BLOCK=1 \"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-no-verify\""
+          },
+          {
+            "type": "command",
+            "command": "SHELLCHECK_HOOK_BLOCK=1 PATH=\"$HOME/.local/bin:$PATH\" \"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-shellcheck\""
+          }
         ]
       },
       {
         "matcher": "Edit|Write|NotebookEdit",
         "hooks": [
-          {"type": "command", "command": "GATE_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_gate_running.py\""},
-          {"type": "command", "command": "SHELLCHECK_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_shellcheck.py\""},
-          {"type": "command", "command": "PYCHECK_HOOK_BLOCK=1 \"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-pycheck\""}
+          {
+            "type": "command",
+            "command": "GATE_HOOK_BLOCK=1 python3 \"$CLAUDE_PROJECT_DIR/scripts/hook_gate_running.py\""
+          },
+          {
+            "type": "command",
+            "command": "SHELLCHECK_HOOK_BLOCK=1 PATH=\"$HOME/.local/bin:$PATH\" \"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-shellcheck\""
+          },
+          {
+            "type": "command",
+            "command": "PYCHECK_HOOK_BLOCK=1 \"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-pycheck\""
+          }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          {"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/absence_audit.py\""},
-          {"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/regen_if_stale.sh\""}
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/absence_audit.py\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/regen_if_stale.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-inbound-asks\""
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-nemik-check\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-inbound-asks\""
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.venv/bin/mikemol-hook-nemik-check\""
+          }
         ]
       }
     ]

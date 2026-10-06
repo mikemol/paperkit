@@ -322,11 +322,16 @@ wheels = [
 [[package]]
 name = "mikemol-hooks"
 version = "0.1.0"
-source = { git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=fca9db7b508ebf84c6e7664de35f658e4ff36c8f#fca9db7b508ebf84c6e7664de35f658e4ff36c8f" }
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=03749d56d55741840da13d86533e7e8d698e3be8#03749d56d55741840da13d86533e7e8d698e3be8" }
 dependencies = [
     { name = "mypy" },
     { name = "ruff", version = "0.16.9", source = { registry = "https://pypi.org/simple" } },
 ]
+
+[[package]]
+name = "mikemol-pathsforward"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=pathsforward&rev=03749d56d55741840da13d86533e7e8d698e3be8#03749d56d55741840da13d86533e7e8d698e3be8" }
 
 [[package]]
 name = "mypy"
@@ -421,6 +426,7 @@ render = [
 [package.dev-dependencies]
 dev = [
     { name = "mikemol-hooks", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-pathsforward", marker = "python_full_version >= '3.13'" },
     { name = "mypy" },
     { name = "ruff", version = "0.16.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
     { name = "ruff", version = "0.16.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
@@ -436,7 +442,8 @@ provides-extras = ["render"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "mikemol-hooks", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=fca9db7b508ebf84c6e7664de35f658e4ff36c8f" },
+    { name = "mikemol-hooks", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=03749d56d55741840da13d86533e7e8d698e3be8" },
+    { name = "mikemol-pathsforward", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=pathsforward&rev=03749d56d55741840da13d86533e7e8d698e3be8" },
     { name = "mypy", specifier = ">=1.8" },
     { name = "ruff" },
 ]

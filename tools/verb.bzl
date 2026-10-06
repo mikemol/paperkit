@@ -17,7 +17,7 @@ ARBITRARY command (pk_cmd's `sh -c cmd`, pk_agree's producers).  bazel = the pro
 record = the artifact downstream proofs depend on.
 """
 
-load("@@//tools:cell.bzl", "cell_builds_env", "cell_pypath")
+load("//tools:cell.bzl", "cell_builds_env", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 _VERDICT = "//tools:verdict.py"

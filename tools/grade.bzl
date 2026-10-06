@@ -10,7 +10,7 @@ Proof: baseline + ONE mutant (a sensitive engine file) for a real check.  The fu
 fan-out + ladder + rests_on clamp is the scaled version.
 """
 
-load("@@//tools:cell.bzl", "cell_pypath")
+load("//tools:cell.bzl", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 

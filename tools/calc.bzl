@@ -6,7 +6,7 @@ re-measured (pk_cmd runs the check, pk_grade_claim re-sweeps), here one sweep fe
 change re-runs only pk_calc; the readings are instant.  footaudit/emergence are the same shape.
 """
 
-load("@@//tools:cell.bzl", "cell_builds_env", "cell_pypath")
+load("//tools:cell.bzl", "cell_builds_env", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
@@ -235,7 +235,7 @@ pk_calc = rule(
         # warrant DECLARED as built, not every staged file.  So the label list is passed twice:
         # once to stage, once to name.  pk_cmd carries the same pair of attrs for the same reason.
         "builds": attr.label_list(allow_files = True),
-        "_observe": attr.label(default = "@@//tools:observe"),
+        "_observe": attr.label(default = "//tools:observe"),
     },
 )
 

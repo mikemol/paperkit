@@ -9,7 +9,7 @@ paper's results = treating it as a library); the package boundary is not semanti
 CROSS one (`result:`, `concept:`) get no special case here.  pk_proof builds the whole DAG (every witness); building it proves the paper.
 """
 
-load("@@//tools:cell.bzl", "cell_pypath")
+load("//tools:cell.bzl", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 

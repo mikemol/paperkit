@@ -1132,7 +1132,7 @@ def _bib_repo_impl(repository_ctx):
     # GENERAL oracle, kept as a cmd: drop (Ζ·resist).  It runs at the PROJECT default tier (a whole-bib
     # oracle has no single warrant's tier); it is pure engine, so sandbox for most projects.
     lc = "" if proj_tier == "sandbox" else ", tier = " + _lit(proj_tier)
-    inv = "\"$(command -v python3)\" paperkit/gate.py --invariants --safe --without-K " + proj
+    inv = "\"$(command -v python3)\" -m paperkit.gate --invariants --safe --without-K " + proj
     out.append("pk_cmd(name = \"invariants\", cmd = " + _lit(inv) + lc + ", data = [" + _lit(files) + "".join([", " + _lit(i) for i in imports]) + ', "@@//paperkit:engine"])')
     recs.append('":invariants"')
 
@@ -1149,7 +1149,7 @@ def _bib_repo_impl(repository_ctx):
     # the protocol here would give the build a second reading of what a pagination is, free to
     # drift from the engine's.  The generator's job is to WIRE the oracle, not to be one.
     if repository_ctx.attr.genres:
-        gen = "\"$(command -v python3)\" paperkit/genre.py --check " + proj
+        gen = "\"$(command -v python3)\" -m paperkit.genre --check " + proj
         out.append("pk_cmd(name = \"genres\", cmd = " + _lit(gen) + lc + ", data = [" + _lit(files) +
                    "".join([", " + _lit(i) for i in imports]) + ', "@@//paperkit:engine"])')
         recs.append('":genres"')
@@ -1170,7 +1170,7 @@ def _bib_repo_impl(repository_ctx):
     # FAIL while //:hook was green.  `--invariants` executes no check — it yields the structure the
     # tables print (sections, prose ≡ projection, cited count, --without-K collapses); the VERDICT
     # is `gate_rec` (what //:hook asserts) and the GRADES are `rec_grades` below, per claim.
-    struct = ("\"$(command -v python3)\" paperkit/gate.py --json --invariants --safe --without-K " +
+    struct = ("\"$(command -v python3)\" -m paperkit.gate --json --invariants --safe --without-K " +
               proj)
     out.append("pk_json(name = \"rec_struct\", cmd = " + _lit(struct) + lc + ", data = [" + rdl +
                '], visibility = ["//visibility:public"])')

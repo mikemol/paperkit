@@ -46,7 +46,6 @@ def certificate(key: str) -> dict:
         raise RuntimeError(f"prove {key}: the def-sweep failed — {r.stderr.strip()[-400:]}")
     calc = json.loads(r.stdout)
     baseline, sens = bool(calc.get("baseline")), calc.get("sens", [])
-    sys.path.insert(0, str(ENGINE))
     import paperkit.grade  # the ONE ladder — derived, never re-declared here
     return {
         "concept": key,

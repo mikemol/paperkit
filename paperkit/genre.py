@@ -523,6 +523,5 @@ if __name__ == "__main__":
     # Ζ·spawn·owner — the SCRIPT entry is outside the module's import graph (`__main__` is not
     # `genre`), so resolving the spawn here adds no component edge: dagderive attributes imports
     # to the module, and this block only runs when the file IS the program.
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
     import paperkit.resolver
     raise SystemExit(main(sys.argv[1:], spawn=paperkit.checkenv.spawn_declared))

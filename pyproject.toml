@@ -332,6 +332,6 @@ dev = [
     # needs Python >= 3.13 while paperkit's floor is 3.11 (what a CONSUMER installs against), and
     # uv refuses the lock outright otherwise.  Raising the ENGINE's floor for a DEV hook would change
     # the consumer contract for a tool no consumer runs; the dev venv is 3.13, so the hook is there.
-    "mikemol-hooks @ git+https://github.com/mikemol/mtools.git@03749d56d55741840da13d86533e7e8d698e3be8#subdirectory=hooks ; python_full_version >= '3.13'",
-    "mikemol-pathsforward @ git+https://github.com/mikemol/mtools.git@03749d56d55741840da13d86533e7e8d698e3be8#subdirectory=pathsforward ; python_full_version >= '3.13'",
+    "mikemol-hooks @ git+https://github.com/mikemol/mtools.git@6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#subdirectory=hooks ; python_full_version >= '3.13'",
+    "mikemol-pathsforward @ git+https://github.com/mikemol/mtools.git@6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#subdirectory=pathsforward ; python_full_version >= '3.13'",
 ]

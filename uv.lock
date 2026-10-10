@@ -322,7 +322,7 @@ wheels = [
 [[package]]
 name = "mikemol-hooks"
 version = "0.1.0"
-source = { git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=03749d56d55741840da13d86533e7e8d698e3be8#03749d56d55741840da13d86533e7e8d698e3be8" }
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#6868dd2a7f3d113b7b505c8f023e2e477a33c0ec" }
 dependencies = [
     { name = "mypy" },
     { name = "ruff", version = "0.16.9", source = { registry = "https://pypi.org/simple" } },
@@ -331,7 +331,7 @@ dependencies = [
 [[package]]
 name = "mikemol-pathsforward"
 version = "0.1.0"
-source = { git = "https://github.com/mikemol/mtools.git?subdirectory=pathsforward&rev=03749d56d55741840da13d86533e7e8d698e3be8#03749d56d55741840da13d86533e7e8d698e3be8" }
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=pathsforward&rev=6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#6868dd2a7f3d113b7b505c8f023e2e477a33c0ec" }
 
 [[package]]
 name = "mypy"
@@ -442,8 +442,8 @@ provides-extras = ["render"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "mikemol-hooks", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=03749d56d55741840da13d86533e7e8d698e3be8" },
-    { name = "mikemol-pathsforward", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=pathsforward&rev=03749d56d55741840da13d86533e7e8d698e3be8" },
+    { name = "mikemol-hooks", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=6868dd2a7f3d113b7b505c8f023e2e477a33c0ec" },
+    { name = "mikemol-pathsforward", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=pathsforward&rev=6868dd2a7f3d113b7b505c8f023e2e477a33c0ec" },
     { name = "mypy", specifier = ">=1.8" },
     { name = "ruff" },
 ]

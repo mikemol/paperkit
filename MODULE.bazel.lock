@@ -199,7 +199,7 @@
           "@@//report/paper.toml": "fd0ccad197ae46e13caa2c02956edbfbe0bc534d3680537fc6ef73c13dc808b0",
           "@@//setup/paper.toml": "3e8a4dab25f21f2f661d7cf7a79817f5f084789f418baeea41e951435df460f5",
           "@@//talk/paper.toml": "768609d35515be72ea3e2bb255754e5fb670960c9584c887a34efa1c412e0dff",
-          "@@//tools/closure.py": "571982723874db4c5c9e8c28816810750e2ce773861f5814a588e63c97814f08",
+          "@@//tools/closure.py": "44da263a43972805c416e997c9f28f1dd85319bcaa2329c9d0666fd815477655",
           "@@//tools/def_sites.py": "6b541257df33e35da4116caa0009dee655e80337f296d5058bdae7d47b5fa40f",
           "@@//tools/imports.py": "6c4204adc7a16528c07403e3b02c063830b10d235b07d958bdb3aef93225d5cb",
           "@@//tools/sites.py": "bd53e382ffa10965fd5deda94e963a4136bd143da45259eb997a440993591aa1"

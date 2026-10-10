@@ -14,11 +14,10 @@ tool to the cwd — the project dir being gated.
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import resolver
+import paperkit.resolver
+import paperkit.checkenv
 
 DIRTY = {
     "PATH": "/usr/bin" + os.pathsep + "." + os.pathsep + os.pathsep + "rel/x",  # abs kept; .,"",rel dropped
@@ -43,7 +42,7 @@ def main() -> int:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
-    e = resolver.clean_env(DIRTY)
+    e = paperkit.checkenv.clean_env(DIRTY)
 
     print("env-sanitization behaviors\n")
     check("keeps PATH's absolute dirs so a check's tools still resolve", e.get("PATH") == "/usr/bin")
@@ -52,8 +51,13 @@ def main() -> int:
     check("keeps HOME and locale (LC_ALL)", e.get("HOME") == "/h" and e.get("LC_ALL") == "C")
     check("keeps paperkit's own knobs (PAPERKIT_*), DROPS the retired MEMBUDGET_* (Bazel bounds memory)",
           e.get("PAPERKIT_CHECK_MB") == "256" and "MEMBUDGET_PARENT" not in e)
-    check("DROPS injection vectors (LD_PRELOAD, IFS, BASH_ENV, PYTHONPATH)",
-          not any(k in e for k in ("LD_PRELOAD", "IFS", "BASH_ENV", "PYTHONPATH")))
+    check("DROPS injection vectors (LD_PRELOAD, IFS, BASH_ENV)",
+          not any(k in e for k in ("LD_PRELOAD", "IFS", "BASH_ENV")))
+    # ⚑ PYTHONPATH IS NEVER INHERITED, BUT IT IS SET: the engine hands every check the one directory
+    # `paperkit` is importable from (the same value as PAPERKIT_PYTHONPATH), so a consumer imports
+    # the engine as the package it is. The caller's own value, "/x" above, does not survive.
+    check("PYTHONPATH is the engine's own, never the caller's",
+          e.get("PYTHONPATH") == e.get("PAPERKIT_PYTHONPATH") and e.get("PYTHONPATH") != "/x")
     check("DROPS unknown vars (FOO) — default-deny, not block-list", "FOO" not in e)
     print()
 

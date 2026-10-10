@@ -11,17 +11,15 @@ across implementations, ruling out a shared bug a single check cannot catch.  Bo
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import resolver
+import paperkit.resolver
 
-ENG = Path(resolver.__file__).resolve().parent
+ENG = Path(paperkit.resolver.__file__).resolve().parent
 
 
 def ag(target):
-    return resolver.resolves(f"agree:{target}", ENG, {})
+    return paperkit.resolver.resolves(f"agree:{target}", ENG, {})
 
 
 def main() -> int:

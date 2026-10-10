@@ -89,14 +89,11 @@ def formulas():
 CLAIMS = {"synth-formulas": formulas}
 '''
 
-# The generator the witness shells out to — flat `import bib`, the shape that broke edge-formulas.
+# The generator the witness shells out to — an engine import, the shape that broke edge-formulas.
+# It is the package spelling now (paperkit:W296): `import paperkit.bib`, no path mutation.
 GEN = '''\
 """synthetic generator."""
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "paperkit"))
-import bib
+import paperkit.bib
 '''
 
 # The same generator with NO engine import — the control: nothing to under-declare.
@@ -128,7 +125,7 @@ def _roots(check: Path, closure: Path) -> set[str]:
     r = subprocess.run(  # noqa: S603
         [PY, str(closure), "--check", str(check), "--relpath", "synth/checks/w.py", *mods],
         cwd=ROOT, capture_output=True, text=True, check=False,
-        env={"PYTHONPATH": str(ROOT / "tools"), "PATH": "/usr/bin:/bin"},
+        env={"PYTHONPATH": str(ROOT), "PATH": "/usr/bin:/bin"},
     )
     return {Path(p).stem for ln in r.stdout.splitlines()
             for c, p in [ln.split("\t")[:2]] if c == "synth-formulas" and ":" not in p}

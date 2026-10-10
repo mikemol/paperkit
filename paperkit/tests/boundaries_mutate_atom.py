@@ -21,13 +21,11 @@ to prevent:
 from __future__ import annotations
 
 import ast
-import sys
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ENGINE))
 
-import mutate
+import paperkit.mutate
 
 
 def main() -> int:
@@ -75,7 +73,7 @@ def main() -> int:
     def reaches_arm(src):
         """The if-then arm `return work()` is a branch: site iff its exact line is enumerated."""
         want = "        return work()" if src is SAFE else "            return work()"
-        for _, _, (b0, bl) in mutate._branch_sites(src):
+        for _, _, (b0, bl) in paperkit.mutate._branch_sites(src):
             if src.splitlines()[b0.lineno - 1] == want and b0.lineno == bl.end_lineno:
                 return True
         return False
@@ -96,7 +94,7 @@ def main() -> int:
     # BARE's protected try-body is `return work()` at line 3; a bare `except:` catches BaseException,
     # so that line must NOT be a branch: site (only the handler body at line 5 is safe to mutate).
     check("(F) the protected body under a bare `except:` is REFUSED",
-          all(b0.lineno != 3 for _, _, (b0, _bl) in mutate._branch_sites(BARE)))
+          all(b0.lineno != 3 for _, _, (b0, _bl) in paperkit.mutate._branch_sites(BARE)))
     check("(δ) `except Exception` does NOT refuse it (BaseException escapes Exception)",
           reaches_arm(NARROW))
 
@@ -109,10 +107,10 @@ def main() -> int:
         "        return 'neg'\n"
     )
     check("(b) `def:classify` == bare `classify` (legacy dispatch unchanged, byte-identical)",
-          mutate.emit_mutant(SRC, "def:classify") == mutate.emit_mutant(SRC, "classify"))
+          paperkit.mutate.emit_mutant(SRC, "def:classify") == paperkit.mutate.emit_mutant(SRC, "classify"))
     check("(b) the ∅ identity is byte-identical to the source",
-          mutate.emit_mutant(SRC, "") == SRC)
-    branch = mutate.emit_mutant(SRC, "branch:classify#0")
+          paperkit.mutate.emit_mutant(SRC, "") == SRC)
+    branch = paperkit.mutate.emit_mutant(SRC, "branch:classify#0")
     check("branch: drops one arm's body → the SAME uncatchable raise (monotone)",
           "raise BaseException('PAPERKIT_MUT')" in branch and branch != SRC)
     check("the branch: mutant still parses (module stays importable — a witness flips only if it "
@@ -121,10 +119,10 @@ def main() -> int:
     # def: is UNTOUCHED by the branch: mutation — a coarse cell survives alongside the finer one.
     check("(b) `def:classify` and `branch:classify#0` are DISTINCT mutants (additive, not a "
           "replacement)",
-          mutate.emit_mutant(SRC, "def:classify") != branch)
+          paperkit.mutate.emit_mutant(SRC, "def:classify") != branch)
 
     # ── flip: is a distinct, NON-monotone op (a value inversion, never a raise) ───────────────────
-    flip = mutate.emit_mutant(SRC, "flip:classify#0")
+    flip = paperkit.mutate.emit_mutant(SRC, "flip:classify#0")
     check("flip: inverts the condition (`x > 0` → `not (x > 0)`), never a raise",
           "not (x > 0)" in flip and "raise BaseException" not in flip.replace(SRC, ""))
     check("the flip: mutant still parses", _parses(flip))
@@ -152,7 +150,7 @@ def _parses(text: str) -> bool:
 
 def _raises(src: str, spec: str) -> bool:
     try:
-        mutate.emit_mutant(src, spec)
+        paperkit.mutate.emit_mutant(src, spec)
         return False
     except KeyError:
         return True

@@ -29,32 +29,31 @@ from pathlib import Path
 # `_fixture_model` import below found nothing and the witness could not establish its baseline.
 ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or Path(__file__).resolve().parents[1])
 ROOT = ENGINE.parent
-sys.path.insert(0, str(Path(__file__).resolve().parent))   # this library — for its own domain walk)
-sys.path.insert(0, str(ENGINE))
-sys.path.insert(0, str(ENGINE / "tests"))
-from _fixture_model import entry  # noqa: E402  (the validated fixture kernel; capability helpers
+import paperkit.tests._fixture_model  # noqa: E402  (the validated fixture kernel; capability helpers
 #   are imported FUNCTION-LOCALLY per witness — the minimal-capability discipline of Μ·kernel·fixture·split)
-import project as P  # noqa: E402  — the bib parser (Μ·model), for the claim-is-record witness
-import gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
-import resolver  # noqa: E402  — VERBS, the engine's OWN verb set (never re-listed here; Λ·registry)
-import routes  # noqa: E402  — Λ·key·graded, the shared graded-key walk (this library is grade 0)
+import paperkit.project  # noqa: E402  — the bib parser (Μ·model), for the claim-is-record witness
+import paperkit.gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
+import paperkit.resolver  # noqa: E402  — VERBS, the engine's OWN verb set (never re-listed here; Λ·registry)
+import paperkit.routes  # noqa: E402  — Λ·key·graded, the shared graded-key walk (this library is grade 0)
 
 
 def adequacy_pitch():
-    from _fixture_delta import discriminate
+    import paperkit.tests._fixture_delta
+    import paperkit.tests._fixture_model
     # the Δ grade ladder, the PITCH face — a passing check only proves a sentence named a verifier,
     # not that the verifier ENTAILS it, so Δ grades how much each check can actually fail.  Witnessed
     # the STRONG way (run the real grader over a fixture, not grep the engine source): a presupposed
     # file: grades vacuous, a content-sensitive cmd: grades behavioral.
-    recs = json.loads(discriminate(
-        [entry("vac", claim="v", check="file:w.bib"),
-         entry("beh", claim="b", check="cmd:grep -q TOKEN a.txt", frm="vac")],
+    recs = json.loads(paperkit.tests._fixture_delta.discriminate(
+        [paperkit.tests._fixture_model.entry("vac", claim="v", check="file:w.bib"),
+         paperkit.tests._fixture_model.entry("beh", claim="b", check="cmd:grep -q TOKEN a.txt", frm="vac")],
         "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
     g = {r["key"]: r["grade"] for r in recs}
     assert g["vac"] == "vacuous" and g["beh"] == "behavioral", f"grade ladder wrong: {g}"
 
 
 def _parse(text):
+    import paperkit.bib
     # the bib PARSER is engine code (project.entries), so mutating a parser def-site flips this
     # witness — the certificate's sensitivity fingerprint IS that parser, which is exactly what a
     # view citing "a claim is a record" should inherit rather than re-derive.
@@ -62,7 +61,7 @@ def _parse(text):
     try:
         p = Path(d) / "t.bib"
         p.write_text(text)
-        return P.entries(p)
+        return paperkit.bib.parse(p)
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -80,7 +79,7 @@ def claim_bears_check():
     # RESOLVES it (runs it).  Parser and resolver are engine, so the certificate's fingerprint IS them.
     rec = _parse("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")["c"]
     assert rec.get("check") == "cmd:true", "the claim carries no check"
-    assert gate.resolves("cmd:true", ENGINE, {}).passed and not gate.resolves("cmd:false", ENGINE, {}).passed, \
+    assert paperkit.resolver.resolves("cmd:true", ENGINE, {}).passed and not paperkit.resolver.resolves("cmd:false", ENGINE, {}).passed, \
         "the verifier is not machine-checkable"
 
 
@@ -88,46 +87,49 @@ def custom_type_resolves():
     # cmd is the escape hatch every check reduces to, and a new domain adds a verifier in config
     # without touching the engine: a config-supplied type resolves by running its cmd; an unregistered
     # one does not.  The resolver dispatch is engine, so mutating a dispatch def-site flips this.
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}).passed, \
+    assert paperkit.resolver.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}).passed, \
         "a config-supplied check type did not resolve to its cmd"
-    assert not gate.resolves("demo:x", ENGINE, {}).passed, \
+    assert not paperkit.resolver.resolves("demo:x", ENGINE, {}).passed, \
         "an unregistered check type resolved with nothing behind it"
 
 
 def failing_check_blocks():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    import paperkit.tests._fixture_gate
+    import paperkit.tests._fixture_model
+    import paperkit.tests._fixture_project
     # an unverified sentence cannot ship: a claim whose check FAILS blocks the gate.  The gate is
     # engine, so mutating its resolution/projection def-sites flips this — the fingerprint is the gate.
-    ok = [entry("x", claim="present", check="cmd:true")]
-    bad = [entry("x", claim="present", check="cmd:false")]
-    good = project_text(ok)
-    assert gate(ok, out=good)[0] == 0, "a claim with a passing verifier did not ship"
-    assert gate(bad, out=good)[0] != 0, "a claim with a FAILING verifier still shipped"
+    ok = [paperkit.tests._fixture_model.entry("x", claim="present", check="cmd:true")]
+    bad = [paperkit.tests._fixture_model.entry("x", claim="present", check="cmd:false")]
+    good = paperkit.tests._fixture_project.project_text(ok)
+    assert paperkit.tests._fixture_gate.gate(ok, out=good)[0] == 0, "a claim with a passing verifier did not ship"
+    assert paperkit.tests._fixture_gate.gate(bad, out=good)[0] != 0, "a claim with a FAILING verifier still shipped"
 
 
 def gate_enforces_invariants():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    import paperkit.tests._fixture_gate
+    import paperkit.tests._fixture_model
+    import paperkit.tests._fixture_project
     # the gate ENFORCES its invariants — the committed prose equals its projection, and every cited
     # claim's check passes — so violating each makes it RED.  The gate is the engine's, so its
     # def-sites (projection-equality, check-resolution) are the certificate's fingerprint.
-    w = [entry("x", claim="content", check="cmd:true")]
-    good = project_text(w)
-    assert gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
-    assert gate(w, out=good + "\nDRIFT\n")[0] != 0, "projection-equality not enforced"
-    bad = [entry("x", claim="content", check="cmd:false")]
-    assert gate(bad, out=project_text(bad))[0] != 0, "check-resolution not enforced"
+    w = [paperkit.tests._fixture_model.entry("x", claim="content", check="cmd:true")]
+    good = paperkit.tests._fixture_project.project_text(w)
+    assert paperkit.tests._fixture_gate.gate(w, out=good)[0] == 0, "a faithful, verified document should pass"
+    assert paperkit.tests._fixture_gate.gate(w, out=good + "\nDRIFT\n")[0] != 0, "projection-equality not enforced"
+    bad = [paperkit.tests._fixture_model.entry("x", claim="content", check="cmd:false")]
+    assert paperkit.tests._fixture_gate.gate(bad, out=paperkit.tests._fixture_project.project_text(bad))[0] != 0, "check-resolution not enforced"
 
 
 def adequacy_gap():
-    from _fixture_gate import gate
+    import paperkit.tests._fixture_gate
+    import paperkit.tests._fixture_model
     # the GATE is blind to RELEVANCE: a passing check proves a sentence NAMED a verifier, not that
     # the verifier ENTAILS the claim, so a false sentence with a behavioral-but-irrelevant check
     # still passes — verification here is adequacy, not proof of meaning.  (Δ·scope bounds this to
     # the GATE it exercises, not gate + grader; crash-sensitive-limit owns the grader's half.)
-    w = [entry("c", claim="the sky is green", check="cmd:grep -q TOKEN a.txt")]
-    assert gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
+    w = [paperkit.tests._fixture_model.entry("c", claim="the sky is green", check="cmd:grep -q TOKEN a.txt")]
+    assert paperkit.tests._fixture_gate.gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
 
 
 def resolver_dispatches():
@@ -136,27 +138,28 @@ def resolver_dispatches():
     # no count, no list, nothing to drift (Λ·registry) — the built-in set is CLOSED, and a custom
     # [checks.X] type dispatches through the registry.  The SUPERSET of the four view faces it
     # certifies; the fingerprint is the resolver's own def-sites.
-    assert gate.resolves("cmd:true", ENGINE, {}).passed and not gate.resolves("file:true", ENGINE, {}).passed, \
+    assert paperkit.resolver.resolves("cmd:true", ENGINE, {}).passed and not paperkit.resolver.resolves("file:true", ENGINE, {}).passed, \
         "the type prefix does not select the verb (a verifier is named type:target)"
-    assert gate.resolves("file:gate.py", ENGINE, {}).passed, "file: verb"
-    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}).passed, "agree: verb"
-    for typ in resolver.VERBS:
-        assert not gate.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}).passed, \
+    assert paperkit.resolver.resolves("file:gate.py", ENGINE, {}).passed, "file: verb"
+    assert paperkit.resolver.resolves("agree:printf 42 ||| printf 42", ENGINE, {}).passed, "agree: verb"
+    for typ in paperkit.resolver.VERBS:
+        assert not paperkit.resolver.resolves(f"{typ}:no-such-target-{typ}", ENGINE, {}).passed, \
             f"{typ}: is declared in VERBS but does not dispatch to a real branch"
-    assert gate.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(), \
+    assert paperkit.resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(), \
         "an unregistered type resolved — the built-in set is not closed"
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}).passed, \
+    assert paperkit.resolver.resolves("demo:x", ENGINE, {"demo": {"cmd": "true"}}).passed, \
         "a custom [checks.X] type did not dispatch through the registry"
 
 
 def document_is_projection():
-    from _fixture_project import project_text
+    import paperkit.tests._fixture_model
+    import paperkit.tests._fixture_project
     # the PROJECTOR component's certificate: a document IS the projection of its claim-DAG — the
     # title, EVERY rubric section (populated or not), and every claim's prose appear in the emitted
     # document, which leads with a heading.  The superset of the three view faces (README pitch,
     # paper thesis, paper projector-emits).
-    t = project_text([entry("a", claim="alpha thesis"),
-                      entry("b", claim="beta point", frm="a")],
+    t = paperkit.tests._fixture_project.project_text([paperkit.tests._fixture_model.entry("a", claim="alpha thesis"),
+                      paperkit.tests._fixture_model.entry("b", claim="beta point", frm="a")],
                      rubric=(("s", "Sec One"), ("t", "Sec Two")), title="Doc")
     low = t.lower()
     assert t.startswith("#"), "the projection does not lead with a document heading"
@@ -182,10 +185,10 @@ def graded_key_resolves():
             "f": {"A": (shared, "A"), "B": (shared, "B")},                     # grade 1
             "d": {"s": {"deep": (shared, "deep")}}}                            # grade 2
     for key in ("flat", "f/A", "f/B", "d/s/deep"):
-        assert routes.dispatch(grid, key, "t", report=False) == 0, f"a grade-valid key did not certify: {key}"
+        assert paperkit.routes.dispatch(grid, key, "t", report=False) == 0, f"a grade-valid key did not certify: {key}"
     assert seen == ["flat", "A", "B", "deep"], f"the walk ran the wrong witnesses: {seen}"
     # the two grade-1 keys share ONE implementation but arrive with DIFFERENT arguments
-    fa, fb = routes.walk(grid, "f/A"), routes.walk(grid, "f/B")
+    fa, fb = paperkit.routes.walk(grid, "f/A"), paperkit.routes.walk(grid, "f/B")
     assert fa[0] is fb[0] and fa[1] != fb[1], "parameterised keys did not share one implementation"
     # THE EXIT-CODE PROTOCOL: 2 is "not mine" (so a resolver can fall through), 1 is FAILED.  A
     # leaf's KeyError must read as 2, NOT 1 — "this argument is not one I serve" is indistinguishable
@@ -194,13 +197,13 @@ def graded_key_resolves():
     def boom(a):
         raise {"miss": KeyError, "bad": AssertionError}[a](a)
     arm = {"x": {"miss": (boom, "miss"), "bad": (boom, "bad")}}
-    assert routes.dispatch(arm, "x/miss", "t", report=False) == 2, "a leaf's KeyError did not read as not-mine"
-    assert routes.dispatch(arm, "x/bad", "t", report=False) == 1, "a failing witness did not read as FAILED"
+    assert paperkit.routes.dispatch(arm, "x/miss", "t", report=False) == 2, "a leaf's KeyError did not read as not-mine"
+    assert paperkit.routes.dispatch(arm, "x/bad", "t", report=False) == 1, "a failing witness did not read as FAILED"
     for absent in ("nope", "f/Z", "f", "flat/extra"):
-        assert routes.dispatch(grid, absent, "t", report=False) == 2, f"{absent!r} should be not-mine"
+        assert paperkit.routes.dispatch(grid, absent, "t", report=False) == 2, f"{absent!r} should be not-mine"
     # THIS library is grade 0, and its table is DERIVED from CONCEPTS — so the two cannot drift.
     assert set(ROUTES) == set(CONCEPTS), "the grade-0 route table drifted from CONCEPTS"
-    assert all(routes.walk(ROUTES, k)[1] is None for k in CONCEPTS), "grade 0 is not nullary"
+    assert all(paperkit.routes.walk(ROUTES, k)[1] is None for k in CONCEPTS), "grade 0 is not nullary"
 
 
 def slice_cache_sound():
@@ -221,7 +224,7 @@ def slice_cache_sound():
     # `BINARY` dict, so editing an operator did not invalidate the witnesses that use it.
     #
     # Both are asserted against the real slicer, on a fixture carrying both shapes.
-    import checkcache as CC
+    import paperkit.checkcache
     src = ("import sys\n"
            "TOP = 1\n"
            "def leaf(x):\n"
@@ -239,15 +242,15 @@ def slice_cache_sound():
         base = Path(d)
         (base / "concepts.py").write_text(src)
         (base / "helper.py").write_text("VALUE = 'a'\n")
-        _t, fns, names, segs, imports = CC.module_index(src)
+        _t, fns, names, segs, imports = paperkit.checkcache.module_index(src)
         search = [base]
 
         def key(fn, route):
-            return CC.slice_key(fn, route, fns, names, segs, imports, search)
+            return paperkit.checkcache.slice_key(fn, route, fns, names, segs, imports, search)
 
         # the local-import edge is SEEN: helper is in the reached-module set, and not in the other's
-        reach_local = CC.slice_of("reaches_local_import", fns, names, imports)
-        reach_none = CC.slice_of("reaches_nothing", fns, names, imports)
+        reach_local = paperkit.checkcache.slice_of("reaches_local_import", fns, names, imports)
+        reach_none = paperkit.checkcache.slice_of("reaches_nothing", fns, names, imports)
         assert "helper" in reach_local[1], "a function-local import is invisible to the slice"
         assert "helper" not in reach_none[1], "an unrelated witness picked up a module it cannot reach"
         # and the edge is LOAD-BEARING: editing that module changes the dependent key, ONLY.
@@ -260,7 +263,7 @@ def slice_cache_sound():
         # THE CONSTANT DIMENSION: the walk goes THROUGH a literal, not up to it.  `leaf` is named
         # only by TABLE, so a function-only index reaches TABLE and stops — and an edit to `leaf`
         # would leave the key untouched, which is the stale PASS.
-        reach_const = CC.slice_of("reaches_via_constant", fns, names, imports)
+        reach_const = paperkit.checkcache.slice_of("reaches_via_constant", fns, names, imports)
         assert "TABLE" in reach_const[0], "the slice missed a constant the witness names"
         assert "leaf" in reach_const[0], \
             "STALE-PASS: a definition reachable only THROUGH a constant is invisible to the slice"
@@ -268,8 +271,8 @@ def slice_cache_sound():
         # and it is LOAD-BEARING: editing the transitively-reached definition moves the key.
         before_c = key("reaches_via_constant", "r/const")
         mutated = src.replace("    return x\n", "    return x + 0\n")
-        _t2, fns2, names2, segs2, imports2 = CC.module_index(mutated)
-        after_c = CC.slice_key("reaches_via_constant", "r/const", fns2, names2, segs2, imports2, search)
+        _t2, fns2, names2, segs2, imports2 = paperkit.checkcache.module_index(mutated)
+        after_c = paperkit.checkcache.slice_key("reaches_via_constant", "r/const", fns2, names2, segs2, imports2, search)
         assert before_c != after_c, \
             "STALE-PASS: editing a definition reached through a constant did not invalidate"
         # the ROUTE is part of the key — one witness serving two claims is two checks, one slice.
@@ -294,17 +297,17 @@ def conclusion_needs_backing():
     # not — so the weak direction (pure prose naming no computed value) is passed deliberately.
     # conclusiongate lives in THIS library (staged by its BUILD manifest), not in cotype/ —
     # a witness may only import what the hermetic sandbox stages.
-    import conclusiongate as CG
+    import paperkit.conclusiongate
     staked = "x = 1 + 1\nprint(f'x is {x}')\nprint('=> therefore x is even')\n"
     backed = staked.replace("print('=>", "assert x % 2 == 0, 'x is odd'\nprint('=>")
     prose = "print('=> therefore the argument holds')\n"
-    assert CG.findings(staked)["ungated"], "a conclusion with no assertion anywhere was not flagged"
-    assert not CG.findings(backed)["unbacked"], "an assertion naming the same value did not count as backing"
-    assert not CG.findings(prose)["unbacked"], \
+    assert paperkit.conclusiongate.findings(staked)["ungated"], "a conclusion with no assertion anywhere was not flagged"
+    assert not paperkit.conclusiongate.findings(backed)["unbacked"], "an assertion naming the same value did not count as backing"
+    assert not paperkit.conclusiongate.findings(prose)["unbacked"], \
         "a conclusion naming no computed value was flagged — the weak direction must stay weak"
     # UNBACKED is distinct from UNGATED: assertions exist, but none touches the conclusion's subject.
     other = "y = 5\nz = 2 + 2\nassert y == 5, 'y'\nprint(f'z is {z}')\nprint('=> so the z value is even')\n"
-    u = CG.findings(other)["unbacked"]
+    u = paperkit.conclusiongate.findings(other)["unbacked"]
     assert u and "z" in u[0][2], f"an assertion about an unrelated name was accepted as backing: {u}"
 
 
@@ -314,8 +317,8 @@ def label_records_carrier():
     # `concept -> {carrier: label}` rather than `label -> concept`.  What it BUYS is ingestion:
     # a foreign corpus splits into REUSE (an existing witness family already covers this, so the
     # term becomes another ARGUMENT to it — the graded key) and WEDGE (transverse, needs new work).
-    import labelmap as LM
-    m = LM.LabelMap({"share": {"circuit": "current divider", "optimisation": "argmin"},
+    import paperkit.labelmap
+    m = paperkit.labelmap.LabelMap({"share": {"circuit": "current divider", "optimisation": "argmin"},
                      "reuse": {"functional": "hash-consing"}},
                     {"share": "operator/means/share"})          # PARTIAL — reuse has no route
     assert m.lookup("Current-Divider")[:2] == ("share", "circuit"), "normalisation failed"
@@ -437,26 +440,28 @@ def derived_is_regenerated_not_trusted():
 
 
 def project_then_gate():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    import paperkit.tests._fixture_gate
+    import paperkit.tests._fixture_model
+    import paperkit.tests._fixture_project
     # two commands do the work — PROJECT makes the document, GATE verifies it: the exact projection
     # passes, and hand-edited drift is rejected.
-    w = [entry("x", claim="content")]
-    doc = project_text(w)
+    w = [paperkit.tests._fixture_model.entry("x", claim="content")]
+    doc = paperkit.tests._fixture_project.project_text(w)
     assert doc.startswith("#"), "project did not make a document"
-    assert gate(w, out=doc)[0] == 0, "gate rejected a faithful document"
-    assert gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
+    assert paperkit.tests._fixture_gate.gate(w, out=doc)[0] == 0, "gate rejected a faithful document"
+    assert paperkit.tests._fixture_gate.gate(w, out=doc + "\nDRIFT\n")[0] != 0, "gate did not verify (drift accepted)"
 
 
 # ── delta component (Μ·kernel·certs·delta) — the Δ grader/coherence concepts, interned here as
 # canonical nodes (library-is-hash-cons: authored ONCE, the paper CITES via concept:). ────────
 def content_marks_relevance():
-    from _fixture_delta import discriminate
+    import paperkit.tests._fixture_delta
+    import paperkit.tests._fixture_model
     # Δ FLAGS the relevance gap without closing it: a check can grade behavioral yet be sensitive
     # only to inputs OTHER than the document's content (an asset, not its bib/rubric/out) —
     # content_sensitive marks that, so behavioral is necessary but not sufficient for relevance.
-    recs = json.loads(discriminate(
-        [entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],   # sensitive to an asset, not content
+    recs = json.loads(paperkit.tests._fixture_delta.discriminate(
+        [paperkit.tests._fixture_model.entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")],   # sensitive to an asset, not content
         "--all", "--json", assets={"a.txt": "TOKEN\n"})[1])
     r = recs[0]
     assert r["grade"] == "behavioral" and r.get("content_sensitive") is False, \
@@ -464,9 +469,9 @@ def content_marks_relevance():
 
 
 def delegated_grade():
-    # a verdict-import sits OUTSIDE the falsifiability ladder: Δ grades result: "imported" —
-    # adequacy delegated to a sibling the gate verifies on its own — run once, never swept.
-    import grader
+    import paperkit.bib
+    import paperkit.grader
+    import paperkit.project
     d = Path(tempfile.mkdtemp())
     try:
         sib = d / "g"
@@ -475,8 +480,8 @@ def delegated_grade():
                                         'rubric = "r.tsv"\nout = "out.md"\n')
         (sib / "r.tsv").write_text("s\tSec\n")
         (sib / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")
-        (sib / "out.md").write_text(P.project(P.load_config(sib)))
-        rec = grader.grade_check("result:g", d, set(), {}, d)
+        (sib / "out.md").write_text(paperkit.project.project(paperkit.bib.load_config(sib)))
+        rec = paperkit.grader.grade_check("result:g", d, set(), {}, d)
         assert rec["grade"] == "imported", f"a green verdict-import should grade imported, got {rec['grade']}"
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -485,8 +490,8 @@ def delegated_grade():
 def sandbox_excludes_siblings():
     # grading runs in a sandbox copy whose mutation surface excludes SIBLING projects (a nested dir
     # with its own paper.toml), so a project grades independently of them.
-    import grader
-    import layout
+    import paperkit.grader
+    import paperkit.layout
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text("[paper]\n")
@@ -494,8 +499,8 @@ def sandbox_excludes_siblings():
         (d / "sub").mkdir()
         (d / "sub" / "paper.toml").write_text("[paper]\n")          # a nested sibling project
         (d / "sub" / "inner.py").write_text("theirs\n")
-        assert (d / "sub") in layout._nested_roots(d), "nested project not detected"
-        names = [f.name for f in grader.sandbox_files(d, set())]
+        assert (d / "sub") in paperkit.layout._nested_roots(d), "nested project not detected"
+        names = [f.name for f in paperkit.grader.sandbox_files(d, set())]
         assert "main.py" in names and "inner.py" not in names, \
             f"surface should keep own files, drop the sibling's (got {names})"
     finally:
@@ -507,7 +512,7 @@ def grounding_reflected():
     # sensitivity: overlap is reflected; a disjoint edge from a claim that tests engine capability
     # is a genuine miss (dischargeable by a `link`); one from a claim that tests nothing engine is
     # vacuously disjoint (rhetorical, auto-discharged); shared test scaffolding is not grounding.
-    import coherence
+    import paperkit.coherence
     recs = [
         {"key": "y", "grade": "behavioral", "rests-on": [],
          "tests": ["paperkit/gate.py::resolves"]},
@@ -518,18 +523,18 @@ def grounding_reflected():
         {"key": "w", "grade": "behavioral", "rests-on": ["y"],          # tests nothing engine → rhetorical
          "tests": ["checks/claims.py::w"]},
     ]
-    g = coherence.grounding_residual(recs)
+    g = paperkit.coherence.grounding_residual(recs)
     assert g["grounding_edges"] == 3, g                                 # x→y, z→y, w→y
     assert g["reflected"] == 1 and ["x", "y"] not in g["misses"], g     # x overlaps y
     assert g["undischarged"] == 1 and ["z", "y"] in g["misses"], g      # z genuine miss
     assert g["rhetorical"] == 1 and ["w", "y"] not in g["misses"], g    # w vacuously disjoint
-    assert coherence.grounding_residual(recs, discharged={"z"})["undischarged"] == 0, \
+    assert paperkit.coherence.grounding_residual(recs, discharged={"z"})["undischarged"] == 0, \
         "a `link` did not discharge a genuine grounding miss"
     scaffold = [
         {"key": "y", "grade": "behavioral", "rests-on": [], "tests": ["checks/claims.py::y"]},
         {"key": "x", "grade": "behavioral", "rests-on": ["y"], "tests": ["checks/claims.py::x"]},
     ]
-    assert coherence.grounding_residual(scaffold)["grounding_edges"] == 0, \
+    assert paperkit.coherence.grounding_residual(scaffold)["grounding_edges"] == 0, \
         "shared scaffolding counted as engine grounding — the engine restriction failed"
 
 
@@ -538,18 +543,18 @@ def emergence_collapse():
     # ⊆ its premises' COLLAPSES (its witness emerges by consuming them); a residual is an INCREMENT;
     # no grounding is a LEAF axiom.  STRICTER than grounding — an edge can OVERLAP yet the claim
     # still test more, which coverage (not overlap) catches.
-    import coherence
+    import paperkit.coherence
     recs = [
         {"key": "ax", "rests-on": [], "tests": ["paperkit/gate.py::resolves"]},                # no grounding → leaf
         {"key": "col", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves"]},           # ⊆ premise → collapse
         {"key": "inc", "rests-on": ["ax"],                                                      # extra site → increment
          "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
     ]
-    e = coherence.emergence_residual(recs)
+    e = paperkit.coherence.emergence_residual(recs)
     assert e["leaf"] == 1, e                                            # 'ax' has no grounding
     assert e["collapse"] == 1, e                                        # 'col' reduces to its premise
     assert e["increment"] == 1 and e["increments"][0][0] == "inc", e    # 'inc' tests beyond its premise
-    assert coherence.grounding_residual(recs)["reflected"] >= 1 and e["collapse"] == 1, \
+    assert paperkit.coherence.grounding_residual(recs)["reflected"] >= 1 and e["collapse"] == 1, \
         "emergence is not strictly finer than grounding (overlap should pass where coverage can fail)"
 
 
@@ -557,8 +562,8 @@ def rests_on_clamps():
     # rests-on is a SEPARATE grounding edge: the EFFECTIVE grade clamps to the weakest premise
     # along it (a behavioral thesis resting on a vacuous atom clamps to vacuous), regardless of
     # prose order — the clamp (grade.clamp) over known premise grades.
-    import grade
-    recs = grade.clamp([
+    import paperkit.grade
+    recs = paperkit.grade.clamp([
         {"key": "atom", "grade": "vacuous", "rests-on": []},
         {"key": "thesis", "grade": "behavioral", "rests-on": ["atom"]},
     ])
@@ -571,13 +576,13 @@ def concept_imports_a_certificate():
     # `concept:` IMPORTS rather than runs: the verb resolves a key against a library and yields
     # its certificate.  Δ therefore grades it `imported` — outside the falsifiability ladder,
     # delegated to the owner that graded it — exactly as a verdict-import is.
-    import grader
-    import resolver
-    assert resolver.VERBS["concept"]["verb"] == "imports", \
+    import paperkit.grader
+    import paperkit.resolver
+    assert paperkit.resolver.VERBS["concept"]["verb"] == "imports", \
         "the concept verb no longer IMPORTS — the engine's own registry disagrees with the claim"
-    assert resolver.VERBS["concept"]["crosses"], \
+    assert paperkit.resolver.VERBS["concept"]["crosses"], \
         "concept: must be a BOUNDARY-CROSSING verb — its proof lives in another project"
-    rec = grader.grade_check("concept:adequacy-pitch", ROOT / "paper", set(), {}, ROOT / "paper")
+    rec = paperkit.grader.grade_check("concept:adequacy-pitch", ROOT / "paper", set(), {}, ROOT / "paper")
     assert rec["grade"] == "imported", \
         f"a concept citation should grade imported (delegated to its library), got {rec['grade']}"
 
@@ -602,7 +607,7 @@ def concept_carries_several_views():
     # the tree passed in-process and failed in the hermetic sandbox, which stages only declared
     # inputs — and it was measuring "does this corpus happen to share a key" rather than "does one
     # concept serve several views", which is the property the claim actually makes.
-    import resolver
+    import paperkit.resolver
     d = Path(tempfile.mkdtemp())
     try:
         def view(name, key):
@@ -615,8 +620,8 @@ def concept_carries_several_views():
                                      "  check = {concept:%s}\n}\n" % key)
             return p
         a, b = view("pitch", "adequacy-pitch"), view("deep", "adequacy-pitch")
-        ra = resolver.resolves("concept:adequacy-pitch", a, {})
-        rb = resolver.resolves("concept:adequacy-pitch", b, {})
+        ra = paperkit.resolver.resolves("concept:adequacy-pitch", a, {})
+        rb = paperkit.resolver.resolves("concept:adequacy-pitch", b, {})
         assert ra.passed and rb.passed, \
             "two distinct views citing one concept did not both resolve against the library"
         # and the SAME key under a different citation is one node: adequacy-pitch and grade-ladder
@@ -639,7 +644,7 @@ def concept_resolves_consumer_first():
     # a def-sweep.  What the fallthrough claim needs is that a key the consumer DISCLAIMS reaches
     # the engine's library and gets ITS verdict — the identity of that key is irrelevant, so it
     # should be the cheapest concept in the library, not the most expensive.
-    import resolver
+    import paperkit.resolver
     d = Path(tempfile.mkdtemp())
     try:
         # a consumer with its own library, owning one key and disclaiming the rest (exit 2).
@@ -662,21 +667,21 @@ def concept_resolves_consumer_first():
             "import sys\n"
             "sys.exit(0 if sys.argv[1:2] == ['mine'] else 2)\n")
         # SELECTION is pure — no spawn needed to witness that the consumer's library is chosen.
-        assert resolver._library_for(d) == (d / "library"), \
+        assert paperkit.resolver._library_for(d) == (d / "library"), \
             "a project with its own library did not resolve to it — the seam is engine-relative"
-        assert resolver._library_for(ROOT / "paper") == resolver._LIBRARY, \
+        assert paperkit.resolver._library_for(ROOT / "paper") == paperkit.resolver._LIBRARY, \
             "a project WITHOUT its own library did not fall back to the engine's"
         # its own key resolves against ITS library (one spawn, of a two-line stub)...
-        assert resolver.resolves("concept:mine", d, {}).passed, \
+        assert paperkit.resolver.resolves("concept:mine", d, {}).passed, \
             "a consumer's own concept key did not resolve against its own library"
         # ...and a key it disclaims FALLS THROUGH to the engine's, rather than being eclipsed.
         # `label-carrier` is the cheapest engine concept (measured 0.07s); any engine key proves
         # the fallthrough, so the probe pays the minimum.
-        assert resolver.resolves("concept:label-carrier", d, {}).passed, \
+        assert paperkit.resolver.resolves("concept:label-carrier", d, {}).passed, \
             ("a key the consumer's library disclaims did not fall through to the engine's — "
              "directory-level selection alone makes every engine concept unreachable")
         # and an UNOWNED key is UNAVAILABLE from both, never a silent pass.
-        assert not resolver.resolves("concept:no-such-concept-anywhere", d, {}).passed, \
+        assert not paperkit.resolver.resolves("concept:no-such-concept-anywhere", d, {}).passed, \
             "a key no library owns resolved as passing — an absent concept must not certify"
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -694,13 +699,13 @@ def degeneracy_has_kinds():
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "paperkit"))
-    import genre
+    import paperkit.genre
 
     undeclared = [{"key": "a", "section": "S"}, {"key": "b", "section": "S"}]
     declared_empty = [{"key": "a", "section": "S", "rests-on": []},
                       {"key": "b", "section": "S", "rests-on": []}]
 
-    u, d = genre.partition(undeclared), genre.partition(declared_empty)
+    u, d = paperkit.genre.partition(undeclared), paperkit.genre.partition(declared_empty)
     assert u["degenerate"] and d["degenerate"], "both fixtures must still report degenerate"
     assert u["edges"] == 0 and d["edges"] == 0, "neither fixture has a grounding edge"
     # The load-bearing arm: the two must be DISTINGUISHABLE in the record alone.
@@ -712,7 +717,7 @@ def degeneracy_has_kinds():
     # A grounded document is not degenerate at all, and carries no kind.
     grounded = [{"key": "a", "section": "S", "rests-on": ["b"]},
                 {"key": "b", "section": "S", "rests-on": ["a"]}]
-    assert not genre.partition(grounded)["degenerate"], "a grounded document must not be degenerate"
+    assert not paperkit.genre.partition(grounded)["degenerate"], "a grounded document must not be degenerate"
 
 
 CONCEPTS = {
@@ -799,9 +804,10 @@ ROUTES = {key: (fn, None) for key, fn in CONCEPTS.items()}
 
 
 def main(argv) -> int:
+    import paperkit.routes
     prove_mode = "--prove" in argv
     argv = [a for a in argv if a != "--prove"]
-    if not argv or routes.walk(ROUTES, argv[0]) is None:
+    if not argv or paperkit.routes.walk(ROUTES, argv[0]) is None:
         # Λ·doc·concept — name WHICH library answered.  `concept:` resolves to the consuming
         # project's library and falls back to the ENGINE's (resolver._library_for), and the
         # fallback is silent by design.  Without this path in the message, a downstream reader
@@ -820,14 +826,14 @@ def main(argv) -> int:
         # fingerprint⟩ instead of a bare pass/fail, so the proof travels with the witness to every view
         # that imports it.  The same measurement the build caches as <key>__dcalc (see prove.py).
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import prove
-        print(json.dumps(prove.certificate(argv[0]), indent=2))
+        import paperkit.prove
+        print(json.dumps(paperkit.prove.certificate(argv[0]), indent=2))
         return 0
     # The shared walk owns RESOLUTION and the exit-code protocol (0 certified / 1 FAILED /
     # 2 not-mine, with a leaf's KeyError reading as 2 — see routes.py).  The verdict LINES stay
     # in this format: `concept <key>: OK` is what this library has always emitted, and the
     # message is a documented surface, so the port must not silently re-word it.
-    fn, arg = routes.walk(ROUTES, argv[0])
+    fn, arg = paperkit.routes.walk(ROUTES, argv[0])
     try:
         fn(arg) if arg is not None else fn()
     except KeyError:

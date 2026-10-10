@@ -15,12 +15,11 @@ from __future__ import annotations
 import os
 import pathlib
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import layout
+import paperkit.layout
+import paperkit.grader
 
 
 def main() -> int:
@@ -48,7 +47,7 @@ def main() -> int:
         (root / ".git").mkdir(); (root / ".git" / "HEAD").write_text("ref")  # SKIP_DIRS
         (root / "bazel-out").mkdir(); (root / "bazel-out" / "huge").write_text("Z" * 9999)  # Ζ·skip: a bazel-* artifact
         dest = Path(dt) / "sb"
-        layout._copy_sandbox(root, dest)
+        paperkit.layout._copy_sandbox(root, dest)
         check(".githooks (a real input the paper reads) is copied — not skipped", (dest / ".githooks" / "pre-commit").is_file())
         check("a non-project dir under the bounded root is copied too", (dest / "data" / "x.txt").is_file())
         check("SKIP_DIRS (.git) are still pruned", not (dest / ".git").exists())
@@ -77,7 +76,7 @@ def main() -> int:
         os.link(src, twin)
 
         dest = Path(dt) / "sb"
-        layout._copy_sandbox(root, dest)
+        paperkit.layout._copy_sandbox(root, dest)
         copied = dest / "sub" / "mod.py"
         check("P: the copy gets a FRESH inode (links back to 1)",
               copied.stat().st_nlink == 1 and copied.stat().st_ino != src.stat().st_ino)
@@ -100,7 +99,7 @@ def main() -> int:
         root = Path(t)
         (root / "a" / "b").mkdir(parents=True); (root / "a" / "b" / "paper.toml").write_text("x")   # deep nested project
         (root / "bazel-out").mkdir(); (root / "bazel-out" / "paper.toml").write_text("x")            # a bazel artifact
-        nested = {p.name for p in layout._nested_roots(root)}
+        nested = {p.name for p in paperkit.layout._nested_roots(root)}
         check("_nested_roots finds a DEEP nested project (paper.toml at any depth)", "b" in nested)
         check("_nested_roots skips a bazel-* dir (never descends the cache)", "bazel-out" not in nested)
 
@@ -117,15 +116,15 @@ def main() -> int:
             (proj / "paper.toml").write_text('[paper]\ntitle = "t"\n')
             refused_undeclared = False
             try:
-                layout._sandbox_root(proj)
+                paperkit.layout._sandbox_root(proj)
             except SystemExit:
                 refused_undeclared = True
             check("nothing declared → REFUSED (the parent is not inferred, at any size)",
                   refused_undeclared)
             (proj / "paper.toml").write_text('[paper]\ntitle = "t"\nroot = "."\n')
-            check("paper.toml [paper] root DECLARES the root", layout._sandbox_root(proj) == proj)
+            check("paper.toml [paper] root DECLARES the root", paperkit.layout._sandbox_root(proj) == proj)
             os.environ["PAPERKIT_ROOT"] = str(root)
-            check("PAPERKIT_ROOT env overrides the paper.toml declaration", layout._sandbox_root(proj) == root)
+            check("PAPERKIT_ROOT env overrides the paper.toml declaration", paperkit.layout._sandbox_root(proj) == root)
     finally:
         os.environ.pop("PAPERKIT_ROOT", None) if saved is None else os.environ.__setitem__("PAPERKIT_ROOT", saved)
 
@@ -145,11 +144,11 @@ def main() -> int:
             (hp / "paper.toml").write_text('[paper]\ntitle = "t"\n')
             refused = False
             try:
-                layout._sandbox_root(hp)
+                paperkit.layout._sandbox_root(hp)
             except SystemExit:
                 refused = True
             (hp / "paper.toml").write_text('[paper]\ntitle = "t"\nroot = "."\n')   # declare → resolves
-            ok = refused and layout._sandbox_root(hp) == hp
+            ok = refused and paperkit.layout._sandbox_root(hp) == hp
             ran.append("declare-or-refuse")
             fails.append("declare-or-refuse") if not ok else None
             print(f"  {'ok ' if ok else 'XX '}declaring a root is the difference between a sandbox and a refusal")
@@ -163,21 +162,14 @@ def main() -> int:
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
         return 1
-    # ---- Ζ·delta·tmpdir: sweep sandboxes are DISK-backed, not tmpfs ----
-    # Each concurrent def-sweep copies the whole repo (measured on paperkit: 1.4-3.2GB per copy,
-    # three concurrent = 7.2GB).  On a distro whose /tmp is tmpfs that is RAM — so the copies
-    # compete with the page cache AND with the memory budget the sweep schedules against, one
-    # resource counted once and spent twice.  Measured: a //:hook run filled a 7.7GB /tmp to 100%
-    # and nothing on the box could write a temp file.
-    import grader as G
-    sd = G._scratch_dir()
+    sd = paperkit.grader._scratch_dir()
     check("scratch: a disk-backed scratch dir is resolved by default", sd is not None)
     check("scratch: and it is NOT the tmpfs /tmp", not str(sd).startswith("/tmp"))
     old = os.environ.get("PAPERKIT_SCRATCH")
     try:
         os.environ["PAPERKIT_SCRATCH"] = "/tmp"
         check("scratch: PAPERKIT_SCRATCH overrides it — a box that WANTS tmpfs can say so",
-              G._scratch_dir() == "/tmp")
+              paperkit.grader._scratch_dir() == "/tmp")
     finally:
         os.environ.pop("PAPERKIT_SCRATCH", None)
         if old is not None:
@@ -189,17 +181,17 @@ def main() -> int:
     d = pathlib.Path(tempfile.mkdtemp())
     try:
         os.environ["PAPERKIT_SCRATCH"] = str(d)
-        husk = d / (G._SANDBOX_PREFIX + "husk")
+        husk = d / (paperkit.grader._SANDBOX_PREFIX + "husk")
         husk.mkdir()
         os.utime(husk, (0, 0))                        # backdate it well past the window
-        live = d / (G._SANDBOX_PREFIX + "live")
+        live = d / (paperkit.grader._SANDBOX_PREFIX + "live")
         live.mkdir()                                  # fresh: a running sweep's copy
-        n = G.reap_sandboxes(older_than_s=1800)
+        n = paperkit.grader.reap_sandboxes(older_than_s=1800)
         check("reap: an OLD sandbox with no live sweep is collected", n == 1 and not husk.exists())
         check("reap: a FRESH one is left alone — a live sweep's copy is not a corpse",
               live.exists())
         check("reap: reaping an empty scratch is a no-op, not an error",
-              G.reap_sandboxes(older_than_s=1800) == 0)
+              paperkit.grader.reap_sandboxes(older_than_s=1800) == 0)
     finally:
         os.environ.pop("PAPERKIT_SCRATCH", None)
         if old is not None:

@@ -13,13 +13,11 @@ document-end footnote — marker on the sentence, explanation + citation collect
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import project as Pr
+import paperkit.project
 
-R, TR = Pr.references, Pr.transitive_reduction
+R, TR = paperkit.project.references, paperkit.project.transitive_reduction
 
 
 def main() -> int:
@@ -55,7 +53,7 @@ def main() -> int:
         F = {"x": {"_src": "p", "claim": "ex", "rests-on": ["y"], **({"link": link} if link else {})},
              "y": {"_src": "p", "claim": "why"}}
         fn = {}
-        return Pr.weave(["x"], F, "p", {"x": 2, "y": 0}, None, fn), fn
+        return paperkit.project.weave(["x"], F, "p", {"x": 2, "y": 0}, None, fn), fn
     cite_s, cite_fn = woven(None)
     exp_s, exp_fn = woven("the reason, expounded")
     check("a `link` materializes the EXPOUND rung — a footnote marker, not an inline cite",

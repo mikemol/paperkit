@@ -36,7 +36,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "paperkit"))
 
 # The words a VERDICT would be spelled with, as opposed to a declared verifier.  `check` is
 # deliberately NOT here: carrying the verifier's NAME is what a record legitimately does.
@@ -57,8 +56,8 @@ def engine_vocabulary() -> set:
     ENGINE's vocabulary — the thing that would have to change for a verdict to become expressible
     — and a project's `consumer_fields` are checked separately, since those CARRY verbatim.
     """
-    import bib
-    return set(bib._SCALAR) | set(bib._LIST)
+    import paperkit.bib
+    return set(paperkit.bib._SCALAR) | set(paperkit.bib._LIST)
 
 
 def declared_consumer_fields() -> set:

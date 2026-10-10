@@ -24,6 +24,18 @@ def cell_pypath(py):
     """
     return 'export PATH="$(cd "$(dirname ' + py.interpreter.path + ')" && pwd):$PATH"; '
 
+def cell_module(tool):
+    """`-m tools.verdict` for the script file `tools/verdict.py`: a tool run BY PACKAGE, not by path.
+
+    A script run by path puts its own directory first on sys.path; `-m` from the action's root puts
+    the ROOT first, so `paperkit` and `tools` are importable with no bootstrap and no environment
+    (paperkit:W297, operator 2026-10-06). `short_path` is root-relative, which is the module path.
+    """
+    path = tool.short_path
+    if not path.endswith(".py"):
+        fail("cell_module: %s is not a python script" % path)
+    return "-m " + path[:-len(".py")].replace("/", ".")
+
 def cell_builds_env(builds):
     """⚑ Ζ·builds·path — THE ARTIFACTS A WARRANT DECLARED, AS ABSOLUTE PATHS, FOR ANY CELL.
 

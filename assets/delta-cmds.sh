@@ -1,3 +1,3 @@
 #!/bin/sh
-python3 paperkit/discriminate.py paper                            # report grades
-python3 paperkit/discriminate.py --min-strength behavioral paper  # gate on weak checks
+python3 -m paperkit.discriminate paper                            # report grades
+python3 -m paperkit.discriminate --min-strength behavioral paper  # gate on weak checks

@@ -98,6 +98,11 @@ def scripts_named(fn: ast.AST, sibling: set[str]) -> set[str]:
             and n.value.rsplit("/", 1)[-1] in sibling}
 
 
+def _stem(dotted: str) -> str:
+    """The engine module stem a flat, `paperkit.`- or `paperkit.tests.`-qualified import names."""
+    return dotted.removeprefix("paperkit.").removeprefix("tests.")
+
+
 def script_imports(path: Path, names: set[str]) -> set[str]:
     """Collect engine module stems a script imports at module level — its own cone seed."""
     out: set[str] = set()
@@ -107,9 +112,11 @@ def script_imports(path: Path, names: set[str]) -> set[str]:
         return out
     for n in ast.walk(tree):
         if isinstance(n, ast.Import):
+            out |= {s for a in n.names if (s := _stem(a.name)) in names}
+        elif isinstance(n, ast.ImportFrom) and n.module == "paperkit":
             out |= {a.name for a in n.names if a.name in names}
-        elif isinstance(n, ast.ImportFrom) and n.module in names:
-            out.add(str(n.module))
+        elif isinstance(n, ast.ImportFrom) and _stem(n.module or "") in names:
+            out.add(_stem(n.module or ""))
     return out
 
 

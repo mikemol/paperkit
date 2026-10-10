@@ -292,7 +292,7 @@ def routes_and_owners(src_path: Path) -> dict[str, str]:
     # would mean adding a module-level sys.path line for Ζ·path·retire to delete again — trading
     # one retirement item for another.  Local, it rides the caller's already-established path and
     # converts to `from paperkit import routes` in one line when the package form lands.
-    import routes
+    import paperkit.routes
 
     spec = importlib.util.spec_from_file_location("_concepts_probe", src_path)
     if spec is None or spec.loader is None:
@@ -306,7 +306,7 @@ def routes_and_owners(src_path: Path) -> dict[str, str]:
     finally:
         sys.path[:] = before
     out: dict[str, str] = {}
-    for path, target in routes.leaves(mod.ROUTES):
+    for path, target in paperkit.routes.leaves(mod.ROUTES):
         fn = getattr(target[0] if isinstance(target, tuple) else target, "__name__", None)
         if fn:
             out["/".join(path)] = fn

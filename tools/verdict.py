@@ -174,8 +174,8 @@ def main(argv):
         # not a rung raises rather than quietly grading everything green.
         if a.bad.startswith("below:"):
             sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "paperkit"))
-            import grade
-            bad = set(grade.below(a.bad.split(":", 1)[1]))
+            import paperkit.grade
+            bad = set(paperkit.grade.below(a.bad.split(":", 1)[1]))
         else:
             bad = {b.lower() for b in a.bad.split(",")}
 
@@ -221,7 +221,7 @@ def main(argv):
         # edge to anything that reads records rather than watches a build.  stderr is TEE'd — it
         # still reaches the terminal (a caller watching the build must not lose it) AND lands in
         # the verdict's `why`, capped, so the failure travels with the artifact.
-        p = subprocess.run([sys.executable, "paperkit/coherence.py", "--from-calcs", a.project, *a.calcs],
+        p = subprocess.run([sys.executable, "-m", "paperkit.coherence", "--from-calcs", a.project, *a.calcs],
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         if p.stderr:
             print(p.stderr, end="", file=sys.stderr)

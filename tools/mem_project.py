@@ -22,13 +22,12 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import mem_db as D
+import tools.mem_db
 
 
 def render(db: Path, project: str) -> str:
-    c = D.connect(db)
-    m = D.manifest(c, project)
+    c = tools.mem_db.connect(db)
+    m = tools.mem_db.manifest(c, project)
     if not m.get("claims") and len(m) == 1:
         return ""                                  # no observations: emit nothing, not a false {}
     return json.dumps(m, indent=2, sort_keys=True) + "\n"

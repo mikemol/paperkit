@@ -11,17 +11,17 @@ proposition against the ENGINE, so it fails if the claim is false, rather than s
 """
 import sys
 from pathlib import Path
+import paperkit.bib
+import paperkit.resolver
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "paperkit"))
-sys.path.insert(0, str(ROOT / "render" / "checks"))
 
 
 def t_chain():
     # imports CHAIN: a project resting on a sibling that rests on a third, and the chain is
     # LOAD-BEARING — break the innermost and the outermost goes red.
     import shutil, tempfile
-    import gate, project as P
+    import paperkit.gate, paperkit.project
     d = Path(tempfile.mkdtemp())
     try:
         def mk(name, check):
@@ -31,11 +31,11 @@ def t_chain():
             (p / "r.tsv").write_text("s\tSec\n")
             (p / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n"
                                      "  check = {%s}\n}\n" % check)
-            (p / "out.md").write_text(P.project(P.load_config(p)))
+            (p / "out.md").write_text(paperkit.project.project(paperkit.bib.load_config(p)))
         mk("inner", "cmd:true"); mk("middle", "result:../inner")
-        assert gate.resolves("result:middle", d, {}).passed, "a two-link chain did not resolve"
+        assert paperkit.resolver.resolves("result:middle", d, {}).passed, "a two-link chain did not resolve"
         mk("inner", "cmd:false")
-        assert not gate.resolves("result:middle", d, {}).passed, \
+        assert not paperkit.resolver.resolves("result:middle", d, {}).passed, \
             "breaking the innermost left the outermost green — the chain is decorative"
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -46,11 +46,11 @@ def t_chain():
 def t_fmt_deck():
     # a deck is a SEGMENTATION, not a linearization: project() returns one string, observe()
     # returns units — a different observation of the same carrier.
-    import project as P
-    assert callable(P.observe) and callable(P.project), "the two observation shapes are not both present"
-    cfg = P.load_config(ROOT / "talk")
-    assert isinstance(P.project(cfg), str), "project() must return one flat stream"
-    u = P.observe(cfg, "staged", ROOT / "talk")
+    import paperkit.project
+    assert callable(paperkit.project.observe) and callable(paperkit.project.project), "the two observation shapes are not both present"
+    cfg = paperkit.bib.load_config(ROOT / "talk")
+    assert isinstance(paperkit.project.project(cfg), str), "project() must return one flat stream"
+    u = paperkit.project.observe(cfg, "staged", ROOT / "talk")
     assert isinstance(u, list) and u and isinstance(u[0], dict), \
         "observe() must return UNITS — a segmentation, not a rendered string"
 
@@ -58,16 +58,16 @@ def t_fmt_deck():
 def t_fmt_genre():
     # grouping and pagination are INDEPENDENT axes, and the pagination objective is REGISTERED
     # like a check type — a consumer adds its own without touching the engine.
-    import genre
-    import project as P
-    cfg = P.load_config(ROOT / "talk")
-    a = P.observe(cfg, "staged", ROOT / "talk")
-    b = P.observe(cfg, "atomic", ROOT / "talk")
+    import paperkit.genre
+    import paperkit.project
+    cfg = paperkit.bib.load_config(ROOT / "talk")
+    a = paperkit.project.observe(cfg, "staged", ROOT / "talk")
+    b = paperkit.project.observe(cfg, "atomic", ROOT / "talk")
     assert len(a) != len(b), "two genres gave the same cut — the axes are not independent"
     try:
-        genre.resolve("no-such-genre")
+        paperkit.genre.resolve("no-such-genre")
         raise AssertionError("an unregistered genre resolved — the registry falls back silently")
-    except genre.Unregistered:
+    except paperkit.genre.Unregistered:
         pass
 
 
@@ -76,14 +76,14 @@ def t_graphs_fig():
     # a FIGURE is alt-texted BY CONSTRUCTION: the projector renders an `as = image` placement as
     # ![claim](path), so the claim's own sentence IS the alternative text — a figure cannot ship
     # without a description unless the claim itself is empty.
-    import project as P
-    cfg = P.load_config(ROOT / "talk")
+    import paperkit.project
+    cfg = paperkit.bib.load_config(ROOT / "talk")
     F = {}
     for b in cfg["bibs"]:
-        F.update(P.entries(b, cfg["consumer_fields"]))
+        F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))
     f = F["t-graphs-fig"]
     assert f.get("emit") and (f.get("as") == "image"), "the figure claim no longer places an image"
-    line = P.emit_block(cfg, f)[0]
+    line = paperkit.project.emit_block(cfg, f)[0]
     assert line.startswith("!["), f"an image placement did not render as markdown image: {line!r}"
     alt = line[2:line.index("](")]
     assert len(alt.split()) > 5, f"the figure's alt text is too thin to describe it: {alt!r}"
@@ -94,14 +94,14 @@ def _figure(key):
     """Shared witness for a placed FIGURE: it is alt-texted by construction (the projector renders
     `as = image` as ![claim](path), so the claim IS the description), its asset exists, and its
     description reads as prose rather than a filename."""
-    import project as P
-    cfg = P.load_config(ROOT / "talk")
+    import paperkit.project
+    cfg = paperkit.bib.load_config(ROOT / "talk")
     F = {}
     for b in cfg["bibs"]:
-        F.update(P.entries(b, cfg["consumer_fields"]))
+        F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))
     f = F[key]
     assert f.get("emit") and f.get("as") == "image", f"{key} no longer places an image"
-    line = P.emit_block(cfg, f)[0]
+    line = paperkit.project.emit_block(cfg, f)[0]
     assert line.startswith("!["), f"{key} did not render as a markdown image: {line!r}"
     alt = line[2:line.index("](")]
     assert len(alt.split()) > 5, f"{key} alt text too thin: {alt!r}"

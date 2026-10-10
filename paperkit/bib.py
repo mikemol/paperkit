@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 # the import is one-directional (bibparse knows nothing about _SCALAR, sections or the DAG), so
 # the grammar can be replaced — by the EBNF-driven table this arc is heading for — without the
 # data model noticing.
-import bibparse
+import paperkit.bibparse
 
 # scalar fields carried verbatim (the projector + checks read these).  `tier` is a per-warrant
 # enforcement-tier flag consumed by the GENERATOR (bibtex.bzl), not by any engine code here —
@@ -233,7 +233,7 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
         # construct absent from this corpus — each naming a line and column.  The scanner it
         # replaces had no answer for those: a value whose brace never closed either swallowed the
         # fields after it or vanished, depending on which patch was in the tree that hour.
-        for e in bibparse.parse(path.read_text(), path):
+        for e in paperkit.bibparse.parse(path.read_text(), path):
             key = e.key
             # `_type` is the BibTeX entry type (@misc/@article/@book) — carried so a reader can
             # ask what a file uses without parsing the bytes itself.  Engine-inert, like `note`.

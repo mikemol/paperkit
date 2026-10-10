@@ -47,7 +47,7 @@ def certificate(key: str) -> dict:
     calc = json.loads(r.stdout)
     baseline, sens = bool(calc.get("baseline")), calc.get("sens", [])
     sys.path.insert(0, str(ENGINE))
-    from grade import _grade_from_sens  # the ONE ladder — derived, never re-declared here
+    import paperkit.grade  # the ONE ladder — derived, never re-declared here
     return {
         "concept": key,
         "owner": OWNER.name,
@@ -55,7 +55,7 @@ def certificate(key: str) -> dict:
         "claim": calc.get("claim", key),
         "verdict": "pass" if baseline else "fail",
         "baseline": baseline,
-        "grade": _grade_from_sens(baseline, sens)["grade"],
+        "grade": paperkit.grade._grade_from_sens(baseline, sens)["grade"],
         "sens": sens,
         "fingerprint": sens,                # alias: the ⟨verdict, fingerprint⟩ vocabulary
     }

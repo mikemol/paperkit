@@ -34,18 +34,17 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bib
-import durable
+import paperkit.bib
+import paperkit.durable
 
 # the projector parses then renders, so it uses the bib data model internally (short names).
-from bib import dep_order, emit_path, is_placed, load_config, rubric
-from bib import parse as entries
+import paperkit.bib
 
 # top-level now: after Μ·cycle rhetoric imports bib (a leaf), NOT project, so project→rhetoric is
 # one-way — the project↔rhetoric cycle is gone and this need no longer be a function-local import.
-from rhetoric import MOVES
+import paperkit.rhetoric
 
-import config
+import paperkit.config
 
 # Minimal, domain-agnostic LaTeX -> Unicode for claim text (em/en dashes, a few
 # escapes, inline math).  A paper that needs more declares its own; this is the
@@ -225,7 +224,7 @@ def emit_block(cfg: dict, f: dict) -> list:
     and the projector and the gate resolve to the SAME path.
     """
     emit = f["emit"]
-    p = emit_path(cfg, emit)                       # project_dir first, then out.parent; None = absent
+    p = paperkit.bib.emit_path(cfg, emit)                       # project_dir first, then out.parent; None = absent
     kind = (f.get("as") or "").strip().lower() or _infer(Path(emit))
     if kind not in RENDERERS:
         raise ValueError(f"{emit}: unknown renderer as={kind!r}; "
@@ -342,8 +341,8 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
             continue
         mv = f.get("move")
         if mv:                                    # a typed `move` with no explicit `join`:
-            if mv in MOVES:                       # realize its default connector (MOVES imported up top)
-                conn = MOVES[mv][1]
+            if mv in paperkit.rhetoric.MOVES:                       # realize its default connector (MOVES imported up top)
+                conn = paperkit.rhetoric.MOVES[mv][1]
                 if conn.strip().endswith((".", "!", "?")):
                     parts.append(conn + clause[:1].upper() + clause[1:])
                 else:
@@ -365,7 +364,7 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
 def project(cfg: dict, target: str = "pandoc") -> str:
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
-        F.update(entries(b, cfg["consumer_fields"]))     # thread the project's declared consumer_fields
+        F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))     # thread the project's declared consumer_fields
 
     by_sec = {}
     for k, f in F.items():
@@ -374,8 +373,8 @@ def project(cfg: dict, target: str = "pandoc") -> str:
     # global prose linearization (rubric order × dep_order) — positions used to project
     # a claim's long (non-adjacent) grounding edges as cross-references.
     pos, _i = {}, 0
-    for sk, _t in rubric(cfg["rubric"]):
-        for k in dep_order(by_sec.get(sk, []), F):
+    for sk, _t in paperkit.bib.rubric(cfg["rubric"]):
+        for k in paperkit.bib.dep_order(by_sec.get(sk, []), F):
             pos[k] = _i
             _i += 1
     # transitive reduction of the grounding DAG — project only references the reader
@@ -386,9 +385,9 @@ def project(cfg: dict, target: str = "pandoc") -> str:
     lines = [f"# {cfg['title']}", ""]
     if cfg["subtitle"]:
         lines += [f"*{cfg['subtitle']}*", ""]
-    for n, (sk, title) in enumerate(rubric(cfg["rubric"]), 1):
+    for n, (sk, title) in enumerate(paperkit.bib.rubric(cfg["rubric"]), 1):
         lines += [f"## {n}. {title}" if cfg["numbered"] else f"## {title}", ""]
-        keys = dep_order(by_sec.get(sk, []), F)
+        keys = paperkit.bib.dep_order(by_sec.get(sk, []), F)
         if not keys:
             lines += ["<!-- structural section: connective prose, no required claim atom -->", ""]
             continue
@@ -493,11 +492,10 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
     must not import the grader — the component lattice has delta depending on project.)
     """
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import genre as genre_mod  # the pagination registry (project component; no upward edge)
 
     F = {}
     for b in cfg["bibs"]:
-        F.update(entries(b, cfg["consumer_fields"]))
+        F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))
     recs = [{"key": k, **f} for k, f in F.items()]
 
     # the GROUPING, in document order (rubric × dep_order), so a unit's claims read in the order
@@ -507,8 +505,8 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
         if f.get("section"):
             by_sec.setdefault(f["section"], []).append(k)
     groups, sections = [], []
-    for sk, _t in rubric(cfg["rubric"]):
-        keys = dep_order(by_sec.get(sk, []), F)
+    for sk, _t in paperkit.bib.rubric(cfg["rubric"]):
+        keys = paperkit.bib.dep_order(by_sec.get(sk, []), F)
         if keys:
             groups.append(keys)
             sections.append(sk)
@@ -516,7 +514,7 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
 
     # the PAGINATION — resolved from the registry, which REFUSES an unregistered name rather than
     # falling back (so a deck is never cut by a genre nobody asked for).
-    spec = genre_mod.resolve(genre_name, project_dir)
+    spec = paperkit.genre.resolve(genre_name, project_dir)
     objective = spec.get("objective")
     # Ρ·deck·residual·wire — REGROUP on the grounding-derived partition at the resolution this
     # genre asks for (γ, which every registry entry carries and nothing read until now).  σ stays
@@ -525,7 +523,7 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
     # project with no grounding (measured: 7 of 11 in this repo) gets exactly the section cut it
     # would have had, and one WITH grounding gets a cut that answers to it.
     # an explicit γ overrides the genre's own; absent, the genre's declared value stands.
-    derived = genre_mod.partition(recs, float(gamma if gamma is not None
+    derived = paperkit.genre.partition(recs, float(gamma if gamma is not None
                                               else spec.get("gamma", 1.0)))
     if not derived["degenerate"]:
         order = {k: i for i, g in enumerate(groups) for k in g}   # document order, preserved
@@ -543,9 +541,8 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
     if objective is not None:
         units = objective(groups, recs)
     else:
-        from resolver import spawn_declared
-        units = genre_mod.run_declared(spec, groups, recs, cwd=project_dir,
-                                       spawn=spawn_declared)
+        units = paperkit.genre.run_declared(spec, groups, recs, cwd=project_dir,
+                                       spawn=paperkit.checkenv.spawn_declared)
 
     # which section a unit came from — a unit never spans sections (the objective splits within a
     # group, never merges across), so the first key's section names the whole unit.
@@ -588,7 +585,7 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).  TARGET is also resolved by gate/discriminate — they reference
 # project.TARGET (the lowest common component in the DEPS lattice owns it).
-TARGET = config.Param("target", "PAPERKIT_TARGET", config="target", default="pandoc", choices=("pandoc", "web", "footnote", "plain"),
+TARGET = paperkit.config.Param("target", "PAPERKIT_TARGET", config="target", default="pandoc", choices=("pandoc", "web", "footnote", "plain"),
                       help="citation render target: pandoc ([@key] for citeproc/PDF), web (intra-page hyperlinks + anchors, for a blog), "
                            "footnote (each clause's provenance as a document-end footnote — self-contained, no bibliography), "
                            "or plain (no citation surfaced at all — a clean SUBMISSION view; the claim-DAG stays the author-side gate)")
@@ -597,7 +594,7 @@ TARGET = config.Param("target", "PAPERKIT_TARGET", config="target", default="pan
 # the set — contradicting the registry — or duplicate it and drift.  Validation therefore happens
 # where the set actually lives: genre.resolve() REFUSES an unregistered name, which is the same
 # reason resolver.VERBS validates a check type rather than config.Param enumerating them.
-GENRE = config.Param("genre", "PAPERKIT_GENRE", config="genre", default="talk",
+GENRE = paperkit.config.Param("genre", "PAPERKIT_GENRE", config="genre", default="talk",
                      help="pagination genre for --observe: a registered objective over the grouping "
                           "(built-ins staged/talk/atomic/collection; a project adds its own with a "
                           "[genres.<name>] table in paper.toml).  Validated by the registry, not by "
@@ -607,14 +604,14 @@ GENRE = config.Param("genre", "PAPERKIT_GENRE", config="genre", default="talk",
 # this makes that reachable, so a deck can be re-cut coarser or finer without inventing a genre.
 # Default None = "whatever the genre asks for", which keeps a genre's declared γ meaningful instead
 # of overriding it with an engine-wide constant.
-GAMMA = config.Param("gamma", "PAPERKIT_GAMMA", config="gamma", default=None,
+GAMMA = paperkit.config.Param("gamma", "PAPERKIT_GAMMA", config="gamma", default=None,
                      help="observe: the grouping resolution γ, overriding the genre's own — "
                           "γ→∞ recovers the authored sections, γ→0 the modularity optimum; "
                           "omit to use the genre's declared value")
-OBSERVE = config.Param("observe", "PAPERKIT_OBSERVE", flag=True,
+OBSERVE = paperkit.config.Param("observe", "PAPERKIT_OBSERVE", flag=True,
                        help="project: emit the DAG's segmentation into units (one per line, "
                             "tab-separated keys) instead of the linearized document")
-CHECK = config.Param("check", "PAPERKIT_CHECK", flag=True,
+CHECK = paperkit.config.Param("check", "PAPERKIT_CHECK", flag=True,
                      help="project: verify the projection round-trips against the bib, then exit")
 # The projector CLI's composed registry: exactly the Params its import cone hosts
 # (bnd-config asserts this completeness — a cone-resolved Param missing here would be
@@ -638,27 +635,28 @@ CHECK = config.Param("check", "PAPERKIT_CHECK", flag=True,
 # different relations, and satisfying the first with the second's mechanism violates ownership.
 # `discriminate.py:158` already had the right form — `resolver.PATH, resolver.ENGINE_PATH`, a
 # qualified reference that composes without binding.  Same here.
-import resolver as _resolver   # noqa: E402  — qualified, so the knobs stay HOSTED by resolver
+import paperkit.resolver   # noqa: E402  — qualified, so the knobs stay HOSTED by resolver
+import paperkit.checkenv
+import paperkit.genre
 
-REGISTRY = [TARGET, GENRE, GAMMA, OBSERVE, CHECK, _resolver.PATH, _resolver.ENGINE_PATH]
+REGISTRY = [TARGET, GENRE, GAMMA, OBSERVE, CHECK, paperkit.checkenv.PATH, paperkit.checkenv.ENGINE_PATH]
 
 
 def main(argv: list) -> int:
-    config.apply_args(argv, REGISTRY)
-    pos = config.positionals(argv, REGISTRY)
+    paperkit.config.apply_args(argv, REGISTRY)
+    pos = paperkit.config.positionals(argv, REGISTRY)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
-    cfg = load_config(project_dir)
+    cfg = paperkit.bib.load_config(project_dir)
     pol = tomllib.loads((project_dir / "paper.toml").read_text()).get("paper", {})
 
-    if config.resolve(OBSERVE):
-        import genre as _genre
+    if paperkit.config.resolve(OBSERVE):
         # Ρ·deck·observe via the CLI: the SECOND observation shape, printed as units.  Not written
         # to cfg["out"] — that path holds the linearization the gate's PROJECT invariant compares
         # against, and a segmentation is not a candidate for it.
         try:
-            _g = config.resolve(GAMMA, pol)
-            units = observe(cfg, config.resolve(GENRE, pol), project_dir, _g)
-        except _genre.Unregistered as e:
+            _g = paperkit.config.resolve(GAMMA, pol)
+            units = observe(cfg, paperkit.config.resolve(GENRE, pol), project_dir, _g)
+        except paperkit.genre.Unregistered as e:
             # a CLI refusal reads as a message, not a traceback — the registry's LOUD invariant is
             # about telling the caller what happened, and a stack trace tells them where.
             print(f"paperkit-project: {e}", file=sys.stderr)
@@ -667,9 +665,9 @@ def main(argv: list) -> int:
             print(f"{u['section']}\t" + "\t".join(u["keys"]))
         return 0
 
-    out = project(cfg, config.resolve(TARGET, pol))   # Ω·config: pandoc (default) | web
+    out = project(cfg, paperkit.config.resolve(TARGET, pol))   # Ω·config: pandoc (default) | web
 
-    if config.resolve(CHECK):
+    if paperkit.config.resolve(CHECK):
         tgt = cfg["out"]
         if not tgt.exists() or tgt.read_text() != out:
             print(f"paperkit-project: {tgt.name} ≠ projection — regenerate "
@@ -680,7 +678,7 @@ def main(argv: list) -> int:
     if "-o" in argv and argv[argv.index("-o") + 1] == "-":
         sys.stdout.write(out)
         return 0
-    durable.write_atomic(cfg["out"], out)
+    paperkit.durable.write_atomic(cfg["out"], out)
     print(f"paperkit-project: wrote {cfg['out'].name} ({len(out.split())} words)", file=sys.stderr)
     return 0
 

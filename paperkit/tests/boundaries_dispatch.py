@@ -19,21 +19,19 @@ from __future__ import annotations
 
 import inspect
 import re
-import sys
 import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
 ROOT = ENGINE.parent
-sys.path.insert(0, str(ENGINE))
 
-import grader
-import resolver
+import paperkit.grader
+import paperkit.resolver
 
 BIBTEX_SRC = (ROOT / "tools" / "bibtex.bzl").read_text()
 FOOTDEPS_SRC = (ENGINE / "footdeps.py").read_text()
-CROSSING = {v for v, s in resolver.VERBS.items() if s["crosses"]}
-LOCAL = set(resolver.VERBS) - CROSSING
+CROSSING = {v for v, s in paperkit.resolver.VERBS.items() if s["crosses"]}
+LOCAL = set(paperkit.resolver.VERBS) - CROSSING
 
 
 def main() -> int:
@@ -46,10 +44,10 @@ def main() -> int:
     print("Λ·registry — the verb set's dispatch boundary\n")
     print("⟨one owner⟩\n")
     check("resolver.VERBS declares the built-in set, and every entry is fully specified",
-          bool(resolver.VERBS) and all(
-              {"arg", "verb", "passes", "crosses"} <= set(s) for s in resolver.VERBS.values()))
+          bool(paperkit.resolver.VERBS) and all(
+              {"arg", "verb", "passes", "crosses"} <= set(s) for s in paperkit.resolver.VERBS.values()))
     check(f"the crossing verbs are DERIVED, not re-listed: {', '.join(sorted(CROSSING))}",
-          set(resolver.CROSSING) == {f"{v}:" for v in CROSSING} and bool(CROSSING))
+          set(paperkit.resolver.CROSSING) == {f"{v}:" for v in CROSSING} and bool(CROSSING))
 
     print("\n⟨every site derives⟩\n")
     # 1. the VERDICT path — every declared verb reaches a real branch.  An unknown TARGET under a
@@ -58,13 +56,13 @@ def main() -> int:
     #    refuted — ask-result-tristate).  The discriminating assertion: no verb RAISES, none PASSES a
     #    bogus target, and the set stays closed.
     dispatched = all(
-        not resolver.resolves(f"{v}:no-such-target-{v}", ENGINE, {}).passed for v in resolver.VERBS)
+        not paperkit.resolver.resolves(f"{v}:no-such-target-{v}", ENGINE, {}).passed for v in paperkit.resolver.VERBS)
     check("resolver.resolves dispatches every declared verb (no fallthrough, no raise)", dispatched)
     check("the built-in set is CLOSED — an undeclared type is UNAVAILABLE (cannot check ≠ refuted)",
-          resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable())
+          paperkit.resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable())
 
     # 2. the FOOTPRINT command — file: opens only its target (None); every other verb runs something.
-    cmds = {v: resolver._check_cmd(f"{v}:t", {}) for v in resolver.VERBS}
+    cmds = {v: paperkit.resolver._check_cmd(f"{v}:t", {}) for v in paperkit.resolver.VERBS}
     check("resolver._check_cmd covers every verb (None only for the verb that runs nothing)",
           cmds["file"] is None and all(c for v, c in cmds.items() if v != "file"))
 
@@ -72,13 +70,13 @@ def main() -> int:
     #    the one that was silently wrong: a missing arm falls through to a local sweep, which cannot
     #    see a witness outside this project's mutation surface and can only read `indeterminate`.
     for v in sorted(CROSSING):
-        rec = grader.grade_check(f"{v}:t", ROOT, set(), {}, ROOT)
+        rec = paperkit.grader.grade_check(f"{v}:t", ROOT, set(), {}, ROOT)
         check(f"grader.grade_check delegates {v}: (crosses=True → imported, not a local sweep)",
               rec.get("grade") == "imported")
     # ...and a LOCAL verb must NOT be delegated: stamping `imported` on a check this project owns
     # would assert a grade nothing ever measured.  Read the arms out of grade_check itself, so the
     # assertion is set-EQUALITY against VERBS rather than a list maintained here.
-    src = inspect.getsource(grader.grade_check)
+    src = inspect.getsource(paperkit.grader.grade_check)
     chunks = re.split(r'\n    if typ == "(\w+)":', src)
     delegated = {chunks[i] for i in range(1, len(chunks), 2)
                  if '"grade": "imported"' in chunks[i + 1]}
@@ -86,9 +84,9 @@ def main() -> int:
           delegated == CROSSING)
 
     # 4. the FOOTPRINT AUDIT — skips exactly the crossing verbs, by asking the verb.  Count the
-    #    code SHAPE (`startswith(resolver.CROSSING)`), never a bare substring: a mention in a
+    #    code SHAPE (`startswith(paperkit.resolver.CROSSING)`), never a bare substring: a mention in a
     #    comment would inflate the tally, and a magic expected-count is the very defect at issue.
-    skips = FOOTDEPS_SRC.count("startswith(resolver.CROSSING)")
+    skips = FOOTDEPS_SRC.count("startswith(paperkit.resolver.CROSSING)")
     hardcoded = re.findall(r'startswith\(\s*[\'"](\w+):', FOOTDEPS_SRC)
     check(f"footdeps' {skips} skip sites ask resolver.CROSSING, and none hardcodes a verb"
           + (f" (found {hardcoded})" if hardcoded else ""),
@@ -133,18 +131,18 @@ def main() -> int:
             "import sys\nsys.exit(0 if sys.argv[1:2] == ['mine'] else 2)\n")
         (far / "doc").mkdir()
         check("a project outside this repo resolves concept: to ITS OWN library, not the engine's",
-              resolver._library_for(far / "doc") == far / "library")
+              paperkit.resolver._library_for(far / "doc") == far / "library")
         check("...and one with NO library falls back to the engine's (fallback, never assumption)",
-              resolver._library_for(Path(d)) == resolver._LIBRARY)
+              paperkit.resolver._library_for(Path(d)) == paperkit.resolver._LIBRARY)
         # Λ·library·fallthrough — per-KEY ownership, both sides reachable (the audit's reverse
         # finding: directory-level selection eclipsed ALL engine keys from any repo owning a
         # library, the exact inverse of the shadowing the seam was built to fix).
         check("a key the project library OWNS resolves project-side",
-              resolver.resolves("concept:mine", far / "doc", {}).passed)
+              paperkit.resolver.resolves("concept:mine", far / "doc", {}).passed)
         check("a key it answers 'not mine' (exit 2) FALLS THROUGH to the engine's library",
-              resolver.resolves("concept:claim-is-record", far / "doc", {}).passed)
+              paperkit.resolver.resolves("concept:claim-is-record", far / "doc", {}).passed)
         check("a key owned NOWHERE is UNAVAILABLE (exit 2 everywhere = cannot witness, not refuted)",
-              resolver.resolves("concept:no-such-concept", far / "doc", {}).is_unavailable())
+              paperkit.resolver.resolves("concept:no-such-concept", far / "doc", {}).is_unavailable())
     # ⚑ THE EXPECTED VALUE IS THE ENGINE'S OWN ANSWER, NOT A PATH SPELLED HERE.  This read
     # `== ROOT / "library"` — a second copy of where the library lives — and RED when Ζ·cite·resolve
     # moved it inside the package (guard-must-not-copy: the arm carried its own copy of the location
@@ -154,12 +152,12 @@ def main() -> int:
     # would resolve elsewhere, which the far-tree arms above measure directly.
     check("in-repo resolution is UNCHANGED by the seam (a project with no library of its own "
           "resolves to the ENGINE's, wherever the engine declares that to be)",
-          resolver._library_for(ROOT / "paper") == resolver._LIBRARY)
+          paperkit.resolver._library_for(ROOT / "paper") == paperkit.resolver._LIBRARY)
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # The exact drift that shipped: a new crossing verb whose skip-set was never updated.  F is
     # built by reverting footdeps to the hardcoded literal — one token — and must be CAUGHT.
-    f_src = FOOTDEPS_SRC.replace("startswith(resolver.CROSSING)", 'startswith("result:")')
+    f_src = FOOTDEPS_SRC.replace("startswith(paperkit.resolver.CROSSING)", 'startswith("result:")')
     caught = (not re.findall(r'startswith\(\s*[\'"](\w+):', FOOTDEPS_SRC)
               and re.findall(r'startswith\(\s*[\'"](\w+):', f_src) == ["result"] * skips)
     fails.append("dispatch-delta") if not caught else None
@@ -173,11 +171,11 @@ def main() -> int:
     # UNAVAILABLE (could not evaluate), NOT FAIL (refuted).  The δ is exactly the fold that shipped:
     # an absent sibling and a ran-and-failed sibling must NOT read the same.  This is the coverage
     # whose absence let the bare-bool fold stand (Λ·location — untested across a repo boundary).
-    absent = resolver.resolves("result:no-such-sibling-here", ENGINE, {})
-    unknown = resolver.resolves("bogusverb:x", ENGINE, {})
-    cmd_ran_failed = resolver.resolves("cmd:false", ENGINE, {})
-    cmd_ran_passed = resolver.resolves("cmd:true", ENGINE, {})
-    no_bool = not hasattr(resolver.Verdict, "__bool__")
+    absent = paperkit.resolver.resolves("result:no-such-sibling-here", ENGINE, {})
+    unknown = paperkit.resolver.resolves("bogusverb:x", ENGINE, {})
+    cmd_ran_failed = paperkit.resolver.resolves("cmd:false", ENGINE, {})
+    cmd_ran_passed = paperkit.resolver.resolves("cmd:true", ENGINE, {})
+    no_bool = not hasattr(paperkit.resolver.Verdict, "__bool__")
     # ⚑ Ζ·arm·operands — SEVEN TERMS REPORTED ONE BIT, and that is why a cell's disagreement
     # with the host was unreadable.  This arm went XX in the sandbox while every term passed on
     # the host, measured one by one; the record could say only `tristate-arm`.  PRINT THE
@@ -187,14 +185,14 @@ def main() -> int:
     terms = [
         ("absent.is_unavailable()", absent.is_unavailable(), repr(absent)),
         ("unknown.is_unavailable()", unknown.is_unavailable(), repr(unknown)),
-        ("cmd:false is FAIL", cmd_ran_failed is resolver.FAIL, repr(cmd_ran_failed)),
-        ("cmd:true is PASS", cmd_ran_passed is resolver.PASS, repr(cmd_ran_passed)),
-        ("not UNAVAILABLE.passed", not resolver.UNAVAILABLE.passed, repr(resolver.UNAVAILABLE.passed)),
-        ("no __bool__", no_bool, repr(hasattr(resolver.Verdict, "__bool__"))),
+        ("cmd:false is FAIL", cmd_ran_failed is paperkit.resolver.FAIL, repr(cmd_ran_failed)),
+        ("cmd:true is PASS", cmd_ran_passed is paperkit.resolver.PASS, repr(cmd_ran_passed)),
+        ("not UNAVAILABLE.passed", not paperkit.resolver.UNAVAILABLE.passed, repr(paperkit.resolver.UNAVAILABLE.passed)),
+        ("no __bool__", no_bool, repr(hasattr(paperkit.resolver.Verdict, "__bool__"))),
         # the determinism set needs three DISTINGUISHABLE outcomes, identity-hashable
         ("set{PASS,FAIL,UNAVAILABLE} == 3",
-         len({resolver.PASS, resolver.FAIL, resolver.UNAVAILABLE}) == 3,
-         repr(len({resolver.PASS, resolver.FAIL, resolver.UNAVAILABLE}))),
+         len({paperkit.resolver.PASS, paperkit.resolver.FAIL, paperkit.resolver.UNAVAILABLE}) == 3,
+         repr(len({paperkit.resolver.PASS, paperkit.resolver.FAIL, paperkit.resolver.UNAVAILABLE}))),
     ]
     arm_ok = all(ok for _, ok, _ in terms)
     if not arm_ok:
@@ -210,7 +208,7 @@ def main() -> int:
     if fails:
         print(f"DISPATCH: FAIL ({len(fails)} sites drifted from resolver.VERBS)")
         return 1
-    print(f"DISPATCH: PASS ({len(resolver.VERBS)} verbs, {len(CROSSING)} crossing, 5 sites, 2 deltas)")
+    print(f"DISPATCH: PASS ({len(paperkit.resolver.VERBS)} verbs, {len(CROSSING)} crossing, 5 sites, 2 deltas)")
     return 0
 
 

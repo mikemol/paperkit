@@ -44,10 +44,10 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bib
-import project as P
+import paperkit.bib
+import paperkit.project
 
-import config
+import paperkit.config
 
 # Ζ·gate·exit (exit alphabet) — main()'s returns are TYPED, engine-aligned with discriminate/coherence
 # (_REFUSE = 3), so a caller can tell "you asked wrong / I could not run" from "I ran and it failed":
@@ -66,36 +66,29 @@ _REFUSE = 3
 # no parallel gate loop, no config/CLI) so it can be imported and tested with a small blast
 # radius.  Re-exported here so callers reaching gate.resolves / gate.clean_env / gate.footprint
 # keep working; the gate itself uses resolves below.
-import resolver
-from resolver import (
-    _ENV_KEEP,
-    _ENV_KEEP_PREFIX,
-    _check_cmd,
-    clean_env,
-    footprint,
-    resolves,
-    run_ok,
-)
+import paperkit.resolver
+import paperkit.resolver
+import paperkit.checkenv
 
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).  JSON and ONLY are also resolved by discriminate — it references
 # gate's (the lowest common component in the DEPS lattice owns them).
-SAFE = config.Param("safe", "PAPERKIT_SAFE", config="safe", flag=True,
+SAFE = paperkit.config.Param("safe", "PAPERKIT_SAFE", config="safe", flag=True,
                     help="zero-postulate: an uncited placement FAILS the gate, not merely advises")
-WITHOUT_K = config.Param("without-K", "PAPERKIT_WITHOUT_K", config="without_k", flag=True, aliases=("--without-k",),
+WITHOUT_K = paperkit.config.Param("without-K", "PAPERKIT_WITHOUT_K", config="without_k", flag=True, aliases=("--without-k",),
                          help="forbid two cited claims sharing a single witness")
-JOBS = config.Param("jobs", "PAPERKIT_JOBS", config="jobs",
+JOBS = paperkit.config.Param("jobs", "PAPERKIT_JOBS", config="jobs",
                     help="gate worker count (default all cores; 1 = serial)")
-JSON = config.Param("json", "PAPERKIT_JSON", flag=True,
+JSON = paperkit.config.Param("json", "PAPERKIT_JSON", flag=True,
                     help="emit structured results to stdout (human lines suppressed)")
-ONLY = config.Param("only", "PAPERKIT_ONLY",
+ONLY = paperkit.config.Param("only", "PAPERKIT_ONLY",
                     help="gate: resolve ONLY this one claim's check (the leaf of the recursive check target, Ζ·starlark) and exit")
-INVARIANTS = config.Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
+INVARIANTS = paperkit.config.Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
                           help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks")
 # The gate CLI's composed registry: exactly the Params its import cone hosts (own 6 +
 # project's + resolver's; bnd-config asserts this completeness).
-REGISTRY = [SAFE, WITHOUT_K, JOBS, JSON, ONLY, INVARIANTS, P.TARGET, P.GENRE, P.GAMMA, P.OBSERVE, P.CHECK,
-            resolver.PATH, resolver.ENGINE_PATH]
+REGISTRY = [SAFE, WITHOUT_K, JOBS, JSON, ONLY, INVARIANTS, paperkit.project.TARGET, paperkit.project.GENRE, paperkit.project.GAMMA, paperkit.project.OBSERVE, paperkit.project.CHECK,
+            paperkit.checkenv.PATH, paperkit.checkenv.ENGINE_PATH]
 
 
 def cited_keys(prose: str) -> set:
@@ -130,10 +123,10 @@ def cited_keys(prose: str) -> set:
 
 
 def main(argv: list) -> int:
-    config.apply_args(argv, REGISTRY)     # Ω·config: capture args (arg overrides env), process-local
-    pos = config.positionals(argv, REGISTRY)
+    paperkit.config.apply_args(argv, REGISTRY)     # Ω·config: capture args (arg overrides env), process-local
+    pos = paperkit.config.positionals(argv, REGISTRY)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
-    as_json = config.resolve(JSON)                   # structured stdout (human lines suppressed)
+    as_json = paperkit.config.resolve(JSON)                   # structured stdout (human lines suppressed)
 
     # Ζ·gate·exit — CANNOT RUN is not RAN-AND-FAILED.  The boundary is not "did tomllib raise" but
     # "does the config ASSEMBLE INTO A GATEABLE PROJECT": no paper.toml, malformed TOML, no [paper]
@@ -157,17 +150,17 @@ def main(argv: list) -> int:
     if "paper" not in raw:
         return cannot_run(f"paper.toml at {project_dir} has no [paper] table — not a gateable project")
     pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
-    safe = config.resolve(SAFE, pol)                 # zero-postulate: uncited placements FAIL
-    without_k = config.resolve(WITHOUT_K, pol)       # forbid two cited claims sharing a witness
-    inv_only = config.resolve(INVARIANTS)            # Ζ·starlark: the invariants NODE (no per-check resolve)
+    safe = paperkit.config.resolve(SAFE, pol)                 # zero-postulate: uncited placements FAIL
+    without_k = paperkit.config.resolve(WITHOUT_K, pol)       # forbid two cited claims sharing a witness
+    inv_only = paperkit.config.resolve(INVARIANTS)            # Ζ·starlark: the invariants NODE (no per-check resolve)
     # The bib IS the makefile: a project's distinct checks are independent targets, so the gate
     # runs them concurrently (default = all cores; jobs=1 forces serial).
-    jobs = int(config.resolve(JOBS) or (os.cpu_count() or 4))
+    jobs = int(paperkit.config.resolve(JOBS) or (os.cpu_count() or 4))
 
     def info(msg):              # human success lines — suppressed under --json
         if not as_json:
             print(msg)
-    cfg = bib.load_config(project_dir)
+    cfg = paperkit.bib.load_config(project_dir)
     # A declared INPUT that does not exist means the config cannot assemble a gateable project — the
     # gate CANNOT RUN, not "ran and failed" (Ζ·gate·exit): warrants naming a missing .bib, or a
     # missing rubric.  This is measured BEFORE the built-artifact check so an unusable config never
@@ -180,12 +173,12 @@ def main(argv: list) -> int:
 
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
-        F.update(bib.parse(b, cfg["consumer_fields"]))
+        F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))
 
     # Ζ·starlark — the LEAF of the recursive check target: resolve ONE claim's check and exit.
     # A project's gate (the node) is this over every claim ∧ the project invariants; a Bazel
     # check target is exactly this leaf, so the bib's claim-DAG runs as the build graph.
-    only = config.resolve(ONLY)
+    only = paperkit.config.resolve(ONLY)
     if only:
         if only not in F or not F[only].get("check"):
             # A key naming no check is a caller BUG, not a ran-and-failed verdict.  Under --json it
@@ -198,7 +191,7 @@ def main(argv: list) -> int:
                                   "pass": False, "only": only}, indent=2))
             print(f"paperkit-gate: no check for claim {only!r}", file=sys.stderr)
             return _REFUSE
-        v = resolves(F[only]["check"], project_dir, custom)
+        v = paperkit.resolver.resolves(F[only]["check"], project_dir, custom)
         # Ω·verdict — the leaf answers the same TRISTATE the node does (ask-result-tristate): a
         # check that could not be EVALUATED is not a refutation of the claim.  Collapsing
         # unresolvable to FAIL here would make an unreachable sibling look like a failing one.
@@ -217,7 +210,7 @@ def main(argv: list) -> int:
         print(f"paperkit-gate: {out.name} not built — run paperkit-project", file=sys.stderr)
         return 1
     prose = out.read_text()
-    target = config.resolve(P.TARGET, pol)
+    target = paperkit.config.resolve(paperkit.project.TARGET, pol)
     cited = cited_keys(prose)
     if target == "plain":
         # plain surfaces NO citation marker, but the projection WEAVES every section-tagged claim — each is
@@ -227,7 +220,7 @@ def main(argv: list) -> int:
     rc = 0
 
     # PROJECT — committed prose is the projection (for the project's declared render target)
-    proj_ok = prose == P.project(cfg, target)
+    proj_ok = prose == paperkit.project.project(cfg, target)
     if not proj_ok:
         print(f"paperkit-gate: {out.name} ≠ projection — regenerate (paperkit-project)", file=sys.stderr)
         rc = 1
@@ -263,8 +256,8 @@ def main(argv: list) -> int:
     # undefined key is a broken grounding: it fails the gate like an undefined
     # citation does.
     warrants = {k for k, f in F.items() if f.get("check")}
-    placed = {k for k, f in F.items() if bib.is_placed(f)}
-    grounded, dangling = bib.rests_closure((cited & set(F)) | placed, F)
+    placed = {k for k, f in F.items() if paperkit.bib.is_placed(f)}
+    grounded, dangling = paperkit.bib.rests_closure((cited & set(F)) | placed, F)
     to_verify = (cited | placed | grounded) & warrants
     undefined = sorted(cited - set(F))
     # Resolve each DISTINCT check exactly once (shared witnesses run one time), concurrently.
@@ -281,7 +274,7 @@ def main(argv: list) -> int:
         distinct = sorted({F[k]["check"] for k in to_verify})
 
         def resolve1(c: str):
-            return resolves(c, project_dir, custom)   # the Verdict — bad/unresolvable split below
+            return paperkit.resolver.resolves(c, project_dir, custom)   # the Verdict — bad/unresolvable split below
 
         if len(distinct) > 1 and jobs > 1:
             with ThreadPoolExecutor(max_workers=max(1, jobs)) as ex:
@@ -354,7 +347,7 @@ def main(argv: list) -> int:
     # COVERAGE — sections present, section-tagged claims cited
     headings = "\n".join(ln for ln in prose.splitlines() if ln.startswith("## "))
     gaps = []
-    for sk, title in bib.rubric(cfg["rubric"]):
+    for sk, title in paperkit.bib.rubric(cfg["rubric"]):
         if title.lower() not in headings.lower():
             gaps.append(f"section '{title}' absent")
     advisories = []
@@ -374,7 +367,7 @@ def main(argv: list) -> int:
     for k, f in F.items():
         if not f.get("emit"):
             continue
-        hits = bib.emit_anchors(cfg, f["emit"])
+        hits = paperkit.bib.emit_anchors(cfg, f["emit"])
         if not hits:
             gaps.append(f"placement [@{k}] emits {f['emit']} — the artifact is ABSENT, so the "
                         f"document renders a placeholder comment where the evidence should be")
@@ -387,7 +380,7 @@ def main(argv: list) -> int:
                         f"anchor (beside the warrants OR beside the output, not both)")
     for k, f in F.items():
         if f.get("section") and k not in cited:
-            if bib.is_placed(f):
+            if paperkit.bib.is_placed(f):
                 # An uncited placement is a POSTULATE: a block in the document with
                 # no claim citing it — present and load-bearing, but outside the
                 # checked claim-DAG.  Tolerated by default (advisory); under --safe
@@ -397,7 +390,7 @@ def main(argv: list) -> int:
                 (gaps if safe else advisories).append(msg)
             else:
                 gaps.append(f"claim [@{k}] tagged section={f['section']} but not cited")
-    secs = len(bib.rubric(cfg["rubric"]))
+    secs = len(paperkit.bib.rubric(cfg["rubric"]))
     if gaps:
         for g in gaps:
             print(f"paperkit-gate: coverage — {g}", file=sys.stderr)
@@ -416,7 +409,7 @@ def main(argv: list) -> int:
             "dangling": sorted(list(e) for e in dangling),
             "sections": secs, "gaps": gaps,
             "postulates": sorted(k for k, f in F.items()
-                                 if f.get("section") and k not in cited and bib.is_placed(f)),
+                                 if f.get("section") and k not in cited and paperkit.bib.is_placed(f)),
             "collapses": collapses,
         }, indent=2))
     print("paperkit-gate: PASS" if rc == 0 else "paperkit-gate: FAIL", file=sys.stderr)

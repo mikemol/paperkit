@@ -19,13 +19,11 @@ than suffix alone.
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ENGINE))
 
-import layout
+import paperkit.layout
 
 
 def main() -> int:
@@ -67,25 +65,25 @@ def main() -> int:
 
         print("⟨the class⟩\n")
         check("a suffixless TEXT command is mutable (Δ can corrupt what a witness reads)",
-              layout._mutable(cmd))
+              paperkit.layout._mutable(cmd))
         check("a suffixless BINARY is NOT mutable (a NUL byte ⇒ binary, excluded)",
-              not layout._mutable(binary))
+              not paperkit.layout._mutable(binary))
         check("the helper agrees: suffixless text is text, suffixless binary is not",
-              layout._suffixless_text(cmd) and not layout._suffixless_text(binary))
+              paperkit.layout._suffixless_text(cmd) and not paperkit.layout._suffixless_text(binary))
 
         print("\n⟨the suffix path is untouched⟩\n")
         check("a suffixed text source is still mutable (MUTABLE_SUFFIXES owns it)",
-              layout._mutable(suffixed))
+              paperkit.layout._mutable(suffixed))
         check("a suffixed binary is still immutable",
-              not layout._mutable(image))
+              not paperkit.layout._mutable(image))
         check("_suffixless_text is FALSE for anything with a suffix (it owns only the bare ones)",
-              not layout._suffixless_text(suffixed) and not layout._suffixless_text(image))
+              not paperkit.layout._suffixless_text(suffixed) and not paperkit.layout._suffixless_text(image))
 
         print("\n⟨derived files stay out⟩\n")
         cache = root / ".delta-cache.json"
         cache.write_text("{}\n")
         check("a DERIVED name is never mutable, suffix or not (it is an output)",
-              not layout._mutable(cache))
+              not paperkit.layout._mutable(cache))
 
         print("\n⟨P, F, δ⟩ minimum-delta pair — δ is the NUL byte\n")
         # The whole class turns on ONE bit of content: the same suffixless file is mutable as
@@ -93,9 +91,9 @@ def main() -> int:
         # let the `.githooks`-only special-case stand as if it were the whole class.
         probe = root / "pk"
         probe.write_text("run\n")
-        as_text = layout._mutable(probe)
+        as_text = paperkit.layout._mutable(probe)
         probe.write_bytes(b"ru\x00n\n")
-        as_binary = layout._mutable(probe)
+        as_binary = paperkit.layout._mutable(probe)
         ok = as_text and not as_binary
         deltas.append("mutable-delta")
         fails.append("mutable-delta") if not ok else None

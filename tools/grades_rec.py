@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path("paperkit")))
-import grade  # noqa: E402
+import paperkit.grade  # noqa: E402
 
 meta = json.loads(Path(sys.argv[1]).read_text())
 recs = {}
@@ -57,5 +57,5 @@ for r in out:
 for r in out:
     r["shared_with"] = [o for o in by_check[r["check"]] if o != r["key"]]
 
-grade.clamp(graded, keys={m["key"] for m in meta})   # mutates the graded records in place
+paperkit.grade.clamp(graded, keys={m["key"] for m in meta})   # mutates the graded records in place
 print(json.dumps(out))

@@ -32,10 +32,10 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import graph
 import lo
 import source
+import paperkit.bib
 
 # The OOXML / ODF package members that make each container well-formed, and the ODF mimetype the
 # presentation (not the text) document declares — the structural facts each node is gated on.
@@ -94,14 +94,14 @@ def pptx_observed(project_dir: Path, out_pptx: Path, genre_name: str = "talk") -
     assert graph.tool_for("units", "pptx") == "pandoc", \
         "the graph no longer declares units→pptx as a pandoc morphism — derive the tool, never hardcode"
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "paperkit"))
-    import project as P
-    cfg = P.load_config(project_dir)
-    units = P.observe(cfg, genre_name, project_dir)
+    import paperkit.project
+    cfg = paperkit.bib.load_config(project_dir)
+    units = paperkit.project.observe(cfg, genre_name, project_dir)
     # the verification marker per claim, by check TYPE — the same table the prose route uses, read
     # from its owner rather than restated (source._MARK / the default for a machine-checked verb).
     F = {}
     for b in cfg["bibs"]:
-        F.update(P.entries(b, cfg["consumer_fields"]))
+        F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))
 
     def marker(key):
         chk = (F.get(key, {}) or {}).get("check", "")

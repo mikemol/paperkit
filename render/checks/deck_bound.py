@@ -30,7 +30,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import graph
 
 # The slide objects the coalgebra declares (Ρ·deck·node).  Derived from the graph, not restated:
@@ -50,8 +49,8 @@ def _projector_targets() -> set[str]:
     """
     root = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(root / "paperkit"))
-    import project  # the owner of the target knob
-    return set(project.TARGET.choices or ())
+    import paperkit.project  # the owner of the target knob
+    return set(paperkit.project.TARGET.choices or ())
 
 
 def main() -> int:

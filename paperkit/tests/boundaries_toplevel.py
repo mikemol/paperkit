@@ -30,8 +30,8 @@ from pathlib import Path
 ENGINE = Path(__file__).resolve().parents[1]
 ROOT = ENGINE.parent
 sys.path.insert(0, str(ROOT / "tools"))
-from boundaries_components import _literal
-from closure import _reads
+import paperkit.tests.boundaries_components
+import tools.closure
 
 
 def emerge_dirs():
@@ -80,7 +80,7 @@ def toplevel_reads(text, names):
     found = set()
     for stmt in ast.parse(text).body:
         if not isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            found |= _reads(stmt, names)
+            found |= tools.closure._reads(stmt, names)
     return found
 
 
@@ -102,7 +102,7 @@ def main() -> int:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
-    components = _literal(ENGINE / "components.bzl", "COMPONENTS")
+    components = paperkit.tests.boundaries_components._literal(ENGINE / "components.bzl", "COMPONENTS")
     names = {f[:-len(".py")].rsplit("/", 1)[-1] for fs in components.values() for f in fs}
     mods = witness_modules()
 

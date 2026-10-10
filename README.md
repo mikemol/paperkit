@@ -70,8 +70,8 @@ Two commands do the work — project turns the claims into the document, and gat
 
 ```sh
 #!/bin/sh
-python3 paperkit/project.py paper   # claims -> paper/paper.md (the projection)
-python3 paperkit/gate.py    paper   # verify: projection-stable, checks pass, coverage
+python3 -m paperkit.project paper   # claims -> paper/paper.md (the projection)
+python3 -m paperkit.gate    paper   # verify: projection-stable, checks pass, coverage
 ```
 
 The gate enforces three invariants: the committed prose equals its projection, every cited claim's check passes, and every section is covered both ways [@rm-cmds-inv].
@@ -123,8 +123,8 @@ You run it as a report or as a gate, like this [@rm-delta-cmds].
 
 ```sh
 #!/bin/sh
-python3 paperkit/discriminate.py paper                            # report grades
-python3 paperkit/discriminate.py --min-strength behavioral paper  # gate on weak checks
+python3 -m paperkit.discriminate paper                            # report grades
+python3 -m paperkit.discriminate --min-strength behavioral paper  # gate on weak checks
 ```
 
 Every tool ships its behavioral boundaries as the triple ⟨P, F, δ⟩ — a minimal pass, a minimal flag, and the minimum delta that flips the verdict [@rm-boundaries].

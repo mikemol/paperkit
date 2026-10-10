@@ -36,8 +36,8 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bib
-import resolver
+import paperkit.bib
+import paperkit.resolver
 
 
 def _wired(repo_root: Path) -> list:
@@ -69,7 +69,7 @@ def _wired(repo_root: Path) -> list:
         # repo_root = git toplevel, so guard existence before the owner call.  A row's `project` gives a
         # NAME; `repo_root / "."` correctly resolves the root row to repo_root.)
         pdir = repo_root / proj.group(1)
-        f = bib.load_bib(bib_path, pdir) if (pdir / "paper.toml").is_file() else bib.parse(bib_path)
+        f = paperkit.bib.load_bib(bib_path, pdir) if (pdir / "paper.toml").is_file() else paperkit.bib.parse(bib_path)
         # a sandbox-tier check = has a check and its effective tier is sandbox (no tier field / "sandbox")
         if any(w.get("check") and (w.get("tier") or "sandbox") == "sandbox" for w in f.values()):
             out.append(proj.group(1))
@@ -118,7 +118,7 @@ def _imported(project_dir: Path, repo_root: Path) -> set:
     footprint read of one is already covered — derived from the same load_config the build uses.
     """
     out = set()
-    for b in bib.load_config(project_dir)["bibs"]:
+    for b in paperkit.bib.load_config(project_dir)["bibs"]:
         try:
             out.add(str(Path(b).resolve().relative_to(repo_root)))
         except ValueError:               # a bib outside the repo — ignore
@@ -217,10 +217,10 @@ def build(repo_root: Path, names: list) -> dict:
         pdir = repo_root if name == "." else repo_root / name
         raw = tomllib.loads((pdir / "paper.toml").read_text())
         custom = raw.get("checks", {})
-        cfg = bib.load_config(pdir)
+        cfg = paperkit.bib.load_config(pdir)
         F = {}
         for b in cfg["bibs"]:
-            F.update(bib.parse(b, cfg["consumer_fields"]))
+            F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))
         # Only SANDBOX-tier checks are footprint-audited (bibtex.bzl: only sandbox is swept + audited).
         # A toolchain/local check runs the host toolchain (veraPDF/lualatex/pandoc, 37s+ each) — stracing
         # it would RERUN that validator (minutes) AND its reads= is not staged-and-gated the sandbox way,
@@ -229,11 +229,11 @@ def build(repo_root: Path, names: list) -> dict:
         # both by the DATA (the tier field) and the VERB (crosses=True), never by re-listing verbs/tiers.
         # strace is I/O-bound, so trace the rest CONCURRENTLY.
         items = [(k, f["check"]) for k, f in sorted(F.items())
-                 if f.get("check") and not f["check"].startswith(resolver.CROSSING)
+                 if f.get("check") and not f["check"].startswith(paperkit.resolver.CROSSING)
                  and (f.get("tier") or "sandbox") == "sandbox"]
 
         def deps(chk):
-            fp = resolver.footprint(chk, pdir, custom, scope=repo_root)
+            fp = paperkit.resolver.footprint(chk, pdir, custom, scope=repo_root)
             return ["*"] if fp is None else fp
 
         with ThreadPoolExecutor(max_workers=min(16, (os.cpu_count() or 4))) as ex:
@@ -247,14 +247,14 @@ def _declared(pdir: Path) -> dict:
     source).  Routed through the canonical parser (paperkit.bib, via bib.parse) — `reads` is now
     a first-class field there, so no separate line scanner / no disagreement with the build.
     """
-    F = bib.parse_project(pdir)
+    F = paperkit.bib.parse_project(pdir)
     return {k: set(f.get("reads", [])) for k, f in F.items()}
 
 
 def _built(pdir: Path) -> dict:
     """{claim: set(repo-relative files)} staged by each claim's `builds` FILE labels — the other
     half of what a claim declares (Ζ·foot·builds).  Same canonical parser as `_declared`."""
-    F = bib.parse_project(pdir)
+    F = paperkit.bib.parse_project(pdir)
     return {k: {p for p in map(_label_path, f.get("builds") or []) if p} for k, f in F.items()}
 
 
@@ -296,11 +296,11 @@ def audit_one(proj: str, claim: str) -> dict:
     raw = tomllib.loads((project_dir / "paper.toml").read_text())
     custom = raw.get("checks", {})
     declared = _declared(project_dir).get(claim, set())
-    F = bib.parse_project(project_dir)
+    F = paperkit.bib.parse_project(project_dir)
     f = F.get(claim)
-    if not f or not f.get("check") or f["check"].startswith(resolver.CROSSING):
+    if not f or not f.get("check") or f["check"].startswith(paperkit.resolver.CROSSING):
         return {"claim": claim, "ok": True, "skip": True}     # a crossing verb is an edge — no footprint
-    fp = resolver.footprint(f["check"], project_dir, custom, scope=repo_root)
+    fp = paperkit.resolver.footprint(f["check"], project_dir, custom, scope=repo_root)
     if fp is None:
         return {"claim": claim, "ok": True, "degraded": True}  # strace blocked — over-declare, never fail
     missing = _missing(fp, declared, projects, _root_files(repo_root), name,
@@ -321,7 +321,7 @@ def _strace_works() -> bool:
     with tempfile.TemporaryDirectory() as d:
         p = Path(d)
         (p / "probe.txt").write_text("PK_PROBE\n")
-        return resolver.footprint("cmd:grep -q PK_PROBE probe.txt", p, {}, scope=p) == ["probe.txt"]
+        return paperkit.resolver.footprint("cmd:grep -q PK_PROBE probe.txt", p, {}, scope=p) == ["probe.txt"]
 
 
 def main(argv: list) -> int:

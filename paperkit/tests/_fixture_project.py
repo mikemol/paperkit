@@ -11,19 +11,19 @@ from __future__ import annotations
 
 import tempfile
 
-from _fixture_model import _call, _write  # the capability-free kernel (bootstraps sys.path)
-import project
+import paperkit.tests._fixture_model  # the capability-free kernel (bootstraps sys.path)
+import paperkit.project
 
 
 def project_text(warrants, *, assets=None, rubric=(("s", "Sec"),),
                  title="t", numbered=False, references=False) -> str:
     with tempfile.TemporaryDirectory() as d:
-        proj = _write(d, warrants, assets, rubric, title, numbered, references)
-        return _call(project.main, ["-o", "-", str(proj)])[1]
+        proj = paperkit.tests._fixture_model._write(d, warrants, assets, rubric, title, numbered, references)
+        return paperkit.tests._fixture_model._call(paperkit.project.main, ["-o", "-", str(proj)])[1]
 
 
 def _projected(proj, out):
     if out is None:                       # faithful: out.md IS the projection
-        _call(project.main, [str(proj)])
+        paperkit.tests._fixture_model._call(paperkit.project.main, [str(proj)])
     else:                                 # caller controls out.md (e.g. citations)
         (proj / "out.md").write_text(out)

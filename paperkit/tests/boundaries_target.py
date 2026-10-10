@@ -11,14 +11,13 @@ One common projector, the target a config knob; no new authoring syntax, no edge
 from __future__ import annotations
 
 import re
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import project as Pr
+import paperkit.project
+import paperkit.bib
 
-R, S = Pr.references, Pr.sentence
+R, S = paperkit.project.references, paperkit.project.sentence
 
 
 def main() -> int:
@@ -54,8 +53,8 @@ def main() -> int:
         (d / "w.bib").write_text("@misc{c1,\n  section = {s}, claim = {one}\n}\n"
                                  "@misc{c2,\n  section = {s}, from = {c1}, claim = {two}\n}\n"
                                  "@misc{c3,\n  section = {s}, from = {c2}, rests-on = {c1}, claim = {three}\n}\n")
-        cfg = Pr.load_config(d)
-        web, pan = Pr.project(cfg, "web"), Pr.project(cfg, "pandoc")
+        cfg = paperkit.bib.load_config(d)
+        web, pan = paperkit.project.project(cfg, "web"), paperkit.project.project(cfg, "pandoc")
         check("web output leaves NO bare [@key] citation", "[@" not in web)
         check("pandoc output uses [@key] citations", "[@c1]" in pan)
         targets = set(re.findall(r"\]\(#([\w.:-]+)\)", web))

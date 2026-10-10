@@ -12,8 +12,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "paperkit"))
-import bib
+import paperkit.bib
 
 # What the ENGINE does with each entry field — the gloss is authored, the KEY SET is bib's.
 # Kind: `warrant` (a claim), `reference` (a bibliography citation), `both`, or an INERT marker.
@@ -73,7 +72,7 @@ def _paper_keys() -> list:
     """The [paper] keys load_config actually reads — parsed from its OWN source (the owner),
     so a new `p.get("k", …)` cannot be documented-or-not by hand.  Deduped, first-seen order.
     """
-    src = inspect.getsource(bib.load_config)
+    src = inspect.getsource(paperkit.bib.load_config)
     seen, out = set(), []
     for k in re.findall(r'p\.get\(\s*"([^"]+)"', src):
         if k not in seen:
@@ -83,7 +82,7 @@ def _paper_keys() -> list:
 
 
 def render() -> str:
-    fields = list(bib._SCALAR) + list(bib._LIST)          # the SET + order come from the owner
+    fields = list(paperkit.bib._SCALAR) + list(paperkit.bib._LIST)          # the SET + order come from the owner
     missing = [f for f in fields if f not in _FIELD_DOC]
     if missing:                                           # a new field shipped without a gloss
         raise SystemExit(f"gen_fields: undocumented bibliography field(s) {missing} — add a gloss "

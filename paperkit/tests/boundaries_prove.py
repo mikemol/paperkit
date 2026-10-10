@@ -39,8 +39,8 @@ def main() -> int:
     # summary line had no accumulator to derive from and printed a literal ("1 sound arm, 2
     # degraded-arm refusals") that no arm could move.  `Suite` counts the arms it is given.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _boundary import Suite
-    s = Suite("PROVE", "Ζ·prove·degrade — a certificate is never emitted unmeasured")
+    import paperkit.tests._boundary
+    s = paperkit.tests._boundary.Suite("PROVE", "Ζ·prove·degrade — a certificate is never emitted unmeasured")
     check = s.check
 
     # P — the sound path: the same entry point, real engine, cheap verdict mode (the prove

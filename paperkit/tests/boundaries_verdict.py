@@ -46,9 +46,9 @@ def _run_ok(cmd: str) -> str:
     """resolves()'s cmd: arm, as a caller reads it."""
     import sys as _s
     _s.path.insert(0, str(ENG))
-    import resolver
+    import paperkit.resolver
     with tempfile.TemporaryDirectory() as d:
-        v = resolver.run_ok(cmd, Path(d))
+        v = paperkit.resolver.run_ok(cmd, Path(d))
         return "cannot-run" if v.is_unavailable() else ("pass" if v.passed else "fail")
 
 

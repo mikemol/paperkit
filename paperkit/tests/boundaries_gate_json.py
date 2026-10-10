@@ -11,15 +11,13 @@ the gate's actual verdict.
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_gate import gate_json  # noqa: E402
-from _fixture_model import _call, entry  # noqa: E402
-from _fixture_project import project_text  # noqa: E402
-import gate as _gate  # noqa: E402  (the CANNOT-RUN path needs a dir with NO paper.toml)
+import paperkit.tests._fixture_gate  # noqa: E402
+import paperkit.tests._fixture_model  # noqa: E402
+import paperkit.tests._fixture_project  # noqa: E402
+import paperkit.gate  # noqa: E402  (the CANNOT-RUN path needs a dir with NO paper.toml)
 
 
 def gate_json_raw(paper_toml=None, *flags):
@@ -30,14 +28,14 @@ def gate_json_raw(paper_toml=None, *flags):
     with tempfile.TemporaryDirectory() as d:
         if paper_toml is not None:
             (Path(d) / "paper.toml").write_text(paper_toml)
-        rc, o, e = _call(_gate.main, ["--json", *flags, d])
+        rc, o, e = paperkit.tests._fixture_model._call(paperkit.gate.main, ["--json", *flags, d])
         return rc, json.loads(o or "{}"), e
 
-C = entry("c", claim="anchored")
-DISTINCT = [entry("a", claim="alpha", check="file:w.bib"),
-            entry("b", claim="beta", check="file:r.tsv", frm="a")]
-SHARED = [entry("a", claim="alpha", check="file:w.bib"),
-          entry("b", claim="beta", check="file:w.bib", frm="a")]
+C = paperkit.tests._fixture_model.entry("c", claim="anchored")
+DISTINCT = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
+            paperkit.tests._fixture_model.entry("b", claim="beta", check="file:r.tsv", frm="a")]
+SHARED = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
+          paperkit.tests._fixture_model.entry("b", claim="beta", check="file:w.bib", frm="a")]
 
 
 def main() -> int:
@@ -55,11 +53,11 @@ def main() -> int:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
-    canonical = project_text([C])
-    rc_ok, j_ok = gate_json([C], out=canonical)
-    rc_bad, j_bad = gate_json([C], out=canonical + "\nDRIFT\n")
-    _, j_distinct = gate_json(DISTINCT)
-    _, j_shared = gate_json(SHARED)
+    canonical = paperkit.tests._fixture_project.project_text([C])
+    rc_ok, j_ok = paperkit.tests._fixture_gate.gate_json([C], out=canonical)
+    rc_bad, j_bad = paperkit.tests._fixture_gate.gate_json([C], out=canonical + "\nDRIFT\n")
+    _, j_distinct = paperkit.tests._fixture_gate.gate_json(DISTINCT)
+    _, j_shared = paperkit.tests._fixture_gate.gate_json(SHARED)
     # Ζ·gate·exit — the CANNOT-RUN cases: the boundary is "assembles into a gateable project",
     # not "did tomllib raise".  All four must exit 3, and NONE may report the downstream
     # "not built — run paperkit-project" line (that would misdiagnose an unusable config as

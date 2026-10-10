@@ -27,22 +27,12 @@ import time
 from pathlib import Path
 from typing import NamedTuple
 
-import resolver
-from grade import _grade_from_sens
-from layout import (_ENGINE, SKIP_DIRS, _copy_sandbox, _mutable, _nested_roots, _sandbox_root,
-                    _Scope)
-from mutate import (  # Ζ·mutant / Μ·sweep·atom — the pure AST mutation primitives (their own leaf)
-    _branch_sites,
-    _data_sites,
-    _def_sites,
-    _drop_data_multi,
-    _flip_condition,
-    _flip_sites,
-    _mutate_lines,
-    emit_mutant,
-)
+import paperkit.resolver
+import paperkit.grade
+import paperkit.layout
+import paperkit.mutate
 
-import config
+import paperkit.config
 
 
 class _Unreachable(int):
@@ -64,9 +54,9 @@ CORRUPT = b"\x00\x00DELTA-CORRUPTION\x00\x00\n"
 
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).
-DELTA_REPEAT = config.Param("delta-repeat", "PAPERKIT_DELTA_REPEAT", default="1",
+DELTA_REPEAT = paperkit.config.Param("delta-repeat", "PAPERKIT_DELTA_REPEAT", default="1",
                             help="re-run the pristine baseline N times to detect a flaky (non-deterministic) check")
-DELTA_PULSE = config.Param("delta-pulse", "PAPERKIT_DELTA_PULSE", default="2",
+DELTA_PULSE = paperkit.config.Param("delta-pulse", "PAPERKIT_DELTA_PULSE", default="2",
                            help="min seconds between Δ progress pulses to a log (0 = silent)")
 
 
@@ -77,7 +67,7 @@ def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
     the engine scripts the checks invoke via ../paperkit.
     """
     req = set(cfg["bibs"]) | {cfg["rubric"], cfg["out"], project_dir / "paper.toml"}
-    req |= set(_ENGINE.glob("*.py"))
+    req |= set(paperkit.layout._ENGINE.glob("*.py"))
     return {p.resolve() for p in req}
 
 
@@ -90,11 +80,11 @@ def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path 
     out, seen = [], set()
 
     def collect(base: Path, skip_nested: bool):
-        nested = _nested_roots(base) if skip_nested else []
+        nested = paperkit.layout._nested_roots(base) if skip_nested else []
         # Ζ·sandbox·declared — the repository's own content (layout._Scope), not `rglob("*")`,
         # which enumerated every cache, stale build copy and nested checkout on disk.
-        for f in _Scope.for_path(base).files(base):
-            if not _mutable(f) or any(part in SKIP_DIRS for part in f.parts):
+        for f in paperkit.layout._Scope.for_path(base).files(base):
+            if not paperkit.layout._mutable(f) or any(part in paperkit.layout.SKIP_DIRS for part in f.parts):
                 continue
             if any(nr in f.parents for nr in nested):
                 continue  # a sibling project's file — not this project's to mutate
@@ -134,8 +124,8 @@ def surface_of(footprint: list | None, sandbox_project: Path, root_copy: Path | 
     base = root_copy or sandbox_project
     named = {(base / p).resolve() for p in footprint}
     out, seen = [], set()
-    for f in _Scope.for_path(base).files(base):          # Ζ·sandbox·declared
-        if not _mutable(f) or any(part in SKIP_DIRS for part in f.parts):
+    for f in paperkit.layout._Scope.for_path(base).files(base):          # Ζ·sandbox·declared
+        if not paperkit.layout._mutable(f) or any(part in paperkit.layout.SKIP_DIRS for part in f.parts):
             continue
         if f.suffix == ".sh" and "checks" in f.parts:
             continue                      # a verifier script; its corruption tests itself
@@ -177,9 +167,9 @@ def unmeasured_reads(footprint: list | None, root_copy: Path | None) -> list:
     out = []
     for p in footprint:
         f = root_copy / p
-        if any(part in SKIP_DIRS for part in Path(p).parts):
+        if any(part in paperkit.layout.SKIP_DIRS for part in Path(p).parts):
             continue                                  # a derived artifact; its SOURCE is measured
-        if f.is_file() and not _mutable(f):
+        if f.is_file() and not paperkit.layout._mutable(f):
             out.append(p)
     return sorted(out)
 
@@ -259,11 +249,11 @@ def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = 
         label = _rel(f, sandbox_project, engine_dir, root_copy)
         if f.suffix == ".py":
             text = f.read_text()
-            for qn, node in _def_sites(text):
+            for qn, node in paperkit.mutate._def_sites(text):
                 sites.append((f, node, f"{label}::{qn}"))
-            for qn, n, (b0, blast) in _branch_sites(text):
+            for qn, n, (b0, blast) in paperkit.mutate._branch_sites(text):
                 sites.append((f, _BranchNode(b0, blast), f"{label}::branch:{qn}#{n}"))
-            for qn, n, _kind, _k, _v in _data_sites(text):
+            for qn, n, _kind, _k, _v in paperkit.mutate._data_sites(text):
                 sites.append((f, _DataNode(qn, n), f"{label}::data-:{qn}#{n}"))
         else:
             sites.append((f, None, label))
@@ -288,18 +278,18 @@ def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
         for f in set(list(linenodes) + list(dataspecs)):
             text = saved[f].decode()
             if f in linenodes:
-                text = _mutate_lines(text, linenodes[f])   # def/branch body-drops (line-span)
+                text = paperkit.mutate._mutate_lines(text, linenodes[f])   # def/branch body-drops (line-span)
             if f in dataspecs:
                 # Μ·sweep·atom — resolve every data-: DROP's (qualname, index) against the CURRENT
                 # text ONCE and remove them per-literal in a single index-stable rebuild.  A sequential
                 # spec-by-spec drop renumbers a literal as it goes, so a later index of the same literal
                 # can vanish; drop_data_multi removes a whole index-SET at once, composition-safe.
-                text = _drop_data_multi(text, dataspecs[f])
+                text = paperkit.mutate._drop_data_multi(text, dataspecs[f])
             f.write_text(text)
         for f, node, _ in group:
             if node is None:
                 f.write_bytes(CORRUPT)
-        return not resolver.resolves(chk, sandbox_project, custom).passed
+        return not paperkit.resolver.resolves(chk, sandbox_project, custom).passed
     finally:
         for f, b in saved.items():
             f.write_bytes(b)
@@ -331,7 +321,7 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     # false") both collapse to False here, and the grade record downstream then said "repo is
     # not green" about a check that merely could not run.  Measured: exactly that, twice, on a
     # green repo whose cells were being killed by their memory cap.
-    _v = resolver.resolves(chk, sandbox_project, custom)
+    _v = paperkit.resolver.resolves(chk, sandbox_project, custom)
     if not _v.passed:
         # ⚑ Ζ·calc·why — KEEP THE CHECK'S OWN REASON, which this line discarded.
         #
@@ -366,7 +356,7 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
                 orig = f.read_bytes()
                 f.write_bytes(CORRUPT)
                 try:
-                    flipped = not resolver.resolves(chk, sandbox_project, custom).passed
+                    flipped = not paperkit.resolver.resolves(chk, sandbox_project, custom).passed
                 finally:
                     f.write_bytes(orig)
                 if flipped:
@@ -508,12 +498,12 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     # load, iteration order, the date, network) gets a single-sample grade that is noise.
     # PAPERKIT_DELTA_REPEAT=N (default 1, off) re-runs the pristine baseline N times; if
     # they disagree the check is PROVABLY non-deterministic, so the sweep would be noise.
-    reps = max(1, int(config.resolve(DELTA_REPEAT)))
+    reps = max(1, int(paperkit.config.resolve(DELTA_REPEAT)))
     # The set is over the raw Verdict IDENTITY, NOT `.passed`: an UNAVAILABLE-then-PASS across reps
     # IS a real non-determinism (the verdict is not a function of project content), and collapsing
     # via `.passed` to {False, False} would HIDE it as a stable fail.  Verdict is identity-hashable
     # with no __bool__ precisely so this set has three distinguishable outcomes (ask-result-tristate).
-    if reps > 1 and len({resolver.resolves(chk, sandbox_project, custom) for _ in range(reps)}) > 1:
+    if reps > 1 and len({paperkit.resolver.resolves(chk, sandbox_project, custom) for _ in range(reps)}) > 1:
         return {"grade": "broken", "tests": [], "determinism": "flaky",
                 "why": f"non-deterministic — {reps} baseline runs in a pristine sandbox disagreed; "
                        "the verdict is not a function of project content (wall-clock / load / "
@@ -523,7 +513,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir, footprint, root_copy)
     # Ζ·broken·offaxis — hand the ladder the third state.  `baseline` is UNREACHABLE (falsy,
     # but not plain False) when the check could not be reached at all.
-    rec = _grade_from_sens(baseline, sens, reachable=(baseline is not UNREACHABLE))
+    rec = paperkit.grade._grade_from_sens(baseline, sens, reachable=(baseline is not UNREACHABLE))
     rec["baseline"] = baseline   # Ζ·calc — the measured baseline (the verdict), part of the CALCULATION
     # Ζ·calc·why — the CHECK's own words, beside the grader's generic ones.  Present only when the
     # check said something, so a passing record stays byte-identical (the non-breaking widening
@@ -552,7 +542,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
         # producer untraceable) leaves `distinct` standing: an unmeasurable sharing must not read
         # as a measured one, in either direction.
         if rec["corroboration"] == "distinct":
-            verdict = resolver.corroboration_of(chk, sandbox_project, custom)
+            verdict = paperkit.resolver.corroboration_of(chk, sandbox_project, custom)
             if verdict is not None:
                 rec["corroboration"], shared = verdict
                 if shared:
@@ -583,7 +573,7 @@ def _vacuity_source(rec: dict, chk: str, sandbox_project: Path,
     try:
         for f in files:
             f.write_bytes(CORRUPT)
-        still_green = resolver.resolves(chk, sandbox_project, custom).passed
+        still_green = paperkit.resolver.resolves(chk, sandbox_project, custom).passed
     finally:
         for f, b in saved.items():
             f.write_bytes(b)
@@ -628,7 +618,7 @@ def _flip_sites_of(sandbox_project: Path, engine_dir: Path | None,
         if f.suffix != ".py":
             continue
         label = _rel(f, sandbox_project, engine_dir, root_copy)
-        for qn, n, _test in _flip_sites(f.read_text()):
+        for qn, n, _test in paperkit.mutate._flip_sites(f.read_text()):
             out.append(FlipSite(f, qn, n, f"{label}::flip:{qn}#{n}"))
     return out
 
@@ -700,8 +690,8 @@ def _flip_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Path 
     """
     saved = fs.file.read_bytes()
     try:
-        fs.file.write_text(_flip_condition(saved.decode(), fs.qualname, fs.n))
-        return not resolver.resolves(chk, sandbox_project, custom).passed
+        fs.file.write_text(paperkit.mutate._flip_condition(saved.decode(), fs.qualname, fs.n))
+        return not paperkit.resolver.resolves(chk, sandbox_project, custom).passed
     finally:
         fs.file.write_bytes(saved)
 
@@ -732,7 +722,7 @@ def _dflip_sites_of(sandbox_project: Path, engine_dir: Path | None,
         if f.suffix != ".py":
             continue
         label = _rel(f, sandbox_project, engine_dir, root_copy)
-        for qn, n, kind, _k, _v in _data_sites(f.read_text()):
+        for qn, n, kind, _k, _v in paperkit.mutate._data_sites(f.read_text()):
             if kind == "Set":
                 continue                                 # a set element has no perturbable value
             out.append(DflipSite(f, qn, n, kind, f"{label}::dflip:{qn}#{n}"))
@@ -747,8 +737,8 @@ def _perturb_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Pa
     """
     saved = ds.file.read_bytes()
     try:
-        ds.file.write_text(emit_mutant(saved.decode(), f"dflip:{ds.qualname}#{ds.n}"))
-        return not resolver.resolves(chk, sandbox_project, custom).passed
+        ds.file.write_text(paperkit.mutate.emit_mutant(saved.decode(), f"dflip:{ds.qualname}#{ds.n}"))
+        return not paperkit.resolver.resolves(chk, sandbox_project, custom).passed
     finally:
         ds.file.write_bytes(saved)
 
@@ -915,14 +905,14 @@ def _sandbox_setup(project_dir, resolution="def"):
     _reap_once()
     tmp = Path(tempfile.mkdtemp(prefix=_SANDBOX_PREFIX, dir=_scratch_dir()))
     _claim_sandbox(tmp)               # stamp BEFORE the copy: a copy interrupted mid-write is owned
-    root = _sandbox_root(project_dir)
-    _copy_sandbox(root, tmp / root.name)
+    root = paperkit.layout._sandbox_root(project_dir)
+    paperkit.layout._copy_sandbox(root, tmp / root.name)
     root_copy = tmp / root.name
     rel = project_dir.relative_to(root)
     sandbox = root_copy if rel == Path() else root_copy / rel
     engine = None
     if resolution == "def":
-        eng_rel = _ENGINE.relative_to(root) if _ENGINE.is_relative_to(root) else Path(_ENGINE.name)
+        eng_rel = paperkit.layout._ENGINE.relative_to(root) if paperkit.layout._ENGINE.is_relative_to(root) else Path(paperkit.layout._ENGINE.name)
         engine = root_copy / eng_rel
         if not engine.is_dir():
             raise RuntimeError(
@@ -949,7 +939,7 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
         # constructed surface had nothing to construct from and the claim could only read
         # indeterminate.  The cache key stays PROJECT-scoped, derived from the same trace (no second
         # strace) — engine entries aren't project inputs (the engine-epoch hash covers them).
-        sweep_fp = resolver.footprint(chk, sandbox, custom, scope=root_copy)
+        sweep_fp = paperkit.resolver.footprint(chk, sandbox, custom, scope=root_copy)
         if sweep_fp is None:
             fp = None
         elif sandbox == root_copy:
@@ -993,7 +983,7 @@ def _grade_parallel(project_dir, checks, custom, presupposed, resolution="file")
     jobs = max(1, min(len(checks), os.cpu_count() or 4))
     total, done, lock, t0 = len(checks), [0], threading.Lock(), time.monotonic()
     tty = sys.stderr.isatty()
-    every = float(config.resolve(DELTA_PULSE))   # min seconds between log pulses; 0 = off
+    every = float(paperkit.config.resolve(DELTA_PULSE))   # min seconds between log pulses; 0 = off
     last = [t0]
 
     def pulse_grade(c):

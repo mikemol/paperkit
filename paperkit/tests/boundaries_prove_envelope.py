@@ -80,8 +80,8 @@ def main() -> int:
     # described — and its vocabulary ("structural") is why a census keyed on the word "behaviors"
     # missed this file entirely.  A derived count has no vocabulary to miss.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _boundary import Suite
-    s = Suite("PROVE-ENVELOPE", "Ζ·prove-gate — --prove and __dcalc run the same oracle")
+    import paperkit.tests._boundary
+    s = paperkit.tests._boundary.Suite("PROVE-ENVELOPE", "Ζ·prove-gate — --prove and __dcalc run the same oracle")
     check = s.check
 
     # ⟨same oracle command⟩ — prove.py's argv IS the discriminate --calc def command pk_calc runs.
@@ -94,7 +94,7 @@ def main() -> int:
     # pk_calc (calc.bzl) builds `discriminate.py --only <claim> --calc [ --resolution <attr> ]`
     calc_src = CALC.read_text()
     check("pk_calc emits the SAME oracle: `discriminate.py --only <claim> --calc` + `--resolution <attr>`",
-          "discriminate.py --only " in calc_src and "--calc" in calc_src
+          "paperkit.discriminate --only " in calc_src and "--calc" in calc_src
           and '" --resolution " + ctx.attr.resolution' in calc_src)
 
     # ⟨same def frame⟩ — prove.py measures resolution="def"; the build emits __dcalc at resolution="def".
@@ -105,7 +105,7 @@ def main() -> int:
     # ⟨same ladder⟩ — prove.py grades via the shared leaf, re-declares no rung order.
     prove_src = PROVE.read_text()
     check("prove.py grades via the imported grade._grade_from_sens (the shared ladder leaf)",
-          "from grade import _grade_from_sens" in prove_src and "_grade_from_sens(baseline, sens)" in prove_src)
+          "paperkit.grade._grade_from_sens(baseline, sens)" in prove_src)
     check("prove.py re-declares NO ladder (no STRENGTH/RANK_C/ORDER of its own — the boundaries_ladder rule)",
           not any(re.search(rf"\b{n}\s*=", prove_src) for n in ("STRENGTH", "RANK_C", "GRADE_C")))
 

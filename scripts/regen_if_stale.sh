@@ -67,12 +67,12 @@ PY
 )"
     [ -n "$out" ] || continue
     if newer_than "$out" "$proj"/*.bib "$proj/paper.toml" "$proj/rubric.tsv" paperkit/project.py; then
-      python3 paperkit/project.py "$proj" >/dev/null 2>&1
+      python3 -m paperkit.project "$proj" >/dev/null 2>&1
     fi
   done
   # the deck segmentation manifests (render/checks/units.py --check owns the comparison)
   if newer_than render/assets/paper-units.tsv paper/*.bib paperkit/project.py paperkit/genre.py; then
-    python3 paperkit/project.py --observe --genre talk paper > render/assets/paper-units.tsv 2>/dev/null
+    python3 -m paperkit.project --observe --genre talk paper > render/assets/paper-units.tsv 2>/dev/null
   fi
   # the generated field + knob tables
   if newer_than paper/assets/formulas.md paper/checks/gen_formulas.py; then

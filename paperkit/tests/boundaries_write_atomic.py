@@ -27,8 +27,7 @@ from pathlib import Path
 
 ENG = Path(__file__).resolve().parent.parent
 ROOT = ENG.parent
-sys.path.insert(0, str(ENG))
-import durable
+import paperkit.durable
 
 
 def _twinned(d: Path, name: str, body: str) -> tuple:
@@ -54,7 +53,7 @@ def main() -> int:
 
         # ── P / F / δ: the same write, two writers, opposite outcomes ───────────────────────────
         live, twin = _twinned(d, "p.py", "ORIGINAL\n")
-        durable.write_atomic(live, "REWRITTEN\n")
+        paperkit.durable.write_atomic(live, "REWRITTEN\n")
         check("P: write_atomic → twin keeps its bytes", twin.read_text() == "ORIGINAL\n")
         check("P: write_atomic → the file HAS the new bytes", live.read_text() == "REWRITTEN\n")
         check("P: write_atomic → the alias is BROKEN (a new inode, links back to 1)",
@@ -67,7 +66,7 @@ def main() -> int:
         print("     δ: one call — replace the path vs truncate the inode.\n")
 
         # ── the helper must not leave debris, and must clean up after itself on failure ─────────
-        durable.write_atomic(d / "bytes.bin", b"\x00\x01\x02")
+        paperkit.durable.write_atomic(d / "bytes.bin", b"\x00\x01\x02")
         check("bytes are written as bytes (not str-coerced)",
               (d / "bytes.bin").read_bytes() == b"\x00\x01\x02")
         check("no temp files left behind on success",
@@ -82,7 +81,7 @@ def main() -> int:
             def __str__(self):
                 raise RuntimeError("boom")
         try:
-            durable.write_atomic(keep, _Boom())      # f.write() rejects a non-str → TypeError
+            paperkit.durable.write_atomic(keep, _Boom())      # f.write() rejects a non-str → TypeError
         except Exception:
             pass
         check("a failed write leaves the target untouched", keep.read_text() == "KEEP\n")
@@ -99,17 +98,17 @@ def main() -> int:
         m = d / "mode.py"
         m.write_text("x\n")
         os.chmod(m, 0o664)
-        durable.write_atomic(m, "y\n")
+        paperkit.durable.write_atomic(m, "y\n")
         check("the replace PRESERVES an existing file's mode (0664 stays 0664)",
               (m.stat().st_mode & 0o777) == 0o664 and m.read_text() == "y\n")
         ro = d / "ro.py"
         ro.write_text("x\n")
         os.chmod(ro, 0o444)
-        durable.write_atomic(ro, "y\n")
+        paperkit.durable.write_atomic(ro, "y\n")
         check("   ...including a read-only one (the writer does not widen either)",
               (ro.stat().st_mode & 0o777) == 0o444)
         fresh = d / "fresh.py"
-        durable.write_atomic(fresh, "z\n")
+        paperkit.durable.write_atomic(fresh, "z\n")
         check("a NEW file gets the umask default, not mkstemp's 0600",
               (fresh.stat().st_mode & 0o777) != 0o600)
 

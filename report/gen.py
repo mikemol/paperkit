@@ -22,8 +22,7 @@ import figure  # report/figure.py — the claim-DAG adequacy plot
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-sys.path.insert(0, str(ROOT / "paperkit"))
-import grade  # noqa: E402  (Μ·grade — the ladder LEAF; the summary DERIVES its rungs, never lists them)
+import paperkit.grade  # noqa: E402  (Μ·grade — the ladder LEAF; the summary DERIVES its rungs, never lists them)
 ASSETS = HERE / "assets"
 _DELTA, _GATE = {}, {}
 
@@ -277,7 +276,7 @@ def _delta_section(name, recs):
     # Ζ·ladder — DERIVED from the engine's ladder, never re-listed: this line used to omit
     # `imported`, so a view importing a concept certificate had its claim dropped from the
     # summary's own total ("80 cited claims — self-grade: 79 behavioral", the 80th unaccounted).
-    order = grade.rungs()
+    order = paperkit.grade.rungs()
     counts, eff_counts, clamped = {}, {}, 0
     for r in recs:
         counts[r["grade"]] = counts.get(r["grade"], 0) + 1
@@ -324,7 +323,7 @@ def dag_svg():
     # Ζ·report·records — the figure plots a claim at its GRADE; a claim with no grade record (gated,
     # never Δ-swept — rec_grades lists it as "not graded") has no position on that axis, so it is
     # left off the plot rather than invented a band.  delta.md still lists it.
-    return figure.svg([r for r in _delta("paper") if r["grade"] in grade.rungs()])
+    return figure.svg([r for r in _delta("paper") if r["grade"] in paperkit.grade.rungs()])
 
 
 GENERATORS = {"gate.md": gate_md, "delta.md": delta_md, "without-k.md": without_k_md,
@@ -391,7 +390,7 @@ def main(argv):
     ASSETS.mkdir(exist_ok=True)
     for name, text in produced.items():
         (ASSETS / name).write_text(text)
-    subprocess.run([sys.executable, "paperkit/project.py", "report"], cwd=ROOT)
+    subprocess.run([sys.executable, "-m", "paperkit.project", "report"], cwd=ROOT)
     print("report generated", file=sys.stderr)
     return 0
 

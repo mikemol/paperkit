@@ -11,14 +11,13 @@ dirs and the ambient, user-writable host PATH is dropped entirely (reproducibili
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import resolver
+import paperkit.resolver
 
-import config as C
+import paperkit.config
+import paperkit.checkenv
 
 SEP = os.pathsep
 
@@ -41,14 +40,14 @@ def main() -> int:
     print("Τ·path — pinning tool resolution\n")
     saved = os.environ.get("PAPERKIT_PATH")
     try:
-        os.environ.pop("PAPERKIT_PATH", None); C._ARGS.clear()
-        e = resolver.clean_env({"PATH": SEP.join(["/usr/bin", "/bin", "/usr/bin", "rel", "."])})
+        os.environ.pop("PAPERKIT_PATH", None); paperkit.config._ARGS.clear()
+        e = paperkit.checkenv.clean_env({"PATH": SEP.join(["/usr/bin", "/bin", "/usr/bin", "rel", "."])})
         check("default: keeps the host's ABSOLUTE entries", e["PATH"].split(SEP) == ["/usr/bin", "/bin"])
         check("default: DEDUPES the dup-laden host PATH (keep first)", e["PATH"].split(SEP).count("/usr/bin") == 1)
 
         with tempfile.TemporaryDirectory() as t1, tempfile.TemporaryDirectory() as t2:
             os.environ["PAPERKIT_PATH"] = SEP.join([t1, t2, "/does-not-exist-xyz", "relative/d"])
-            e = resolver.clean_env({"PATH": "/usr/bin"})
+            e = paperkit.checkenv.clean_env({"PATH": "/usr/bin"})
             check("a declared PATH pins resolution to exactly the declared dirs", e["PATH"].split(SEP) == [t1, t2])
             check("the host's ambient PATH is DROPPED when pinned", "/usr/bin" not in e["PATH"])
             check("a non-existent declared dir is dropped", "/does-not-exist-xyz" not in e["PATH"])
@@ -59,11 +58,11 @@ def main() -> int:
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     saved = os.environ.get("PAPERKIT_PATH")
     try:
-        C._ARGS.clear()
+        paperkit.config._ARGS.clear()
         with tempfile.TemporaryDirectory() as t:
             host = SEP.join(["/usr/bin", "/bin"])
-            os.environ.pop("PAPERKIT_PATH", None); F = resolver.clean_env({"PATH": host})["PATH"]
-            os.environ["PAPERKIT_PATH"] = t; P = resolver.clean_env({"PATH": host})["PATH"]
+            os.environ.pop("PAPERKIT_PATH", None); F = paperkit.checkenv.clean_env({"PATH": host})["PATH"]
+            os.environ["PAPERKIT_PATH"] = t; P = paperkit.checkenv.clean_env({"PATH": host})["PATH"]
             ok = F.split(SEP) == ["/usr/bin", "/bin"] and t == P
             fails.append("pin-delta") if not ok else None
             print(f"  {'ok ' if ok else 'XX '}declaring PAPERKIT_PATH flips resolution from the host PATH to the pinned set")

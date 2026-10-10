@@ -32,9 +32,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mem_learn import pow2 as pow2_bucket
-from mem_learn import resolution
+import tools.mem_learn
 
 
 def peaks_for(project: str, tree: Path) -> dict:
@@ -47,7 +45,7 @@ def peaks_for(project: str, tree: Path) -> dict:
     for f in tree.rglob("*.peak"):
         if f"paperkit_{project}" not in str(f) and f"/{project}/" not in str(f):
             continue
-        res, claim = resolution(f.stem)
+        res, claim = tools.mem_learn.resolution(f.stem)
         if res is None:
             continue
         try:
@@ -74,11 +72,11 @@ def deposit(db: Path, project: str, measured: dict, run: str = "") -> int:
     bytes = max(bytes, excluded.bytes)` is the same rule as one clause the database enforces, and
     it cannot be got wrong the way the merge was.
     """
-    import mem_db as D
-    c = D.connect(db)
+    import tools.mem_db
+    c = tools.mem_db.connect(db)
     rows = [(project, res, claim, cell, int(mb * 1024 * 1024))
             for (res, claim, cell), mb in measured.items()]
-    return D.record(c, rows, run=run)
+    return tools.mem_db.record(c, rows, run=run)
 
 
 def main(argv: list) -> int:

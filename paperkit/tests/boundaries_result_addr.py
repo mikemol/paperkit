@@ -31,8 +31,7 @@ import tempfile
 from pathlib import Path
 
 ENG = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ENG))
-import resolver
+import paperkit.resolver
 
 GATE = str(ENG / "gate.py")
 
@@ -73,7 +72,7 @@ def _leaf(project: Path, claim: str) -> dict:
 
 
 def _resolve(check: str, frm: Path) -> str:
-    v = resolver.resolves(check, frm, {})
+    v = paperkit.resolver.resolves(check, frm, {})
     return "cannot-run" if v.is_unavailable() else ("pass" if v.passed else "fail")
 
 
@@ -161,8 +160,8 @@ def main() -> int:
         # that — while this helper folded it to a three-element string enum one layer down.  A
         # prohibition on the type is not a prohibition in the test.
         print("\n  ⟨attribution⟩ a cannot-run says WHO could not answer, and why")
-        v_key = resolver.resolves(f"result:{rel_bad}#no-such-key", here, {})
-        v_gone = resolver.resolves("result:../nonexistent#c", here, {})
+        v_key = paperkit.resolver.resolves(f"result:{rel_bad}#no-such-key", here, {})
+        v_gone = paperkit.resolver.resolves("result:../nonexistent#c", here, {})
         att = [
             ("the sibling RAN and declined → owner names the citation",
              bool(v_key.owner) and "no-such-key" in v_key.owner, True),
@@ -192,10 +191,10 @@ def main() -> int:
 
         # ── 5. the trace matches what RUNS (Λ·trace·quote) ──────────────────────────────────────
         print("\n  ⟨trace⟩ footprint's command is the command resolves() runs")
-        cmd = resolver._check_cmd(f"result:{rel_bad}#c", {}, here)
+        cmd = paperkit.resolver._check_cmd(f"result:{rel_bad}#c", {}, here)
         # shlex.quote leaves a shell-safe token BARE, so assert the address is CARRIED, and that a
         # metacharacter-bearing key would be QUOTED -- the injection seam Λ·trace·quote closed.
-        nasty = resolver._check_cmd(f"result:{rel_bad}#a b;rm", {}, here)
+        nasty = paperkit.resolver._check_cmd(f"result:{rel_bad}#a b;rm", {}, here)
         ok = ("--only" in cmd and " c " in f" {cmd} "
               and ("'a b;rm'" in nasty or '"a b;rm"' in nasty))
         print(f"    {'ok  ' if ok else 'FAIL'} traced command carries the --only address; a "
@@ -220,11 +219,11 @@ def main() -> int:
     (_d / "citer").mkdir()
     for label, got, want in [
         ("a sibling NAME resolves to the sibling, not <citer>/<name>",
-         resolver._sibling_for(_d / "citer", "sib"), (_d / "sib").resolve()),
+         paperkit.resolver._sibling_for(_d / "citer", "sib"), (_d / "sib").resolve()),
         ("the same name resolves from the tree root too",
-         resolver._sibling_for(_d, "sib"), (_d / "sib").resolve()),
+         paperkit.resolver._sibling_for(_d, "sib"), (_d / "sib").resolve()),
         ("an unresolvable name is returned UNCHANGED (the gate reports its own cannot-run)",
-         pathlib.Path(str(resolver._sibling_for(_d / "citer", "no-such-project"))),
+         pathlib.Path(str(paperkit.resolver._sibling_for(_d / "citer", "no-such-project"))),
          pathlib.Path("no-such-project")),
     ]:
         ok = got == want
@@ -238,7 +237,7 @@ def main() -> int:
     try:
         (_d / "mine").mkdir()
         (_d / "mine" / "paper.toml").write_text("[paper]\n")
-        ok = resolver._sibling_for(_d / "citer", "mine") == (_d / "mine").resolve()
+        ok = paperkit.resolver._sibling_for(_d / "citer", "mine") == (_d / "mine").resolve()
         print(f"    {'ok  ' if ok else 'FAIL'} seam: a consumer's OWN sibling wins over the engine tree")
         if not ok:
             fails.append("seam: consumer-first ladder")

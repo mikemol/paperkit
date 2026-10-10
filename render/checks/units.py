@@ -27,9 +27,9 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+import paperkit.bib
 
 _ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(_ROOT / "paperkit"))
 
 # The observed projects and the genre each is cut under.  A project appears here once it commits a
 # manifest; the genre is part of the declaration because a different genre is a different cut, and
@@ -64,9 +64,9 @@ _OBSERVED_FLOOR = 4
 
 def manifest(project_dir: Path, genre_name: str) -> str:
     """The segmentation as text: one unit per line, section then keys, tab-separated."""
-    import project as P
-    cfg = P.load_config(project_dir)
-    units = P.observe(cfg, genre_name, project_dir)
+    import paperkit.project
+    cfg = paperkit.bib.load_config(project_dir)
+    units = paperkit.project.observe(cfg, genre_name, project_dir)
     return "".join(f"{u['section']}\t" + "\t".join(u["keys"]) + "\n" for u in units)
 
 

@@ -6,7 +6,7 @@ re-measured (pk_cmd runs the check, pk_grade_claim re-sweeps), here one sweep fe
 change re-runs only pk_calc; the readings are instant.  footaudit/emergence are the same shape.
 """
 
-load("//tools:cell.bzl", "cell_builds_env", "cell_pypath")
+load("//tools:cell.bzl", "cell_builds_env", "cell_module", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
@@ -202,7 +202,7 @@ def _calc_impl(ctx):
         command = cell_pypath(py) + cell_builds_env(ctx.files.builds) +
                   'export PAPERKIT_ROOT="$PWD" PAPERKIT_SCRATCH="${PWD}.pk-scratch"; PK_ACCT="$PWD/.pk-calc-account.$$"; ' +
                   _cap_prefix(ctx.file._cap.path, bucket) +
-                  '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
+                  '"$(command -v python3)" -m paperkit.discriminate --only ' + ctx.attr.claim +
                   " --calc" + res + " " + ctx.attr.project + " > " + c.path + ' 2>"$PK_ACCT"; rc=$?; ' +
                   'cat "$PK_ACCT" >&2; rm -f "$PK_ACCT"; rm -rf "$PAPERKIT_SCRATCH"; ' +
                   '[ "$rc" = 0 ] || echo "Ζ·account·calc: discriminate exited $rc for ' + ctx.attr.claim + '" >&2' +
@@ -254,7 +254,7 @@ def _mem_learn_impl(ctx):
     ctx.actions.run_shell(
         outputs = [out],
         inputs = depset([ctx.file._tool] + peaks, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path + " " +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) + " " +
                   " ".join([p.path for p in peaks]) + " > " + out.path,
         mnemonic = "PkMemLearn",
         progress_message = "Τ·mem·learn " + ctx.label.name,
@@ -282,7 +282,7 @@ def _mutate_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset(ctx.files.data, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" paperkit/mutate.py ' +
+        command = cell_pypath(py) + '"$(command -v python3)" -m paperkit.mutate ' +
                   ctx.attr.module + " '" + ctx.attr.site + "' > " + o.path,
         mnemonic = "PkMutate",
         progress_message = "Ζ·mutate " + ctx.label.name,
@@ -476,7 +476,7 @@ def _eval_impl(ctx):
         # other every ~2.8ms (kills ctx-switch AND, under zswap, the refault codec-CPU thrash).
         # Per-cell = thread-independent (the durable fix Phase 1's server-tune could not reach).
         # Ζ·cell·wire — the LAUNCHER is invoked directly.  It was
-        # `"$(command -v python3)" tools/eval.py`, which found an interpreter by hand precisely
+        # `"$(command -v python3)" -m tools.eval`, which found an interpreter by hand precisely
         # because a bare script has no launcher; a py_binary ships one that sets the interpreter
         # AND the import layout together.  The `sys.executable` requirement the old comment
         # records (the check re-spawns the projector as [sys.executable, …], and bare `python3`
@@ -555,7 +555,7 @@ def _sens_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset([ctx.file._tool, ctx.file.baseline] + ctx.files.evals, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " --baseline " + ctx.file.baseline.path + " " + evals + " > " + o.path,
         mnemonic = "PkSens",
         progress_message = "Ζ·sens " + ctx.label.name,
@@ -587,7 +587,7 @@ def _decisions_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset([ctx.file._tool] + ctx.files.flips + ctx.files.reach, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " --flips " + flips + " --reach " + reach + " > " + o.path,
         mnemonic = "PkDecisions",
         progress_message = "Μ·decisions " + ctx.label.name,
@@ -618,7 +618,7 @@ def _decisions_summary_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o],
         inputs = depset([ctx.file._tool] + ctx.files.decisions, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " --summary " + recs + " > " + o.path,
         mnemonic = "PkDecisionsSummary",
         progress_message = "Μ·decisions·summary " + ctx.label.name,
@@ -647,7 +647,7 @@ def _mutant_impl(ctx):
         outputs = [o],
         inputs = depset(ctx.files.data, transitive = [py.files]),
         command = cell_pypath(py) + 'export PAPERKIT_ROOT="$PWD" PAPERKIT_SCRATCH="${PWD}.pk-scratch"; ' +  # Ζ·scratch·per-action (see pk_calc)
-                  '"$(command -v python3)" paperkit/discriminate.py --only ' + ctx.attr.claim +
+                  '"$(command -v python3)" -m paperkit.discriminate --only ' + ctx.attr.claim +
                   " --mutant '" + ctx.attr.site + "' " + ctx.attr.project + " > " + o.path +
                   '; rm -rf "$PAPERKIT_SCRATCH"',
         mnemonic = "PkMutant",
@@ -678,7 +678,7 @@ def _cohere_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " cohere cohere " + ctx.attr.project + " " + v.path + " " + calcs,
         mnemonic = "PkCohere",
         progress_message = "Ζ·emerge·gate cohere " + ctx.label.name,
@@ -705,7 +705,7 @@ def _verdict_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool, calc], transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " calc verdict " + calc.path + " " + v.path,
         mnemonic = "PkVerdict",
         progress_message = "Ζ·calc verdict " + ctx.label.name,
@@ -733,7 +733,7 @@ def _canary_impl(ctx):
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset([ctx.file._tool, ctx.file.pos, ctx.file.nul], transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " canary " + ctx.file.pos.path + " " + ctx.file.nul.path + " " + v.path,
         mnemonic = "PkCanary",
         progress_message = "Ζ·canary " + ctx.label.name,
@@ -758,7 +758,7 @@ def _grade_impl(ctx):
     ctx.actions.run_shell(
         outputs = [g],
         inputs = depset([calc] + ctx.files.data, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" tools/read_grade.py ' + calc.path + " > " + g.path,
+        command = cell_pypath(py) + '"$(command -v python3)" -m tools.read_grade ' + calc.path + " > " + g.path,
         mnemonic = "PkGradeRead",
         progress_message = "Ζ·calc grade " + ctx.label.name,
     )

@@ -12,16 +12,14 @@ and a behaviorally-agreeing oracle share a GRADE but differ in corroboration.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_delta import discriminate
-from _fixture_model import entry
+import paperkit.tests._fixture_delta
+import paperkit.tests._fixture_model
 
 
 def grade(check):
-    _, out = discriminate([entry("w", claim="c", check=check)], "--all", "--json",
+    _, out = paperkit.tests._fixture_delta.discriminate([paperkit.tests._fixture_model.entry("w", claim="c", check=check)], "--all", "--json",
                           assets={"a.txt": "CANON\n"})
     return json.loads(out)[0]
 
@@ -71,20 +69,20 @@ def main() -> int:
     import shutil as _sh
     import tempfile as _tf
 
-    import resolver as _R
+    import paperkit.resolver
     _d = Path(_tf.mkdtemp())
     try:
         (_d / "a.txt").write_text("CANON\n")
         # two producers reading the SAME file — correlated, and the file is named
-        v = _R.corroboration_of("agree:cat a.txt ||| cat a.txt && true", _d, {})
+        v = paperkit.resolver.corroboration_of("agree:cat a.txt ||| cat a.txt && true", _d, {})
         check("two producers reading one file are CORRELATED, and the shared read is NAMED",
               v is not None and v[0] == "correlated" and "a.txt" in v[1])
         # δ: the second producer reads NOTHING — the only change, and the verdict flips
-        v2 = _R.corroboration_of("agree:cat a.txt ||| printf CANON", _d, {})
+        v2 = paperkit.resolver.corroboration_of("agree:cat a.txt ||| printf CANON", _d, {})
         check("δ: a producer that reads nothing shared ⇒ INDEPENDENT, certified not assumed",
               v2 is not None and v2[0] == "independent" and v2[1] == [])
         check("a non-agree check has no producers to partition ⇒ None, never a verdict",
-              _R.corroboration_of("cmd:true", _d, {}) is None)
+              paperkit.resolver.corroboration_of("cmd:true", _d, {}) is None)
     finally:
         _sh.rmtree(_d, ignore_errors=True)
 

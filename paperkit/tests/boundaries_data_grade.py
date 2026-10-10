@@ -18,14 +18,12 @@ breached:
 """
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ENGINE))
 
-import grader
+import paperkit.grader
 
 _MOD = 'SCOPE = {"x": "full", "y": "fragment", "z": "full"}\ndef s(k):\n    return SCOPE[k]\n'
 
@@ -36,7 +34,7 @@ def _sens_of(check_src):
         (p / "m.py").write_text(_MOD)
         (p / "check.py").write_text(check_src)
         chk = "cmd:python3 check.py"
-        _b, sens = grader.sensitivity(chk, p, {}, engine_dir=p)
+        _b, sens = paperkit.grader.sensitivity(chk, p, {}, engine_dir=p)
         return sens
 
 
@@ -46,8 +44,8 @@ def _decisions_of(check_src):
         (p / "m.py").write_text(_MOD)
         (p / "check.py").write_text(check_src)
         chk = "cmd:python3 check.py"
-        _b, sens = grader.sensitivity(chk, p, {}, engine_dir=p)
-        return [u for u in grader.decisions_unasserted(chk, p, {}, p, sens) if "dflip:" in u]
+        _b, sens = paperkit.grader.sensitivity(chk, p, {}, engine_dir=p)
+        return [u for u in paperkit.grader.decisions_unasserted(chk, p, {}, p, sens) if "dflip:" in u]
 
 
 def main() -> int:
@@ -71,21 +69,21 @@ def main() -> int:
           not any("::data-:SCOPE#1" in x for x in data_sens))
 
     # ── the DflipSite structural bar ─────────────────────────────────────────────────────────────
-    ds = grader.DflipSite(file=Path("x.py"), qualname="D", n=0, kind="dict", label="x.py::dflip:D#0")
+    ds = paperkit.grader.DflipSite(file=Path("x.py"), qualname="D", n=0, kind="dict", label="x.py::dflip:D#0")
     try:
-        grader._apply("cmd:x", Path(), {}, [ds])
+        paperkit.grader._apply("cmd:x", Path(), {}, [ds])
         barred = False
     except (ValueError, TypeError):
         barred = True                                    # 5 fields vs the sweep's `f, node, _ =`
     check("a DflipSite handed to _apply FAILS structurally (the value-perturb bar)", barred)
     check("a DflipSite is a distinct 5-field type, not a (file, node, label) triple",
-          len(grader.DflipSite._fields) == 5 and "node" not in grader.DflipSite._fields)
+          len(paperkit.grader.DflipSite._fields) == 5 and "node" not in paperkit.grader.DflipSite._fields)
     # a dflip: label is never in _sites (the sweep surface); only _dflip_sites_of yields it.
     with tempfile.TemporaryDirectory() as d:
         p = Path(d)
         (p / "m.py").write_text(_MOD)
-        site_labels = [x[2] for x in grader._sites(p, p)]
-        dflip_labels = [x.label for x in grader._dflip_sites_of(p, p)]
+        site_labels = [x[2] for x in paperkit.grader._sites(p, p)]
+        dflip_labels = [x.label for x in paperkit.grader._dflip_sites_of(p, p)]
     check("no dflip: label appears in _sites (the sweep never sees a value-perturb)",
           not any("::dflip:" in lbl for lbl in site_labels))
     check("data-: labels DO appear in _sites (the monotone drop is a swept site)",

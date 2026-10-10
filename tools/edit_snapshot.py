@@ -1042,8 +1042,8 @@ def require_explicit_mutation(label, argv=None, intent=None):
     try:
         _sys.path.insert(0, _os.path.join(
             _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "scripts"))
-        import ratchet as _r
-        _r.log_fallthrough(label, "unstated-mutation", known=("--apply", "--dry-run"),
+        import tools.ratchet
+        tools.ratchet.log_fallthrough(label, "unstated-mutation", known=("--apply", "--dry-run"),
                            argv=argv, exit_code=2)
     except Exception:
         pass

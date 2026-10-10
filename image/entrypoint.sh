@@ -6,6 +6,6 @@
 # cwd is /work (WORKDIR); the paper's checks resolve their siblings from there.
 case "${1:-gate}" in
   serve) exec python3 -m http.server "${2:-8000}" --directory /work --bind 0.0.0.0 ;;
-  gate)  exec python3 paperkit/gate.py --safe --without-K paper ;;
+  gate)  exec python3 -m paperkit.gate --safe --without-K paper ;;
   *)     exec "$@" ;;   # passthrough, for debugging
 esac

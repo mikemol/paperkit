@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
-import cpuweight as W
+import tools.cpuweight
 
 _fails = []
 
@@ -33,7 +33,7 @@ def main() -> int:
     print("CPUWEIGHT BOUNDARIES ⟨P, F, δ⟩")
 
     # ---- the reading (P): the box's contention signal is the runnable RATIO, not loadavg ----
-    ratio, blocked = W.runnable_ratio()
+    ratio, blocked = tools.cpuweight.runnable_ratio()
     check("P: runnable_ratio() reads a non-negative ratio and a blocked count",
           ratio >= 0 and blocked >= 0)
     check("P: the ratio is per-core (procs_running normalised by cpu_count)",
@@ -43,23 +43,23 @@ def main() -> int:
     # cgroup instead of the build's, throttling their terminal/editor while the build runs
     # unweighted.  The tool answers this by CONSTRUCTION -- it creates its own cgroup rather
     # than discovering one -- so the arm asserts membership is exclusive, not merely likely.
-    self_cg = W._cgroup_of("self")
-    cg, why = W.build_cgroup("paperkit-boundaries-test.scope")
+    self_cg = tools.cpuweight._cgroup_of("self")
+    cg, why = tools.cpuweight.build_cgroup("paperkit-boundaries-test.scope")
     check("δ: build_cgroup() CREATES a cgroup (does not adopt the caller's)",
           cg is not None and cg != self_cg)
     if cg:
-        d = W.CGROUP_ROOT / cg.lstrip("/")
+        d = tools.cpuweight.CGROUP_ROOT / cg.lstrip("/")
         check("δ: the created cgroup is EMPTY — membership is by construction, not inspection",
               d.joinpath("cgroup.procs").read_text().strip() == "")
         check("δ: it exposes a writable cpu.weight (the `cpu` controller is delegated)",
-              W._writable_weight_file(cg) is not None)
+              tools.cpuweight._writable_weight_file(cg) is not None)
         # the caller's own cgroup must be untouched by any of this
         # ACTUALLY run apply() and confirm the caller's cgroup is untouched — the vacuous
         # version of this arm (guarded so it never ran) would pass against the very bug it
         # names, since a test that does not exercise the path cannot observe the damage.
-        self_f = W.CGROUP_ROOT / self_cg.lstrip("/") / "cpu.weight"
+        self_f = tools.cpuweight.CGROUP_ROOT / self_cg.lstrip("/") / "cpu.weight"
         before = self_f.read_text().strip()
-        build_f = W.CGROUP_ROOT / W.build_cgroup()[0].lstrip("/") / "cpu.weight"
+        build_f = tools.cpuweight.CGROUP_ROOT / tools.cpuweight.build_cgroup()[0].lstrip("/") / "cpu.weight"
         build_before = build_f.read_text().strip()
         # ⚑ Ζ·arm·sound — AN ABSENT PRECONDITION IS `cannot-run`, NOT `fail`.  This arm WRITES the
         # build cgroup's cpu.weight and asserts it reads back 37.  A sandboxed cell cannot write
@@ -76,7 +76,7 @@ def main() -> int:
                   "cannot both hold.  The property needs two DISTINCT cgroups to be measurable.")
             raise SystemExit(3)
         try:
-            W.apply(37)                               # default path: targets the BUILD's cgroup
+            tools.cpuweight.apply(37)                               # default path: targets the BUILD's cgroup
             _bw, _sw = build_f.read_text().strip(), self_f.read_text().strip()
             print(f"     [δ operands] build_f={build_f} -> {_bw!r} (want 37); "
                   f"self_f={self_f} -> {_sw!r} (want {before!r})")
@@ -94,26 +94,26 @@ def main() -> int:
     # ---- F: the lever is unreachable → a NO-OP with a named reason, never a failure ----
     d = Path(tempfile.mkdtemp())
     try:
-        real_root = W.CGROUP_ROOT
-        W.CGROUP_ROOT = d                       # an empty tree: no cpu.weight anywhere
-        changed, why = W.apply(20, pid="self")
+        real_root = tools.cpuweight.CGROUP_ROOT
+        tools.cpuweight.CGROUP_ROOT = d                       # an empty tree: no cpu.weight anywhere
+        changed, why = tools.cpuweight.apply(20, pid="self")
         check("F: cpu.weight absent → no change, and the reason NAMES the cgroup",
               changed is False and "not writable" in why)
         check("F: an unreachable lever still returns cleanly (a QoL knob never fails a build)",
               isinstance(changed, bool) and isinstance(why, str))
     finally:
-        W.CGROUP_ROOT = real_root
+        tools.cpuweight.CGROUP_ROOT = real_root
         import shutil
         shutil.rmtree(d, ignore_errors=True)
 
     # ---- F: a bogus pid has no cgroup → named no-op, not a traceback ----
-    changed, why = W.apply(20, pid=2 ** 30)
+    changed, why = tools.cpuweight.apply(20, pid=2 ** 30)
     check("F: a nonexistent pid → no change, reason names the missing cgroup entry",
           changed is False and "cgroup" in why)
 
     # ---- P: main() is best-effort — it returns 0 even when it cannot weight anything ----
     check("P: main() exits 0 even when the lever is unreachable (never fails a build)",
-          W.main(["--weight=20", "--report"]) == 0)
+          tools.cpuweight.main(["--weight=20", "--report"]) == 0)
 
     # ---- Ζ·cell·admit·server: the property that MATTERS is where the CELLS are ----
     # The earlier suite asked "was a cgroup created and joined", and that passed while every
@@ -122,9 +122,9 @@ def main() -> int:
     # terminal cgroup while `joined=True` was printed).  A success message about the action is
     # not evidence about the outcome.
     check("server: the servers that fork cells are enumerable",
-          isinstance(W.build_servers(), list))
-    cgv, _ = W.build_cgroup()
-    ok_v, why_v = W.verify(cgv) if cgv else (False, "no cgroup")
+          isinstance(tools.cpuweight.build_servers(), list))
+    cgv, _ = tools.cpuweight.build_cgroup()
+    ok_v, why_v = tools.cpuweight.verify(cgv) if cgv else (False, "no cgroup")
     check("server: verify() answers about CELLS, not about the cgroup's existence",
           isinstance(ok_v, bool) and ("cell" in why_v or "nothing to verify" in why_v))
     # F: the instrument must not COUNT ITSELF.  A /proc/*/cmdline substring test matches this
@@ -143,7 +143,7 @@ def main() -> int:
     # population changes under the test, and a `bash -c "... # marker"` decoy execs the marker
     # away before it is sampled).  A rule is a function; test it as one.
     argv_rule = lambda a, c: ("linux-sandbox" in a or "execroot/_main" in a)
-    comm_rule = lambda a, c: W.is_cell(c)          # the LIVE predicate, not a copy of it
+    comm_rule = lambda a, c: tools.cpuweight.is_cell(c)          # the LIVE predicate, not a copy of it
     #                     (argv,                                    comm)
     A_CELL = ("/x/linux-sandbox -W /tmp -- python3 check.py", "linux-sandbox")
     A_PROBE = ("pgrep -f linux-sandbox", "pgrep")
@@ -232,7 +232,7 @@ def main() -> int:
               b"linux-sandbox" in decoy_argv)
         check(f"F: the decoy's argv says linux-sandbox but its comm is {decoy_comm!r}, "
               "and is_cell() reads comm — so it is not a cell",
-              not W.is_cell(decoy_comm))
+              not tools.cpuweight.is_cell(decoy_comm))
     finally:
         os.close(_w)          # EOF -> the child exits; its lifetime ended by US, not by a timer
         decoy.wait(timeout=5)   # rc is incidental — cat fails on the sentinel, which is argv, not a file

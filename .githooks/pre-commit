@@ -43,7 +43,7 @@ unset _pk_path _pk_ifs _pk_d
 # tools/project_endpoints.py projects .bazelrc from), at the moment of use.  An operator's explicit
 # setting still WINS — local.env is theirs — and this is only the fallback when it is unset.  The
 # query failing leaves it empty, which the push below already treats as "no sink" (never fatal).
-: "${PAPERKIT_LOGS_URL:=$("$PY" tools/project_endpoints.py --get victorialogs-http /insert/jsonline 2>/dev/null || true)}"
+: "${PAPERKIT_LOGS_URL:=$("$PY" -m tools.project_endpoints --get victorialogs-http /insert/jsonline 2>/dev/null || true)}"
 # W44 — a best-effort step that FAILS says so.  `|| true` is what hid a killed otlp_push (a whole-file
 # read of a 139 GB log, the likely trigger of a host-wide OOM): the log went from `[killed]` straight
 # to `ok: bazel test //:hook`.  Still never fatal — telemetry must not block a commit — but LOUD.
@@ -93,7 +93,7 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
 # any path outside the allowlist (cotype/ — bazel-invisible AND index-gated by its own check
 # below).  Refusal is instant, BEFORE any build cost, and NAMES the paths;
 # PK_HOOK_ALLOW_DIRTY=1 downgrades it to a loud advisory for a deliberate split commit.
-run "hook-index (worktree ≡ index)"   "$PY" tools/hook_index.py
+run "hook-index (worktree ≡ index)"   "$PY" -m tools.hook_index
 
 # Η·hook·grid (H3) — //:hook's member list is a per-project x per-kind GRID that tools/bibtex.bzl
 # already knows and that is transcribed BY HAND into BUILD.bazel, in a file the generator cannot
@@ -107,7 +107,7 @@ run "hook-index (worktree ≡ index)"   "$PY" tools/hook_index.py
 # is what makes bnd-check's completeness proof sound: it compares two INDEPENDENT textual sources,
 # and generating the list would let the audited graph supply its own audit ([[instrument-vs-gate]]).
 # Cheap and text-only, so it lands here beside hook-index — before any build cost.
-run "hook-grid (//:hook ≡ MODULE)"    "$PY" tools/hook_grid.py
+run "hook-grid (//:hook ≡ MODULE)"    "$PY" -m tools.hook_grid
 
 # Ζ·cell·admit — the grid's CPU share is governed by ONE lever: a proportional cpu.weight on the
 # build's own cgroup (set below, next to the RAM budget).  The per-cell SCHED_BATCH + nice 19 +
@@ -233,10 +233,10 @@ PK_T0=$(date +%s)
 for _p in library paper .; do
   _j="${_p%/}/mem.json"; [ "$_p" = "." ] && _j="mem.json"
   [ -f "$_j" ] && [ -f mem.sqlite ] && \
-    "$PY" tools/mem_project.py mem.sqlite "$([ "$_p" = "." ] && echo root || echo "$_p")" "$_j" --check \
+    "$PY" -m tools.mem_project mem.sqlite "$([ "$_p" = "." ] && echo root || echo "$_p")" "$_j" --check \
     || true
 done
-PK_SWEEP_RAM=$("$PY" tools/sweep_budget.py)
+PK_SWEEP_RAM=$("$PY" -m tools.sweep_budget)
 # Ζ·cell·admit — the sweep budget above bounds RAM; nothing bounded CPU SHARE.  Bazel's scheduler
 # sees only its own actions, so a concurrent build in ANOTHER repo is invisible to it and the two
 # oversubscribe together (measured: 4.7-5.4 runnable/core on 10 cores with procs_blocked=0 — pure
@@ -276,7 +276,7 @@ PK_COORDLOG="$PK_TMPDIR/pk-coord-$$.jsonl"   # Ζ·execlog·leak — was ${TMPDI
                                              # happy one); the trap owns it now.
 ( _cpid=$(bazel info server_pid 2>/dev/null | tail -1)
   case "$_cpid" in ''|*[!0-9]*) : ;; *)
-    "$PY" tools/coord_sample.py "$_cpid" "$PK_COORDLOG" --interval=1 >/dev/null 2>&1 &
+    "$PY" -m tools.coord_sample "$_cpid" "$PK_COORDLOG" --interval=1 >/dev/null 2>&1 &
     echo $! > "$PK_COORDLOG.pid" ;; esac ) || true
 # ⚑ Ζ·execlog·drop — NO EXECUTION LOG.  This line passed --execution_log_json_file for otlp_push
 # and logs_push, and MEASURED 2026-09-25 on luthen it was the most expensive thing the hook did:
@@ -291,7 +291,7 @@ PK_COORDLOG="$PK_TMPDIR/pk-coord-$$.jsonl"   # Ζ·execlog·leak — was ${TMPDI
 # input manifest, which telemetry never reads.  Operator: "we don't need the log."  Metrics now
 # come from BuildBuddy's records as bounded aggregates (W44); if a full log is ever wanted, it goes
 # to a btrfs-on-zram target with bees on top, retained as that store needs — never md0.
-"$PY" tools/cpuweight.py --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
+"$PY" -m tools.cpuweight --weight="${PAPERKIT_CPU_WEIGHT:-20}" \
     --exec bazel test //:hook --config=mutant --config=remote \
     --local_resources=memory="$PK_SWEEP_RAM" > "$PK_HOOKLOG" 2>&1
 PK_HOOK_RC=$?
@@ -312,13 +312,13 @@ PK_SECS=$(( $(date +%s) - PK_T0 ))
 # crossed the first time (making mem_learn DEPEND on the cells was measured at 41,468 deps).
 # Runs on RED as well as green: a failed build still measured whatever cells it got through.
 for _p in library paper .; do
-  _pk_best_effort "mem_harvest $_p" "$PY" tools/mem_harvest.py "$_p" --run "${PK_T0}-$$"
+  _pk_best_effort "mem_harvest $_p" "$PY" -m tools.mem_harvest "$_p" --run "${PK_T0}-$$"
 done
 
 if [ -n "${PAPERKIT_LOGS_URL:-}" ]; then
   # Findings only: the spawn timeline came from the execution log (Ζ·execlog·drop); the live
   # per-action stream is BES and BuildBuddy's execution records.
-  _pk_best_effort "logs_push" "$PY" tools/logs_push.py "$PK_HOOKLOG" --rc "$PK_HOOK_RC" \
+  _pk_best_effort "logs_push" "$PY" -m tools.logs_push "$PK_HOOKLOG" --rc "$PK_HOOK_RC" \
       --seconds "$PK_SECS" --run-id "${PK_T0}-$$"
 fi
 # Ζ·execlog·leak — the `rm -f "$PK_EXECLOG" "$PK_HOOKLOG"` that stood here is GONE, and its
@@ -365,7 +365,7 @@ echo "[pre-commit] ok: bazel test //:hook"
 # remediation ("add X to the claim's `reads` field") instead of a cryptic sandbox file-not-found —
 # or, as with bnd-prove's nonzero-F-arm, a red the hook MASKS.  Sound by construction: the audit's
 # coverage model (own ∪ engine ∪ declared-filegroups ∪ imports) is gated by bnd-otlp-adjacent tests.
-run "footprint audit (reads ⊇ Φ)"   "$PY" paperkit/footdeps.py
+run "footprint audit (reads ⊇ Φ)"   "$PY" -m paperkit.footdeps
 
 # Σ·cotype — cotype-monotone: ledger entry keys never vanish (append-only, retirement-logged).
 # A commit-DELTA property: its truth-maker is HEAD's ledger vs the STAGED one, which only this

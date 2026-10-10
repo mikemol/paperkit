@@ -24,9 +24,7 @@ from pathlib import Path
 # the engine beside the paper (the normal gate path).
 ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or Path(__file__).resolve().parents[2] / "paperkit")
 PAPER_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ENGINE))
-sys.path.insert(0, str(ENGINE / "tests"))
-from _fixture_model import entry  # noqa: E402  (the validated fixture kernel — counter-fixtures;
+from paperkit.tests._fixture_model import entry  # noqa: E402  (the validated fixture kernel — counter-fixtures;
 #   capability helpers are imported FUNCTION-LOCALLY per witness, so closure.py's BASE stays model-only)
 
 def _src(name):
@@ -38,13 +36,13 @@ def _src(name):
 
 
 def _parse(bib_text):
-    import project as P
+    import paperkit.project
     """Parse one .bib through the real engine parser; return its record fields."""
     d = tempfile.mkdtemp()
     try:
         p = Path(d) / "t.bib"
         p.write_text(bib_text)
-        return P.entries(p)
+        return paperkit.bib.parse(p)
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -52,35 +50,35 @@ def _parse(bib_text):
 def agree_builtin():
     # agree CONCURS — ≥2 independent producers (split on |||) must all exit 0 and emit
     # IDENTICAL output; agreement across implementations rules out a shared bug.
-    import gate
-    assert gate.resolves("agree:printf 42 ||| printf 42", ENGINE, {}).passed, "agree: of two concurring producers failed"
-    assert not gate.resolves("agree:printf 42 ||| printf 43", ENGINE, {}).passed, "agree: of two disagreeing producers passed"
-    assert not gate.resolves("agree:printf 42", ENGINE, {}).passed, "agree: with a single producer (no independence) passed"
-    assert not gate.resolves("agree:printf 42 ||| false", ENGINE, {}).passed, "agree: tolerated a producer that failed"
+    import paperkit.gate
+    assert paperkit.resolver.resolves("agree:printf 42 ||| printf 42", ENGINE, {}).passed, "agree: of two concurring producers failed"
+    assert not paperkit.resolver.resolves("agree:printf 42 ||| printf 43", ENGINE, {}).passed, "agree: of two disagreeing producers passed"
+    assert not paperkit.resolver.resolves("agree:printf 42", ENGINE, {}).passed, "agree: with a single producer (no independence) passed"
+    assert not paperkit.resolver.resolves("agree:printf 42 ||| false", ENGINE, {}).passed, "agree: tolerated a producer that failed"
 
 
 def result_builtin():
     # result PARSES a sibling project's machine-readable gate verdict (gate --json): a
     # green sibling resolves True, a red one False — composition, not re-derivation.
-    import gate
-    import project as P
+    import paperkit.gate
+    import paperkit.project
     d = Path(tempfile.mkdtemp())
     try:
         sib = d / "g"
         sib.mkdir()
 
         def write(check):
-            import project as P
+            import paperkit.project
             (sib / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
                                             'rubric = "r.tsv"\nout = "out.md"\n')
             (sib / "r.tsv").write_text("s\tSec\n")
             (sib / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {%s}\n}\n" % check)
-            (sib / "out.md").write_text(P.project(P.load_config(sib)))
+            (sib / "out.md").write_text(paperkit.project.project(paperkit.bib.load_config(sib)))
 
         write("cmd:true")
-        assert gate.resolves("result:g", d, {}).passed, "result: did not PARSE a green sibling's verdict as pass"
+        assert paperkit.resolver.resolves("result:g", d, {}).passed, "result: did not PARSE a green sibling's verdict as pass"
         write("cmd:false")
-        assert not gate.resolves("result:g", d, {}).passed, "result: did not PARSE a red sibling's verdict as fail"
+        assert not paperkit.resolver.resolves("result:g", d, {}).passed, "result: did not PARSE a red sibling's verdict as fail"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -89,15 +87,15 @@ def dataset_backed():
     # "a custom verifier may interpret a dataset the project SHIPS … a single edit can
     # falsify" — a check whose command reads a project file resolves true while the file
     # matches and flips false on a one-line edit to that shipped dataset.
-    import gate
+    import paperkit.gate
     d = Path(tempfile.mkdtemp())
     try:
         custom = {"data": {"cmd": "python3 -c \"import json,sys; "
                                   "sys.exit(0 if json.load(open('d.json'))['k']=='ok' else 1)\""}}
         (d / "d.json").write_text('{"k": "ok"}')
-        assert gate.resolves("data:x", d, custom).passed, "a dataset-backed check over matching data must resolve"
+        assert paperkit.resolver.resolves("data:x", d, custom).passed, "a dataset-backed check over matching data must resolve"
         (d / "d.json").write_text('{"k": "drift"}')
-        assert not gate.resolves("data:x", d, custom).passed, "a single edit to the shipped dataset must flip the verdict"
+        assert not paperkit.resolver.resolves("data:x", d, custom).passed, "a single edit to the shipped dataset must flip the verdict"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -106,7 +104,7 @@ def dataset_fresh():
     # "the verifier re-runs the producer … and fails on drift" — fresh-by-construction:
     # a check that regenerates via the producer and compares passes on a matching
     # committed asset and fails once that asset drifts from what the producer yields.
-    import gate
+    import paperkit.gate
     d = Path(tempfile.mkdtemp())
     try:
         # a fresh: check REGENERATES via its producer and compares to the committed asset — the
@@ -116,25 +114,25 @@ def dataset_fresh():
         (d / "producer.sh").write_text("echo CANON-V1\n")
         custom = {"fresh": {"cmd": 'test "$(cat asset.txt)" = "$(sh producer.sh)"'}}
         (d / "asset.txt").write_text("CANON-V1\n")
-        assert gate.resolves("fresh:x", d, custom).passed, "a committed asset matching its producer must pass"
+        assert paperkit.resolver.resolves("fresh:x", d, custom).passed, "a committed asset matching its producer must pass"
         (d / "asset.txt").write_text("STALE\n")
-        assert not gate.resolves("fresh:x", d, custom).passed, "an asset drifted from its producer must fail"
+        assert not paperkit.resolver.resolves("fresh:x", d, custom).passed, "an asset drifted from its producer must fail"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
 
 def file_builtin():
     # "file, that an artifact exists"
-    import gate
-    assert gate.resolves("file:gate.py", ENGINE, {}).passed, "file: of an existing path failed"
-    assert not gate.resolves("file:does-not-exist.xyz", ENGINE, {}).passed, "file: of a missing path passed"
+    import paperkit.gate
+    assert paperkit.resolver.resolves("file:gate.py", ENGINE, {}).passed, "file: of an existing path failed"
+    assert not paperkit.resolver.resolves("file:does-not-exist.xyz", ENGINE, {}).passed, "file: of a missing path passed"
 
 
 def cmd_builtin():
     # "cmd, that a script exits zero"
-    import gate
-    assert gate.resolves("cmd:true", ENGINE, {}).passed, "cmd:true did not pass"
-    assert not gate.resolves("cmd:false", ENGINE, {}).passed, "cmd:false did not fail"
+    import paperkit.gate
+    assert paperkit.resolver.resolves("cmd:true", ENGINE, {}).passed, "cmd:true did not pass"
+    assert not paperkit.resolver.resolves("cmd:false", ENGINE, {}).passed, "cmd:false did not fail"
 
 
 # ── engine section ───────────────────────────────────────────────────────────
@@ -147,8 +145,8 @@ def prose_is_artifact():
 
 
 def edit_cant_survive():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_gate import gate
+    from paperkit.tests._fixture_project import project_text
     # "a hand-edit cannot survive a build" — only the exact projection passes the gate
     w = [entry("x", claim="anchored")]
     canonical = project_text(w)
@@ -184,7 +182,7 @@ def record_is_bibentry():
 
 
 def prose_projected():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # "the prose is projected, not authored" — the prose tracks the warrants
     a = project_text([entry("x", claim="zzfirst wording")]).lower()
     b = project_text([entry("x", claim="zzsecond wording")]).lower()
@@ -193,7 +191,7 @@ def prose_projected():
 
 
 def ordered_by_deps():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # "within each section the claims are ordered by their dependency edges"
     t = project_text([entry("b", claim="zzbeta", frm="a"),
                       entry("a", claim="zzalpha")]).lower()
@@ -201,7 +199,7 @@ def ordered_by_deps():
 
 
 def joined_by_glue():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # "joined by connective glue" — an explicit glue connector is woven between edges
     t = project_text([entry("a", claim="zzalpha"),
                       entry("b", claim="zzbeta", frm="a", glue="BECAUSE")]).lower()
@@ -209,7 +207,7 @@ def joined_by_glue():
 
 
 def deterministic():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # "the same warrant set always giving the same document"
     w1 = [entry("a", claim="zzalpha")]
     w2 = [entry("a", claim="zzomega")]
@@ -228,18 +226,18 @@ def node_is_claim():
 
 def claims_are_warrants():
     # this paper's claims ARE its warrants: warrants.bib parses to the cited claim records
-    import project as P
+    import paperkit.project
     recs = {}                                             # bib-list-aware: claims may be authored across modules
-    cfg = P.load_config(PAPER_DIR)
+    cfg = paperkit.bib.load_config(PAPER_DIR)
     for b in cfg["bibs"]:
-        recs.update(P.entries(b, cfg["consumer_fields"]))  # thread the project's declared consumer_fields
+        recs.update(paperkit.bib.parse(b, cfg["consumer_fields"]))  # thread the project's declared consumer_fields
     assert recs.get("paper-is-projection", {}).get("claim"), "the paper's claims are not its warrants"
 
 
 # ── Π·selfhost: the drift-caught negative-assertions, as Φ counter-fixtures ───
 def paperkit_on_paperkit():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_gate import gate
+    from paperkit.tests._fixture_project import project_text
     # run paperkit on paperkit: project a fixture, confirm the gate ACCEPTS the
     # faithful projection and REJECTS a drift of it
     w = [entry("x", claim="self applied")]
@@ -249,8 +247,8 @@ def paperkit_on_paperkit():
 
 
 def one_green_check():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_gate import gate
+    from paperkit.tests._fixture_project import project_text
     # the document's correctness and the tool's are ONE green check: a single gate
     # invocation verifies the projection (document) AND runs the verifier (tool) —
     # breaking either side fails the same gate
@@ -265,8 +263,8 @@ def one_green_check():
 # ── Π·distinct-witnesses: split the shared projection-stable group (--without-K) ──
 def paper_is_paperkit():
     # this paper is itself a paperkit project: a well-formed config projecting to paper.md
-    import project as P
-    cfg = P.load_config(PAPER_DIR)
+    import paperkit.project
+    cfg = paperkit.bib.load_config(PAPER_DIR)
     assert (PAPER_DIR / "paper.toml").exists() and cfg["bibs"] and cfg["rubric"].exists(), \
         "the paper is not a well-formed paperkit project"
     assert cfg["out"].name == "paper.md", "the paper does not project to paper.md"
@@ -274,18 +272,18 @@ def paper_is_paperkit():
 
 def prose_is_projection():
     # the paper's prose IS the projection of its warrants
-    import project as P
-    cfg = P.load_config(PAPER_DIR)
-    assert P.project(cfg) == cfg["out"].read_text(), "paper.md is not the projection of its warrants"
+    import paperkit.project
+    cfg = paperkit.bib.load_config(PAPER_DIR)
+    assert paperkit.project.project(cfg) == cfg["out"].read_text(), "paper.md is not the projection of its warrants"
 
 
 def closes_gap():
     # closes the say/check gap: every claim in the ledger carries a verifier
-    import project as P
+    import paperkit.project
     F = {}                                                # bib-list-aware: claims may be authored across modules
-    cfg = P.load_config(PAPER_DIR)
+    cfg = paperkit.bib.load_config(PAPER_DIR)
     for b in cfg["bibs"]:
-        F.update(P.entries(b, cfg["consumer_fields"]))    # thread the project's declared consumer_fields
+        F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))    # thread the project's declared consumer_fields
     # an entry with an `author` is an external reference (resolves by being defined), not an
     # assertion the paper makes — only the paper's OWN claims owe a verifier.
     missing = [k for k, f in F.items()
@@ -294,8 +292,8 @@ def closes_gap():
 
 
 def unverified_cant_ship():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_gate import gate
+    from paperkit.tests._fixture_project import project_text
     # an unverified sentence cannot ship: one failing verifier blocks the whole document
     w = [entry("a", claim="verified", check="cmd:true"),
          entry("b", claim="unverified", frm="a", check="cmd:false")]
@@ -303,8 +301,8 @@ def unverified_cant_ship():
 
 
 def not_project():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_gate import gate
+    from paperkit.tests._fixture_project import project_text
     # ...because it does not project: only the exact projection ships
     w = [entry("x", claim="canonical")]
     good = project_text(w)
@@ -314,7 +312,7 @@ def not_project():
 
 # ── edges: the three dependency graphs (from / rests-on / move) ───────────────
 def edge_from_orders():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # `from` fixes prose order — a claim is projected only AFTER the claims it lists,
     # so document order is a topological sort of the from-graph (keys given scrambled)
     t = project_text([entry("c", claim="gamma", frm="b"),
@@ -328,8 +326,8 @@ def edge_chiral():
     # grounding is independent of prose adjacency: rests-on clamps even when the premise is NOT a
     # from-neighbor (the two graphs diverge / reverse).  Π — tests the CLAMP (grade.clamp) over
     # known grades: the thesis grounds on `atom` but is a prose-neighbor of `mid`, yet clamps to atom.
-    import grade
-    recs = grade.clamp([
+    import paperkit.grade
+    recs = paperkit.grade.clamp([
         {"key": "atom", "grade": "vacuous", "rests-on": []},
         {"key": "mid", "grade": "behavioral", "rests-on": []},               # the prose neighbor
         {"key": "thesis", "grade": "behavioral", "from": ["mid"], "rests-on": ["atom"]},
@@ -344,17 +342,17 @@ def edge_chiral():
 def edge_move_types():
     # the `move` field names a typed relation; its KIND decides its role, and a
     # section's scheme admits only certain kinds
-    import rhetoric
-    assert rhetoric.kind_of("consequence") == "entail", "consequence is not an entail move"
-    assert rhetoric.kind_of("antithesis") == "turn", "antithesis is not a turn move"
-    ok = rhetoric.check_scheme("ladder", ["a", "b"], ["consequence"])
-    bad = rhetoric.check_scheme("ladder", ["a", "b"], ["antithesis"])
+    import paperkit.rhetoric
+    assert paperkit.rhetoric.kind_of("consequence") == "entail", "consequence is not an entail move"
+    assert paperkit.rhetoric.kind_of("antithesis") == "turn", "antithesis is not a turn move"
+    ok = paperkit.rhetoric.check_scheme("ladder", ["a", "b"], ["consequence"])
+    bad = paperkit.rhetoric.check_scheme("ladder", ["a", "b"], ["antithesis"])
     assert ok == [] and bad, "a ladder must admit consequence (entail) and reject antithesis (turn)"
 
 
 # ── projection: the projector's mechanics ────────────────────────────────────
 def weave_sentence():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # a section's claims weave into ONE paragraph: first clause capitalized, each
     # carries its own citation tag, the rest attach inline (not one bullet per claim)
     t = project_text([entry("a", claim="alpha beat"),
@@ -365,7 +363,7 @@ def weave_sentence():
 
 
 def connector_resolution():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # the connector between adjacent clauses resolves by priority: an explicit `join`
     # overrides a `move`'s default connector
     won = project_text([entry("a", claim="alpha"),
@@ -378,7 +376,7 @@ def connector_resolution():
 
 
 def emit_placement():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # an `emit` warrant is placed VERBATIM (not woven), fenced by the asset's
     # extension; an image asset is placed as a markdown image instead
     code = project_text([entry("e", claim="example", emit="ex.sh")],
@@ -390,7 +388,7 @@ def emit_placement():
 
 
 def config_flags():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # projection structure is configured, not hard-coded: `numbered` toggles section
     # numbers, `references` toggles the bibliography heading
     on = project_text([entry("a", claim="x")], numbered=True, references=True)
@@ -400,7 +398,7 @@ def config_flags():
 
 
 def latex_clean():
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_project import project_text
     # claim text is normalized on the way out: --- → em-dash, an inter-word -- →
     # en-dash, LaTeX escapes resolved, braces stripped, trailing period dropped
     t = project_text([entry("a", claim=r"alpha --- beta, a\_b, and x--y")]).lower()
@@ -411,7 +409,7 @@ def latex_clean():
 
 # ── gate: resolution and the strict modes ────────────────────────────────────
 def resolve_passes():
-    from _fixture_gate import gate
+    from paperkit.tests._fixture_gate import gate
     # RESOLVE: a cited claim whose check FAILS blocks the gate (the verdict is the
     # conjunction of every cited claim's check)
     assert gate([entry("c", claim="present", check="cmd:true")])[0] == 0, \
@@ -421,7 +419,7 @@ def resolve_passes():
 
 
 def safe_rejects_postulates():
-    from _fixture_gate import gate
+    from paperkit.tests._fixture_gate import gate
     # --safe: an uncited placement (a block no prose cites) is a postulate — advised
     # against by default, REJECTED under --safe
     w = [entry("p", claim="cited prose", check="cmd:true"),
@@ -431,7 +429,7 @@ def safe_rejects_postulates():
 
 
 def without_k_distinct():
-    from _fixture_gate import gate
+    from paperkit.tests._fixture_gate import gate
     # --without-K: two cited claims sharing ONE witness collapse (proof-irrelevance,
     # Axiom K); the flag forbids it, demanding a distinct witness per claim
     shared = [entry("a", claim="alpha", check="cmd:true"),
@@ -444,7 +442,7 @@ def without_k_distinct():
 
 
 def jobs_parallel():
-    from _fixture_gate import gate
+    from paperkit.tests._fixture_gate import gate
     # --jobs: checks resolve concurrently (default all cores) and the verdict is
     # independent of the worker count — parallel ≡ serial
     ok = [entry("a", claim="alpha", check="cmd:true"),
@@ -461,7 +459,7 @@ def jobs_parallel():
 # byte-for-byte this module's old grade_ladder(), so the concept is now authored, graded, and proved
 # ONCE, and this view inherits the owner's engine fingerprint rather than re-deriving it.
 def mutation_probes():
-    from _fixture_delta import discriminate
+    from paperkit.tests._fixture_delta import discriminate
     # the grade is empirical: Δ corrupts each input and sees if the check flips from
     # pass to fail; the inputs whose corruption flips it are its sensitivity set
     recs = json.loads(discriminate(
@@ -475,16 +473,16 @@ def mutation_probes():
 def content_cache():
     # a Δ grade is cached PER CHECK on its READ footprint (the files it opens), over the
     # content key as the coarse soundness basis: a grade is a pure function of that content.
-    import discriminate
-    import resolver
+    import paperkit.discriminate
+    import paperkit.resolver
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text('[paper]\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n')
         (d / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:grep -q ZZZ w.bib}\n}\n")
         (d / "r.tsv").write_text("s\tSec\n")
         # basis: content_key is stable, and moves when an input changes (a pure content hash — no strace)
-        k1 = discriminate.content_key(d)
-        assert k1 == discriminate.content_key(d), "content key not stable for unchanged inputs"
+        k1 = paperkit.cache.content_key(d)
+        assert k1 == paperkit.cache.content_key(d), "content key not stable for unchanged inputs"
         # refinement: the per-check cache key is the check's READ footprint — a SUBSET of content, so an
         # unread file is not in it (the cache will not over-invalidate).  Φ·spawn·foot: test the footprint
         # PARSE over the check's trace (reads w.bib only) hermetically; the strace CAPTURE is
@@ -492,11 +490,11 @@ def content_cache():
         (d / "data.txt").write_text("unread by the check\n")
         trace = ('openat(AT_FDCWD, "/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = 3\n'
                  'openat(AT_FDCWD, "w.bib", O_RDONLY) = 3\n')
-        fp = resolver.parse_reads(trace, d, d)
+        fp = paperkit.resolver.parse_reads(trace, d, d)
         assert fp == ["w.bib"], f"footprint is not exactly the file the check reads: {fp}"
         assert "data.txt" not in fp, "an unread file entered the footprint — the cache would over-invalidate"
         (d / "w.bib").write_text((d / "w.bib").read_text() + "\n% changed\n")
-        assert discriminate.content_key(d) != k1, "content key did not change when an input changed"
+        assert paperkit.cache.content_key(d) != k1, "content key did not change when an input changed"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -505,8 +503,8 @@ def footprint_scopes():
     # Δ traces each check's READ footprint (the files it opens), a SUPERSET of its
     # sensitivity set, so the footprint SCOPES the sweep — each check graded against what
     # it reads, not the whole repo.  An unread file is in neither the footprint nor the flip-set.
-    import grader
-    import resolver
+    import paperkit.grader
+    import paperkit.resolver
     d = Path(tempfile.mkdtemp())
     try:
         (d / "a.txt").write_text("FOO\n")
@@ -521,9 +519,9 @@ def footprint_scopes():
                  'openat(AT_FDCWD, "a.txt", O_RDONLY) = 3\n'
                  'openat(AT_FDCWD, "nope.txt", O_RDONLY) = -1 ENOENT (No such file or directory)\n'
                  'openat(AT_FDCWD, "out.md", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 4\n')
-        fp = resolver.parse_reads(trace, d, d)
+        fp = paperkit.resolver.parse_reads(trace, d, d)
         assert fp == ["a.txt"], f"footprint should be the one read file: {fp}"
-        baseline, sens = grader.sensitivity(chk, d, {}, None, footprint=fp)
+        baseline, sens = paperkit.grader.sensitivity(chk, d, {}, None, footprint=fp)
         assert baseline and set(sens) <= set(fp), f"sensitivity is not within the read footprint: {sens}"
         assert "b.txt" not in sens, "an unread file flipped the check"
     finally:
@@ -549,7 +547,7 @@ def module_split():
 
 
 def min_strength():
-    from _fixture_delta import discriminate
+    from paperkit.tests._fixture_delta import discriminate
     # --min-strength gates the grades: a project fails if any cited claim's check grades
     # BELOW the threshold — this is how the paper enforces its own proof-relevance
     strong = [entry("c", claim="c", check="cmd:grep -q TOKEN a.txt")]   # behavioral
@@ -563,14 +561,14 @@ def min_strength():
 def pump_parse_witness():
     # a slow check is structured as pump()/parse(): pump advances state one increment
     # (no verdict), parse reads done?/progress; the driver only loads → pump → serialize
-    import driver
+    import paperkit.driver
     class W:
         def initial(self): return {"c": 0}
         def pump(self, s): return {"c": s["c"] + 1}
         def parse(self, s): return {"done": s["c"] >= 3, "progress": f'{s["c"]}/3'}
         def serialize(self, s): return json.dumps(s)
         def deserialize(self, x): return json.loads(x)
-    meaning, steps, done = driver.drive(W())
+    meaning, steps, done = paperkit.driver.drive(W())
     assert done and steps == 3 and meaning["progress"] == "3/3", \
         f"the driver did not pump to completion (steps={steps}, {meaning})"
 
@@ -579,7 +577,7 @@ def resumable():
     # under a budget the driver stops short and persists its state (exit 2 = resume,
     # not failure); resuming from the token completes — a resumed run equals an
     # uninterrupted one
-    import driver
+    import paperkit.driver
     class W:
         def initial(self): return {"c": 0, "r": []}
         def pump(self, s): time.sleep(0.05); return {"c": s["c"] + 1, "r": s["r"] + [s["c"]]}
@@ -588,16 +586,16 @@ def resumable():
         def deserialize(self, x): return json.loads(x)
     sf = os.path.join(tempfile.mkdtemp(), "s.json")
     w = W()
-    _, _, done1 = driver.drive(w, state_path=sf, budget=0.06)     # budget bites before 4 pumps
+    _, _, done1 = paperkit.driver.drive(w, state_path=sf, budget=0.06)     # budget bites before 4 pumps
     assert not done1, "the budget did not stop the witness short"
-    m2, _, done2 = driver.drive(w, state_path=sf, budget=0.0)     # resume; 0 = run to completion
+    m2, _, done2 = paperkit.driver.drive(w, state_path=sf, budget=0.0)     # resume; 0 = run to completion
     assert done2 and m2["results"] == [0, 1, 2, 3], f"resume did not complete faithfully ({m2})"
 
 
 def roundtrip_obligation():
     # the one soundness obligation is deserialize(serialize(state)) == state; the driver
     # asserts it, so a witness whose serialization loses state is rejected
-    import driver
+    import paperkit.driver
     class Lossy:
         def initial(self): return {"c": 0, "keep": "x"}
         def pump(self, s): return {"c": s["c"] + 1, "keep": s["keep"]}
@@ -605,7 +603,7 @@ def roundtrip_obligation():
         def serialize(self, s): return json.dumps({"c": s["c"]})   # DROPS "keep"
         def deserialize(self, x): return json.loads(x)
     try:
-        driver.drive(Lossy())
+        paperkit.driver.drive(Lossy())
     except AssertionError:
         return
     raise AssertionError("the driver did not enforce the round-trip obligation")
@@ -615,30 +613,30 @@ def roundtrip_obligation():
 def prosody():
     # the clause-attachment layer is PROSODY, not glue: a typed move whose KIND and
     # default connector are a data-driven vocabulary (a new device is a new row)
-    import rhetoric
-    kinds = {rhetoric.kind_of(m) for m in rhetoric.MOVES}
+    import paperkit.rhetoric
+    kinds = {paperkit.rhetoric.kind_of(m) for m in paperkit.rhetoric.MOVES}
     assert {"entail", "extend", "turn", "parallel", "restate"} <= kinds, f"missing move kinds ({kinds})"
-    assert rhetoric.MOVES["consequence"][1] == "so ", "the consequence connector is not 'so '"
-    assert rhetoric.kind_of("not-a-move") is None, "an unknown move was given a kind"
+    assert paperkit.rhetoric.MOVES["consequence"][1] == "so ", "the consequence connector is not 'so '"
+    assert paperkit.rhetoric.kind_of("not-a-move") is None, "an unknown move was given a kind"
 
 
 def scheme_count():
     # a section's scheme constrains its claim COUNT (a period is one beat, a tricolon three)
-    import rhetoric
-    assert rhetoric.check_scheme("period", ["a", "b"], ["addition"]), "period must reject two claims"
-    assert rhetoric.check_scheme("tricolon", ["a", "b"], ["addition"]), "tricolon must reject two claims"
-    assert rhetoric.check_scheme("tricolon", ["a", "b", "c"], ["addition", "addition"]) == [], \
+    import paperkit.rhetoric
+    assert paperkit.rhetoric.check_scheme("period", ["a", "b"], ["addition"]), "period must reject two claims"
+    assert paperkit.rhetoric.check_scheme("tricolon", ["a", "b"], ["addition"]), "tricolon must reject two claims"
+    assert paperkit.rhetoric.check_scheme("tricolon", ["a", "b", "c"], ["addition", "addition"]) == [], \
         "tricolon must accept three parallel claims"
 
 
 def scheme_opt_in():
     # schemes are OPT-IN: only a section that declares one in the rubric's 3rd column is
     # checked; a two-column row is unconstrained
-    import rhetoric
+    import paperkit.rhetoric
     d = Path(tempfile.mkdtemp())
     try:
         (d / "r.tsv").write_text("a\tAlpha\nb\tBeta\tladder\n")     # only b declares a scheme
-        sch = rhetoric.schemes_from_rubric(d / "r.tsv")
+        sch = paperkit.rhetoric.schemes_from_rubric(d / "r.tsv")
         assert sch == {"b": "ladder"}, f"only a declaring section should carry a scheme ({sch})"
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -647,7 +645,7 @@ def scheme_opt_in():
 def form_gate():
     # rhetoric makes FORM checkable like content: a section that declares a scheme is
     # gated — analyze flags a violation when its realized moves break it, none when they honor it
-    import rhetoric
+    import paperkit.rhetoric
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text('[paper]\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n')
@@ -655,14 +653,14 @@ def form_gate():
         base = ("@misc{a,\n  section = {s},\n  claim = {alpha}\n}\n"
                 "@misc{b,\n  section = {s}, from = {a}, move = {%s},\n  claim = {beta}\n}\n")
         (d / "w.bib").write_text(base % "antithesis")             # a turn beat breaks the ladder
-        assert next(r[4] for r in rhetoric.analyze(d) if r[0] == "s"), "a turn beat should violate a ladder"
+        assert next(r[4] for r in paperkit.rhetoric.analyze(d) if r[0] == "s"), "a turn beat should violate a ladder"
         (d / "w.bib").write_text(base % "consequence")            # an entail beat honors it
-        assert next(r[4] for r in rhetoric.analyze(d) if r[0] == "s") == [], "an all-entail ladder should be clean"
+        assert next(r[4] for r in paperkit.rhetoric.analyze(d) if r[0] == "s") == [], "an all-entail ladder should be clean"
     finally:
         shutil.rmtree(d, ignore_errors=True)
     # and THIS paper practices it: the rhetoric section declares a scheme (rubric 3rd column)
     # and its realized moves honor it, so the declaration is load-bearing, not decorative.
-    rows = {r[0]: r for r in rhetoric.analyze(PAPER_DIR)}
+    rows = {r[0]: r for r in paperkit.rhetoric.analyze(PAPER_DIR)}
     assert "rhetoric" in rows, "the rhetoric section should declare a scheme (rubric 3rd column)"
     assert rows["rhetoric"][4] == [], f"the paper's own rhetoric section violates its scheme: {rows['rhetoric'][4]}"
 
@@ -671,13 +669,13 @@ def form_gate():
 def multi_project():
     # the repository is several paperkit projects — each a paper.toml directory that
     # projects a document — discovered by their paper.toml, not hard-coded
-    import project as P
+    import paperkit.project
     root = Path(__file__).resolve().parents[2]
     tomls = [p for p in root.rglob("paper.toml") if ".git" not in p.parts]
     assert len(tomls) >= 4, f"expected several projects, found {len(tomls)}"
     for d in (root / "paper", root / "boundaries"):
-        cfg = P.load_config(d)
-        assert P.project(cfg) == cfg["out"].read_text(), f"{cfg['out'].name} is not its own projection"
+        cfg = paperkit.bib.load_config(d)
+        assert paperkit.project.project(cfg) == cfg["out"].read_text(), f"{cfg['out'].name} is not its own projection"
 
 
 def project_dag():
@@ -701,37 +699,37 @@ def local_ci():
     # not the behaviour); the entailing witness is bnd-hook-index over the predicate's core.
     hook = (Path(__file__).resolve().parents[2] / ".githooks" / "pre-commit").read_text()
     assert "bazel test //:hook" in hook, "the pre-commit hook does not run `bazel test //:hook`"
-    assert "tools/hook_index.py" in hook, "the pre-commit hook does not verify worktree≡index (Ζ·hook·index)"
-    assert "paperkit/footdeps.py" in hook, "the pre-commit hook does not run the footprint audit (Ξ·dag·reads — declared reads ⊇ Φ·footprint)"
+    assert "-m tools.hook_index" in hook, "the pre-commit hook does not verify worktree≡index (Ζ·hook·index)"
+    assert "-m paperkit.footdeps" in hook,"the pre-commit hook does not run the footprint audit (Ξ·dag·reads — declared reads ⊇ Φ·footprint)"
 
 
 def boundaries_project():
     # every engine tool ships a ⟨P, F, δ⟩ boundary suite, and those suites are gathered
     # as their own gated project (BOUNDARIES.md)
-    import project as P
+    import paperkit.project
     root = Path(__file__).resolve().parents[2]
     suites = list((root / "paperkit" / "tests").glob("boundaries_*.py"))
     assert len(suites) >= 6, f"expected the tool boundary suites, found {len(suites)}"
-    cfg = P.load_config(root / "boundaries")
-    assert cfg["out"].name == "BOUNDARIES.md" and P.project(cfg) == cfg["out"].read_text(), \
+    cfg = paperkit.bib.load_config(root / "boundaries")
+    assert cfg["out"].name == "BOUNDARIES.md" and paperkit.project.project(cfg) == cfg["out"].read_text(), \
         "the boundaries project does not project to BOUNDARIES.md"
 
 
 def report_live():
     # the report's figures are live pipeline output — rendered from gate/Δ --json, not
     # scraped from human text — and the report projects to its own document
-    import project as P
+    import paperkit.project
     root = Path(__file__).resolve().parents[2]
     gen = (root / "report" / "gen.py").read_text()
     assert "discriminate.py" in gen and "gate.py" in gen and "--json" in gen, \
         "the report does not render from machine-readable pipeline data"
-    assert P.load_config(root / "report")["out"].name == "REPORT.md", "the report does not project to REPORT.md"
+    assert paperkit.bib.load_config(root / "report")["out"].name == "REPORT.md", "the report does not project to REPORT.md"
 
 
 # ── implications: what follows, and the honest limits ────────────────────────
 def fresh_by_construction():
-    from _fixture_gate import gate
-    from _fixture_project import project_text
+    from paperkit.tests._fixture_gate import gate
+    from paperkit.tests._fixture_project import project_text
     # because the document IS the projection, regeneration is idempotent and any
     # hand-edit is rejected — the prose cannot drift from its claims
     w = [entry("a", claim="alpha")]
@@ -742,7 +740,7 @@ def fresh_by_construction():
 
 
 def trust_boundary():
-    from _fixture_gate import gate
+    from paperkit.tests._fixture_gate import gate
     # a check is arbitrary code (cmd: is the universal escape hatch), so gating a
     # document EXECUTES its checks — the warrant set is trusted code, like a Makefile.
     # Demonstrate: a cmd: check with a side effect runs when the document is gated.
@@ -756,7 +754,7 @@ def trust_boundary():
 
 
 def env_sanitized():
-    from _fixture_gate import gate
+    from paperkit.tests._fixture_gate import gate
     # to bound that, a check runs in a controlled, default-deny environment: an ambient
     # variable that is not on the allow-list does NOT reach it, so a verdict cannot be
     # injected through the caller's environment (sshd's defence against env injection)
@@ -775,8 +773,8 @@ def path_surface():
     # over an explicit env needs no subprocess and no os.environ/cwd manipulation (the end-to-end
     # plant-a-tool-and-resolve DEMONSTRATION is a cwd/PATH process probe — boundaries_path, standard
     # sandbox; running it here would depend on the cwd/PATH the hermetic mutation sandbox controls).
-    import resolver
-    kept = resolver.clean_env(
+    import paperkit.resolver
+    kept = paperkit.checkenv.clean_env(
         {"PATH": os.pathsep.join(["/usr/bin", ".", "", "reldir", "/bin"])})["PATH"].split(os.pathsep)
     assert "/usr/bin" in kept and "/bin" in kept, "clean_env dropped an ABSOLUTE PATH dir (the host's trust)"
     assert all(os.path.isabs(p) for p in kept if p), "clean_env kept a non-absolute PATH entry"
@@ -790,15 +788,15 @@ def collapse_safe():
     # discrimination — every input that flips it flips a premise (its fingerprint is covered), so the
     # premise's witness fails and blocks it; only an INCREMENT's residual escapes (no premise catches
     # it).  So emergence's collapse verdict is SOUND for deletion, its increment verdict a keep-warning.
-    import coherence
+    import paperkit.coherence
     by = {r["key"]: r for r in [
         {"key": "ax", "rests-on": [], "tests": ["paperkit/gate.py::resolves"]},
         {"key": "col", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves"]},
         {"key": "inc", "rests-on": ["ax"], "tests": ["paperkit/gate.py::resolves", "paperkit/project.py::weave"]},
     ]}
-    e = coherence.emergence_residual(list(by.values()))
+    e = paperkit.coherence.emergence_residual(list(by.values()))
     # COLLAPSE ⇒ SAFE: nothing the collapsed claim discriminates escapes its premises.
-    col_escapes = coherence._engine_cap(by["col"]["tests"]) - coherence._engine_cap(by["ax"]["tests"])
+    col_escapes = paperkit.coherence._engine_cap(by["col"]["tests"]) - paperkit.coherence._engine_cap(by["ax"]["tests"])
     assert e["collapse"] == 1 and not col_escapes, \
         "a collapsed claim discriminates an input no premise catches — deletion would lose it"
     # INCREMENT ⇒ KEEP: the residual is exactly the input no premise catches.
@@ -809,22 +807,22 @@ def collapse_safe():
 def grouping_residual():
     # Ρ·deck·residual — σ (authored sections) vs P* (rests-on modularity), reported as the NAMED
     # claims that move.  A SYNTHETIC fixture with a KNOWN answer calibrates the measure.
-    import coherence
+    import paperkit.coherence
     dense_a = [{"key": f"a{i}", "section": "A",
                 "rests-on": [f"a{j}" for j in range(3) if j != i]} for i in range(3)]
     dense_b = [{"key": f"b{i}", "section": "B",
                 "rests-on": [f"b{j}" for j in range(3) if j != i]} for i in range(3)]
     stray = [{"key": "stray", "section": "B", "rests-on": ["a0", "a1", "a2"]}]
-    r = coherence.grouping_residual(dense_a + dense_b + stray)
+    r = paperkit.coherence.grouping_residual(dense_a + dense_b + stray)
     assert not r["degenerate"], "a fixture with rests-on edges was read as having no grounding graph"
     assert r["moved"] == ["stray"] and r["residual"] == 1, \
         f"the residual must NAME exactly the misfiled claim, got {r['moved']}"
     # AGREEMENT ⇒ ZERO, the other direction: without it the measure could report a constant.
-    agree = coherence.grouping_residual(dense_a + dense_b)
+    agree = paperkit.coherence.grouping_residual(dense_a + dense_b)
     assert agree["residual"] == 0 and agree["moved"] == [], \
         f"a grouping that IS the grounding structure must have residual 0, got {agree}"
     # DEGENERATE is declared, not silently zero.
-    none = coherence.grouping_residual([{"key": "x", "section": "A", "rests-on": []}])
+    none = paperkit.coherence.grouping_residual([{"key": "x", "section": "A", "rests-on": []}])
     assert none["degenerate"] and none["edges"] == 0, \
         "a record set with no grounding edges must declare itself degenerate, not report agreement"
 
@@ -834,47 +832,47 @@ def grouping_tail_falls_back():
     # claim is trivially unmovable, so it would pass even with the regularizer deleted; the
     # DISCRIMINATING case is one weak cross-section edge, where modularity's null term makes the
     # lone edge contribute ≈0 and the −γ·d term must decide.
-    import coherence
+    import paperkit.coherence
     dense_a = [{"key": f"a{i}", "section": "A",
                 "rests-on": [f"a{j}" for j in range(3) if j != i]} for i in range(3)]
     dense_b = [{"key": f"b{i}", "section": "B",
                 "rests-on": [f"b{j}" for j in range(3) if j != i]} for i in range(3)]
     weak = dense_a + dense_b + [{"key": "weak", "section": "B", "rests-on": ["a0"]}]
-    assert "weak" not in coherence.grouping_residual(weak)["moved"], \
+    assert "weak" not in paperkit.coherence.grouping_residual(weak)["moved"], \
         "a claim with ONE cross-section edge was reassigned — γ is not holding the tail to σ"
     # and at γ→0 it SHOULD move: the fallback is γ's doing, not the fixture's.
-    assert "weak" in coherence.grouping_residual(weak, gamma=0.0)["moved"], \
+    assert "weak" in paperkit.coherence.grouping_residual(weak, gamma=0.0)["moved"], \
         "at γ=0 the lone edge should dominate — else the assertion above proves nothing about γ"
 
 
 def grouping_discharge():
     # Ρ·deck·residual·gate — a `link`-acknowledged claim leaves the residual (the measurement) but
     # clears `undischarged` (the gateable count); the budget gates only the latter.
-    import coherence
+    import paperkit.coherence
     dense_a = [{"key": f"a{i}", "section": "A",
                 "rests-on": [f"a{j}" for j in range(3) if j != i]} for i in range(3)]
     dense_b = [{"key": f"b{i}", "section": "B",
                 "rests-on": [f"b{j}" for j in range(3) if j != i]} for i in range(3)]
     fx = dense_a + dense_b + [{"key": "stray", "section": "B", "rests-on": ["a0", "a1", "a2"]}]
-    d = coherence.grouping_residual(fx, discharged=frozenset({"stray"}))
+    d = paperkit.coherence.grouping_residual(fx, discharged=frozenset({"stray"}))
     assert d["residual"] == 1 and d["undischarged"] == 0 and d["acknowledged"] == ["stray"], \
         f"a `link`-acknowledged claim must leave the residual but clear the gateable count, got {d}"
-    assert coherence._residual_exit({"grouping": d}, 0) == 0, \
+    assert paperkit.coherence._residual_exit({"grouping": d}, 0) == 0, \
         "a fully-discharged residual must pass even a zero budget"
-    u = coherence.grouping_residual(fx)
-    assert coherence._residual_exit({"grouping": u}, 0) == 1, \
+    u = paperkit.coherence.grouping_residual(fx)
+    assert paperkit.coherence._residual_exit({"grouping": u}, 0) == 1, \
         "an un-acknowledged residual must FAIL a zero budget — the control is inert"
-    assert coherence._residual_exit({"grouping": u}, None) == 0, \
+    assert paperkit.coherence._residual_exit({"grouping": u}, None) == 0, \
         "with no --max-residual the face must report without failing (instrument, not control)"
 
 
 def grouping_not_pagination():
     # The two axes are INDEPENDENT: one grouping, several paginations of it.  Same input, different
     # unit counts — if a genre could not change the cut, the axis would not be separate.
-    import genre
+    import paperkit.genre
     groups = [["a", "b"], ["c"]]
-    staged = genre.resolve("staged")["objective"](groups, ())
-    atomic = genre.resolve("atomic")["objective"](groups, ())
+    staged = paperkit.genre.resolve("staged")["objective"](groups, ())
+    atomic = paperkit.genre.resolve("atomic")["objective"](groups, ())
     assert staged == [["a", "b"], ["c"]], "the staged cut must be the identity on the grouping"
     assert atomic == [["a"], ["b"], ["c"]], "the atomic cut must be one unit per claim"
     assert len(staged) != len(atomic), \
@@ -884,19 +882,19 @@ def grouping_not_pagination():
 def genre_registry():
     # OPEN registry: a PROJECT registers its own without touching the engine, and that registration
     # must NOT leak into the engine's built-in set (per-project, not global mutation).
-    import genre
+    import paperkit.genre
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text('[paper]\ntitle = "t"\n\n'
                                       '[genres.brief]\nwhat = "one line per cluster"\n'
                                       'cmd = "python3 checks/brief.py"\ngamma = 4.0\n')
-        reg = genre.registry(d)
+        reg = paperkit.genre.registry(d)
         assert "brief" in reg and reg["brief"]["cmd"] == "python3 checks/brief.py", \
             "a project's [genres.*] table did not register — the open half of the registry is closed"
         assert reg["brief"]["gamma"] == 4.0, "a declared genre's gamma was not carried"
-        assert "brief" not in genre.registry(), \
+        assert "brief" not in paperkit.genre.registry(), \
             "a project's registration leaked into the ENGINE's built-in set — the registry is global state"
-        assert set(genre.BUILTIN) <= set(reg), "registering a genre dropped a built-in"
+        assert set(paperkit.genre.BUILTIN) <= set(reg), "registering a genre dropped a built-in"
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -904,47 +902,47 @@ def genre_registry():
 def genre_gates_the_seam():
     # An open set cannot be gated by case analysis, so the SEAM is gated: TOTAL and LOUD, each
     # against a real breach.
-    import genre
+    import paperkit.genre
     groups = [["a", "b"], ["c"]]
     # LOUD — an unregistered name REFUSES rather than falling back.
     try:
-        genre.resolve("no-such-genre")
+        paperkit.genre.resolve("no-such-genre")
         raise AssertionError("an unregistered genre RESOLVED — the registry falls back silently")
-    except genre.Unregistered:
+    except paperkit.genre.Unregistered:
         pass
     # TOTAL — each of the four ways an objective stops being a function of the grouping is refused.
     for name, obj in (("drops", lambda g, r: [u[:1] for u in g]),
                       ("duplicates", lambda g, r: [list(u) for u in g] + [list(g[0])]),
                       ("invents", lambda g, r: [list(u) for u in g] + [["ghost"]]),
                       ("raises", lambda g, r: (_ for _ in ()).throw(ValueError("x")))):
-        ok, _ = genre.is_total(obj, groups)
+        ok, _ = paperkit.genre.is_total(obj, groups)
         assert not ok, f"an objective that {name} passed TOTAL — a cut that {name} is not a pagination"
     for name in ("staged", "atomic", "talk"):
-        ok, why = genre.is_total(genre.resolve(name)["objective"], groups)
+        ok, why = paperkit.genre.is_total(paperkit.genre.resolve(name)["objective"], groups)
         assert ok, f"the built-in {name!r} objective failed TOTAL: {why}"
 
 
 def genre_budget():
     # A BUDGETED objective keeps the grouping's bracketing and splits only over-full clusters, at
     # CLAIM boundaries — never mid-claim, since the claim is the atom the engine is built on.
-    import genre
+    import paperkit.genre
     recs = [{"key": "x", "claim": "w " * 50}, {"key": "y", "claim": "w " * 50},
             {"key": "z", "claim": "w " * 200}]
-    u = genre.resolve("talk")["objective"]([["x", "y"], ["z"]], recs)
+    u = paperkit.genre.resolve("talk")["objective"]([["x", "y"], ["z"]], recs)
     assert u == [["x"], ["y"], ["z"]], \
         f"two 50-word claims exceed an 84-word budget together and must SPLIT, got {u}"
-    assert genre.resolve("staged")["objective"]([["x", "y"], ["z"]], recs) == [["x", "y"], ["z"]], \
+    assert paperkit.genre.resolve("staged")["objective"]([["x", "y"], ["z"]], recs) == [["x", "y"], ["z"]], \
         "the unbudgeted `staged` must NOT split — the budget is what distinguishes talk from it"
     assert ["z"] in u, "a single over-budget claim must keep its own unit, never be cut mid-claim"
-    ok, why = genre.is_total(genre.resolve("talk")["objective"], [["x", "y"], ["z"]])
+    ok, why = paperkit.genre.is_total(paperkit.genre.resolve("talk")["objective"], [["x", "y"], ["z"]])
     assert ok, f"the budgeted objective broke TOTAL: {why}"
 
 
 def genre_collection():
     # Ρ·deck·objective·two — the collection cut MERGES where talk SPLITS, and its cost is the
     # cross-unit grounding edge: a unit that rests outside itself is not self-contained.
-    import genre
-    obj = genre.resolve("collection")["objective"]
+    import paperkit.genre
+    obj = paperkit.genre.resolve("collection")["objective"]
     # two groups joined by ONE grounding edge must become ONE unit.
     recs = [{"key": "a", "rests-on": []}, {"key": "b", "rests-on": ["a"]}]
     assert obj([["a"], ["b"]], recs) == [["a", "b"]], \
@@ -963,21 +961,21 @@ def genre_collection():
     assert obj([["a"], ["b"], ["c"]], tri) == [["a", "b", "c"]], \
         "a chain of grounding edges must close transitively into ONE unit"
     # and it stays TOTAL under merging.
-    ok, why = genre.is_total(obj, [["a"], ["b"], ["c"]])
+    ok, why = paperkit.genre.is_total(obj, [["a"], ["b"], ["c"]])
     assert ok, f"the collection objective broke TOTAL: {why}"
 
 
 def observe_regroups_on_grounding():
     # Ρ·deck·residual·wire — observe() cuts on the GROUNDING-derived partition, not the authored
     # sections, and one owner computes that partition for both the projector and the ∂² grade.
-    import genre, coherence
+    import paperkit.genre, paperkit.coherence
     # ONE OWNER: the grade's partition IS the projector's, not a second copy that could drift.
     recs = [{"key": "a", "section": "A", "rests-on": []},
             {"key": "b", "section": "B", "rests-on": ["a"]},
             {"key": "c", "section": "B", "rests-on": []}]
-    p = genre.partition(recs, 0.0)
+    p = paperkit.genre.partition(recs, 0.0)
     assert not p["degenerate"] and p["part"], "the shared partition returned nothing to group on"
-    r = coherence.grouping_residual(recs, gamma=0.0)
+    r = paperkit.coherence.grouping_residual(recs, gamma=0.0)
     # the residual's `moved` must be exactly the claims the shared partition relabels — if the two
     # disagreed, the grade would be measuring a grouping no deck uses.
     sec = {x["key"]: x["section"] for x in recs}
@@ -986,33 +984,33 @@ def observe_regroups_on_grounding():
     # DEGENERATE ⇒ the section cut, by construction: a project with no grounding is unchanged.
     flat = [{"key": "x", "section": "S", "rests-on": []},
             {"key": "y", "section": "S", "rests-on": []}]
-    d = genre.partition(flat, 1.0)
+    d = paperkit.genre.partition(flat, 1.0)
     assert d["degenerate"] and d["part"] == {"x": "S", "y": "S"}, \
         "with no grounding the partition must fall back to section, not invent a grouping"
     # and γ is live: it is the resolution knob, so different γ may give different partitions.
-    assert genre.partition(recs, 0.0)["part"] is not None, "γ=0 must still yield a partition"
+    assert paperkit.genre.partition(recs, 0.0)["part"] is not None, "γ=0 must still yield a partition"
 
 
 def partition_merges():
     # Ρ·deck·partition·merge — γ must control the group COUNT, not just which claims group
     # together.  Before the merge operator the derived partition always carried σ's cardinality,
     # so γ moved labels and never structure.
-    import genre
+    import paperkit.genre
     # two sections densely grounded INTO each other: at low γ they should become ONE group,
     # at high γ σ must win and they stay two.
     recs = ([{"key": f"a{i}", "section": "A", "rests-on": [f"a{j}" for j in range(3) if j != i]}
              for i in range(3)]
             + [{"key": f"b{i}", "section": "B",
                 "rests-on": [f"b{j}" for j in range(3) if j != i] + [f"a{i}"]} for i in range(3)])
-    lo = genre.partition(recs, 0.0)
-    hi = genre.partition(recs, 100.0)
+    lo = paperkit.genre.partition(recs, 0.0)
+    hi = paperkit.genre.partition(recs, 100.0)
     assert lo["groups"] < hi["groups"], \
         f"γ does not change the group COUNT ({lo['groups']} vs {hi['groups']}) — merge is inert"
     assert hi["groups"] == 2, f"at high γ the authored σ must win, got {hi['groups']} groups"
     # a merge must only join CONNECTED groups — unconnected ones fuse a document on no evidence.
     apart = ([{"key": "x", "section": "X", "rests-on": []},
               {"key": "y", "section": "Y", "rests-on": []}])
-    d = genre.partition(apart, 0.0)
+    d = paperkit.genre.partition(apart, 0.0)
     assert d["degenerate"] or d["groups"] == 2, \
         "two groups with NO grounding edge between them were merged — fused on no evidence"
 
@@ -1027,8 +1025,8 @@ def genre_declared_runs():
     # `genre` may not import it (project → resolver was an undeclared upward edge).  So every
     # caller supplies it.  This file is a paper witness, outside the engine partition, so it
     # imports resolver directly — exactly as project.py does at the live call site.
-    import genre
-    from resolver import spawn_declared
+    import paperkit.genre
+    import paperkit.resolver
     d = Path(tempfile.mkdtemp())
     try:
         (d / "ok.py").write_text(
@@ -1036,7 +1034,7 @@ def genre_declared_runs():
             "for g in [l.split(chr(9)) for l in sys.stdin.read().splitlines() if l.strip()]:\n"
             "    [print(k) for k in g]\n")
         spec = {"cmd": f"python3 {d / 'ok.py'}"}
-        units = genre.run_declared(spec, [["a", "b"]], [], spawn=spawn_declared)
+        units = paperkit.genre.run_declared(spec, [["a", "b"]], [], spawn=paperkit.checkenv.spawn_declared)
         assert units == [["a"], ["b"]], f"the declared objective's units did not come back, got {units}"
         # DROPS ⇒ refused, with the same message a built-in would get.
         (d / "bad.py").write_text(
@@ -1044,16 +1042,16 @@ def genre_declared_runs():
             "for g in [l.split(chr(9)) for l in sys.stdin.read().splitlines() if l.strip()]:\n"
             "    print(g[0])\n")
         try:
-            genre.run_declared({"cmd": f"python3 {d / 'bad.py'}"}, [["a", "b"]], [],
-                               spawn=spawn_declared)
+            paperkit.genre.run_declared({"cmd": f"python3 {d / 'bad.py'}"}, [["a", "b"]], [],
+                               spawn=paperkit.checkenv.spawn_declared)
             raise AssertionError("a declared objective that DROPS a claim was accepted")
         except SystemExit:
             pass
         # a FAILING objective is refused rather than read as an empty pagination.
         (d / "fail.py").write_text("import sys\nsys.exit(3)\n")
         try:
-            genre.run_declared({"cmd": f"python3 {d / 'fail.py'}"}, [["a"]], [],
-                               spawn=spawn_declared)
+            paperkit.genre.run_declared({"cmd": f"python3 {d / 'fail.py'}"}, [["a"]], [],
+                               spawn=paperkit.checkenv.spawn_declared)
             raise AssertionError("a declared objective that FAILED was accepted")
         except SystemExit:
             pass
@@ -1074,9 +1072,9 @@ def genre_declared_gated():
     # Two independent searches over BUILD.bazel, tools/bibtex.bzl and .githooks/pre-commit find
     # no reference: it runs when a human types it.  A capability that exists and is unwired is
     # the shape audit finding 6 and Η-F2 both record; this claim is the wire.
-    import genre
+    import paperkit.genre
     proj = Path(__file__).resolve().parent.parent
-    reg = genre.registry(proj)
+    reg = paperkit.genre.registry(proj)
     declared = {n: s for n, s in reg.items() if s.get("declared")}
     assert declared, ("paper.toml declares no [genres.*] table — this claim asserts the project's "
                       "OWN declarations are gated, and there are none to gate")
@@ -1087,8 +1085,8 @@ def genre_declared_gated():
         # run_declared raises SystemExit on a non-zero exit AND on a non-total result, so this
         # single call covers both — the same seam the live --observe path uses, not a copy of it.
         # Ζ·spawn·owner — the spawn is injected (see genre_declared_runs above).
-        from resolver import spawn_declared
-        units = genre.run_declared(spec, groups, [], cwd=proj, spawn=spawn_declared)
+        import paperkit.resolver
+        units = paperkit.genre.run_declared(spec, groups, [], cwd=proj, spawn=paperkit.checkenv.spawn_declared)
         flat = sorted(k for u in units for k in u)
         assert flat == ["a", "b", "c"], (
             f"declared genre {name!r} is not total over the grouping: got {units}")
@@ -1097,23 +1095,23 @@ def genre_declared_gated():
 def gamma_is_reachable():
     # Ρ·deck·gamma·declare — γ is the resolution dial and must be REACHABLE, not frozen into each
     # genre.  An explicit γ overrides the genre's own; absent, the genre's declared value stands.
-    import genre, project as P
+    import paperkit.genre, paperkit.project
     recs = ([{"key": f"a{i}", "section": "A", "rests-on": [f"a{j}" for j in range(3) if j != i]}
              for i in range(3)]
             + [{"key": f"b{i}", "section": "B",
                 "rests-on": [f"b{j}" for j in range(3) if j != i] + [f"a{i}"]} for i in range(3)])
-    assert genre.partition(recs, 100.0)["groups"] > genre.partition(recs, 0.0)["groups"], \
+    assert paperkit.genre.partition(recs, 100.0)["groups"] > paperkit.genre.partition(recs, 0.0)["groups"], \
         "γ does not change the grouping — the resolution dial is inert"
     # the knob exists and defaults to None, so a genre's declared γ is not overridden by a constant
-    assert P.GAMMA.default is None, \
+    assert paperkit.project.GAMMA.default is None, \
         "a non-None γ default would override every genre's declared resolution with one constant"
-    assert P.GAMMA.choices is None, "γ is continuous — a choices tuple would fix it to a few values"
+    assert paperkit.project.GAMMA.choices is None, "γ is continuous — a choices tuple would fix it to a few values"
 
 
 def observe_second_shape():
     # Ρ·deck·observe — a SECOND observation shape beside project()'s linearization.
-    import project as P
-    from _fixture_model import entry
+    import paperkit.project
+    from paperkit.tests._fixture_model import entry
     d = Path(tempfile.mkdtemp())
     try:
         (d / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
@@ -1123,27 +1121,27 @@ def observe_second_shape():
             "@misc{a,\n section = {s},\n claim = {%s},\n check = {cmd:true}\n}\n"
             "@misc{b,\n section = {s}, from = {a},\n claim = {%s},\n check = {cmd:true}\n}\n"
             % ("w " * 50, "w " * 50))
-        cfg = P.load_config(d)
+        cfg = paperkit.bib.load_config(d)
         # project() LINEARIZES — one string; observe() SEGMENTS — units.
-        flat = P.project(cfg)
+        flat = paperkit.project.project(cfg)
         assert isinstance(flat, str), "project() must still return one flat stream"
-        units = P.observe(cfg, "staged", d)
+        units = paperkit.project.observe(cfg, "staged", d)
         assert isinstance(units, list) and units and isinstance(units[0], dict), \
             "observe() must return UNITS, not a rendered string — returning prose re-linearizes"
         # the two axes compose: same carrier, different pagination.
-        assert len(P.observe(cfg, "staged", d)) == 1, "staged must keep the section as one unit"
-        assert len(P.observe(cfg, "atomic", d)) == 2, "atomic must give each claim its own unit"
-        assert len(P.observe(cfg, "talk", d)) == 2, \
+        assert len(paperkit.project.observe(cfg, "staged", d)) == 1, "staged must keep the section as one unit"
+        assert len(paperkit.project.observe(cfg, "atomic", d)) == 2, "atomic must give each claim its own unit"
+        assert len(paperkit.project.observe(cfg, "talk", d)) == 2, \
             "two 50-word claims exceed the talk budget and must split into two units"
         # a unit carries its keys and its section, and never spans sections.
-        u = P.observe(cfg, "talk", d)[0]
+        u = paperkit.project.observe(cfg, "talk", d)[0]
         assert u["keys"] and u["section"] == "s", "a unit must name its keys and its section"
         # LOUD propagates through the projector: an unregistered genre REFUSES here too.
-        import genre
+        import paperkit.genre
         try:
-            P.observe(cfg, "no-such-genre", d)
+            paperkit.project.observe(cfg, "no-such-genre", d)
             raise AssertionError("observe() accepted an unregistered genre — LOUD does not propagate")
-        except genre.Unregistered:
+        except paperkit.genre.Unregistered:
             pass
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -1153,15 +1151,15 @@ def observe_bounded_by_adoption():
     # The cut is bounded by DECLARED grounding: a project with no rests-on has nothing for a
     # DAG-derived grouping to read, and the residual face says so by declaring itself degenerate
     # rather than reporting 0 as agreement.
-    import coherence
+    import paperkit.coherence
     no_ground = [{"key": "a", "section": "S", "rests-on": []},
                  {"key": "b", "section": "S", "rests-on": []}]
-    r = coherence.grouping_residual(no_ground)
+    r = paperkit.coherence.grouping_residual(no_ground)
     assert r["degenerate"] and r["edges"] == 0, \
         "a project declaring no grounding must be reported DEGENERATE, not as agreeing"
     grounded = [{"key": "a", "section": "S", "rests-on": ["b"]},
                 {"key": "b", "section": "S", "rests-on": ["a"]}]
-    assert not coherence.grouping_residual(grounded)["degenerate"], \
+    assert not paperkit.coherence.grouping_residual(grounded)["degenerate"], \
         "a project WITH grounding edges must not be reported degenerate"
 
 
@@ -1171,11 +1169,11 @@ def from_and_rests_on_are_distinct():
     # (coherence.py: `frm = {r["key"]: r.get("from", []) ...}`) and bib.dep_order visits only
     # `from`; the grounding graph is built from `rests-on` alone.  So a prose connective cannot
     # license a grounding edge, and neither field substitutes for the other.
-    import coherence
+    import paperkit.coherence
     # A record set carrying `from` but NO `rests-on`: prose order exists, grounding does not.
     prose_only = [{"key": "a", "section": "S", "from": [], "rests-on": []},
                   {"key": "b", "section": "S", "from": ["a"], "rests-on": []}]
-    r = coherence.grouping_residual(prose_only)
+    r = paperkit.coherence.grouping_residual(prose_only)
     assert r["edges"] == 0, \
         "`from` must contribute NO grounding edge — a prose connective is not a truth-maker"
     assert r["degenerate"], \
@@ -1183,7 +1181,7 @@ def from_and_rests_on_are_distinct():
     # The converse: grounding WITHOUT prose adjacency still builds the graph.
     ground_only = [{"key": "a", "section": "S", "from": [], "rests-on": ["b"]},
                    {"key": "b", "section": "S", "from": [], "rests-on": ["a"]}]
-    assert coherence.grouping_residual(ground_only)["edges"] > 0, \
+    assert paperkit.coherence.grouping_residual(ground_only)["edges"] > 0, \
         "`rests-on` alone must build the grounding graph — prose adjacency is not required for it"
 
 
@@ -1192,7 +1190,7 @@ def depth_annotates_without_reordering():
     # that changes MATERIALIZATION (project.py indents the claim as a nested proof step) over a
     # derived order it does not disturb.  bib.dep_order visits only `from`, so the sequence is
     # invariant under adding `depth` to any entry.
-    import bib as B
+    import paperkit.bib
     # The fixture is built so that DEP-order and DEPTH-order DISAGREE: dep_order must yield
     # [a, b, c] (c depends on b, b on a), while sorting by `depth` would surface c first.
     # If the annotation ever leaked into ordering, these two would be distinguishable.
@@ -1204,16 +1202,16 @@ def depth_annotates_without_reordering():
          "b": {"claim": "second", "depth": "2"},
          "c": {"claim": "third", "depth": "1"}}
     keys = ["a", "b", "c"]
-    got = B.dep_order(keys, F)
+    got = paperkit.bib.dep_order(keys, F)
     assert got == ["a", "b", "c"], \
         f"dep_order must follow authored order and `from` alone; a depth-sort gives [c, b, a] (got {got})"
     # And the order is INVARIANT under changing depth: same records, depths permuted.
     G = {k: dict(v) for k, v in F.items()}
     for k, d in (("a", "1"), ("b", "3"), ("c", "2")):
         G[k]["depth"] = d
-    assert B.dep_order(keys, G) == got, \
+    assert paperkit.bib.dep_order(keys, G) == got, \
         "permuting `depth` must leave dep_order fixed — the hint annotates, it does not reorder"
-    assert "depth" in B._SCALAR, \
+    assert "depth" in paperkit.bib._SCALAR, \
         "`depth` must be a declared scalar field, not an ad-hoc key the projector guesses at"
 
 
@@ -1221,12 +1219,12 @@ def compose_two_imports():
     # Ρ·paper·compose — exactly TWO verbs cross a project boundary, and that is a STRUCTURAL bit
     # in the engine's own registry, not a convention.  Derived from VERBS, never re-listed here
     # (a guard must not copy the set it guards).
-    import resolver
-    crossing = {v for v, spec in resolver.VERBS.items() if spec["crosses"]}
+    import paperkit.resolver
+    crossing = {v for v, spec in paperkit.resolver.VERBS.items() if spec["crosses"]}
     assert crossing == {"result", "concept"}, \
         f"the boundary-crossing verb set changed: {sorted(crossing)} — the claim names two"
     # and `crosses` is load-bearing: the derived prefix tuple every consumer reads comes from it.
-    assert set(resolver.CROSSING) == {f"{v}:" for v in crossing}, \
+    assert set(paperkit.resolver.CROSSING) == {f"{v}:" for v in crossing}, \
         "CROSSING is not derived from VERBS — a consumer could re-list the set and drift"
 
 
@@ -1234,7 +1232,7 @@ def compose_delegates():
     # Both crossing verbs DELEGATE adequacy to the owner: Δ grades them `imported` rather than
     # sweeping the imported proof.  Asserted for BOTH, since a rule holding for one verb only
     # would be a special case rather than the composition rule the claim states.
-    import grader
+    import paperkit.grader
     d = Path(tempfile.mkdtemp())
     try:
         sib = d / "g"
@@ -1244,12 +1242,12 @@ def compose_delegates():
         (sib / "r.tsv").write_text("s\tSec\n")
         (sib / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n"
                                    "  check = {cmd:true}\n}\n")
-        import project as P
-        (sib / "out.md").write_text(P.project(P.load_config(sib)))
-        assert grader.grade_check("result:g", d, set(), {}, d)["grade"] == "imported", \
+        import paperkit.project
+        (sib / "out.md").write_text(paperkit.project.project(paperkit.bib.load_config(sib)))
+        assert paperkit.grader.grade_check("result:g", d, set(), {}, d)["grade"] == "imported", \
             "a verdict-import did not delegate its grade to the sibling that owns it"
         eng = Path(__file__).resolve().parents[2]
-        assert grader.grade_check("concept:adequacy-pitch", eng / "paper", set(), {},
+        assert paperkit.grader.grade_check("concept:adequacy-pitch", eng / "paper", set(), {},
                                   eng / "paper")["grade"] == "imported", \
             "a certificate-import did not delegate its grade to the library that owns it"
     finally:
@@ -1260,22 +1258,22 @@ def compose_refuses_regrid():
     # The anti-pattern: re-deriving a sibling's proof locally.  The engine REFUSES it structurally
     # — the sweep's footprint skips a crossing check rather than stracing a whole sibling gate, so
     # an importing project cannot accidentally pay for (or contradict) the owner's measurement.
-    import footdeps
-    import resolver
+    import paperkit.footdeps
+    import paperkit.resolver
     src = _src("footdeps.py")
     assert "CROSSING" in src, \
         ("the footprint audit no longer asks the verb registry which checks cross a boundary — "
          "it would strace a sibling's whole gate and re-derive what the owner already measured")
     # and the skip is per-VERB, so adding a crossing verb reaches this site by declaration alone.
-    assert len(resolver.CROSSING) >= 2, "the derived crossing-prefix set collapsed"
+    assert len(paperkit.resolver.CROSSING) >= 2, "the derived crossing-prefix set collapsed"
 
 
 def compose_chains():
     # Imports CHAIN: a project resting on a sibling that rests on a third.  Built and gated, so
     # transitivity is exhibited rather than asserted — a two-link chain where the middle project's
     # verdict depends on the innermost one's.
-    import gate
-    import project as P
+    import paperkit.gate
+    import paperkit.project
     d = Path(tempfile.mkdtemp())
     try:
         def mk(name, check):
@@ -1286,19 +1284,19 @@ def compose_chains():
             (p / "r.tsv").write_text("s\tSec\n")
             (p / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n"
                                      "  check = {%s}\n}\n" % check)
-            (p / "out.md").write_text(P.project(P.load_config(p)))
+            (p / "out.md").write_text(paperkit.project.project(paperkit.bib.load_config(p)))
             return p
         mk("inner", "cmd:true")
         # the sibling path is relative to the CITING project's dir (resolver runs the sub-gate
         # with cwd = that project), so middle cites ../inner, not inner.
         mk("middle", "result:../inner")
-        assert gate.resolves("result:middle", d, {}).passed, \
+        assert paperkit.resolver.resolves("result:middle", d, {}).passed, \
             "a two-link chain of verdict-imports did not resolve — imports do not compose"
         # and the chain is LOAD-BEARING: breaking the innermost must break the outermost.
         mk_inner = d / "inner" / "w.bib"
         mk_inner.write_text("@misc{c,\n  section = {s},\n  claim = {x},\n"
                             "  check = {cmd:false}\n}\n")
-        assert not gate.resolves("result:middle", d, {}).passed, \
+        assert not paperkit.resolver.resolves("result:middle", d, {}).passed, \
             ("breaking the INNERMOST project left the outermost green — the verdict does not "
              "carry the cone beneath it, so the chain is decorative")
     finally:
@@ -1306,13 +1304,13 @@ def compose_chains():
 
 
 def forward_direction():
-    import project as P
+    import paperkit.project
     # the structure residual is closed by PROJECTION: the grounding DAG renders as transitively-REDUCED
     # cross-references — a re-cited premise reachable by a LONGER rests-on path is redundant and dropped
     # (transitive_reduction, the `drop` rung of drop < cite < expound < figure).  Behavioral (Ε·behavioral).
-    assert P.transitive_reduction({"c": ["a", "b"], "b": ["a"]}) == {"c": ["b"], "b": ["a"]}, \
+    assert paperkit.project.transitive_reduction({"c": ["a", "b"], "b": ["a"]}) == {"c": ["b"], "b": ["a"]}, \
         "did not drop the redundant c→a edge (a is already reachable from c via b)"
-    assert P.transitive_reduction({"c": ["a"], "b": ["a"]}) == {"c": ["a"], "b": ["a"]}, \
+    assert paperkit.project.transitive_reduction({"c": ["a"], "b": ["a"]}) == {"c": ["a"], "b": ["a"]}, \
         "dropped a direct grounding edge that has no longer path"
 
 

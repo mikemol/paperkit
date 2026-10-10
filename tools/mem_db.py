@@ -33,8 +33,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mem_learn import pow2
+import tools.mem_learn
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS peak (
@@ -91,7 +90,7 @@ def manifest(c: sqlite3.Connection, project: str) -> dict:
         return out
     by_res: dict = {}
     for res, claim, b in per_claim:
-        by_res.setdefault(res, []).append((claim, pow2(b / (1024 * 1024))))
+        by_res.setdefault(res, []).append((claim, tools.mem_learn.pow2(b / (1024 * 1024))))
     for res, rows in by_res.items():
         out[res] = max(b for _, b in rows)
         for claim, b in rows:

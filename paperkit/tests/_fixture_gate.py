@@ -14,18 +14,18 @@ from __future__ import annotations
 import json
 import tempfile
 
-from _fixture_model import _call, _write  # the capability-free kernel (bootstraps sys.path)
-from _fixture_project import _projected
-import gate as _gate
+import paperkit.tests._fixture_model  # the capability-free kernel (bootstraps sys.path)
+import paperkit.tests._fixture_project
+import paperkit.gate
 
 
 def gate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
          title="t", numbered=False, references=False):
     """(returncode, stderr).  Projects out.md before gating (or writes `out`)."""
     with tempfile.TemporaryDirectory() as d:
-        proj = _write(d, warrants, assets, rubric, title, numbered, references)
-        _projected(proj, out)
-        rc, _o, e = _call(_gate.main, [*flags, str(proj)])
+        proj = paperkit.tests._fixture_model._write(d, warrants, assets, rubric, title, numbered, references)
+        paperkit.tests._fixture_project._projected(proj, out)
+        rc, _o, e = paperkit.tests._fixture_model._call(paperkit.gate.main, [*flags, str(proj)])
         return rc, e
 
 
@@ -33,7 +33,7 @@ def gate_json(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
               title="t", numbered=False, references=False):
     """(returncode, parsed gate --json dict).  Projects out.md first (or writes `out`)."""
     with tempfile.TemporaryDirectory() as d:
-        proj = _write(d, warrants, assets, rubric, title, numbered, references)
-        _projected(proj, out)
-        rc, o, _e = _call(_gate.main, ["--json", *flags, str(proj)])
+        proj = paperkit.tests._fixture_model._write(d, warrants, assets, rubric, title, numbered, references)
+        paperkit.tests._fixture_project._projected(proj, out)
+        rc, o, _e = paperkit.tests._fixture_model._call(paperkit.gate.main, ["--json", *flags, str(proj)])
         return rc, json.loads(o or "{}")

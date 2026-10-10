@@ -74,7 +74,7 @@ def imports(text: str, names: set[str], pkg: str = "paperkit") -> set[str]:
         return out
     for n in ast.walk(tree):
         if isinstance(n, ast.Import):
-            out |= {a.name for a in n.names if a.name in names}
+            out |= {s for a in n.names if (s := stem_of(a.name, pkg)) in names}
         elif isinstance(n, ast.ImportFrom):
             mod = n.module or ""
             if mod in names:                       # `from _fixture_model import fx`
@@ -83,6 +83,18 @@ def imports(text: str, names: set[str], pkg: str = "paperkit") -> set[str]:
                 # `from paperkit[.sub] import X` — X is the module, not the package
                 out |= {a.name for a in n.names if a.name in names}
     return out
+
+
+def stem_of(dotted: str, pkg: str) -> str:
+    """Return the module stem a dotted import names: `bib` for `bib` and for `paperkit[.sub].bib`.
+
+    ⚑ A BARE DOTTED IMPORT IS THE FOURTH SPELLING (paperkit:W296): `import paperkit.bib`,
+    `import paperkit.tests._fixture_model`. The engine imports itself this way once its flat
+    imports are atomized, and the edge it records is the module's stem, as for the other three.
+    """
+    if dotted.startswith(pkg + "."):
+        return dotted.rsplit(".", 1)[-1]
+    return dotted
 
 
 def stem_index(paths: list[str]) -> dict[str, str]:

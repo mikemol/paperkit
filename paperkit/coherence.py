@@ -64,7 +64,7 @@ from pathlib import Path
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bib
+import paperkit.bib
 
 _ENGINE = Path(__file__).resolve().parent
 # Ζ·ladder·sentinel — the same REFUSE rung discriminate types (a caller bug the tool will not
@@ -171,8 +171,8 @@ def grouping_residual(records: list, gamma: float = 1.0, discharged=frozenset())
     # which delta depends on), not duplicated here.  One owner, two consumers: the projector cuts
     # a deck on this partition, this face measures how far it sits from the authored sigma.  A
     # second copy would drift, and the residual would then be measuring a grouping no deck uses.
-    import genre
-    g = genre.partition(records, gamma)
+    import paperkit.genre
+    g = paperkit.genre.partition(records, gamma)
     if g["degenerate"]:
         return {"claims": len(keys), "edges": 0, "residual": 0, "undischarged": 0,
                 "gamma": gamma, "sections": len(sigma), "moved": [], "acknowledged": [],
@@ -489,7 +489,7 @@ def _records_from_calcs(project_dir: Path, calc_files: list) -> list:
     This is what makes the ∂² faces a CHEAP READING over the cached calculation.  The structure comes
     from the canonical parser (paperkit.bib, via bib.parse) — entries already carries rests-on.
     """
-    F = bib.parse_project(project_dir)
+    F = paperkit.bib.parse_project(project_dir)
     recs = []
     for f in calc_files:
         c = json.loads(Path(f).read_text())
@@ -532,7 +532,7 @@ def _coverage(project_dir: Path, records: list) -> tuple:
 
 
 def F_of(project_dir: Path) -> dict:
-    return bib.parse_project(project_dir)
+    return paperkit.bib.parse_project(project_dir)
 
 
 def _records_from_cache(project_dir: Path) -> list:
@@ -575,7 +575,7 @@ def _records_from_cache(project_dir: Path) -> list:
               "sensitivity, grounding and emergence faces would read a measurement that cannot "
               "discriminate.  Re-grade with --resolution def.", file=sys.stderr)
         raise SystemExit(_REFUSE)
-    F = bib.parse_project(project_dir)
+    F = paperkit.bib.parse_project(project_dir)
     # a check may serve SEVERAL claims (binding dilution) — the cache keys by check, the faces
     # key by claim, so one cached grade fans out to every claim citing it.
     by_check: dict = {}
@@ -598,7 +598,7 @@ def _all_keys(project_dir: Path) -> frozenset:
     """Every key the bib DECLARES — the set against which an ungraded target is `pending`
     (a claim awaiting measurement) rather than `dangling` (an edge to nothing at all).
     """
-    F = bib.parse_project(project_dir)
+    F = paperkit.bib.parse_project(project_dir)
     return frozenset(F)
 
 
@@ -606,7 +606,7 @@ def _discharged(project_dir: Path) -> set:
     """Claims carrying a `link` footnote — the author has acknowledged that this claim's
     prose and grounding edges diverge, and why; that discharges the advisory.
     """
-    F = bib.parse_project(project_dir)
+    F = paperkit.bib.parse_project(project_dir)
     return {k for k, f in F.items() if f.get("link")}
 
 

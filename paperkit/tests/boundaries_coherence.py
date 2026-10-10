@@ -15,11 +15,9 @@ from __future__ import annotations
 
 import contextlib
 import io
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import coherence as C
+import paperkit.coherence
 
 
 def rec(key, frm=(), rests=(), grade="behavioral", tests=(), section=None):
@@ -82,38 +80,38 @@ def main() -> int:
 
     print("∂² residual behaviors\n")
     check("structure: a grounding edge to the immediate predecessor is CARRIED (0 owed)",
-          C.structure_residual(CARRIED)["carried"] == 1 and C.structure_residual(CARRIED)["owed"] == 0)
+          paperkit.coherence.structure_residual(CARRIED)["carried"] == 1 and paperkit.coherence.structure_residual(CARRIED)["owed"] == 0)
     check("structure: a grounding edge two-back is a LONG edge owed a reference",
-          C.structure_residual(LONG)["owed"] == 1 and C.structure_residual(LONG)["carried"] == 0)
+          paperkit.coherence.structure_residual(LONG)["owed"] == 1 and paperkit.coherence.structure_residual(LONG)["carried"] == 0)
     check("a long edge is un-acknowledged by default (advisory)",
-          C.structure_residual(LONG)["undischarged"] == 1)
+          paperkit.coherence.structure_residual(LONG)["undischarged"] == 1)
     check("a `link` footnote discharges the long edge (still drawn, not flagged)",
-          C.structure_residual(LONG, discharged={"c"})["undischarged"] == 0
-          and C.structure_residual(LONG, discharged={"c"})["owed"] == 1)
+          paperkit.coherence.structure_residual(LONG, discharged={"c"})["undischarged"] == 0
+          and paperkit.coherence.structure_residual(LONG, discharged={"c"})["owed"] == 1)
     check("sensitivity: distinct tests → 2 signatures, 0 collapse",
-          C.sensitivity_residual(DISTINCT)["signatures"] == 2 and C.sensitivity_residual(DISTINCT)["collapse"] == 0)
+          paperkit.coherence.sensitivity_residual(DISTINCT)["signatures"] == 2 and paperkit.coherence.sensitivity_residual(DISTINCT)["collapse"] == 0)
     check("sensitivity: shared tests → 1 signature, 1 collapse (name-distinct, sensitivity-same)",
-          C.sensitivity_residual(COLLAPSED)["signatures"] == 1 and C.sensitivity_residual(COLLAPSED)["collapse"] == 1)
+          paperkit.coherence.sensitivity_residual(COLLAPSED)["signatures"] == 1 and paperkit.coherence.sensitivity_residual(COLLAPSED)["collapse"] == 1)
     check("grounding: overlapping engine fingerprint → edge reflected, 0 residual",
-          C.grounding_residual(GROUNDED)["reflected"] == 1 and C.grounding_residual(GROUNDED)["undischarged"] == 0)
+          paperkit.coherence.grounding_residual(GROUNDED)["reflected"] == 1 and paperkit.coherence.grounding_residual(GROUNDED)["undischarged"] == 0)
     check("grounding: disjoint with a NON-empty fingerprint → genuine undischarged miss",
-          C.grounding_residual(GENUINE)["undischarged"] == 1)
+          paperkit.coherence.grounding_residual(GENUINE)["undischarged"] == 1)
     check("grounding: an empty-fingerprint claim is vacuously disjoint → rhetorical, auto-discharged",
-          C.grounding_residual(RHETORICAL)["rhetorical"] == 1 and C.grounding_residual(RHETORICAL)["undischarged"] == 0)
+          paperkit.coherence.grounding_residual(RHETORICAL)["rhetorical"] == 1 and paperkit.coherence.grounding_residual(RHETORICAL)["undischarged"] == 0)
     check("grounding: a `link` discharges a genuine miss",
-          C.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0)
+          paperkit.coherence.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0)
     check("grounding: shared scaffolding is not engine grounding (no edge counted)",
-          C.grounding_residual(SCAFFOLD)["grounding_edges"] == 0)
+          paperkit.coherence.grounding_residual(SCAFFOLD)["grounding_edges"] == 0)
 
     # Ζ·cohere·mute — the EXIT, not the computation.  Every check above proves the residual is
     # computed right; none proved anyone ever SEES it.  `--from-calcs` (the arm //:cohere runs)
     # returned 1 in silence, so a red gate said `fail` and discarded the named misses one field
     # away.  δ = the same fixtures, one edge apart: silence+0 vs the edge named on stderr.
     def _exit(recs, discharged=frozenset()):
-        rep = C.report(recs, set(discharged), frozenset(r["key"] for r in recs))
+        rep = paperkit.coherence.report(recs, set(discharged), frozenset(r["key"] for r in recs))
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
-            rc = C._grounding_exit(rep)
+            rc = paperkit.coherence._grounding_exit(rep)
         return rc, err.getvalue()
 
     p_rc, p_err = _exit(GROUNDED)
@@ -125,59 +123,59 @@ def main() -> int:
     check("exit (δ): a `link` on the same fixture flips it back to silent+0",
           _exit(GENUINE, {"b"}) == (0, ""))
     check("vacuity (Ν·vac): no claim tests engine capability → report flags vacuous (refuse a verdict)",
-          C.report(VAC)["vacuous"] is True)
+          paperkit.coherence.report(VAC)["vacuous"] is True)
     check("vacuity (Ν·vac): one engine site → NOT vacuous (a real verdict is possible)",
-          C.report(LIVE)["vacuous"] is False)
+          paperkit.coherence.report(LIVE)["vacuous"] is False)
     check("frame (c): _universal_sites is the intersection over cited fingerprints (≥2 claims)",
-          C._universal_sites(UNIVFRAME) == frozenset({U}))
+          paperkit.coherence._universal_sites(UNIVFRAME) == frozenset({U}))
     check("frame (c): below two fingerprints the frame is undefined → identity quotient (empty)",
-          C._universal_sites([rec("a", tests=[U, "paperkit/gate.py::resolves"])]) == frozenset())
+          paperkit.coherence._universal_sites([rec("a", tests=[U, "paperkit/gate.py::resolves"])]) == frozenset())
     check("frame (c): un-quotiented, the shared universal site reflects the edge (undischarged 0)",
-          C.grounding_residual(UNIVFRAME)["undischarged"] == 0)
+          paperkit.coherence.grounding_residual(UNIVFRAME)["undischarged"] == 0)
     check("frame (c): report() quotients the universal site → the edge is a genuine miss (undischarged 1)",
-          C.report(UNIVFRAME)["grounding"]["undischarged"] == 1)
+          paperkit.coherence.report(UNIVFRAME)["grounding"]["undischarged"] == 1)
     check("unmeasured (d): a rests-on to an ungraded-but-declared target is PENDING",
-          C.unmeasured_edges(PENDING, all_keys=frozenset({"x", "y"}))["pending"] == [["x", "y"]])
+          paperkit.coherence.unmeasured_edges(PENDING, all_keys=frozenset({"x", "y"}))["pending"] == [["x", "y"]])
     check("unmeasured (d): a rests-on to a target no bib entry declares is DANGLING (broken edge)",
-          C.unmeasured_edges(DANGLING, all_keys=frozenset({"x"}))["dangling"] == [["x", "z"]])
+          paperkit.coherence.unmeasured_edges(DANGLING, all_keys=frozenset({"x"}))["dangling"] == [["x", "z"]])
     check("unmeasured (d): a graded target is seen by grounding → not counted",
-          C.unmeasured_edges(MEASURED_TGT, all_keys=frozenset({"x", "y"}))["unmeasured"] == 0)
+          paperkit.coherence.unmeasured_edges(MEASURED_TGT, all_keys=frozenset({"x", "y"}))["unmeasured"] == 0)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
     pairs = [
         ("structure residual tracks the grounding edge's prose distance",
          "the dependent claim's grounding target (predecessor → two-back)",
-         "adjacent → 0 owed", C.structure_residual(CARRIED)["owed"] == 0,
-         "non-adjacent → 1 owed", C.structure_residual(LONG)["owed"] == 1),
+         "adjacent → 0 owed", paperkit.coherence.structure_residual(CARRIED)["owed"] == 0,
+         "non-adjacent → 1 owed", paperkit.coherence.structure_residual(LONG)["owed"] == 1),
         ("sensitivity collapse tracks signature sharing",
          "the second witness's tests (y.py → w.py)",
-         "distinct → 0 collapse", C.sensitivity_residual(DISTINCT)["collapse"] == 0,
-         "shared   → 1 collapse", C.sensitivity_residual(COLLAPSED)["collapse"] == 1),
+         "distinct → 0 collapse", paperkit.coherence.sensitivity_residual(DISTINCT)["collapse"] == 0,
+         "shared   → 1 collapse", paperkit.coherence.sensitivity_residual(COLLAPSED)["collapse"] == 1),
         ("a `link` footnote discharges a long edge (advisory, not a gate)",
          "acknowledging claim c's link",
-         "un-acknowledged → 1", C.structure_residual(LONG)["undischarged"] == 1,
-         "footnoted → 0", C.structure_residual(LONG, discharged={"c"})["undischarged"] == 0),
+         "un-acknowledged → 1", paperkit.coherence.structure_residual(LONG)["undischarged"] == 1,
+         "footnoted → 0", paperkit.coherence.structure_residual(LONG, discharged={"c"})["undischarged"] == 0),
         ("grounding: a disjoint edge is residual only when UN-explained",
          "why the edge is disjoint (empty fingerprint / link / neither)",
          "rhetorical OR linked → 0 residual",
-         C.grounding_residual(RHETORICAL)["undischarged"] == 0
-         and C.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0,
-         "genuine + unlinked → 1 residual", C.grounding_residual(GENUINE)["undischarged"] == 1),
+         paperkit.coherence.grounding_residual(RHETORICAL)["undischarged"] == 0
+         and paperkit.coherence.grounding_residual(GENUINE, discharged={"b"})["undischarged"] == 0,
+         "genuine + unlinked → 1 residual", paperkit.coherence.grounding_residual(GENUINE)["undischarged"] == 1),
         ("Ν·vac: a measurement is vacuous only when NO claim tests engine capability",
          "the lone claim's fingerprint (scaffolding-only → an engine site)",
-         "engine site → not vacuous", C.report(LIVE)["vacuous"] is False,
-         "scaffold only → vacuous", C.report(VAC)["vacuous"] is True),
+         "engine site → not vacuous", paperkit.coherence.report(LIVE)["vacuous"] is False,
+         "scaffold only → vacuous", paperkit.coherence.report(VAC)["vacuous"] is True),
         ("frame (c): the computed quotient turns a trivial universal overlap into the genuine miss",
          "whether _universal_sites is quotiented out (report frames; grounding_residual default does not)",
-         "un-quotiented → 0 (U reflects)", C.grounding_residual(UNIVFRAME)["undischarged"] == 0,
-         "quotiented → 1 (miss surfaces)", C.report(UNIVFRAME)["grounding"]["undischarged"] == 1),
+         "un-quotiented → 0 (U reflects)", paperkit.coherence.grounding_residual(UNIVFRAME)["undischarged"] == 0,
+         "quotiented → 1 (miss surfaces)", paperkit.coherence.report(UNIVFRAME)["grounding"]["undischarged"] == 1),
         ("unmeasured (d): an edge's target is pending until it is graded",
          "whether the rests-on target has a record (ungraded → pending, graded → seen)",
          "target graded → 0 unmeasured",
-         C.unmeasured_edges(MEASURED_TGT, all_keys=frozenset({"x", "y"}))["unmeasured"] == 0,
+         paperkit.coherence.unmeasured_edges(MEASURED_TGT, all_keys=frozenset({"x", "y"}))["unmeasured"] == 0,
          "target ungraded → 1 pending",
-         C.unmeasured_edges(PENDING, all_keys=frozenset({"x", "y"}))["unmeasured"] == 1),
+         paperkit.coherence.unmeasured_edges(PENDING, all_keys=frozenset({"x", "y"}))["unmeasured"] == 1),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok

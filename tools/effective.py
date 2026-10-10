@@ -28,9 +28,8 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "paperkit"))
-import bib
-import grade
+import paperkit.bib
+import paperkit.grade
 
 
 def _delegation(check: str) -> dict | None:
@@ -52,7 +51,7 @@ def records(project_dir: Path, grade_files: list) -> list:
     """Assemble {key, grade, rests-on, delegates_to} — the grade records joined to the bib's
     edges.  The grade files carry the measurement; the bib carries the structure.
     """
-    F = bib.parse_project(project_dir)
+    F = paperkit.bib.parse_project(project_dir)
     out = []
     for gf in grade_files:
         d = json.loads(Path(gf).read_text())
@@ -108,7 +107,7 @@ def main(argv: list) -> int:
         rest.append(argv[i])
         i += 1
     project_dir, grade_files = Path(rest[0]), rest[1:]
-    rs = grade.clamp(records(project_dir, grade_files), owner_grades(owners))
+    rs = paperkit.grade.clamp(records(project_dir, grade_files), owner_grades(owners))
     print(json.dumps({"project": project_dir.name or str(project_dir),
                       "claims": [{"key": r["key"], "grade": r["grade"],
                                   "effective_grade": r["effective_grade"],

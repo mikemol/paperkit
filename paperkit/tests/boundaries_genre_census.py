@@ -29,9 +29,9 @@ BY NAME with its reason rather than by relaxing the check.
 import itertools
 import sys
 from pathlib import Path
+import paperkit.bib
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "paperkit"))
 
 # ⚑ DECLARED, NOT INFERRED.  `brief` IS `staged` (Ν-F1, measured byte-identical), and it is kept on
 # purpose: it is the only regression fixture for the declared-genre seam whose expected output is
@@ -52,8 +52,8 @@ KNOWN_DUPLICATE = {
 
 
 def partition(cfg, genre, project, gamma=None):
-    import project as P
-    units = [u["keys"] for u in P.observe(cfg, genre, project, gamma)]
+    import paperkit.project
+    units = [u["keys"] for u in paperkit.project.observe(cfg, genre, project, gamma)]
     return {k: i for i, u in enumerate(units) for k in u}, units
 
 
@@ -67,12 +67,12 @@ def disagreement(a, b, keys) -> float:
 
 
 def main() -> int:
-    import project as P
-    import genre as G
+    import paperkit.project
+    import paperkit.genre
 
     proj = ROOT / "paper"
-    cfg = P.load_config(proj)
-    names = sorted(G.registry(proj))
+    cfg = paperkit.bib.load_config(proj)
+    names = sorted(paperkit.genre.registry(proj))
     print("Ξ·bnd-genre-census — every registered genre is a distinct vantage\n")
 
     cuts, sizes = {}, {}

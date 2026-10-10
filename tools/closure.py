@@ -29,17 +29,24 @@ import ast
 import sys
 from pathlib import Path
 
-from imports import imports as _mod_imports
+import tools.imports
 
 
 def _imports(node, names):
     out = set()
     for n in ast.walk(node):
         if isinstance(n, ast.Import):
+            out |= {s for a in n.names if (s := _stem(a.name)) in names}
+        elif isinstance(n, ast.ImportFrom) and n.module == "paperkit":
             out |= {a.name for a in n.names if a.name in names}
-        elif isinstance(n, ast.ImportFrom) and n.module in names:
-            out.add(n.module)
+        elif isinstance(n, ast.ImportFrom) and _stem(n.module or "") in names:
+            out.add(_stem(n.module or ""))
     return out
+
+
+def _stem(dotted):
+    """The engine module stem a flat or `paperkit.`-qualified import names."""
+    return dotted.removeprefix("paperkit.").removeprefix("tests.")
 
 
 def _reads(node, names):
@@ -164,7 +171,7 @@ def main(argv):
     # this cone), hence the modules whose def-drop can flip it.  Roots alone UNDER-scope — node-is-claim
     # roots {gate,project,resolver} but exercises bib.parse via project's `entries = bib.parse`, so bib
     # (transitively imported, not a root) must be in the perturbation surface or its flip is missed.
-    igraph = {s: _mod_imports(Path(p).read_text(), set(names)) for s, p in names.items()}
+    igraph = {s: tools.imports.imports(Path(p).read_text(), set(names)) for s, p in names.items()}
 
     def _cone(seed):
         seen = set(seed)

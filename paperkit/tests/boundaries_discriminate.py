@@ -16,23 +16,21 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_delta import discriminate, discriminate_stderr
-from _fixture_model import entry
-from _fixture_project import project_text
+import paperkit.tests._fixture_delta
+import paperkit.tests._fixture_model
+import paperkit.tests._fixture_project
 
 TOKEN = "WARRANT-TOKEN-A1B2"
 
 
 def W(check):
-    return [entry("w", claim=f"a claim that mentions {TOKEN}", check=check)]
+    return [paperkit.tests._fixture_model.entry("w", claim=f"a claim that mentions {TOKEN}", check=check)]
 
 
 def grade_of(check, assets=None):
-    _, out = discriminate(W(check), "--all", "--json", assets=assets)
+    _, out = paperkit.tests._fixture_delta.discriminate(W(check), "--all", "--json", assets=assets)
     return json.loads(out)[0]
 
 
@@ -41,7 +39,7 @@ def grader_of(check, resumable=False):
     # resumable pump-witness (GradeWitness); the default is the batch grader
     # (_grade_parallel).  That the grader is RECORDED, not inferred, is the point.
     flags = ("--all", "--json") + (("--budget", "0") if resumable else ())
-    _, out = discriminate(W(check), *flags)
+    _, out = paperkit.tests._fixture_delta.discriminate(W(check), *flags)
     return json.loads(out)[0]["grader"]
 
 
@@ -49,7 +47,7 @@ def determinism_of(check):
     # Δ·det: grade with the determinism guard ON (PAPERKIT_DELTA_REPEAT=2) and report
     # "flaky" if the pristine baseline disagreed across runs, else the ordinary grade.
     env = {**os.environ, "PAPERKIT_DELTA_REPEAT": "2"}
-    _, out = discriminate(W(check), "--all", "--json", env=env)
+    _, out = paperkit.tests._fixture_delta.discriminate(W(check), "--all", "--json", env=env)
     r = json.loads(out)[0]
     return r.get("determinism") or r["grade"]
 
@@ -62,14 +60,14 @@ FLAKY = "cmd:sh -c 'if [ -f det.flag ]; then rm det.flag; false; else touch det.
 def grades_via(warrants, resumable=False):
     # Σ·flat·agree: the whole grade-set produced by one grader, keyed by check.
     flags = ("--all", "--json") + (("--budget", "0") if resumable else ())
-    _, out = discriminate(warrants, *flags)
+    _, out = paperkit.tests._fixture_delta.discriminate(warrants, *flags)
     return {r["check"]: r["grade"] for r in json.loads(out)}
 
 
 def pulse_lines(warrants, off=False):
     # Δ·pulse: count the liveness heartbeat lines ("graded N/total") in the grade's stderr.
     env = {**os.environ, "PAPERKIT_DELTA_PULSE": "0"} if off else None
-    err = discriminate_stderr(warrants, "--all", "--json", env=env)
+    err = paperkit.tests._fixture_delta.discriminate_stderr(warrants, "--all", "--json", env=env)
     return sum(1 for ln in err.splitlines() if "graded " in ln and "/" in ln)
 
 
@@ -77,9 +75,9 @@ def pulse_lines(warrants, off=False):
 # (content-sensitive cmd), indeterminate (corruption-blind cmd) — so grader
 # equivalence is checked on a discriminating set, not a degenerate all-same one.
 MIXED = [
-    entry("v", claim="a presupposed input", check="file:w.bib"),
-    entry("b", claim=f"content that mentions {TOKEN}", check=f"cmd:grep -q {TOKEN} w.bib"),
-    entry("i", claim="a check blind to the project", check="cmd:true"),
+    paperkit.tests._fixture_model.entry("v", claim="a presupposed input", check="file:w.bib"),
+    paperkit.tests._fixture_model.entry("b", claim=f"content that mentions {TOKEN}", check=f"cmd:grep -q {TOKEN} w.bib"),
+    paperkit.tests._fixture_model.entry("i", claim="a check blind to the project", check="cmd:true"),
 ]
 
 
@@ -87,17 +85,17 @@ def compose_sub(green=True):
     # Ξ·seam: assets for a nested sibling project 'g' that GATES GREEN (a passing file:
     # check) or RED (a failing cmd:false) — the verdict a `result:g` import imports.  The
     # paper.toml/rubric/title MUST match _fixture's so g/out.md == project(g) (prose≡proj).
-    w = entry("c", claim="a sibling claim", check=("file:w.bib" if green else "cmd:false"))
+    w = paperkit.tests._fixture_model.entry("c", claim="a sibling claim", check=("file:w.bib" if green else "cmd:false"))
     toml = ('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
             'out = "out.md"\nnumbered = false\nreferences = false\n')
     return {"g/paper.toml": toml, "g/r.tsv": "s\tSec\n", "g/w.bib": w,
-            "g/out.md": project_text([w])}
+            "g/out.md": paperkit.tests._fixture_project.project_text([w])}
 
 
 def gate_exit(check, cited):
     # cited-only gating: control whether [@w] appears in the projection directly
     out = "the claim [@w]\n" if cited else "no citation here\n"
-    rc, _ = discriminate(W(check), "--min-strength", "behavioral", out=out)
+    rc, _ = paperkit.tests._fixture_delta.discriminate(W(check), "--min-strength", "behavioral", out=out)
     return rc
 
 
@@ -246,8 +244,8 @@ def main() -> int:
     # (delegated to a separately-gated sibling) but REJECTS a vacuous file: — the gate-mode
     # proof that composition meets the behavioral floor without re-deriving the sibling.
     print("Δ adequacy-composes — Ξ·seam\n")
-    imp_rc, _ = discriminate(W("result:g"), "--min-strength", "behavioral", assets=compose_sub(True))
-    vac_rc, _ = discriminate(W("file:w.bib"), "--min-strength", "behavioral")
+    imp_rc, _ = paperkit.tests._fixture_delta.discriminate(W("result:g"), "--min-strength", "behavioral", assets=compose_sub(True))
+    vac_rc, _ = paperkit.tests._fixture_delta.discriminate(W("file:w.bib"), "--min-strength", "behavioral")
     compose_ok = imp_rc == 0 and vac_rc == 1
     if not compose_ok:
         fails.append(("adequacy-composes", imp_rc, vac_rc))
@@ -261,8 +259,8 @@ def main() -> int:
     # The fixture project has no engine, so def must fail loud; file resolution needs none, passes.
     print("Δ def-resolution engine guard — Ν·loud\n")
     chk = f"cmd:grep -q {TOKEN} w.bib"
-    def_rc, _ = discriminate(W(chk), "--all", "--json", "--resolution", "def")
-    file_rc, _ = discriminate(W(chk), "--all", "--json", "--resolution", "file")
+    def_rc, _ = paperkit.tests._fixture_delta.discriminate(W(chk), "--all", "--json", "--resolution", "def")
+    file_rc, _ = paperkit.tests._fixture_delta.discriminate(W(chk), "--all", "--json", "--resolution", "file")
     loud_ok = def_rc != 0 and file_rc == 0
     if not loud_ok:
         fails.append(("N-loud", def_rc, file_rc))
@@ -276,8 +274,8 @@ def main() -> int:
     # moved validation to the ladder's ONE consumer — the set is derived from grade.py, listed
     # nowhere).  P = a real rung gates (adequacy-composes above); F = a bogus floor is refused.
     print("Δ floor validation — Ζ·ladder\n")
-    bogus_rc, _ = discriminate(W("cmd:true"), "--min-strength", "bogus")
-    bogus_msg = discriminate_stderr(W("cmd:true"), "--min-strength", "bogus")
+    bogus_rc, _ = paperkit.tests._fixture_delta.discriminate(W("cmd:true"), "--min-strength", "bogus")
+    bogus_msg = paperkit.tests._fixture_delta.discriminate_stderr(W("cmd:true"), "--min-strength", "bogus")
     floor_ok = bogus_rc != 0 and "--min-strength must be one of" in bogus_msg
     if not floor_ok:
         fails.append(("floor-refusal", bogus_rc, bogus_msg))
@@ -292,8 +290,8 @@ def main() -> int:
     # typo instead of spinning (a downstream consumer measured 29 iterations in 15s on the old
     # overloaded code).  A real key grades and exits 0.
     print("Δ exit alphabet — Ζ·ladder·sentinel (finding A)\n")
-    refuse_rc, _ = discriminate(W("cmd:true"), "--only", "no-such-key")
-    ok_rc, _ = discriminate(W("cmd:true"), "--only", "w")
+    refuse_rc, _ = paperkit.tests._fixture_delta.discriminate(W("cmd:true"), "--only", "no-such-key")
+    ok_rc, _ = paperkit.tests._fixture_delta.discriminate(W("cmd:true"), "--only", "w")
     refuse_ok = refuse_rc == 3 and ok_rc == 0
     if not refuse_ok:
         fails.append(("refuse-code", refuse_rc, ok_rc))

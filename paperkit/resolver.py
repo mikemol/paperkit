@@ -38,15 +38,7 @@ from pathlib import Path
 # (project.py, gate.py, discriminate.py) keep resolving unchanged. A full census (comprehensive,
 # not just the function names) found this complete set of external dependents -- over-exporting
 # here is deliberate and safe, not guesswork.
-from checkenv import (  # noqa: F401 -- re-exported, see comment above
-    _ENV_DROP,
-    _ENV_KEEP,
-    _ENV_KEEP_PREFIX,
-    ENGINE_PATH,
-    PATH,
-    clean_env,
-    spawn_declared,
-)
+import paperkit.checkenv
 
 _GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
 # ⚑ Ζ·lib·land — ONE `.parent`, LIKE `_GATE` ABOVE, because the library now lives INSIDE the
@@ -471,7 +463,7 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
         # lines — to STDOUT"), and this site — the one that actually RUNS the check — kept it.  The
         # two streams stay on SEPARATE handles and are never merged; stdout is appended after
         # stderr only when composing the account, so a parse of either is unaffected.
-        p = subprocess.Popen(cmd, shell=True, cwd=cwd, env=clean_env(),
+        p = subprocess.Popen(cmd, shell=True, cwd=cwd, env=paperkit.checkenv.clean_env(),
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              start_new_session=True, preexec_fn=_cpu_rlimit(cpu))
         try:
@@ -568,7 +560,7 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
             if claim:
                 argv += ["--only", claim]
             argv.append(str(_sibling_for(project_dir, proj)))
-            r = subprocess.run(argv, cwd=project_dir, env=clean_env(),
+            r = subprocess.run(argv, cwd=project_dir, env=paperkit.checkenv.clean_env(),
                                capture_output=True, text=True)
             rec = json.loads(r.stdout or "{}")
             if rec.get("available") is False:         # the sibling's own cannot-run
@@ -605,14 +597,14 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         try:
             lib = _library_for(project_dir)
             r = subprocess.run(_library_cmd(lib, target),
-                               cwd=lib, env=clean_env(), capture_output=True)
+                               cwd=lib, env=paperkit.checkenv.clean_env(), capture_output=True)
             # Λ·library·fallthrough — per-KEY, not per-directory: exit 2 is the library's own
             # "not mine" sentinel, so a project library lacking the key falls through to the
             # engine's (the true owner answers); any other exit is the OWNING library's verdict.
             # The owning case runs ONCE; only a fallthrough pays the cheap rc-2 probe first.
             if r.returncode == 2 and lib != _LIBRARY:
                 r = subprocess.run(_library_cmd(_LIBRARY, target),
-                                   cwd=_LIBRARY, env=clean_env(), capture_output=True)
+                                   cwd=_LIBRARY, env=paperkit.checkenv.clean_env(), capture_output=True)
             # exit 2 from the FINAL owner = "nobody owns this key": the concept is UNAVAILABLE (no
             # library can witness it), NOT refuted.  Any other exit is the owning library's verdict.
             if r.returncode == 2:
@@ -660,7 +652,7 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         outs = set()
         for prod in producers:
             try:
-                r = subprocess.run(prod, shell=True, cwd=project_dir, env=clean_env(),
+                r = subprocess.run(prod, shell=True, cwd=project_dir, env=paperkit.checkenv.clean_env(),
                                    capture_output=True, text=True)
             except Exception:
                 return UNAVAILABLE                    # a producer could not be SPAWNED — cannot
@@ -865,7 +857,7 @@ def footprint(check: str, project_dir: Path, custom: dict, scope: Path | None = 
     try:
         try:
             subprocess.run(["strace", "-f", "-qq", "-e", "trace=openat,open", "-o", str(trace),
-                            "sh", "-c", cmd], cwd=project_dir, env=clean_env(), capture_output=True)
+                            "sh", "-c", cmd], cwd=project_dir, env=paperkit.checkenv.clean_env(), capture_output=True)
         except FileNotFoundError:
             return None                                   # Φ·degrade: strace not installed
         # Φ·degrade: when strace cannot trace — absent (above) or unable to ATTACH (no ptrace,

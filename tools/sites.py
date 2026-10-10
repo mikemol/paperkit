@@ -33,13 +33,12 @@ ONE source the in-process sweep also imports — no separate twin to drift).  Us
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "paperkit"))
 
-from def_sites import def_sites
-from imports import imports
+import tools.def_sites
+import tools.imports
 
 # Μ·sweep·atom — the ONE atom source (grader imports the same enumerators; no separate twin to drift).
-from mutate import _branch_sites, _data_sites, _flip_sites
+import paperkit.mutate
 
 
 def sites(path, names):
@@ -48,17 +47,17 @@ def sites(path, names):
     import+ injects (absent engine imports).
     """
     text = Path(path).read_text()
-    for qn in def_sites(text):
+    for qn in tools.def_sites.def_sites(text):
         yield qn                                        # def-drop — a bare qualname
-    for qn, n, _arm in _branch_sites(text):
+    for qn, n, _arm in paperkit.mutate._branch_sites(text):
         yield "branch:%s#%d" % (qn, n)                  # Μ·sweep·atom — a branch-arm reach probe (raise-kind)
-    for qn, n, _test in _flip_sites(text):
+    for qn, n, _test in paperkit.mutate._flip_sites(text):
         yield "flip:%s#%d" % (qn, n)                    # Μ·sweep·atom — a condition inversion (non-monotone)
-    for qn, n, kind, _k, _v in _data_sites(text):
+    for qn, n, kind, _k, _v in paperkit.mutate._data_sites(text):
         yield "data-:%s#%d" % (qn, n)                   # Μ·sweep·atom — a data key/elem DROP (raise-kind, like branch:)
         if kind != "Set":                               # a set element has no perturbable value (data-: covers presence)
             yield "dflip:%s#%d" % (qn, n)               # Μ·sweep·atom — a data value PERTURB (non-monotone, like flip:)
-    absent = names - imports(text, names) - {Path(path).stem}
+    absent = names - tools.imports.imports(text, names) - {Path(path).stem}
     for name in sorted(absent):
         yield "import+:" + name                         # inject an absent engine import (negative polarity)
 

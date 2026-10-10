@@ -10,13 +10,13 @@ Proof: baseline + ONE mutant (a sensitive engine file) for a real check.  The fu
 fan-out + ladder + rests_on clamp is the scaled version.
 """
 
-load("//tools:cell.bzl", "cell_pypath")
+load("//tools:cell.bzl", "cell_module", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
 
 def _verdict_tool(py, tool):
-    return cell_pypath(py) + '"$(command -v python3)" ' + tool.path + " "
+    return cell_pypath(py) + '"$(command -v python3)" ' + cell_module(tool) + " "
 
 def _rerun(ctx, tag, mutate):
     """A Bazel action: stage the inputs, optionally corrupt `mutate`, run `gate.py --only` under
@@ -31,7 +31,7 @@ def _rerun(ctx, tag, mutate):
         inputs = depset(ctx.files.data, transitive = [py3.files]),
         command = ('set -e; D=$(mktemp -d); cp --parents %s "$D/"; %s' +
                    'PY=$(cd "$(dirname %s)" && pwd)/$(basename %s); export PATH="$(dirname "$PY"):$PATH"; ' +
-                   'if (cd "$D" && "$PY" paperkit/gate.py --only %s %s) >"$D/o" 2>&1; ' +
+                   'if (cd "$D" && "$PY" -m paperkit.gate --only %s %s) >"$D/o" 2>&1; ' +
                    'then echo pass > %s; else { echo fail; tail -8 "$D/o"; } > %s; fi; rm -rf "$D"') % (
             files, corrupt, interp, interp, ctx.attr.claim, ctx.attr.project, v.path, v.path),
         mnemonic = "PkRerun",
@@ -84,7 +84,7 @@ def _grade_claim_impl(ctx):
         inputs = depset(ctx.files.data, transitive = [py.files]),
         command = ('PY=$(cd "$(dirname ' + interp + ')" && pwd)/$(basename ' + interp + '); ' +
                    'export PATH="$(dirname "$PY"):$PATH"; export PAPERKIT_ROOT="$PWD"; ' +
-                   '"$PY" paperkit/discriminate.py --only ' + ctx.attr.claim + " " + ctx.attr.project +
+                   '"$PY" -m paperkit.discriminate --only ' + ctx.attr.claim + " " + ctx.attr.project +
                    " > " + v.path),
         mnemonic = "PkGradeClaim",
         progress_message = "Ζ·nest grade " + ctx.label.name,
@@ -151,7 +151,7 @@ def _footprint_impl(ctx):
         inputs = depset(ctx.files.data, transitive = [py.files]),
         command = ('PY=$(cd "$(dirname ' + interp + ')" && pwd)/$(basename ' + interp + '); ' +
                    'export PATH="$(dirname "$PY"):$PATH"; ' +
-                   '"$PY" paperkit/footdeps.py --only ' + ctx.attr.claim + " " + ctx.attr.project +
+                   '"$PY" -m paperkit.footdeps --only ' + ctx.attr.claim + " " + ctx.attr.project +
                    " > " + v.path),
         mnemonic = "PkFootprint",
         progress_message = "Ζ·foot·act " + ctx.label.name,

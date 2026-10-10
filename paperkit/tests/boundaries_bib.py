@@ -14,25 +14,23 @@ from __future__ import annotations
 import io
 import pathlib
 import shutil
-import sys
 import tempfile
 from contextlib import redirect_stderr
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import bib
+import paperkit.bib
 
 
 def _warns(body: str, consumer_fields: tuple = ()) -> str:
     """Parse a one-entry bib with this body (and optional declared consumer fields); return the
     parser's stderr and the parsed record.
     """
-    bib._WARNED.clear()                          # the dedup is per build, not per probe
+    paperkit.bib._WARNED.clear()                          # the dedup is per build, not per probe
     p = Path(tempfile.mkdtemp()) / "t.bib"
     p.write_text("@misc{k,\n" + body + "\n}\n")
     err = io.StringIO()
     with redirect_stderr(err):
-        parsed = bib.parse(p, consumer_fields)
+        parsed = paperkit.bib.parse(p, consumer_fields)
     return err.getvalue(), parsed["k"]
 
 
@@ -53,9 +51,9 @@ def main() -> int:
 
     print("bib parser behaviors\n")
     check("_top_fields finds the top-level fields",
-          bib._top_fields("claim = {a}, check = {cmd:true}") == ["claim", "check"])
+          paperkit.bib._top_fields("claim = {a}, check = {cmd:true}") == ["claim", "check"])
     check("_top_fields ignores an `=` INSIDE a value (set notation is not a field)",
-          bib._top_fields("claim = {x = {1,2}}, check = {cmd:true}") == ["claim", "check"])
+          paperkit.bib._top_fields("claim = {x = {1,2}}, check = {cmd:true}") == ["claim", "check"])
     known_err, known = _warns("  claim = {a claim},\n  check = {cmd:true}")
     check("a known field is carried (claim + check parsed)",
           known.get("claim") == "a claim" and known.get("check") == "cmd:true")
@@ -94,9 +92,9 @@ def main() -> int:
           math.get("claim", "").startswith("clamp:") and math["claim"].endswith("holds")
           and "$" in math["claim"])
     check("_scalar_value counts to arbitrary depth (nested \\mathrm{} inside \\{ \\})",
-          bib._scalar_value(r"claim = {a \min\{\mathrm{x}\} b}", "claim") == r"a \min\{\mathrm{x}\} b")
+          paperkit.bib._scalar_value(r"claim = {a \min\{\mathrm{x}\} b}", "claim") == r"a \min\{\mathrm{x}\} b")
     check("_top_fields ignores escaped braces in math (they are not structural depth)",
-          bib._top_fields(r"claim = {$\{x\}$ text}, check = {cmd:true}") == ["claim", "check"])
+          paperkit.bib._top_fields(r"claim = {$\{x\}$ text}, check = {cmd:true}") == ["claim", "check"])
     # A project DECLARES the extra scalar fields it tolerates (its downstream consumer's vocabulary);
     # paperkit carries them but consumes them in no invariant.  A DECLARED field is carried AND quiet;
     # an UNdeclared unknown is still named loud — the declaration is what tells a consumer's field
@@ -126,10 +124,10 @@ def main() -> int:
         (d / "paper.toml").write_text(
             '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["w.bib"]\nout="o.md"\n' + cf_line)
         (d / "w.bib").write_text("@misc{k,\n  claim = {c},\n  provenance = {p},\n  check = {cmd:true}\n}\n")
-        bib._WARNED.clear()
+        paperkit.bib._WARNED.clear()
         err = io.StringIO()
         with redirect_stderr(err):
-            recs = bib.load_bib(d / "w.bib", d)
+            recs = paperkit.bib.load_bib(d / "w.bib", d)
         return err.getvalue(), recs["k"]
     lb_err, lb = _load_bib_from_toml('consumer_fields=["provenance"]\n')
     check("load_bib resolves consumer_fields from paper.toml on disk — a DECLARED field carried + quiet",
@@ -164,9 +162,9 @@ def main() -> int:
             '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["a.bib","b.bib"]\nout="o.md"\n')
         (d / "a.bib").write_text("@misc{dup,\n  claim = {first},\n  check = {cmd:true}\n}\n")
         (d / "b.bib").write_text(second_body)
-        bib._WARNED.clear()
+        paperkit.bib._WARNED.clear()
         try:
-            return True, bib.parse_project(d)
+            return True, paperkit.bib.parse_project(d)
         except SystemExit as e:
             return False, str(e)
     ok_dup, dup_msg = _two_bibs("@misc{dup,\n  claim = {second}\n}\n")
@@ -195,14 +193,14 @@ def main() -> int:
          "undeclared → dropped + named", "journal" in _warns("  journal = {J}")[0]),
         ("a top-level field is named, an `=` inside a value is not (brace depth)",
          "whether the `= {` sits at brace depth 0 or inside a value",
-         "top level → a field", bib._top_fields("points = {q}") == ["points"],
-         "inside a value → not", bib._top_fields("claim = {a points = {q} b}") == ["claim"]),
+         "top level → a field", paperkit.bib._top_fields("points = {q}") == ["points"],
+         "inside a value → not", paperkit.bib._top_fields("claim = {a points = {q} b}") == ["claim"]),
         ("a claim's value is brace-counted, and an escaped brace is content not structure",
          "whether a `}` is a real closing brace or a LaTeX-escaped literal `\\}`",
          "unescaped } closes the value",
-         bib._scalar_value(r"claim = {a {b} c}", "claim") == "a {b} c",
+         paperkit.bib._scalar_value(r"claim = {a {b} c}", "claim") == "a {b} c",
          "escaped \\} does NOT close it early",
-         bib._scalar_value(r"claim = {a \} b}", "claim") == r"a \} b"),
+         paperkit.bib._scalar_value(r"claim = {a \} b}", "claim") == r"a \} b"),
         ("a consumer field is carried-and-quiet iff the project DECLARED it",
          "whether the field name is in this project's declared consumer_fields",
          "declared → carried + quiet",
@@ -238,7 +236,7 @@ def main() -> int:
             '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n'
             '[checks.premise]\ncmd = "true"\nmechanical = false\n'
             '[checks.oracle]\ncmd = "python3 x.py {target}"\n')
-        cfg = bib.load_config(d)
+        cfg = paperkit.bib.load_config(d)
         ok = cfg["nonmechanical"] == ("premise",)
         print(f"  {'ok' if ok else 'XX'} a declared `mechanical = false` type is reported "
               f"non-mechanical")
@@ -247,7 +245,7 @@ def main() -> int:
         (d / "paper.toml").write_text(
             '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n'
             '[checks.premise]\ncmd = "true"\n')
-        ok2 = bib.load_config(d)["nonmechanical"] == ()
+        ok2 = paperkit.bib.load_config(d)["nonmechanical"] == ()
         print(f"  {'ok' if ok2 else 'XX'} δ: the same type WITHOUT the flag is mechanical — "
               f"declared, never inferred from `cmd = \"true\"`")
         ran.append(ok2)
@@ -266,7 +264,7 @@ def main() -> int:
         # F: above the header — TOML puts it at the top level, outside .get("paper", {})
         (d3 / "paper.toml").write_text('root="."\n[paper]\n' + body)
         try:
-            bib.load_config(d3)
+            paperkit.bib.load_config(d3)
             ok = False
         except SystemExit as e:
             ok = "belongs under [paper]" in str(e) and "root" in str(e)
@@ -275,13 +273,13 @@ def main() -> int:
         ran.append(ok)
         # δ: the SAME line, one header later.  Same three characters, opposite effect.
         (d3 / "paper.toml").write_text("[paper]\n" + body + 'root="."\n')
-        ok2 = bib.load_config(d3) is not None
+        ok2 = paperkit.bib.load_config(d3) is not None
         print(f"  {'ok' if ok2 else 'XX'} δ: the same line BELOW the header is accepted — "
               f"placement is the whole difference, and it is invisible by eye")
         ran.append(ok2)
         # the set is DERIVED from both owners, never copied: a guard carrying its own list
         # would certify a tautology the moment a key was added to one owner and not the guard.
-        keys = set(bib.paper_keys()) | set(bib._param_config_keys())
+        keys = set(paperkit.bib.paper_keys()) | set(paperkit.bib._param_config_keys())
         ok3 = "root" in keys and "consumer_fields" in keys and "title" in keys
         print(f"  {'ok' if ok3 else 'XX'} the guarded set is derived from BOTH owners "
               f"(load_config's p.get calls + Param config= declarations): {len(keys)} keys")
@@ -299,7 +297,7 @@ def main() -> int:
         (d2 / "paper.toml").write_text(base + '[checks.claim]\ncmd="x {target}"\n'
                                               'consumer_fields=["upstream_doc"]\n')
         try:
-            bib.load_config(d2)
+            paperkit.bib.load_config(d2)
             ok = False                       # reached => it accepted a misplaced declaration
         except SystemExit as e:
             ok = "belongs under [paper]" in str(e)
@@ -309,7 +307,7 @@ def main() -> int:
         # δ: the SAME key, one table up, is accepted — placement is the whole difference
         (d2 / "paper.toml").write_text(base + 'consumer_fields=["upstream_doc"]\n'
                                               '[checks.claim]\ncmd="x {target}"\n')
-        ok2 = bib.load_config(d2)["consumer_fields"] == ("upstream_doc",)
+        ok2 = paperkit.bib.load_config(d2)["consumer_fields"] == ("upstream_doc",)
         print(f"  {'ok' if ok2 else 'XX'} δ: the same declaration under [paper] is accepted")
         ran.append(ok2)
     finally:

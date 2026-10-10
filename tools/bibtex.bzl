@@ -502,7 +502,6 @@ def _surface(module_ctx, core):
     hermetic-python principle holds).  Returns ["module\tspec", ...] where spec is a mutate.py mutation:
     a def-drop (bare qualname) or an import+ inject (Ζ·mutant·struct — toggle presence, both polarities)."""
     py = _host_py(module_ctx, "·gen·surface")
-    ds = module_ctx.path(Label("@@//tools:sites.py"))
     # WATCH the generator + its imports, so editing the enumerator regenerates the surface (else the
     # extension serves a STALE result — the tool is an INPUT like the core modules, [[bazel-action-idempotency]]).
     for t in ("sites.py", "def_sites.py", "imports.py"):
@@ -512,7 +511,9 @@ def _surface(module_ctx, core):
     # set ([[bazel-action-idempotency]]: the tool is an input like the core modules).
     module_ctx.watch(module_ctx.path(Label("@@//paperkit:mutate.py")))
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
-    res = module_ctx.execute([str(py), str(ds)] + core, working_directory = root)
+    # ⚑ RUN BY PACKAGE, NEVER BY PATH (paperkit:W297): `-m tools.sites` from the root puts the root
+    # first on sys.path, so `paperkit` and `tools` are importable with no bootstrap and no environment.
+    res = module_ctx.execute([str(py), "-m", "tools.sites"] + core, working_directory = root)
     if res.return_code != 0:
         fail("·gen·surface: sites.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]
@@ -639,7 +640,7 @@ def _closures(module_ctx, project, core):
     # --relpath — the check's REPO-RELATIVE path (paper/checks/claims.py, checks/readme.py), so
     # closure.py resolves Path(__file__).parents[N] to the SANDBOX prefix a file toggle must hit.
     relpath = script if project == "." else project + "/" + script
-    res = module_ctx.execute([str(py), str(cl), "--check", str(check), "--relpath", relpath] + core, working_directory = root)
+    res = module_ctx.execute([str(py), "-m", "tools.closure", "--check", str(check), "--relpath", relpath] + core, working_directory = root)
     if res.return_code != 0:
         fail("·gen·closure: closure.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]

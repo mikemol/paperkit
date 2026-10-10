@@ -36,14 +36,12 @@ from __future__ import annotations
 import importlib.util
 import re
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
 ENG = Path(__file__).resolve().parent.parent
 ROOT = ENG.parent
-sys.path.insert(0, str(ENG))
-import resolver
+import paperkit.resolver
 
 
 def _consumer(w: Path, body: str) -> Path:
@@ -71,7 +69,7 @@ def _consumer(w: Path, body: str) -> Path:
 
 
 def _verdict(check: str, frm: Path) -> str:
-    v = resolver.resolves(check, frm, {})
+    v = paperkit.resolver.resolves(check, frm, {})
     return "cannot-run" if v.is_unavailable() else ("pass" if v.passed else "fail")
 
 
@@ -113,7 +111,7 @@ def main() -> int:
         # above — this suite does not declare and the sandbox does not stage.  Assert the arm
         # only where the terminal owner exists; elsewhere say so.  `cannot-run` there is the
         # ENGINE being right (no library can witness the key), not the seam misbehaving.
-        if (resolver._LIBRARY / "concepts.py").is_file():   # the ENGINE's library, wherever it declares it
+        if (paperkit.resolver._LIBRARY / "concepts.py").is_file():   # the ENGINE's library, wherever it declares it
             check("F: a consumer that DISCLAIMS the key falls through to the engine's library",
                   _verdict("concept:rm-pitch", none) == "pass")
         else:

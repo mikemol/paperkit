@@ -22,10 +22,28 @@ def imports(text, names):
         return out
     for n in ast.walk(tree):
         if isinstance(n, ast.Import):
-            out |= {a.name for a in n.names if a.name in names}
-        elif isinstance(n, ast.ImportFrom) and n.module in names:
-            out.add(n.module)
+            out |= {m for a in n.names if (m := _engine_module(a.name)) in names}
+        elif isinstance(n, ast.ImportFrom) and n.module:
+            if (m := _engine_module(n.module)) in names:
+                out.add(m)
+            elif n.module in PACKAGES:
+                out |= {a.name for a in n.names if a.name in names}
     return out
+
+
+# ⚑ THE ENGINE IMPORTS ITSELF AS A PACKAGE (paperkit:W296): `import paperkit.layout`,
+# `import paperkit.tests._fixture_model`, `from paperkit import layout`. An engine module is named by
+# its stem whichever spelling reaches it, so the flat `import layout` and the package one are the
+# same edge.
+PACKAGES = ("paperkit", "paperkit.tests", "paperkit.library")
+
+
+def _engine_module(dotted):
+    """The stem an import names: `layout` for `layout` and for `paperkit[.tests].layout`."""
+    parts = dotted.split(".")
+    if parts[0] == "paperkit" and len(parts) > 1:
+        return parts[-1]
+    return dotted
 
 
 def _literal(path, name):
@@ -116,8 +134,8 @@ if __name__ == "__main__":
             print("imports.py --write: dag.bzl already fresh")
             raise SystemExit(0)
         sys.path.insert(0, str(eng))
-        import durable
-        durable.write_atomic(dag, want)      # Ζ·write·atomic — the generator eats its own cooking
+        import paperkit.durable
+        paperkit.durable.write_atomic(dag, want)      # Ζ·write·atomic — the generator eats its own cooking
         print("imports.py --write: regenerated paperkit/dag.bzl")
         raise SystemExit(0)
 

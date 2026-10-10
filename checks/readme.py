@@ -18,11 +18,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = ROOT / "paperkit"
-sys.path.insert(0, str(ENGINE))
-sys.path.insert(0, str(ENGINE / "tests"))
-import gate
-import project as P
-import resolver
+import paperkit.gate
+import paperkit.project
+import paperkit.resolver
+import paperkit.bib
 
 # (Μ·kernel·fixture·reads — no module-level source reads: a witness that inspects a module's
 # SOURCE reads it inside its own body, so only that witness stages the module and sweeps its
@@ -35,16 +34,16 @@ def _parse(text):
     try:
         p = Path(d) / "t.bib"
         p.write_text(text)
-        return P.entries(p)
+        return paperkit.bib.parse(p)
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
 
 def rm_selfhost():
     # this README is itself a projection: README.md == project(root warrants)
-    cfg = P.load_config(ROOT)
+    cfg = paperkit.bib.load_config(ROOT)
     assert cfg["out"].name == "README.md", "the root project does not project to README.md"
-    assert P.project(cfg) == cfg["out"].read_text(), "README.md is not the projection of the root warrants"
+    assert paperkit.project.project(cfg) == cfg["out"].read_text(), "README.md is not the projection of the root warrants"
 
 
 def rm_resolver_premise():
@@ -52,11 +51,11 @@ def rm_resolver_premise():
     # NOT one of the built-in resolving verbs — it surfaces an honest "not machine-checked" note and does
     # NOT dispatch in the gate's CLOSED built-in set.  Behavioral: drop the premise branch from
     # _verify_note, or let premise sneak in as a resolving verb, and this flips.
-    assert "not machine-checked" in P._verify_note("premise:the-axiom"), \
+    assert "not machine-checked" in paperkit.project._verify_note("premise:the-axiom"), \
         "the premise provenance note does not surface 'not machine-checked'"
-    assert "Machine-verified" in P._verify_note("cmd:true"), "the cmd provenance note regressed"
-    assert "Agda-proved" in P._verify_note("agda:Foo.bar"), "the agda provenance note regressed"
-    assert gate.resolves("premise:x", ENGINE, {}).is_unavailable(), \
+    assert "Machine-verified" in paperkit.project._verify_note("cmd:true"), "the cmd provenance note regressed"
+    assert "Agda-proved" in paperkit.project._verify_note("agda:Foo.bar"), "the agda provenance note regressed"
+    assert paperkit.resolver.resolves("premise:x", ENGINE, {}).is_unavailable(), \
         "premise resolved as a built-in gate verb — it must be a provenance KIND, not a verb"
 
 
@@ -94,16 +93,16 @@ def rm_ci_enable():
 def rm_cmds_eg():
     # the example commands invoke real engine entrypoints (project makes, gate verifies)
     cmds = (ROOT / "assets" / "commands.sh").read_text()
-    assert "paperkit/project.py" in cmds and "paperkit/gate.py" in cmds, \
+    assert "-m paperkit.project" in cmds and "-m paperkit.gate" in cmds, \
         "the commands example does not show the project + gate entrypoints"
-    for tool in re.findall(r"paperkit/\S+\.py", cmds):
-        assert (ROOT / tool).exists(), f"the example runs a non-existent entrypoint {tool}"
+    for mod in re.findall(r"-m paperkit\.(\w+)", cmds):
+        assert (ENGINE / f"{mod}.py").exists(), f"the example runs a non-existent entrypoint paperkit.{mod}"
 
 
 def rm_delta_cmds():
     # the Δ example runs the real discriminate entrypoint with a flag it actually defines
     cmds = (ROOT / "assets" / "delta-cmds.sh").read_text()
-    assert "paperkit/discriminate.py" in cmds, "the Δ example does not run discriminate.py"
+    assert "-m paperkit.discriminate" in cmds, "the Δ example does not run discriminate.py"
     assert (ENGINE / "discriminate.py").exists(), "discriminate.py (the Δ tool) is missing"
     assert "--min-strength" in cmds and "--min-strength" in (ENGINE / "discriminate.py").read_text(), \
         "the example uses a --min-strength flag discriminate.py does not define"
@@ -133,11 +132,11 @@ def rm_delta_tbl():
     # Ζ·ladder: read from grade.py, never re-listed here.  The old form hardcoded its own 4-tuple
     # and asserted only membership, so it was green while the table omitted `broken` and
     # `imported` — a witness that carries its own copy of the set it guards proves a tautology.
-    import grade
+    import paperkit.grade
     tbl = (ROOT / "assets" / "grades.md").read_text()
     tabled = re.findall(r"\| `(\w+)` \|", tbl)
-    assert tabled == grade.rungs(), \
-        f"the grade table and the engine's ladder disagree: table={tabled} ladder={grade.rungs()}"
+    assert tabled == paperkit.grade.rungs(), \
+        f"the grade table and the engine's ladder disagree: table={tabled} ladder={paperkit.grade.rungs()}"
 
 
 def rm_resolver_tbl():
@@ -148,17 +147,17 @@ def rm_resolver_tbl():
     # So the assertion is set-EQUALITY, which fails on an omitted row AND on a row for a dead verb.
     tbl = (ROOT / "assets" / "resolver.md").read_text()
     tabled = set(re.findall(r"\|\s*`(\w+):", tbl))
-    assert tabled == set(resolver.VERBS), \
-        f"the resolver table and the engine's verb set disagree: {tabled ^ set(resolver.VERBS)}"
+    assert tabled == set(paperkit.resolver.VERBS), \
+        f"the resolver table and the engine's verb set disagree: {tabled ^ set(paperkit.resolver.VERBS)}"
     # every COLUMN is derived too, not just the key — otherwise VERBS' arg/passes would be declared
     # data that nothing reads, and the table's gloss could drift while the row stayed present.
-    for typ, spec in resolver.VERBS.items():
+    for typ, spec in paperkit.resolver.VERBS.items():
         arg = spec["arg"].replace("|", r"\|")          # markdown escapes agree:'s ||| separator
         row = f"| `{typ}:{arg}` | {spec['verb']} | {spec['passes']} |"
         assert row in tbl, f"the table's {typ}: row does not match the engine's declaration\n  want: {row}"
-    assert gate.resolves("cmd:true", ENGINE, {}).passed and gate.resolves("file:gate.py", ENGINE, {}).passed, \
+    assert paperkit.resolver.resolves("cmd:true", ENGINE, {}).passed and paperkit.resolver.resolves("file:gate.py", ENGINE, {}).passed, \
         "the tabled built-in verbs do not dispatch"
-    assert gate.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(), "the built-in set is not closed"
+    assert paperkit.resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(), "the built-in set is not closed"
 
 
 def rm_resolver_eg():
@@ -169,7 +168,7 @@ def rm_resolver_eg():
     assert checks, "the example declares no [checks.<type>]"
     for typ, spec in checks.items():
         assert "{target}" in spec.get("cmd", ""), f"[checks.{typ}] has no {{target}} cmd template"
-    assert gate.resolves("demo:x", ENGINE, {"demo": {"cmd": "true {target}"}}).passed, \
+    assert paperkit.resolver.resolves("demo:x", ENGINE, {"demo": {"cmd": "true {target}"}}).passed, \
         "the resolver does not dispatch a config-declared custom type"
 
 

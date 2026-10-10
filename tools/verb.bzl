@@ -17,7 +17,7 @@ ARBITRARY command (pk_cmd's `sh -c cmd`, pk_agree's producers).  bazel = the pro
 record = the artifact downstream proofs depend on.
 """
 
-load("//tools:cell.bzl", "cell_builds_env", "cell_pypath")
+load("//tools:cell.bzl", "cell_builds_env", "cell_module", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 _VERDICT = "//tools:verdict.py"
@@ -70,7 +70,7 @@ def _engine_importable():
     return 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"; '
 
 def _verdict_tool(py, tool):
-    return cell_pypath(py) + '"$(command -v python3)" ' + tool.path + " "
+    return cell_pypath(py) + '"$(command -v python3)" ' + cell_module(tool) + " "
 
 
 # Ζ·tier·pin — the toolchain pool's PATH, PINNED as a build-graph VALUE instead of inherited via
@@ -196,7 +196,7 @@ def _cmd_impl(ctx):
                   "( " + inner + ' ) >"$PK_ACCT" 2>&1; rc=$?; ' +
                   'if [ "$rc" = 0 ]; then V=pass; elif [ "$rc" = 3 ]; then V=cannot-run; else V=fail; fi; ' +
                   'cat "$PK_ACCT" >&2; ' +
-                  '"$(command -v python3)" ' + ctx.file._tool.path + ' emit cmd "$V" ' + v.path +
+                  '"$(command -v python3)" ' + cell_module(ctx.file._tool) + ' emit cmd "$V" ' + v.path +
                   ' --account "$PK_ACCT"; rm -f "$PK_ACCT";',
         # Ρ·check·resource·set — a check action declares NO resource_set, so per-claim checks are
         # scheduled by job count alone while the sweep grid (pk_calc) is memory-bounded per cell.
@@ -313,7 +313,7 @@ def _grades_impl(ctx):
     ctx.actions.run_shell(
         outputs = [out],
         inputs = depset([ctx.file._tool, meta] + ctx.files.grades + ctx.files._engine, transitive = [py.files]),
-        command = cell_pypath(py) + _engine_importable() + '"$(command -v python3)" ' + ctx.file._tool.path +
+        command = cell_pypath(py) + _engine_importable() + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " " + meta.path + " " + " ".join([g.path for g in ctx.files.grades]) + ' > "' + out.path + '"',
         mnemonic = "PkGrades",
     )

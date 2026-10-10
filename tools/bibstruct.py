@@ -168,8 +168,8 @@ def _mutation_contract_error():
     a read-only consumer of this tool pays nothing for the write half's contract.
     """
     try:
-        import edit_snapshot as _es
-        return _es.MutationContractError
+        import tools.edit_snapshot
+        return tools.edit_snapshot.MutationContractError
     except Exception:                       # not importable here — the clause becomes inert
         class _Never(Exception):
             pass
@@ -843,8 +843,8 @@ def main(argv, intent=None):
         if "--apply" not in argv:
             print("--add: DRY RUN — pass --apply to write.")
             return 0
-        import edit_snapshot as _es
-        _es.guard(f"bibstruct --add {akey}", [target], intent=intent)
+        import tools.edit_snapshot
+        tools.edit_snapshot.guard(f"bibstruct --add {akey}", [target], intent=intent)
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(new)
         bad = roundtrip(target)
@@ -886,8 +886,8 @@ def main(argv, intent=None):
         if "--apply" not in argv:
             print("--addfield: DRY RUN — pass --apply to write.")
             return 0
-        import edit_snapshot as _es
-        _es.guard(f"bibstruct --addfield {akey2}.{afield}", [target], intent=intent)
+        import tools.edit_snapshot
+        tools.edit_snapshot.guard(f"bibstruct --addfield {akey2}.{afield}", [target], intent=intent)
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(new)
         bad = roundtrip(target)
@@ -927,8 +927,8 @@ def main(argv, intent=None):
         if "--apply" not in argv:
             print("--set: DRY RUN — pass --apply to write.")
             return 0
-        import edit_snapshot as _es
-        _es.guard(f"bibstruct --set {skey}.{sfield}", [target], intent=intent)
+        import tools.edit_snapshot
+        tools.edit_snapshot.guard(f"bibstruct --set {skey}.{sfield}", [target], intent=intent)
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(new)
         # ⚑ THE POST-CONDITION IS THE TOTALITY PROBE, RE-RUN ON WHAT WE WROTE.

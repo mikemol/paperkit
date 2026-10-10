@@ -14,16 +14,13 @@ of its footprint cannot change its verdict.  Bounds:
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import resolver
+import paperkit.resolver
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_delta import discriminate
-from _fixture_model import entry
+import paperkit.tests._fixture_delta
+import paperkit.tests._fixture_model
 
 
 def fp(check):
@@ -33,12 +30,12 @@ def fp(check):
         (p / "a.txt").write_text("FOO\n")
         (p / "b.txt").write_text("BAR\n")
         (p / "w.bib").write_text("x\n")
-        return resolver.footprint(check, p, {})
+        return paperkit.resolver.footprint(check, p, {})
 
 
 def sens(check):
     # Δ's sensitivity `tests` for the same check, over a fixture shipping a.txt
-    _, out = discriminate([entry("w", claim="c", check=check)], "--all", "--json",
+    _, out = paperkit.tests._fixture_delta.discriminate([paperkit.tests._fixture_model.entry("w", claim="c", check=check)], "--all", "--json",
                           assets={"a.txt": "FOO\n"})
     return json.loads(out)[0].get("tests", [])
 
@@ -70,7 +67,7 @@ def main() -> int:
         pp = Path(dd)
         (pp / "sub").mkdir()
         (pp / "sub" / "x.txt").write_text("y\n")
-        dir_fp = resolver.footprint("cmd:ls sub", pp, {})
+        dir_fp = paperkit.resolver.footprint("cmd:ls sub", pp, {})
     check("a directory a check opens is NOT in the footprint (regular files only)", dir_fp == [])
 
     print("\n⟨P, F, δ⟩ minimum-delta pairs\n")

@@ -22,10 +22,10 @@ import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ENGINE))
 
-import grader
-import layout
+import paperkit.grader
+import paperkit.layout
+import paperkit.grade
 
 
 def main() -> int:
@@ -33,8 +33,8 @@ def main() -> int:
     # closure here appended to `fails` alone, so the count printed below was a literal that no
     # arm could move: "7 behaviors, 1 delta" tracked when it was typed, not what runs.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _boundary import Suite
-    s = Suite("SURFACE", "Ζ·surface·kind — measured vs merely read")
+    import paperkit.tests._boundary
+    s = paperkit.tests._boundary.Suite("SURFACE", "Ζ·surface·kind — measured vs merely read")
     check = s.check
     # The gap-suffix is DELIBERATELY not a real one.  A first version of this check used `.json`
     # — and then `.json` was admitted to MUTABLE_SUFFIXES the next day, so the fixture's premise
@@ -44,7 +44,7 @@ def main() -> int:
     # that the mechanism exists to help change.  The assert below is the guard: if this suffix ever
     # becomes real, this says so loudly instead of silently passing on a hollow premise.
     GAP = ".not-a-paperkit-input"
-    assert GAP not in layout.MUTABLE_SUFFIXES, "the fixture's gap-suffix became a real input"
+    assert GAP not in paperkit.layout.MUTABLE_SUFFIXES, "the fixture's gap-suffix became a real input"
 
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
@@ -54,7 +54,7 @@ def main() -> int:
         (root / "proj" / "__pycache__").mkdir()
         (root / "proj" / "__pycache__" / "m.cpython-313.pyc").write_bytes(b"\x00")
         reads = ["proj/doc.md", f"proj/data{GAP}", "proj/__pycache__/m.cpython-313.pyc"]
-        un = grader.unmeasured_reads(reads, root)
+        un = paperkit.grader.unmeasured_reads(reads, root)
 
         print("⟨the axis⟩\n")
         check("a file the claim READS but the sweep CANNOT MUTATE is reported",
@@ -66,30 +66,26 @@ def main() -> int:
         check("exactly the gap, nothing else", un == [f"proj/data{GAP}"])
 
         print("\n⟨it is an axis, not a rung⟩\n")
-        # The whole point of the sentinel lesson: incompleteness is not a weaker grade.  If this
-        # ever became a rung, `grade.below()` would start FAILING claims for being unmeasured —
-        # punishing the claim for the instrument's blind spot.
-        import grade
         check("`unmeasured` is not a rung on the ladder (incompleteness is not a grade)",
-              "unmeasured" not in grade.RANK_C and "unmeasured" not in grade.STRENGTH)
+              "unmeasured" not in paperkit.grade.RANK_C and "unmeasured" not in paperkit.grade.STRENGTH)
         check("...so no adequacy floor can fail a claim for it",
-              all("unmeasured" not in grade.below(f) for f in grade.ORDER))
+              all("unmeasured" not in paperkit.grade.below(f) for f in paperkit.grade.ORDER))
 
         print("\n⟨Φ·degrade⟩\n")
         check("no trace ⇒ no claim either way (never a false 'nothing is unmeasured')",
-              grader.unmeasured_reads(None, root) == [] and
-              grader.unmeasured_reads(reads, None) == [])
+              paperkit.grader.unmeasured_reads(None, root) == [] and
+              paperkit.grader.unmeasured_reads(reads, None) == [])
 
         print("\n⟨P, F, δ⟩ minimum-delta pair\n")
         # δ is one entry in MUTABLE_SUFFIXES: the gap exists BECAUSE a suffix is absent, and
         # closing it is a deliberate, measurable act rather than a silent proxy decision.
-        was = set(layout.MUTABLE_SUFFIXES)
+        was = set(paperkit.layout.MUTABLE_SUFFIXES)
         try:
-            layout.MUTABLE_SUFFIXES.add(GAP)
-            closed = grader.unmeasured_reads(reads, root)
+            paperkit.layout.MUTABLE_SUFFIXES.add(GAP)
+            closed = paperkit.grader.unmeasured_reads(reads, root)
         finally:
-            layout.MUTABLE_SUFFIXES.clear()
-            layout.MUTABLE_SUFFIXES.update(was)
+            paperkit.layout.MUTABLE_SUFFIXES.clear()
+            paperkit.layout.MUTABLE_SUFFIXES.update(was)
         s.delta("admitting the suffix CLOSES the gap, and the axis says so",
                 un == [f"proj/data{GAP}"], closed == [],
                 p=f"as shipped: data{GAP} is read, not mutable → reported as unmeasured",

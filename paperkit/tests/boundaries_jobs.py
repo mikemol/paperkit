@@ -11,28 +11,26 @@ knob with no semantic effect.
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_gate import gate
-from _fixture_model import entry
+import paperkit.tests._fixture_gate
+import paperkit.tests._fixture_model
 
 # A multi-check project, so parallelism actually fans out (3 distinct checks).
-PASS = [entry("a", claim="alpha", check="cmd:true"),
-        entry("b", claim="beta", check="cmd:true", frm="a"),
-        entry("c", claim="gamma", check="cmd:true", frm="b")]
+PASS = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="cmd:true"),
+        paperkit.tests._fixture_model.entry("b", claim="beta", check="cmd:true", frm="a"),
+        paperkit.tests._fixture_model.entry("c", claim="gamma", check="cmd:true", frm="b")]
 # Same shape, but one check fails — the verdict must flip regardless of --jobs.
-FAIL = [entry("a", claim="alpha", check="cmd:true"),
-        entry("b", claim="beta", check="cmd:false", frm="a"),
-        entry("c", claim="gamma", check="cmd:true", frm="b")]
+FAIL = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="cmd:true"),
+        paperkit.tests._fixture_model.entry("b", claim="beta", check="cmd:false", frm="a"),
+        paperkit.tests._fixture_model.entry("c", claim="gamma", check="cmd:true", frm="b")]
 # Memory bounding lives entirely in the Bazel layer (Τ·mem: the bib generator projects the learned
 # mem.json to a per-sweep resource_set).  The engine is INERT to memory — it just resolves the
 # check — so a `mem` annotation on a check leaves the verdict identical to a run without one.
-LEASED_PASS = [entry("a", claim="alpha", check="cmd:true", mem="256"),
-               entry("b", claim="beta", check="cmd:true", frm="a", mem="256")]
-LEASED_FAIL = [entry("a", claim="alpha", check="cmd:true", mem="256"),
-               entry("b", claim="beta", check="cmd:false", frm="a", mem="256")]
+LEASED_PASS = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="cmd:true", mem="256"),
+               paperkit.tests._fixture_model.entry("b", claim="beta", check="cmd:true", frm="a", mem="256")]
+LEASED_FAIL = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="cmd:true", mem="256"),
+               paperkit.tests._fixture_model.entry("b", claim="beta", check="cmd:false", frm="a", mem="256")]
 
 
 def main() -> int:
@@ -50,12 +48,12 @@ def main() -> int:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
-    rc_pass_serial, _ = gate(PASS, "--jobs=1")
-    rc_pass_par, _ = gate(PASS, "--jobs=8")
-    rc_fail_serial, _ = gate(FAIL, "--jobs=1")
-    rc_fail_par, _ = gate(FAIL, "--jobs=8")
-    rc_leased_pass, _ = gate(LEASED_PASS)     # mem declared; the engine is inert to it
-    rc_leased_fail, _ = gate(LEASED_FAIL)
+    rc_pass_serial, _ = paperkit.tests._fixture_gate.gate(PASS, "--jobs=1")
+    rc_pass_par, _ = paperkit.tests._fixture_gate.gate(PASS, "--jobs=8")
+    rc_fail_serial, _ = paperkit.tests._fixture_gate.gate(FAIL, "--jobs=1")
+    rc_fail_par, _ = paperkit.tests._fixture_gate.gate(FAIL, "--jobs=8")
+    rc_leased_pass, _ = paperkit.tests._fixture_gate.gate(LEASED_PASS)     # mem declared; the engine is inert to it
+    rc_leased_fail, _ = paperkit.tests._fixture_gate.gate(LEASED_FAIL)
 
     print("parallel-gate behaviors\n")
     check("a clean project passes serial (--jobs=1 → exit 0)", rc_pass_serial == 0)

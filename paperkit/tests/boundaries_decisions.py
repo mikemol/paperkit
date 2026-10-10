@@ -24,15 +24,13 @@ Two soundness invariants of the finer atom's NON-monotone half:
 """
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ENGINE))
 
-import grade
-import grader
+import paperkit.grade
+import paperkit.grader
 
 _MOD = (
     "def classify(x):\n"
@@ -50,8 +48,8 @@ def _decisions(chk_src):
         (p / "decision_module.py").write_text(_MOD)
         (p / "check.py").write_text(chk_src)
         chk = "cmd:python3 check.py"
-        _baseline, sens = grader.sensitivity(chk, p, {}, engine_dir=p)
-        return grader.decisions_unasserted(chk, p, {}, p, sens)
+        _baseline, sens = paperkit.grader.sensitivity(chk, p, {}, engine_dir=p)
+        return paperkit.grader.decisions_unasserted(chk, p, {}, p, sens)
 
 
 def main() -> int:
@@ -64,22 +62,22 @@ def main() -> int:
     print("Μ·sweep·atom — flip: structurally barred; decision-coverage sound\n")
 
     # ── (c) the structural bar ───────────────────────────────────────────────────────────────────
-    fs = grader.FlipSite(file=Path("x.py"), qualname="f", n=0, label="x.py::flip:f#0")
+    fs = paperkit.grader.FlipSite(file=Path("x.py"), qualname="f", n=0, label="x.py::flip:f#0")
     try:
-        grader._apply("cmd:x", Path(), {}, [fs])
+        paperkit.grader._apply("cmd:x", Path(), {}, [fs])
         barred = False
     except (ValueError, TypeError):
         barred = True                                    # the sweep's `f, node, _ = …` cannot unpack it
     check("(c) a FlipSite handed to _apply FAILS structurally (not a silent no-op)", barred)
     check("(c) a FlipSite is a distinct 4-field type, not a (file, node, label) triple",
-          len(grader.FlipSite._fields) == 4 and "node" not in grader.FlipSite._fields)
+          len(paperkit.grader.FlipSite._fields) == 4 and "node" not in paperkit.grader.FlipSite._fields)
 
     # A flip: site is NEVER produced by _sites (the sweep's surface) — only by _flip_sites_of.
     with tempfile.TemporaryDirectory() as d:
         p = Path(d)
         (p / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
-        site_labels = [s[2] for s in grader._sites(p, p)]
-        flip_labels = [f.label for f in grader._flip_sites_of(p, p)]
+        site_labels = [s[2] for s in paperkit.grader._sites(p, p)]
+        flip_labels = [f.label for f in paperkit.grader._flip_sites_of(p, p)]
     check("(c) no flip: label appears in _sites (the sweep never sees a condition site)",
           not any("::flip:" in lbl for lbl in site_labels))
     check("(c) _flip_sites_of yields flip: sites separately",
@@ -110,11 +108,11 @@ def main() -> int:
 
     # ── the axis is orthogonal, never a rung ─────────────────────────────────────────────────────
     check("decisions_unasserted is NOT a rung (absent from RANK_C — incompleteness is not a grade)",
-          "decisions_unasserted" not in grade.RANK_C and "unasserted" not in grade.RANK_C)
+          "decisions_unasserted" not in paperkit.grade.RANK_C and "unasserted" not in paperkit.grade.RANK_C)
     check("decisions_unasserted is NOT in STRENGTH (never gates min-strength)",
-          "decisions_unasserted" not in grade.STRENGTH and "unasserted" not in grade.STRENGTH)
+          "decisions_unasserted" not in paperkit.grade.STRENGTH and "unasserted" not in paperkit.grade.STRENGTH)
     check("DECISIONS_C declares the axis (unasserted < asserted), like CORRO_C",
-          grade.DECISIONS_C == {"unasserted": 0, "asserted": 1})
+          paperkit.grade.DECISIONS_C == {"unasserted": 0, "asserted": 1})
 
     print()
     if fails:

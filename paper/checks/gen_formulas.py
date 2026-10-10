@@ -19,8 +19,7 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "paperkit"))
-import bib  # noqa: E402
+import paperkit.bib  # noqa: E402
 
 # Each row: the claim that owns the formula, a short relation label, and which of the claim's math
 # spans is the row's formula (a claim may carry more than one — index into its spans).  This is the
@@ -44,7 +43,7 @@ def _claims() -> dict:
     recs = {}
     pdir = Path(__file__).resolve().parents[1]           # the paper project dir (has paper.toml)
     for f in sorted(pdir.glob("*.bib")):
-        recs.update(bib.load_bib(f, pdir))               # route through the owner — bind paper's consumer_fields
+        recs.update(paperkit.bib.load_bib(f, pdir))               # route through the owner — bind paper's consumer_fields
     return recs
 
 

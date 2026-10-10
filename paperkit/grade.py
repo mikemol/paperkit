@@ -140,8 +140,8 @@ class _ScopeC(dict):
 
     def _fill(self):
         if not self._loaded:
-            import bib
-            self.update({v: i for i, v in enumerate(bib._SCOPES)})
+            import paperkit.bib
+            self.update({v: i for i, v in enumerate(paperkit.bib._SCOPES)})
             self._loaded = True
 
     def __contains__(self, k):

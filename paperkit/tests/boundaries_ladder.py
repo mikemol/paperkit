@@ -20,14 +20,12 @@ by source for the ones that are Starlark or a separate process.
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
 ROOT = ENGINE.parent
-sys.path.insert(0, str(ENGINE))
 
-import grade  # noqa: E402
+import paperkit.grade  # noqa: E402
 
 # Every consumer that orders/displays/gates on the ladder, and the file it lives in.
 CONSUMERS = {
@@ -39,7 +37,7 @@ CONSUMERS = {
 }
 # A rung name appearing in a LIST or comma-run is a re-declaration; one appearing in a comment or
 # a single-key lookup is not.  Match runs of >=3 quoted-or-bare rung names — the shape of a copy.
-RUNGS = sorted(grade.RANK_C)
+RUNGS = sorted(paperkit.grade.RANK_C)
 _RUN = re.compile(r"(?:[\"'`]?(?:" + "|".join(RUNGS) + r")[\"'`]?\s*[,:]\s*){3,}")
 
 
@@ -53,30 +51,30 @@ def main() -> int:
     print("Ζ·ladder — the grade ladder's boundary\n")
     print("⟨one owner⟩\n")
     check(f"grade.RANK_C totally orders the {len(RUNGS)} rungs (distinct ranks, no ties)",
-          len(set(grade.RANK_C.values())) == len(grade.RANK_C))
+          len(set(paperkit.grade.RANK_C.values())) == len(paperkit.grade.RANK_C))
     check("rungs() is that order, descending — the display order, derived",
-          grade.rungs() == sorted(grade.RANK_C, key=grade.RANK_C.get, reverse=True))
+          paperkit.grade.rungs() == sorted(paperkit.grade.RANK_C, key=paperkit.grade.RANK_C.get, reverse=True))
     check("every --min-strength floor is a real rung (the knob cannot name what the ladder cannot rank)",
-          set(grade.ORDER) <= set(grade.RANK_C))
+          set(paperkit.grade.ORDER) <= set(paperkit.grade.RANK_C))
 
     print("\n⟨the floor fails CLOSED⟩\n")
     # below() must be a function of the ORDER, not a list: for every floor, exactly the lower rungs.
-    ok = all(set(grade.below(f)) == {g for g in grade.RANK_C if grade.RANK_C[g] < grade.RANK_C[f]}
-             for f in grade.RANK_C)
+    ok = all(set(paperkit.grade.below(f)) == {g for g in paperkit.grade.RANK_C if paperkit.grade.RANK_C[g] < paperkit.grade.RANK_C[f]}
+             for f in paperkit.grade.RANK_C)
     check("below(floor) is exactly the rungs ranked under it, for EVERY floor", ok)
     check("`imported` clears the behavioral floor (a delegation is not a weak grade)",
-          "imported" not in grade.below("behavioral"))
+          "imported" not in paperkit.grade.below("behavioral"))
     check("`indeterminate` does NOT clear it (the grade a missing delegation arm produces)",
-          "indeterminate" in grade.below("behavioral"))
+          "indeterminate" in paperkit.grade.below("behavioral"))
     # the fail-open property, stated positively: a rung inserted BELOW the floor is caught by
     # derivation, and would have been missed by any list written before it existed.
-    was = dict(grade.RANK_C)
+    was = dict(paperkit.grade.RANK_C)
     try:
-        grade.RANK_C["hypothetical"] = -2
-        caught = "hypothetical" in grade.below("behavioral")
+        paperkit.grade.RANK_C["hypothetical"] = -2
+        caught = "hypothetical" in paperkit.grade.below("behavioral")
     finally:
-        grade.RANK_C.clear()
-        grade.RANK_C.update(was)
+        paperkit.grade.RANK_C.clear()
+        paperkit.grade.RANK_C.update(was)
     check("a NEW sub-floor rung is failed the moment it exists (a blacklist would pass it)", caught)
 
     print("\n⟨every consumer derives⟩\n")
@@ -94,7 +92,7 @@ def main() -> int:
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # F = the blacklist as it was actually written, and the rung it was actually blind to.
     literal = ",".join(["vacuous", "existence", "indeterminate", "broken"])   # the list as written
-    blind = [g for g in grade.below("behavioral") if g not in literal.split(",")]
+    blind = [g for g in paperkit.grade.below("behavioral") if g not in literal.split(",")]
     caught = ("below:behavioral" in gbzl and literal not in gbzl)
     fails.append("ladder-delta") if not caught else None
     print(f"  {'ok ' if caught else 'XX '}re-hardcoding the adequacy blacklist is CAUGHT")

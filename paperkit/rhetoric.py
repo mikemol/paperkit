@@ -88,7 +88,7 @@ Section = tuple[str, str, list[str], list[str | None], list[str]]
 # seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
 # The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bib
+import paperkit.bib
 
 # ⚑ Ζ·anno·rhetoric — THE UNTYPED EDGE IS DECLARED ONCE, HERE, and this is the placement decision
 # in this file.  The import above is unfollowable to mypy (a runtime sys.path insert is not an
@@ -101,11 +101,11 @@ import bib
 # one readable block, it confines the untyped surface to five lines instead of a dozen call sites,
 # and it puts the drift in ONE place if bib.py's signatures change.  These are not stubs for bib —
 # bib.py owns its own annotations — they are the contract rhetoric.py depends on.
-_rubric_rows: Callable[[Path], list[Row]] = bib.rubric_rows
-_load_config: Callable[[Path], Config] = bib.load_config
-_parse: Callable[[Path, tuple[str, ...]], FieldMap] = bib.parse
-_dep_order: Callable[[list[str], FieldMap], list[str]] = bib.dep_order
-_is_placed: Callable[[Fields], bool] = bib.is_placed
+_rubric_rows: Callable[[Path], list[Row]] = paperkit.bib.rubric_rows
+_load_config: Callable[[Path], Config] = paperkit.bib.load_config
+_parse: Callable[[Path, tuple[str, ...]], FieldMap] = paperkit.bib.parse
+_dep_order: Callable[[list[str], FieldMap], list[str]] = paperkit.bib.dep_order
+_is_placed: Callable[[Fields], bool] = paperkit.bib.is_placed
 
 # (kind, default connector).  kind is what SCHEMES constrain; connector is the
 # realization project.py falls back to when a claim gives no explicit `join`.

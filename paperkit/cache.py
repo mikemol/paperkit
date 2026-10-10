@@ -10,8 +10,8 @@ import hashlib
 import json
 from pathlib import Path
 
-import durable
-from layout import _ENGINE, SKIP_DIRS, _mutable, _nested_roots, _Scope
+import paperkit.durable
+import paperkit.layout
 
 
 def content_key(project_dir: Path) -> str:
@@ -23,12 +23,12 @@ def content_key(project_dir: Path) -> str:
     what makes the finer key sound (a footprint ⊆ this content).
     """
     parts = []
-    for tag, base in (("proj", project_dir), ("engine", _ENGINE)):
-        nested = _nested_roots(base) if tag == "proj" else []
+    for tag, base in (("proj", project_dir), ("engine", paperkit.layout._ENGINE)):
+        nested = paperkit.layout._nested_roots(base) if tag == "proj" else []
         # Ζ·sandbox·declared — hash the repository's own content (layout._Scope), not every file
         # on disk: a cache or stale build copy in the tree must not change a soundness key.
-        for f in _Scope.for_path(base).files(base):
-            if (_mutable(f) and not any(p in SKIP_DIRS for p in f.parts)
+        for f in paperkit.layout._Scope.for_path(base).files(base):
+            if (paperkit.layout._mutable(f) and not any(p in paperkit.layout.SKIP_DIRS for p in f.parts)
                     and not any(nr in f.parents for nr in nested)):
                 parts.append(f"{tag}/{f.relative_to(base)}:{hashlib.sha256(f.read_bytes()).hexdigest()}")
     return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
@@ -41,18 +41,18 @@ def engine_hash() -> str:
     completed by this: an engine edit invalidates every check; a project edit invalidates
     only the checks whose footprint touched it.
     """
-    parts = [f"{f.relative_to(_ENGINE)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
-             for f in _Scope.for_path(_ENGINE).files(_ENGINE)      # Ζ·sandbox·declared
-             if _mutable(f) and not any(p in SKIP_DIRS for p in f.parts)]
+    parts = [f"{f.relative_to(paperkit.layout._ENGINE)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
+             for f in paperkit.layout._Scope.for_path(paperkit.layout._ENGINE).files(paperkit.layout._ENGINE)      # Ζ·sandbox·declared
+             if paperkit.layout._mutable(f) and not any(p in paperkit.layout.SKIP_DIRS for p in f.parts)]
     return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
 
 
 def _def_index(text: str) -> dict:
     """{qualname: body-source} for a .py source — the DEFINITION granularity Δ already mutates at."""
-    import mutate
+    import paperkit.mutate
     lines = text.splitlines(keepends=True)
     out = {}
-    for qual, node in mutate._def_sites(text):
+    for qual, node in paperkit.mutate._def_sites(text):
         out[qual] = "".join(lines[node.body[0].lineno - 1:node.end_lineno])
     return out
 
@@ -131,6 +131,6 @@ def load(project_dir: Path) -> dict:
 
 def save(project_dir: Path, data: dict) -> None:
     try:
-        durable.write_atomic(project_dir / ".delta-cache.json", json.dumps(data))
+        paperkit.durable.write_atomic(project_dir / ".delta-cache.json", json.dumps(data))
     except Exception:
         pass

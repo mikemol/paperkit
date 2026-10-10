@@ -30,15 +30,14 @@ from pathlib import Path
 # invoke it by; nothing from library_kernel enters this module's namespace.
 ENGINE = Path(__file__).resolve().parent.parent
 
-sys.path.insert(0, str(ENGINE))
-import discriminate as D
+import paperkit.discriminate
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _fixture_model import DISCRIMINATE, _write, entry
+import paperkit.tests._fixture_model
+import paperkit.cache
 
 
 def _disc(proj, *flags):
-    return subprocess.run([sys.executable, str(DISCRIMINATE), "--all", "--json", *flags, str(proj)],
+    return subprocess.run([sys.executable, str(paperkit.tests._fixture_model.DISCRIMINATE), "--all", "--json", *flags, str(proj)],
                           capture_output=True, text=True).stdout
 
 
@@ -66,19 +65,19 @@ def main() -> int:
 
     d = tempfile.mkdtemp()
     try:
-        proj = _write(d, [entry("w", claim="alpha", check="cmd:true")], None,
+        proj = paperkit.tests._fixture_model._write(d, [paperkit.tests._fixture_model.entry("w", claim="alpha", check="cmd:true")], None,
                       (("s", "Sec"),), "t", False, False)
 
         print("Μ behaviors\n")
-        k1, k2 = D.content_key(proj), D.content_key(proj)
+        k1, k2 = paperkit.cache.content_key(proj), paperkit.cache.content_key(proj)
         check("content_key is deterministic (same content → same key)", k1 == k2)
 
         (proj / "w.bib").write_text((proj / "w.bib").read_text() + "\n% edit\n")
-        k3 = D.content_key(proj)
+        k3 = paperkit.cache.content_key(proj)
         check("a mutable input change → different key", k3 != k1)
 
         (proj / "note.log").write_text("ignored")
-        k4 = D.content_key(proj)
+        k4 = paperkit.cache.content_key(proj)
         check("a non-input file (.log) → same key", k4 == k3)
 
         out1 = _disc(proj)
@@ -93,9 +92,9 @@ def main() -> int:
 
         # Δ·footprint-cache: editing a file re-grades ONLY the checks that READ it.  The
         # per-check grader field shows it — the toucher is graded fresh, the rest "cache".
-        fpp = _write(tempfile.mkdtemp(),
-                     [entry("ca", claim="reads a", check="cmd:grep -q FOO fa.txt"),
-                      entry("cb", claim="reads b", check="cmd:grep -q BAR fb.txt")],
+        fpp = paperkit.tests._fixture_model._write(tempfile.mkdtemp(),
+                     [paperkit.tests._fixture_model.entry("ca", claim="reads a", check="cmd:grep -q FOO fa.txt"),
+                      paperkit.tests._fixture_model.entry("cb", claim="reads b", check="cmd:grep -q BAR fb.txt")],
                      {"fa.txt": "FOO\n", "fb.txt": "BAR\n"}, (("s", "Sec"),), "t", False, False)
 
         def graders(p):
@@ -114,7 +113,7 @@ def main() -> int:
         # sensitive to the DEFINITIONS it changed, not every check that reads the module.
         gd = Path(tempfile.mkdtemp())
         mod = gd / "mod.py"
-        fh, fine = D._footprint_hash, D._fine
+        fh, fine = paperkit.cache.footprint_hash, paperkit.discriminate._fine
         DEF = fine({"grade": "behavioral", "tests": ["mod.py::foo"]})   # sensitive to foo, not bar
         FILE = fine({"grade": "behavioral", "tests": ["mod.py"]})       # whole-file sensitive
         mod.write_text("def foo():\n    return 1\n\ndef bar():\n    return 2\n")

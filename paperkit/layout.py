@@ -14,7 +14,7 @@ import tempfile
 import tomllib
 from pathlib import Path
 
-import config
+import paperkit.config
 
 # Ζ·surface·admit — the suffixes Δ may corrupt.  This is a PROXY for the real property ("could
 # this file's content change a claim's truth"), and every proxy carries an error term: a file the
@@ -47,7 +47,7 @@ _ENGINE = Path(__file__).resolve().parent
 # Ω·config — the knob this module RESOLVES, declared here (place-by-ownership; the kernel hosts
 # the mechanism only).  NOTE: resolver._ENV_DROP names "PAPERKIT_ROOT" as a string LITERAL (it
 # cannot import layout upward) — keep the two in sync.
-ROOT = config.Param("root", "PAPERKIT_ROOT", config="root",
+ROOT = paperkit.config.Param("root", "PAPERKIT_ROOT", config="root",
                     help="the Δ sandbox's bounded universe (the dir copied to mutate); else inferred, $HOME refused")
 
 
@@ -64,7 +64,7 @@ def _root_override(project_dir: Path) -> Path | None:
             paper = tomllib.loads(cfg.read_text()).get("paper", {})
         except Exception:
             paper = {}
-    decl = config.resolve(ROOT, paper)
+    decl = paperkit.config.resolve(ROOT, paper)
     if not decl:
         return None
     root = Path(decl)

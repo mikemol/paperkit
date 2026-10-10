@@ -22,24 +22,21 @@ from __future__ import annotations
 import ast
 import importlib
 import os
-import sys
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ENGINE))
-sys.path.insert(0, str(ENGINE.parent))
-import config as C  # noqa: E402
+import paperkit.config  # noqa: E402
 from tools import dagderive as _dagderive  # noqa: E402
 from tools import dagnames as _dagnames  # noqa: E402
 
 # Synthetic Params — the mechanism's specimens (no coupling to any real knob).
-VAL = C.Param("syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def"))
-FLAG = C.Param("syn-flag", "PAPERKIT_SYN_FLAG", config="syn_flag", flag=True, aliases=("--syn-alias",))
+VAL = paperkit.config.Param("syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def"))
+FLAG = paperkit.config.Param("syn-flag", "PAPERKIT_SYN_FLAG", config="syn_flag", flag=True, aliases=("--syn-alias",))
 SYN = [VAL, FLAG]
 
 
 def reset(p):
-    C._ARGS.clear()
+    paperkit.config._ARGS.clear()
     os.environ.pop(p.env, None)
 
 
@@ -72,7 +69,7 @@ def _cone(stem, imports):
 
 def _hosted(mod):
     """The Params a module HOSTS (declares module-level) — introspected, never hand-listed."""
-    return {n: v for n, v in vars(mod).items() if isinstance(v, C.Param)}
+    return {n: v for n, v in vars(mod).items() if isinstance(v, paperkit.config.Param)}
 
 
 def main() -> int:
@@ -93,33 +90,33 @@ def main() -> int:
     print("Ω·config — arg > env > config > default, one rule for every knob (synthetic specimens)\n")
     p = VAL
     reset(p)
-    check("default when nothing is set", C.resolve(p) == "file")
-    check("project config (paper.toml [paper]) overrides the default", C.resolve(p, {"syn_val": "def"}) == "def")
+    check("default when nothing is set", paperkit.config.resolve(p) == "file")
+    check("project config (paper.toml [paper]) overrides the default", paperkit.config.resolve(p, {"syn_val": "def"}) == "def")
     os.environ[p.env] = "file"
-    check("env overrides project config", C.resolve(p, {"syn_val": "def"}) == "file")
-    C.apply_args(["--syn-val", "def"], SYN)
-    check("an explicit arg overrides the env", C.resolve(p, {"syn_val": "def"}) == "def")
+    check("env overrides project config", paperkit.config.resolve(p, {"syn_val": "def"}) == "file")
+    paperkit.config.apply_args(["--syn-val", "def"], SYN)
+    check("an explicit arg overrides the env", paperkit.config.resolve(p, {"syn_val": "def"}) == "def")
     check("apply_args is PROCESS-LOCAL — it does NOT mutate os.environ (a spawned check won't "
           "inherit the grader's flags)", os.environ.get(p.env) == "file")
     reset(p)
 
-    check("a flag is False by default", C.resolve(FLAG) is False)
-    C.apply_args(["--syn-flag"], SYN); check("a flag set by its arg is True", C.resolve(FLAG) is True)
-    C._ARGS.clear()
-    check("a flag set by [paper] config is True", C.resolve(FLAG, {"syn_flag": True}) is True)
-    C.apply_args(["--syn-alias"], SYN); check("a flag honours its alias", C.resolve(FLAG) is True)
-    C._ARGS.clear()
+    check("a flag is False by default", paperkit.config.resolve(FLAG) is False)
+    paperkit.config.apply_args(["--syn-flag"], SYN); check("a flag set by its arg is True", paperkit.config.resolve(FLAG) is True)
+    paperkit.config._ARGS.clear()
+    check("a flag set by [paper] config is True", paperkit.config.resolve(FLAG, {"syn_flag": True}) is True)
+    paperkit.config.apply_args(["--syn-alias"], SYN); check("a flag honours its alias", paperkit.config.resolve(FLAG) is True)
+    paperkit.config._ARGS.clear()
 
     os.environ[p.env] = "bogus"
     raised = False
     try:
-        C.resolve(p)
+        paperkit.config.resolve(p)
     except SystemExit:
         raised = True
     os.environ.pop(p.env, None)
     check("a value outside the param's choices is REFUSED", raised)
     check("positionals strips flags + valued options, keeps the project dir",
-          C.positionals(["--syn-val", "def", "--syn-flag", "myproj"], SYN) == ["myproj"])
+          paperkit.config.positionals(["--syn-val", "def", "--syn-flag", "myproj"], SYN) == ["myproj"])
 
     # ── Μ·kernel·shrink·registry — the entry-registry completeness boundary ──────────────
     # Expected set DERIVED from the owners: dag.bzl (import DAG) + vars() introspection
@@ -133,7 +130,13 @@ def main() -> int:
     # this suite over the PARTITION rather than anything it asserts.  The translation is owned by
     # tools/dagnames.py (the fourth private copy is where it broke; there is not a fifth here).
     engine_stems = _dagnames.module_names(ENGINE, skip=("tests",), pkg=ENGINE.name)
-    mods = {s: importlib.import_module(s) for s in engine_stems}
+    # ⚑ THE ENGINE IS LOADED AS THE PACKAGE IT IS (paperkit:W296): a top-level module `gate` is
+    # `paperkit.gate`, so one Param is one object. Imported flat beside the package, `gate` and
+    # `paperkit.gate` were two loads of the same file, every Param twice, and every REGISTRY
+    # comparison by identity read "missing=[X] extra=[X]".
+    mods = {
+        s: importlib.import_module(s if "." in s else f"paperkit.{s}") for s in engine_stems
+    }
 
     check("the kernel hosts ZERO Params (config.py is the mechanism alone)",
           not _hosted(mods["config"]))
@@ -168,8 +171,8 @@ def main() -> int:
 
     print("\n⟨P, F, δ⟩ minimum-delta pairs\n")
     reset(p); os.environ[p.env] = "file"
-    F = C.resolve(p)
-    C.apply_args(["--syn-val", "def"], SYN); P_ = C.resolve(p)
+    F = paperkit.config.resolve(p)
+    paperkit.config.apply_args(["--syn-val", "def"], SYN); P_ = paperkit.config.resolve(p)
     ok = F == "file" and P_ == "def"
     fails.append("arg-over-env") if not ok else None
     reset(p)

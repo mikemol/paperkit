@@ -288,6 +288,8 @@ def _run(check: str, claim: str, wall: int) -> tuple[bool, str]:
     try:
         p = subprocess.Popen(
             [sys.executable, check, claim],
+            # the staged engine is the `paperkit` package beside the cwd, so the cwd is its import root
+            env={**os.environ, "PYTHONPATH": os.getcwd()},
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, process_group=0)
     except OSError as e:
         return True, f"could not spawn the check ({e.__class__.__name__}: {e}) — the mutation exhausted the cell's process budget, which is a flip"

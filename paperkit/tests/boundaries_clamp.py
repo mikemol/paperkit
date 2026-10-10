@@ -11,11 +11,10 @@ records clamp or do not depending solely on whether the owner's grade is in hand
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import grade as G
+import paperkit.grade
+import paperkit.grader
 
 _fails = []
 
@@ -43,19 +42,19 @@ def main() -> int:
     print("CLAMP BOUNDARIES ⟨P, F, δ⟩")
 
     # ---- P: no owner grades → the pre-Λ·pi·carry behaviour, exactly ----
-    r = by(G.clamp(recs()))
+    r = by(paperkit.grade.clamp(recs()))
     check("P: with no owner grades, an unresolved delegation does NOT clamp (imported ranks top)",
           r["b"]["effective_grade"] == "imported" and r["a"]["effective_grade"] == "behavioral")
     check("P: and nothing is credited as the pin",
           r["b"]["clamped_by"] is None)
 
     # ---- P: a STRONG owner resolves the edge and still clamps nothing ----
-    r = by(G.clamp(recs(), {("library", "w"): "behavioral"}))
+    r = by(paperkit.grade.clamp(recs(), {("library", "w"): "behavioral"}))
     check("P: a behavioral owner resolves the edge without weakening the importer",
           r["b"]["effective_grade"] == "behavioral" and r["a"]["effective_grade"] == "behavioral")
 
     # ---- F: a WEAK owner clamps the importer, and the taint TRANSITS rests-on ----
-    r = by(G.clamp(recs(), {("library", "w"): "vacuous"}))
+    r = by(paperkit.grade.clamp(recs(), {("library", "w"): "vacuous"}))
     check("F: a vacuous owner clamps its importer to vacuous",
           r["b"]["effective_grade"] == "vacuous")
     check("F: and the clamp CROSSES the boundary then transits rests-on to the dependent claim",
@@ -64,24 +63,24 @@ def main() -> int:
           r["b"]["clamped_by"] == "library#w")
 
     # ---- δ: the minimum delta is ONE owner grade over identical records ----
-    without = by(G.clamp(recs()))["a"]["effective_grade"]
-    with_ = by(G.clamp(recs(), {("library", "w"): "vacuous"}))["a"]["effective_grade"]
+    without = by(paperkit.grade.clamp(recs()))["a"]["effective_grade"]
+    with_ = by(paperkit.grade.clamp(recs(), {("library", "w"): "vacuous"}))["a"]["effective_grade"]
     check("δ: identical records, one owner grade apart → behavioral vs vacuous",
           (without, with_) == ("behavioral", "vacuous"))
 
     # ---- F: an owner grade for a DIFFERENT claim must not resolve this edge ----
-    r = by(G.clamp(recs(), {("library", "other"): "vacuous"}))
+    r = by(paperkit.grade.clamp(recs(), {("library", "other"): "vacuous"}))
     check("F: a non-matching owner key leaves the edge unresolved (no accidental clamp)",
           r["b"]["effective_grade"] == "imported")
     # ---- F: ...and neither does the right claim under the WRONG owner ----
-    r = by(G.clamp(recs(), {("paper", "w"): "vacuous"}))
+    r = by(paperkit.grade.clamp(recs(), {("paper", "w"): "vacuous"}))
     check("F: the owner is part of the key — same claim, wrong owner, no clamp",
           r["b"]["effective_grade"] == "imported")
 
     # ---- P: a record with no delegation edge is untouched by owner_grades ----
     plain = [{"key": "p", "grade": "existence", "rests-on": []}]
     check("P: a non-delegating record is unaffected by owner grades",
-          by(G.clamp(plain, {("library", "w"): "vacuous"}))["p"]["effective_grade"] == "existence")
+          by(paperkit.grade.clamp(plain, {("library", "w"): "vacuous"}))["p"]["effective_grade"] == "existence")
 
     # ---- the grade is TWO-DIMENSIONAL: (self, effective) both cross the edge ----
     # Two owners with the SAME effective grade but DIFFERENT self grades must stay
@@ -92,8 +91,8 @@ def main() -> int:
                                        "clamped_by": None}}
     weak_premise = {("library", "w"): {"grade": "behavioral", "effective_grade": "vacuous",
                                        "clamped_by": "some-premise"}}
-    rw = by(G.clamp(recs(), weak_witness))["b"]
-    rp = by(G.clamp(recs(), weak_premise))["b"]
+    rw = by(paperkit.grade.clamp(recs(), weak_witness))["b"]
+    rp = by(paperkit.grade.clamp(recs(), weak_premise))["b"]
     check("2D: both owners clamp the importer identically (effective is the bound)",
           rw["effective_grade"] == rp["effective_grade"] == "vacuous")
     check("2D: but the owner's SELF grade survives the crossing — the two stay distinguishable",
@@ -101,7 +100,7 @@ def main() -> int:
     check("2D: and the owner's own pin travels with it (not a dead end on the far side)",
           rp["delegated"]["clamped_by"] == "some-premise")
     check("2D: a bare grade string still works (a caller holding one number)",
-          by(G.clamp(recs(), {("library", "w"): "vacuous"}))["b"]["effective_grade"] == "vacuous")
+          by(paperkit.grade.clamp(recs(), {("library", "w"): "vacuous"}))["b"]["effective_grade"] == "vacuous")
 
     # ---- Ζ·pi·unresolved: THREE states, not two ----
     # "No constraint recorded" and "constraint recorded as: none" render identically once
@@ -111,8 +110,8 @@ def main() -> int:
     # tristate for this reason; the unfold needs the same.
     strong = {("library", "w"): {"grade": "behavioral", "effective_grade": "behavioral",
                                  "clamped_by": None}}
-    u = by(G.clamp(recs()))["b"]
-    ok = by(G.clamp(recs(), strong))["b"]
+    u = by(paperkit.grade.clamp(recs()))["b"]
+    ok = by(paperkit.grade.clamp(recs(), strong))["b"]
     check("3-state: an UNRESOLVED edge is named as a value, not left as silence",
           u["unresolved"] == ["library#w"])
     check("3-state: a RESOLVED edge that clamps nothing records NO unresolved entry",
@@ -125,13 +124,13 @@ def main() -> int:
     # chain and only sometimes from the final name (substrate: `take n` vs the last CF digit).
     deep = {("library", "w"): {"grade": "behavioral", "effective_grade": "vacuous",
                                "clamped_by": "lib-premise"}}
-    rr = by(G.clamp(recs(), deep))
+    rr = by(paperkit.grade.clamp(recs(), deep))
     check("path: the clamped claim carries the WHOLE chain, crossing the boundary",
           rr["b"]["clamp_path"] == ["library#w", "lib-premise"])
     check("path: and a dependent claim's chain is its own step PLUS the chain beneath it",
           rr["a"]["clamp_path"] == ["b", "library#w", "lib-premise"])
     check("path: an unclamped claim has an empty chain (nothing to follow)",
-          by(G.clamp(recs(), strong))["a"]["clamp_path"] == [])
+          by(paperkit.grade.clamp(recs(), strong))["a"]["clamp_path"] == [])
 
     # ---- Ζ·pi·unresolved is a FOURTH ORTHOGONAL AXIS, not a rung ----
     # The discipline is already stated twice in grade.py (corroboration, decision-coverage):
@@ -140,15 +139,15 @@ def main() -> int:
     # owner clamps nothing — numerically identical to never having resolved it, and opposite in
     # meaning.  Only a separate axis tells them apart.
     strong2 = {("library", "w"): "behavioral"}
-    t = by(G.clamp(recs()))["b"]
-    rz = by(G.clamp(recs(), strong2))["b"]
+    t = by(paperkit.grade.clamp(recs()))["b"]
+    rz = by(paperkit.grade.clamp(recs(), strong2))["b"]
     check("axis: an unresolved delegation does NOT lower the grade (incompleteness is not a rung)",
           t["grade"] == t["effective_grade"] == "imported" and t["clamp"] == 0)
     check("axis: resolution is a readable VALUE, not inferred from an empty list",
           (t["resolution"], rz["resolution"]) == ("truncated", "resolved"))
     # The pure form of the collision: an owner that is ITSELF `imported` clamps nothing, so the
     # resolved and truncated readings are IDENTICAL on every grade field and differ only here.
-    chained = by(G.clamp(recs(), {("library", "w"): "imported"}))["b"]
+    chained = by(paperkit.grade.clamp(recs(), {("library", "w"): "imported"}))["b"]
     check("axis: resolved-imposing-nothing and never-resolved are identical on grade AND "
           "effective — only the axis separates them",
           (chained["grade"], chained["effective_grade"], chained["clamp"]) ==
@@ -157,8 +156,8 @@ def main() -> int:
     check("axis: resolving the rank-4 placeholder to a real grade DOES clamp (it is not a no-op)",
           rz["effective_grade"] == "behavioral" and rz["clamp"] == 1)
     check("axis: the ladder owns its rungs — resolution is NOT one of them",
-          "truncated" not in G.RANK_C and "resolved" not in G.RANK_C
-          and G.RESOLUTION_C == {"truncated": 0, "resolved": 1})
+          "truncated" not in paperkit.grade.RANK_C and "resolved" not in paperkit.grade.RANK_C
+          and paperkit.grade.RESOLUTION_C == {"truncated": 0, "resolved": 1})
 
     # ---- Ζ·pi·interval: a truncation WIDENS A BRACKET instead of vanishing ----
     # effective_grade is the OPTIMISTIC endpoint (unresolved imposes nothing), which alone reads
@@ -166,12 +165,12 @@ def main() -> int:
     # ladder floor.  The WIDTH is the cost of not having unfolded — same units, monotone, and
     # zero once every edge resolves.  Not a bound on the EDGE: an error bound on a step you
     # should not take licenses taking it (linux-sources retracted exactly that method).
-    t2 = by(G.clamp(recs()))
+    t2 = by(paperkit.grade.clamp(recs()))
     strong3 = {("library", "w"): {"grade": "behavioral", "effective_grade": "behavioral",
                                   "clamped_by": None}}
     weak3 = {("library", "w"): {"grade": "vacuous", "effective_grade": "vacuous",
                                 "clamped_by": None}}
-    s3, w3 = by(G.clamp(recs(), strong3)), by(G.clamp(recs(), weak3))
+    s3, w3 = by(paperkit.grade.clamp(recs(), strong3)), by(paperkit.grade.clamp(recs(), weak3))
     check("interval: an unresolved edge WIDENS the bracket rather than vanishing",
           t2["b"]["interval_width"] > 0 and t2["b"]["effective_min"] == "broken")
     check("interval: resolving it collapses the bracket to a point",
@@ -195,35 +194,27 @@ def main() -> int:
     chain = [{"key": "a", "grade": "behavioral", "rests-on": ["b"]},
              {"key": "b", "grade": "existence", "rests-on": ["c"]},
              {"key": "c", "grade": "vacuous", "rests-on": []}]
-    ch = by(G.clamp([dict(x) for x in chain]))
+    ch = by(paperkit.grade.clamp([dict(x) for x in chain]))
     check("fold: the base case (no premises) verifies against the claim's own grade",
-          G.verify_hop(ch["c"], {})[0])
+          paperkit.grade.verify_hop(ch["c"], {})[0])
     check("fold: an interior hop verifies from its premise's RESULT alone",
-          G.verify_hop(ch["b"], {"c": "vacuous"})[0]
-          and G.verify_hop(ch["a"], {"b": "vacuous"})[0])
+          paperkit.grade.verify_hop(ch["b"], {"c": "vacuous"})[0]
+          and paperkit.grade.verify_hop(ch["a"], {"b": "vacuous"})[0])
     forged = dict(ch["a"])
     forged["effective_grade"] = "behavioral"     # a link claiming more than its premise allows
-    okf, expected, why = G.verify_hop(forged, {"b": "vacuous"})
+    okf, expected, why = paperkit.grade.verify_hop(forged, {"b": "vacuous"})
     check("fold: a FORGED hop is caught locally, and the reason names the recomputation",
           okf is False and expected == "vacuous" and "record says behavioral" in why)
     # THE BOUND that makes a hop checkable — substrate's `r < b`, here monotonicity:
     check("fold: the bound is that a hop may only LOWER — never exceed its weakest premise",
-          G.verify_hop({"key": "x", "grade": "behavioral",
+          paperkit.grade.verify_hop({"key": "x", "grade": "behavioral",
                         "effective_grade": "behavioral"}, {"p": "vacuous"})[0] is False)
     check("fold: a delegation hop verifies from the OWNER's grade, nothing above it",
-          G.verify_hop({"key": "y", "grade": "imported", "effective_grade": "vacuous",
+          paperkit.grade.verify_hop({"key": "y", "grade": "imported", "effective_grade": "vacuous",
                         "delegates_to": {"owner": "library", "claim": "w", "verb": "concept"}},
                        {}, {("library", "w"): "vacuous"})[0])
-
-    # ---- Ζ·broken·offaxis: a cannot-run is not a refutation ----
-    # `_grade_from_sens` emits `broken` on `not baseline`, and a baseline fails for two
-    # categorically different reasons: the claim is FALSE, or the check could not be REACHED.
-    # The resolver separates them (tristate); `grader.sensitivity` used to read `.passed` and
-    # collapse both to False, so a check killed by its memory cap graded "repo is not green"
-    # about a green repo.  Measured, twice, 2026-08-26.
-    import grader as GR
-    ref = G._grade_from_sens(False, [], reachable=True)
-    unr = G._grade_from_sens(False, [], reachable=False)
+    ref = paperkit.grade._grade_from_sens(False, [], reachable=True)
+    unr = paperkit.grade._grade_from_sens(False, [], reachable=False)
     check("a REFUTED baseline says the repo is not green",
           ref["baseline"] == "refuted" and "not green" in ref["why"])
     check("an UNREACHABLE baseline says nothing was ESTABLISHED, and says so out loud",
@@ -235,7 +226,7 @@ def main() -> int:
           ref["grade"] == unr["grade"] == "broken" and ref["baseline"] != unr["baseline"])
     # and the sentinel stays FALSY, so every existing `if not baseline` in the tree still holds
     check("UNREACHABLE is falsy — every existing `if not baseline` is unaffected",
-          not GR.UNREACHABLE and GR.UNREACHABLE is not False)
+          not paperkit.grader.UNREACHABLE and paperkit.grader.UNREACHABLE is not False)
 
     # ---- Ζ·rests·unresolved: an UNGRADED premise is a truncation, not a free pass ----
     # A `rests-on` target with no record is SKIPPED by the clamp loop, and silence about that
@@ -246,7 +237,7 @@ def main() -> int:
     # monotonicity bound then certifies against.
     def _one(rests, **kw):
         rs = [{"key": "a", "grade": "behavioral", "rests-on": rests}]
-        G.clamp(rs, **kw)
+        paperkit.grade.clamp(rs, **kw)
         return rs[0]
 
     ung = _one(["ghost"], keys={"a", "ghost"})

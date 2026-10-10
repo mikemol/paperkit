@@ -19,13 +19,12 @@ import sys
 from contextlib import redirect_stderr
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "paperkit"))
-import bib  # noqa: E402
+import paperkit.bib  # noqa: E402
 
 
 def main() -> int:
     demo_dir = Path(__file__).resolve().parents[1]       # the demo/ project dir (has paper.toml)
-    declared = bib.load_config(demo_dir)["consumer_fields"]
+    declared = paperkit.bib.load_config(demo_dir)["consumer_fields"]
     if "provenance" not in declared:
         print("demo: paper.toml must declare consumer_fields = [\"provenance\"]", file=sys.stderr)
         return 1
@@ -34,7 +33,7 @@ def main() -> int:
     # so we can assert the declared field is carried QUIETLY (no loud-drop).
     err = io.StringIO()
     with redirect_stderr(err):
-        recs = bib.load_bib(demo_dir / "warrants.bib", demo_dir)
+        recs = paperkit.bib.load_bib(demo_dir / "warrants.bib", demo_dir)
     stderr = err.getvalue()
 
     carriers = [k for k, r in recs.items() if r.get("provenance")]

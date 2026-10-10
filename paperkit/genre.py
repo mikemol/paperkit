@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+import paperkit.checkenv
 
 # NO engine imports: this module reads a project's paper.toml directly (tomllib, function-local)
 # and is otherwise pure.  A module-level `import bib` here would make the parser a staged input of
@@ -523,5 +524,5 @@ if __name__ == "__main__":
     # `genre`), so resolving the spawn here adds no component edge: dagderive attributes imports
     # to the module, and this block only runs when the file IS the program.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from resolver import spawn_declared
-    raise SystemExit(main(sys.argv[1:], spawn=spawn_declared))
+    import paperkit.resolver
+    raise SystemExit(main(sys.argv[1:], spawn=paperkit.checkenv.spawn_declared))

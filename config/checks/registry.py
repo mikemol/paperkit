@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path("../paperkit").resolve()))
-import config as C  # noqa: E402
+import paperkit.config  # noqa: E402
 
 
 def union():
@@ -52,21 +52,21 @@ def union():
     # "owns" a name.
     out = []
     for stem in (f[:-3] for fs in comps.values() for f in fs if "/" not in f):
-        out += [v for v in vars(importlib.import_module(stem)).values() if isinstance(v, C.Param)]
+        out += [v for v in vars(importlib.import_module(stem)).values() if isinstance(v, paperkit.config.Param)]
     deduped = list({id(p): p for p in out}.values())
     return sorted(deduped, key=lambda p: p.name)
 
 
 def precedence():
-    p = C.Param("syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def"))
-    C._ARGS.clear(); os.environ.pop(p.env, None)
-    assert C.resolve(p) == "file", "default"
-    assert C.resolve(p, {"syn_val": "def"}) == "def", "config over default"
+    p = paperkit.config.Param("syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def"))
+    paperkit.config._ARGS.clear(); os.environ.pop(p.env, None)
+    assert paperkit.config.resolve(p) == "file", "default"
+    assert paperkit.config.resolve(p, {"syn_val": "def"}) == "def", "config over default"
     os.environ[p.env] = "file"
-    assert C.resolve(p, {"syn_val": "def"}) == "file", "env over config"
-    C.apply_args(["--syn-val", "def"], [p])
-    assert C.resolve(p, {"syn_val": "def"}) == "def", "arg over env"
-    C._ARGS.clear(); os.environ.pop(p.env, None)
+    assert paperkit.config.resolve(p, {"syn_val": "def"}) == "file", "env over config"
+    paperkit.config.apply_args(["--syn-val", "def"], [p])
+    assert paperkit.config.resolve(p, {"syn_val": "def"}) == "def", "arg over env"
+    paperkit.config._ARGS.clear(); os.environ.pop(p.env, None)
 
 
 def well_formed():

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# W304 -- push to origin/main after a commit, but only a commit the gate verified.
+#
+# Operator, 2026-10-10: "Add git push to the post-commit hook."  Modelled on mtools'
+# .githooks/post-commit.  Two jobs, in this order: verify that pre-commit recorded this commit's
+# tree as gate-verified, THEN push.  A bypass that reaches HEAD by a route nobody enumerated has no
+# witness and is not published, however it was produced.
+#
+# It refuses to PUSH, never the commit: post-commit cannot undo a commit, so a refusal is a message
+# and every branch exits 0.  A moved remote is reported with the command to run, never rebased here
+# (a hook that rewrote history under a concurrent writer would do it unasked and unread).
+
+set -uo pipefail
+
+_git_dir=$(git rev-parse --git-dir)
+_witness="$_git_dir/mtools/gate-verified"
+# Quoted: HEAD^{tree} reads as brace expansion to a shell (SC1083).
+_tree=$(git rev-parse "HEAD^{tree}")
+
+# A missing witness file says the gate has never run in this clone (environment); a file lacking
+# this tree says it ran for other commits and not this one (this commit).  Only the second is a bypass.
+if [ ! -r "$_witness" ]; then
+    echo "post-commit: no gate witness in this clone; NOT pushing (environment, not the commit)."
+    exit 0
+fi
+
+if ! grep -qxF "$_tree" "$_witness"; then
+    echo "post-commit: THE GATE DID NOT RUN FOR THIS COMMIT (tree $_tree not in $_witness)."
+    echo "post-commit: policy is never --no-verify. NOT PUSHING. Re-commit through the gate."
+    exit 0
+fi
+
+# The cause is read from the push, not assumed: only a ref the remote REJECTED is a moved remote;
+# anything else (a failing pre-push, an unreachable remote) is an abandoned push.
+_push_out=$(git push origin HEAD:main 2>&1)
+_push_rc=$?
+if [ -n "$_push_out" ]; then
+    echo "$_push_out"
+fi
+if [ "$_push_rc" -eq 0 ]; then
+    echo "post-commit: pushed $(git rev-parse --short HEAD) to origin/main"
+elif grep -qE '\[(remote )?rejected\]' <<<"$_push_out"; then
+    echo "post-commit: PUSH REFUSED, the remote has moved. The commit is SAFE and LOCAL."
+    echo "post-commit: reconcile deliberately: git fetch origin && git rebase origin/main && git push origin HEAD:main"
+else
+    echo "post-commit: PUSH ABANDONED (exit $_push_rc), not because the remote moved; output above."
+    echo "post-commit: the commit is SAFE and LOCAL. Fix the cause, then: git push origin HEAD:main"
+fi
+
+exit 0

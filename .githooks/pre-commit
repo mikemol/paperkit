@@ -384,3 +384,12 @@ if git rev-parse -q --verify HEAD:cotype/ledger.md >/dev/null 2>&1; then
   rm -f "$old" "$new"; _pk_extra=""
 fi
 echo "[pre-commit] all checks passed"
+
+# W304 -- THE GATE'S WITNESS, for post-commit.  Every check above has passed for exactly the tree
+# git is about to commit, and `git write-tree` names that tree (under `commit --only` it reads the
+# temporary index, so it is the committed tree and not the working one).  post-commit pushes only a
+# tree recorded here, so a commit that reached HEAD without passing this hook (a route nobody
+# enumerated) has no witness and is not published.
+_pk_git_dir=$(git rev-parse --git-dir)
+mkdir -p "$_pk_git_dir/mtools"
+git write-tree >> "$_pk_git_dir/mtools/gate-verified"

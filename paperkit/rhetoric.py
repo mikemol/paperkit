@@ -47,18 +47,17 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import paperkit.bib
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# Ζ·anno·rhetoric — the shapes bib.py's readers actually return, named HERE because the engine's
-# flat sibling import (below) is invisible to the type checker: `import bib` behind a sys.path
-# insert resolves at runtime and not at analysis time, so every value crossing that edge arrives
-# untyped.  MEASURED, because the opposite was claimed: making the import resolve
-# (--ignore-missing-imports) takes this file from 65 mypy errors to 64 — it deletes the
-# import-not-found line and NOTHING else.  The Any-cascade was never the import's doing; it was
-# unannotated defs and bare generics inside this file.  So these aliases are not a workaround for
-# the import spelling, and fixing that spelling would not retire them: they are this module's
-# statement of what it requires of its dependency, which is a thing worth writing down either way.
+# Ζ·anno·rhetoric — the shapes bib.py's readers actually return, named HERE as this module's
+# statement of what it requires of its dependency, which is worth writing down whether or not the
+# type checker can follow the import.  (It once could not: a flat `import bib` behind a sys.path
+# insert resolved at runtime and not at analysis time.  MEASURED then, because the opposite was
+# claimed: making the import resolve took this file from 65 mypy errors to 64 — the Any-cascade
+# was never the import's doing, it was unannotated defs and bare generics inside this file.)
 #
 # ⚑ READ OFF bib.py, NOT GUESSED.  A precise-looking annotation over a genuinely loose structure
 # buys a green by telling the checker something false, so each of these traces to a line:
@@ -79,22 +78,11 @@ Config = dict[str, object]
 # and the two were free to drift while it was spelled `list` at both ends.
 Section = tuple[str, str, list[str], list[str | None], list[str]]
 
-# Ζ·pkg·shape — the engine's own directory, FIRST on sys.path, and it must stay a per-module
-# line rather than moving to paperkit/__init__.py: a package __init__ runs only when the
-# package is IMPORTED, and these modules are also loaded as siblings by a caller that has
-# already put its own directory ahead of ours.  render/checks/ ships its OWN bib.py, so a
-# witness inserting that directory shadows the engine's parser and `from bib import
-# dep_order` resolves to the wrong module.  MEASURED: removing these six lines reddened
-# seven talk claims with "cannot import name 'dep_order' from bib (render/checks/bib.py)".
-# The insert is a PRIORITY CLAIM, not a reachability fix — __init__.py handles reachability.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import paperkit.bib
-
-# ⚑ Ζ·anno·rhetoric — THE UNTYPED EDGE IS DECLARED ONCE, HERE, and this is the placement decision
-# in this file.  The import above is unfollowable to mypy (a runtime sys.path insert is not an
-# analysis-time fact), so every `bib.foo(...)` is a call on an Any and each such CALL EXPRESSION is
-# itself Any — casting the result narrows the value but not the call, which is why a per-call cast
-# left five errors standing and this binding leaves none.
+# ⚑ Ζ·anno·rhetoric — THE EDGE TO bib IS DECLARED ONCE, HERE, and this is the placement decision
+# in this file.  Ζ·path·retire removed the sys.path insert this module used to carry (the shadow
+# it defended was measured FALSE in paperkit/__init__.py: a package-qualified import reaches the
+# engine's bib whatever sits earlier on sys.path), so `import paperkit.bib` is an ordinary
+# top-of-file import and mypy follows it.
 #
 # Naming the five functions this module uses, with the signatures bib.py actually defines, does
 # three things a scattered cast does not: it states this module's REQUIREMENT of its dependency in

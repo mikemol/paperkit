@@ -28,7 +28,6 @@ This check gates the bound so it cannot rot into a comment nobody honours.  It a
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 import graph
 
@@ -47,8 +46,6 @@ def _projector_targets() -> set[str]:
     target CANNOT be added without this check seeing it; a grep over dispatch sites would miss the
     default (`pandoc` never appears in a `target == …` comparison).
     """
-    root = Path(__file__).resolve().parents[2]
-    sys.path.insert(0, str(root / "paperkit"))
     import paperkit.project  # the owner of the target knob
     return set(paperkit.project.TARGET.choices or ())
 

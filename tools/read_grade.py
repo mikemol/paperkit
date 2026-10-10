@@ -35,9 +35,7 @@ read before — ADDITIVE, not a shape change.
 """
 import json
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path("paperkit")))
 import paperkit.grade
 
 c = json.load(open(sys.argv[1]))

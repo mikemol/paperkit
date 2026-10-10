@@ -24,7 +24,6 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path("paperkit")))
 import paperkit.grade  # noqa: E402
 
 meta = json.loads(Path(sys.argv[1]).read_text())

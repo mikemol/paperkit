@@ -27,9 +27,6 @@ import sys
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent.parent
-if str(ENGINE) not in sys.path:                  # Φ·spawn: the helpers import the engine IN-PROCESS
-    sys.path.insert(0, str(ENGINE))              # (was: spawn by absolute path), so ENGINE is on path
-                                                 # here — self-contained, not reliant on the caller's setup
 # The engine CLI paths — for the few boundary suites that genuinely test CROSS-PROCESS behaviour
 # (memoize: a Δ grade cached across processes) and so spawn a real process (under the standard
 # boundaries gate, not the hermetic grid).  The capability helpers run IN-PROCESS, not via these.

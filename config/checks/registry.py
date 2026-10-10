@@ -12,7 +12,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path("../paperkit").resolve()))
 import paperkit.config  # noqa: E402
 
 
@@ -52,7 +51,10 @@ def union():
     # "owns" a name.
     out = []
     for stem in (f[:-3] for fs in comps.values() for f in fs if "/" not in f):
-        out += [v for v in vars(importlib.import_module(stem)).values() if isinstance(v, paperkit.config.Param)]
+        # W299 -- the stem is a bare filename from components.bzl, so it is qualified as a PACKAGE
+        # module: a bare import_module(stem) resolved only because a sys.path insert put
+        # paperkit/ first, which a census of import STATEMENTS did not see (it is a dynamic import).
+        out += [v for v in vars(importlib.import_module(f"paperkit.{stem}")).values() if isinstance(v, paperkit.config.Param)]
     deduped = list({id(p): p for p in out}.values())
     return sorted(deduped, key=lambda p: p.name)
 

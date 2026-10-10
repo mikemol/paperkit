@@ -133,7 +133,6 @@ if __name__ == "__main__":
         if dag.read_text() == want:
             print("imports.py --write: dag.bzl already fresh")
             raise SystemExit(0)
-        sys.path.insert(0, str(eng))
         import paperkit.durable
         paperkit.durable.write_atomic(dag, want)      # Ζ·write·atomic — the generator eats its own cooking
         print("imports.py --write: regenerated paperkit/dag.bzl")

@@ -93,7 +93,6 @@ def pptx_observed(project_dir: Path, out_pptx: Path, genre_name: str = "talk") -
     """
     assert graph.tool_for("units", "pptx") == "pandoc", \
         "the graph no longer declares units→pptx as a pandoc morphism — derive the tool, never hardcode"
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "paperkit"))
     import paperkit.project
     cfg = paperkit.bib.load_config(project_dir)
     units = paperkit.project.observe(cfg, genre_name, project_dir)

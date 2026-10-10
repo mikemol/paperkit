@@ -24,6 +24,9 @@ every claim (claims.py imports _fixture_model + read_texts three sources).
 
 Usage: closure.py --check paper/checks/claims.py <engine.py>…
 """
+
+from __future__ import annotations
+
 import argparse
 import ast
 import sys
@@ -50,11 +53,14 @@ def _stem(dotted):
 
 
 def _reads(node, names):
-    return {Path(n.value).stem for n in ast.walk(node)
-            if isinstance(n, ast.Constant) and isinstance(n.value, str)
-            and n.value.endswith(".py") and Path(n.value).stem in names}
-
-
+    return {
+        Path(n.value).stem
+        for n in ast.walk(node)
+        if isinstance(n, ast.Constant)
+        and isinstance(n.value, str)
+        and n.value.endswith(".py")
+        and Path(n.value).stem in names
+    }
 
 
 def _parents_prefix(node, parts):
@@ -65,11 +71,15 @@ def _parents_prefix(node, parts):
     both as a module/function const (ROOT = …parents[1]) AND inline inside a path expression (local_ci:
     …parents[2] / ".githooks" / "pre-commit").
     """
-    if (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute)
-            and node.value.attr == "parents" and isinstance(node.slice, ast.Constant)
-            and isinstance(node.slice.value, int)
-            and any(isinstance(x, ast.Name) and x.id == "__file__" for x in ast.walk(node))):
-        return "/".join(parts[:-(node.slice.value + 1)])
+    if (
+        isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Attribute)
+        and node.value.attr == "parents"
+        and isinstance(node.slice, ast.Constant)
+        and isinstance(node.slice.value, int)
+        and any(isinstance(x, ast.Name) and x.id == "__file__" for x in ast.walk(node))
+    ):
+        return "/".join(parts[: -(node.slice.value + 1)])
     return None
 
 
@@ -88,9 +98,15 @@ def _dir_consts(relpath, stmts, pref=None):
         pp = _parents_prefix(v, parts)
         if pp is not None:
             pref[tgt] = pp
-        elif (isinstance(v, ast.BinOp) and isinstance(v.op, ast.Div) and isinstance(v.left, ast.Name)
-              and v.left.id in pref and isinstance(v.right, ast.Constant) and isinstance(v.right.value, str)):
-            pref[tgt] = "/".join(p for p in (pref[v.left.id], v.right.value) if p)   # NAME / "sub"
+        elif (
+            isinstance(v, ast.BinOp)
+            and isinstance(v.op, ast.Div)
+            and isinstance(v.left, ast.Name)
+            and v.left.id in pref
+            and isinstance(v.right, ast.Constant)
+            and isinstance(v.right.value, str)
+        ):
+            pref[tgt] = "/".join(p for p in (pref[v.left.id], v.right.value) if p)  # NAME / "sub"
     return pref
 
 
@@ -104,8 +120,12 @@ def _resolve_path(node, pref, parts):
         return pp
     if isinstance(node, ast.Name):
         return pref.get(node.id)
-    if (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div)
-            and isinstance(node.right, ast.Constant) and isinstance(node.right.value, str)):
+    if (
+        isinstance(node, ast.BinOp)
+        and isinstance(node.op, ast.Div)
+        and isinstance(node.right, ast.Constant)
+        and isinstance(node.right.value, str)
+    ):
         base = _resolve_path(node.left, pref, parts)
         return None if base is None else "/".join(p for p in (base, node.right.value) if p)
     return None
@@ -119,7 +139,11 @@ def _exists_paths(node, pref, parts):
     """
     out = set()
     for c in ast.walk(node):
-        if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "exists":
+        if (
+            isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Attribute)
+            and c.func.attr == "exists"
+        ):
             p = _resolve_path(c.func.value, pref, parts)
             if p is not None:
                 out.add(p)
@@ -134,38 +158,66 @@ def _content_edges(fn, pref, parts):
     every reader identically).  Resolves the comparator when it is an inline `F.read_text()` or a
     FUNCTION-LOCAL name bound to one (module-level SRC constants are a coarser, later rung).
     """
-    reads = {}                                           # local name → file path (bound to X.read_text())
+    reads = {}  # local name → file path (bound to X.read_text())
     for n in ast.walk(fn):
-        if (isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name)
-                and isinstance(n.value, ast.Call) and isinstance(n.value.func, ast.Attribute)
-                and n.value.func.attr == "read_text"):
+        if (
+            isinstance(n, ast.Assign)
+            and len(n.targets) == 1
+            and isinstance(n.targets[0], ast.Name)
+            and isinstance(n.value, ast.Call)
+            and isinstance(n.value.func, ast.Attribute)
+            and n.value.func.attr == "read_text"
+        ):
             p = _resolve_path(n.value.func.value, pref, parts)
             if p is not None:
                 reads[n.targets[0].id] = p
     out = set()
     for c in ast.walk(fn):
-        if not (isinstance(c, ast.Compare) and len(c.ops) == 1 and isinstance(c.ops[0], ast.In)
-                and isinstance(c.left, ast.Constant) and isinstance(c.left.value, str)):
+        if not (
+            isinstance(c, ast.Compare)
+            and len(c.ops) == 1
+            and isinstance(c.ops[0], ast.In)
+            and isinstance(c.left, ast.Constant)
+            and isinstance(c.left.value, str)
+        ):
             continue
         comp = c.comparators[0]
         p = None
-        if isinstance(comp, ast.Call) and isinstance(comp.func, ast.Attribute) and comp.func.attr == "read_text":
-            p = _resolve_path(comp.func.value, pref, parts)   # inline `"S" in (root / "x").read_text()`
+        if (
+            isinstance(comp, ast.Call)
+            and isinstance(comp.func, ast.Attribute)
+            and comp.func.attr == "read_text"
+        ):
+            p = _resolve_path(
+                comp.func.value, pref, parts
+            )  # inline `"S" in (root / "x").read_text()`
         elif isinstance(comp, ast.Name):
-            p = reads.get(comp.id)                         # `"S" in gen` (gen = F.read_text())
+            p = reads.get(comp.id)  # `"S" in gen` (gen = F.read_text())
         if p is not None:
             out.add((p, c.left.value))
     return out
 
 
+class MainArgs(argparse.Namespace):
+    """The typed result of `main` (generated by pycodemod typed-args)."""
+
+    check: str
+    relpath: str
+    engine: list[str]
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", required=True, help="the check module, e.g. paper/checks/claims.py")
-    ap.add_argument("--relpath", default="", help="the check's REPO-RELATIVE path (for parents[N] resolution); defaults to --check")
+    ap.add_argument(
+        "--relpath",
+        default="",
+        help="the check's REPO-RELATIVE path (for parents[N] resolution); defaults to --check",
+    )
     ap.add_argument("engine", nargs="+", help="the engine module .py paths (the resolvable names)")
-    a = ap.parse_args(argv)
+    a = ap.parse_args(argv, namespace=MainArgs())
 
-    names = {Path(p).stem: p for p in a.engine}      # stem → relpath
+    names = {Path(p).stem: p for p in a.engine}  # stem → relpath
     # Ξ·dag — the engine import graph (stem → direct engine imports), to expand a witness's closure
     # ROOTS to its full TRANSITIVE cone: the modules the check actually LOADS (PycInfo stages exactly
     # this cone), hence the modules whose def-drop can flip it.  Roots alone UNDER-scope — node-is-claim
@@ -185,7 +237,9 @@ def main(argv):
 
     tree = ast.parse(Path(a.check).read_text())
 
-    funcs = {fn.name: fn for fn in tree.body if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    funcs = {
+        fn.name: fn for fn in tree.body if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
 
     # BASE — the module-level roots, run on EVERY witness (claims.py imports _fixture_model + read_texts
     # gate/resolver/project at import).  Top-level statements only (defs handled per-witness).
@@ -202,7 +256,7 @@ def main(argv):
         seen.add(fnname)
         fn = funcs[fnname]
         ri, rr = _imports(fn, names), _reads(fn, names)
-        for c in ast.walk(fn):        # follow intra-claims.py calls (a witness → local _parse helper)
+        for c in ast.walk(fn):  # follow intra-claims.py calls (a witness → local _parse helper)
             if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in funcs:
                 ci, cr = roots(c.func.id, seen)
                 ri |= ci
@@ -225,8 +279,11 @@ def main(argv):
     _DISPATCH = ("CLAIMS", "CONCEPTS", "WITNESSES")
     claims = {}
     for n in tree.body:
-        if (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id in _DISPATCH for t in n.targets)
-                and isinstance(n.value, ast.Dict)):
+        if (
+            isinstance(n, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id in _DISPATCH for t in n.targets)
+            and isinstance(n.value, ast.Dict)
+        ):
             for k, v in zip(n.value.keys, n.value.values):
                 if isinstance(k, ast.Constant) and isinstance(v, ast.Name):
                     claims[k.value] = v.id
@@ -238,7 +295,7 @@ def main(argv):
     # "X exists").  No `not`-parsing needed: the counterfactual is simply the opposite of what is.
     relpath = a.relpath or a.check
     parts = relpath.split("/")
-    mod_pref = _dir_consts(relpath, tree.body)           # the module-level dir constants (shared)
+    mod_pref = _dir_consts(relpath, tree.body)  # the module-level dir constants (shared)
 
     # Ξ·dag·concept — the SUBPROCESS edge.  A witness that resolves `concept:KEY` does not IMPORT
     # that key's witness: resolver.resolves() SHELLS OUT to the owning library's concepts.py, which
@@ -252,8 +309,12 @@ def main(argv):
     def _concept_keys(fn):
         out = set()
         for c in ast.walk(fn):
-            if isinstance(c, ast.Constant) and isinstance(c.value, str) and c.value.startswith("concept:"):
-                k = c.value[len("concept:"):]
+            if (
+                isinstance(c, ast.Constant)
+                and isinstance(c.value, str)
+                and c.value.startswith("concept:")
+            ):
+                k = c.value[len("concept:") :]
                 if k in claims:
                     out.add(k)
         return out
@@ -294,8 +355,9 @@ def main(argv):
         """Engine roots of every sibling script this witness names as a path constant."""
         out = set()
         for c in ast.walk(fn):
-            if not (isinstance(c, ast.Constant) and isinstance(c.value, str)
-                    and c.value.endswith(".py")):
+            if not (
+                isinstance(c, ast.Constant) and isinstance(c.value, str) and c.value.endswith(".py")
+            ):
                 continue
             script = check_dir / Path(c.value).name
             if not script.exists() or script.resolve() == Path(a.check).resolve():
@@ -308,13 +370,15 @@ def main(argv):
 
     for key in sorted(claims):
         fn = funcs[claims[key]]
-        pref = _dir_consts(relpath, fn.body, mod_pref)   # extend with the witness's function-local ones
+        pref = _dir_consts(
+            relpath, fn.body, mod_pref
+        )  # extend with the witness's function-local ones
         wi, wr = roots(claims[key], set())
-        for ck in _concept_keys(fn):                     # follow each resolved key's witness cone
+        for ck in _concept_keys(fn):  # follow each resolved key's witness cone
             ci, cr = _resolved_roots(ck, {key})
             wi |= ci
             wr |= cr
-        wi |= _script_roots(fn)                          # Ξ·dag·script — a sibling generator's imports
+        wi |= _script_roots(fn)  # Ξ·dag·script — a sibling generator's imports
         cone = _cone(base_i | wi)
         for stem in sorted(cone):
             print(f"{key}\t{names[stem]}")
@@ -323,7 +387,7 @@ def main(argv):
             print(f"{key}\tread:{names[stem]}")
         for path in sorted(_exists_paths(fn, pref, parts)):
             if Path(path).is_dir():
-                continue                                 # a dir-existence is not a single-artifact toggle
+                continue  # a dir-existence is not a single-artifact toggle
             op = "file-" if Path(path).exists() else "file+"
             print(f"{key}\t{op}:{path}")
         # Ζ·mutant·struct·node-kinds (BIB/content) — a CONTENT edge, emitted as `claim<TAB>op<TAB>path

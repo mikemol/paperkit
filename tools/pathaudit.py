@@ -39,38 +39,37 @@ OUT = sys.stdout
 TREES = ("paperkit", "tools", "checks", "render", "config", "paper", "library", "demo", "talk")
 PROBES = ("paperkit", "tools", "paperkit.bib", "paperkit.tests", "tools.closure")
 
-# ⚑ Ζ·path·runtime — NOT EVERY SITE IS A BOOTSTRAP, AND A BULK SWEEP THAT ASSUMES SO BREAKS THREE
-# THINGS.  Classified by reading each one (2026-08-31); they are three DIFFERENT kinds, which is
-# why "the three runtime sites" was itself too coarse a description:
+# ⚑ Ζ·path·runtime — NOT EVERY SITE IS A BOOTSTRAP, AND A BULK SWEEP THAT ASSUMES SO BREAKS THINGS.
+# The kinds, classified by reading each one (2026-08-31, restated 2026-10-10):
 #
-#   checkcache.py:188   RUNTIME, well-formed.  Loads an arbitrary witness by path and reads the
-#                       sys.path THAT module established, to make a cache key's file set real
-#                       rather than nominal.  Saves and restores sys.path in a `finally`.  ⚑ Its
-#                       PURPOSE largely evaporates once Ζ·path·retire lands — with no mutations
-#                       left to discover, the probe measures an empty set.
-#   checkcache.py:248   MIXED, and unrestored.  Same dynamic-load shape, but the insert ALSO
-#                       serves this module's own flat `import routes as R` — one statement doing a
-#                       bootstrap and a runtime job at once — and there is no `finally`, so the
-#                       process keeps the entry.  The bootstrap half retires; the runtime half
-#                       needs the save/restore its sibling already has.
-#   bibstruct.py:466    SEARCH, and dead here.  A borrowed tool locating a FOREIGN paperkit via
-#                       $PAPERKIT / ~/github/paperkit — the search-instead-of-declare pattern
-#                       pyproject.toml already names as the defect.  Inside paperkit the whole
-#                       branch is unnecessary: `paperkit.bib` imports directly.
+#   a BOOTSTRAP is a MODULE-LEVEL mutation: it runs at import so the file's own flat imports
+#   resolve.  The package declaration covers it, and it retires.
+#   a RUNTIME site is a mutation INSIDE A FUNCTION: it exists to load or locate something at a call
+#   (checkcache's by-path load of an arbitrary witness, which saves and restores sys.path in a
+#   `finally`; bibstruct's search for a foreign paperkit).  The two are told apart STRUCTURALLY, by
+#   whether the call sits inside a def, never by a table of line numbers: the table this replaced
+#   named lines 188/248/466, the files were edited, and the audit reported "0 runtime" while the
+#   sites it meant had moved to 303 and 477 — a classification keyed on position rots on the first
+#   edit above it.
 #
-# A fourth kind is legitimate and now gone: `tools/shadowprobe.py` CONSTRUCTED a hostile sys.path
-# as its experiment.  It was a one-shot instrument, its finding is recorded in paperkit/__init__.py
-# where the claim it refuted lived, and it is deleted — a tool whose method is the practice being
-# retired cannot stay in the tree doing it.
-RUNTIME_SITES = {
-    "paperkit/checkcache.py": (188, 248),
-    "paperkit/tools/bibstruct.py": (466,),
-}
+# A kind that is legitimate and now gone: `tools/shadowprobe.py` CONSTRUCTED a hostile sys.path
+# as its experiment.  It was a one-shot instrument, its finding is recorded in
+# paperkit/__init__.py where the claim it refuted lived, and it is deleted — a tool whose method
+# is the practice being retired cannot stay in the tree doing it.
 
 
-def sites(tree: Path) -> list[tuple[str, int, str]]:
-    """Find every module-level sys.path mutation as (file, line, the call source)."""
-    out: list[tuple[str, int, str]] = []
+def _function_lines(mod: ast.Module) -> set[int]:
+    """Return every line number that sits inside a function body."""
+    lines: set[int] = set()
+    for node in ast.walk(mod):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            lines.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+    return lines
+
+
+def sites(tree: Path) -> list[tuple[str, int, str, bool]]:
+    """Find every sys.path mutation as (file, line, the call source, inside a function)."""
+    out: list[tuple[str, int, str, bool]] = []
     for p in sorted(tree.rglob("*.py")):
         if "__pycache__" in p.parts:
             continue
@@ -78,6 +77,7 @@ def sites(tree: Path) -> list[tuple[str, int, str]]:
             mod = ast.parse(p.read_text())
         except (OSError, SyntaxError):
             continue
+        in_function = _function_lines(mod)
         for node in ast.walk(mod):
             if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
                 continue
@@ -86,7 +86,8 @@ def sites(tree: Path) -> list[tuple[str, int, str]]:
             tgt = node.func.value
             if (isinstance(tgt, ast.Attribute) and tgt.attr == "path"
                     and isinstance(tgt.value, ast.Name) and tgt.value.id == "sys"):
-                out.append((str(p.relative_to(ROOT)), node.lineno, ast.unparse(node)))
+                out.append((str(p.relative_to(ROOT)), node.lineno, ast.unparse(node),
+                            node.lineno in in_function))
     return out
 
 
@@ -115,27 +116,26 @@ def importable(name: str) -> tuple[bool, str]:
 
 def main(argv: list[str]) -> int:
     """Report every sys.path mutation, and optionally whether its target needs one."""
-    found: list[tuple[str, int, str]] = []
+    found: list[tuple[str, int, str, bool]] = []
     for t in TREES:
         d = ROOT / t
         if d.is_dir():
             found.extend(sites(d))
 
-    by_file: dict[str, list[tuple[int, str]]] = {}
-    for f, line, src in found:
-        by_file.setdefault(f, []).append((line, src))
+    by_file: dict[str, list[tuple[int, str, bool]]] = {}
+    for f, line, src, in_function in found:
+        by_file.setdefault(f, []).append((line, src, in_function))
 
     runtime = 0
     for f in sorted(by_file):
         OUT.write(f"  {f}\n")
-        for line, src in by_file[f]:
-            known = line in RUNTIME_SITES.get(f, ())
-            runtime += known
-            OUT.write(f"      :{line}  {'[runtime] ' if known else ''}{src}\n")
+        for line, src, in_function in by_file[f]:
+            runtime += in_function
+            OUT.write(f"      :{line}  {'[runtime] ' if in_function else ''}{src}\n")
 
     OUT.write(f"\n{len(by_file)} file(s) mutate sys.path · {len(found)} site(s)\n")
-    OUT.write(f"  {runtime} classified RUNTIME (dynamic load / foreign-repo search) — see\n"
-              f"  RUNTIME_SITES above; the other {len(found) - runtime} are bootstraps the\n"
+    OUT.write(f"  {runtime} classified RUNTIME (inside a function: a dynamic load or a search at\n"
+              f"  call time); the other {len(found) - runtime} are module-level bootstraps the\n"
               "  package declaration already covers.\n")
 
     if "--probe" in argv:

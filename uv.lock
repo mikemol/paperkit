@@ -320,6 +320,34 @@ wheels = [
 ]
 
 [[package]]
+name = "mikemol-atomicwrite"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=atomicwrite&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+
+[[package]]
+name = "mikemol-bibparse"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=bibparse&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+
+[[package]]
+name = "mikemol-buildtel"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=buildtel&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+
+[[package]]
+name = "mikemol-gatecheck"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=gatecheck&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+dependencies = [
+    { name = "mikemol-importdag" },
+]
+
+[[package]]
+name = "mikemol-grade"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=grade&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+
+[[package]]
 name = "mikemol-hooks"
 version = "0.1.0"
 source = { git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#6868dd2a7f3d113b7b505c8f023e2e477a33c0ec" }
@@ -329,9 +357,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "mikemol-importdag"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=importdag&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+dependencies = [
+    { name = "mikemol-atomicwrite" },
+]
+
+[[package]]
+name = "mikemol-memres"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=memres&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+
+[[package]]
+name = "mikemol-mutantcell"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=mutantcell&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+dependencies = [
+    { name = "mikemol-importdag" },
+    { name = "mikemol-mutation" },
+]
+
+[[package]]
+name = "mikemol-mutation"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=mutation&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
+
+[[package]]
 name = "mikemol-pathsforward"
 version = "0.1.0"
 source = { git = "https://github.com/mikemol/mtools.git?subdirectory=pathsforward&rev=6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#6868dd2a7f3d113b7b505c8f023e2e477a33c0ec" }
+
+[[package]]
+name = "mikemol-pkgbuild"
+version = "0.1.0"
+source = { git = "https://github.com/mikemol/mtools.git?subdirectory=pkgbuild&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f#7d4a458a68fcd8f4ae1e9693316b1cccff38501f" }
 
 [[package]]
 name = "mypy"
@@ -425,8 +485,18 @@ render = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "mikemol-atomicwrite", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-bibparse", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-buildtel", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-gatecheck", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-grade", marker = "python_full_version >= '3.13'" },
     { name = "mikemol-hooks", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-importdag", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-memres", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-mutantcell", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-mutation", marker = "python_full_version >= '3.13'" },
     { name = "mikemol-pathsforward", marker = "python_full_version >= '3.13'" },
+    { name = "mikemol-pkgbuild", marker = "python_full_version >= '3.13'" },
     { name = "mypy" },
     { name = "ruff", version = "0.16.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
     { name = "ruff", version = "0.16.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
@@ -442,8 +512,18 @@ provides-extras = ["render"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "mikemol-atomicwrite", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=atomicwrite&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
+    { name = "mikemol-bibparse", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=bibparse&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
+    { name = "mikemol-buildtel", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=buildtel&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
+    { name = "mikemol-gatecheck", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=gatecheck&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
+    { name = "mikemol-grade", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=grade&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
     { name = "mikemol-hooks", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=hooks&rev=6868dd2a7f3d113b7b505c8f023e2e477a33c0ec" },
+    { name = "mikemol-importdag", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=importdag&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
+    { name = "mikemol-memres", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=memres&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
+    { name = "mikemol-mutantcell", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=mutantcell&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
+    { name = "mikemol-mutation", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=mutation&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
     { name = "mikemol-pathsforward", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=pathsforward&rev=6868dd2a7f3d113b7b505c8f023e2e477a33c0ec" },
+    { name = "mikemol-pkgbuild", marker = "python_full_version >= '3.13'", git = "https://github.com/mikemol/mtools.git?subdirectory=pkgbuild&rev=7d4a458a68fcd8f4ae1e9693316b1cccff38501f" },
     { name = "mypy", specifier = ">=1.8" },
     { name = "ruff" },
 ]

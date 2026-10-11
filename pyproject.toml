@@ -334,4 +334,17 @@ dev = [
     # the consumer contract for a tool no consumer runs; the dev venv is 3.13, so the hook is there.
     "mikemol-hooks @ git+https://github.com/mikemol/mtools.git@6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#subdirectory=hooks ; python_full_version >= '3.13'",
     "mikemol-pathsforward @ git+https://github.com/mikemol/mtools.git@6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#subdirectory=pathsforward ; python_full_version >= '3.13'",
+    # W142a -- the tools/ migration's landed packages (mtools:W531), pinned at ONE sha that holds all
+    # ten and the judged-fix mode.  importdag is pinned because gatecheck and mutantcell DEPEND on it
+    # (read from their pyproject.toml), though nothing is repointed onto it yet (mtools:W547).
+    "mikemol-pkgbuild @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=pkgbuild ; python_full_version >= '3.13'",
+    "mikemol-gatecheck @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=gatecheck ; python_full_version >= '3.13'",
+    "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=atomicwrite ; python_full_version >= '3.13'",
+    "mikemol-grade @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=grade ; python_full_version >= '3.13'",
+    "mikemol-mutation @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=mutation ; python_full_version >= '3.13'",
+    "mikemol-bibparse @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=bibparse ; python_full_version >= '3.13'",
+    "mikemol-mutantcell @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=mutantcell ; python_full_version >= '3.13'",
+    "mikemol-memres @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=memres ; python_full_version >= '3.13'",
+    "mikemol-buildtel @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=buildtel ; python_full_version >= '3.13'",
+    "mikemol-importdag @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=importdag ; python_full_version >= '3.13'",
 ]

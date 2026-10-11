@@ -42,7 +42,7 @@ class _Unreachable(int):
 
     def __new__(cls):
         return super().__new__(cls, 0)
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "UNREACHABLE"
 
 
@@ -79,7 +79,7 @@ def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path 
     """
     out, seen = [], set()
 
-    def collect(base: Path, skip_nested: bool):
+    def collect(base: Path, skip_nested: bool) -> None:
         nested = paperkit.layout._nested_roots(base) if skip_nested else []
         # Ζ·sandbox·declared — the repository's own content (layout._Scope), not `rglob("*")`,
         # which enumerated every cache, stale build copy and nested checkout on disk.
@@ -209,7 +209,7 @@ class _BranchNode:
 
     __slots__ = ("body", "end_lineno")
 
-    def __init__(self, first, last):
+    def __init__(self, first, last) -> None:
         self.body = [first]
         self.end_lineno = last.end_lineno
 
@@ -226,7 +226,7 @@ class _DataNode:
 
     __slots__ = ("spec",)
 
-    def __init__(self, qualname, n):
+    def __init__(self, qualname, n) -> None:
         self.spec = f"data-:{qualname}#{n}"
 
 
@@ -382,7 +382,7 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     def run(group) -> list:
         flips: list[str] = []
 
-        def split(g):
+        def split(g) -> None:
             if not g or not apply(g):
                 return                   # cleared in one run: no flipper here
             if len(g) == 1:
@@ -1018,7 +1018,7 @@ class GradeWitness:
     parallel via _grade_parallel.
     """
 
-    def __init__(self, project_dir, checks, custom, presupposed, resolution="file"):
+    def __init__(self, project_dir, checks, custom, presupposed, resolution="file") -> None:
         self.project_dir, self.checks = project_dir, checks
         self.custom, self.presupposed = custom, presupposed
         self.resolution = resolution

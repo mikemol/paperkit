@@ -31,7 +31,7 @@ def main() -> int:
     ran = []
     deltas = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         # Λ·guard-must-not-copy — `ran` COUNTS the arms and `deltas` the ⟨P,F,δ⟩ pairs; the summary
         # must not restate a number authored beside the set it describes.  This suite printed a
         # hardcoded "8 behaviors, 1 delta" with NO counter feeding it: deleting an arm left the

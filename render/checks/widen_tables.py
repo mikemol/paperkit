@@ -59,7 +59,7 @@ def read_document(docx):
         return z.read("word/document.xml").decode()
 
 
-def write_document(src, dst, new_doc):
+def write_document(src, dst, new_doc) -> None:
     with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
         for it in zin.infolist():
             data = new_doc.encode() if it.filename == "word/document.xml" else zin.read(it.filename)
@@ -249,7 +249,7 @@ def lay_out(doc, cells, ink_widths, text_w):
         tbl = re.sub(r"<w:tblGrid>.*?</w:tblGrid>", grid, tbl, flags=re.S)
         ci = [0]
 
-        def repl_tcw(_m):
+        def repl_tcw(_m) -> str:
             w = cols[ci[0] % len(cols)]
             ci[0] += 1
             return f'<w:tcW w:w="{w}" w:type="dxa" />'
@@ -262,7 +262,7 @@ def lay_out(doc, cells, ink_widths, text_w):
     return "".join(out), changed
 
 
-def _deps_absent():
+def _deps_absent() -> str | None:
     # PIL-only port: numpy is NOT a paperkit dependency and must not be required.  PIL is
     # already a render-layer dep (ocr.py); libreoffice + pdftoppm are the render toolchain.
     if not (_have("libreoffice") and _have("pdftoppm")):
@@ -285,7 +285,7 @@ def _measure(src):
     return doc, cells, ink
 
 
-def check(src):
+def check(src) -> int:
     """G9 guard: assert every cell fits its column, so the R-1 clip can't recur.
     A pure margin guard misses this — LibreOffice clips the overflow AT the margin,
     so broken and fixed both stop at the same x; the real signal is per-cell fit.
@@ -333,7 +333,7 @@ def check(src):
     return 0
 
 
-def _selftest():
+def _selftest() -> int:
     """⟨P, F, δ⟩ — a docx with a math cell wider than its column:
       F: --check on the un-widened docx reports the un-wrappable math cell overflows → CLIPS (rc 1).
       P: after widen() sizes the columns to measured ink, --check finds every cell fits (rc 0).
@@ -348,7 +348,7 @@ def _selftest():
         return 0
     fails = []
 
-    def check_(desc, cond):
+    def check_(desc, cond) -> None:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
@@ -477,7 +477,7 @@ def widen(src_docx, dst_docx, text_w=9360):
     return dst_docx
 
 
-def _deliverable(paper_md="../paper/paper.md"):
+def _deliverable(paper_md="../paper/paper.md") -> int:
     """Ρ·render·widen·live — build the real docx, widen it, and assert every un-wrappable math
     cell FITS.  The selftest proves the METHOD on a fixture; this proves the DELIVERABLE, which is
     what the warrant claims.  An unmeasurable verdict is reported and REFUSED as a pass: with the

@@ -58,7 +58,7 @@ def _def_sites(text: str) -> list:
     except SyntaxError:
         return out
 
-    def rec(node, prefix):
+    def rec(node, prefix) -> None:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if child.body[0].lineno > child.lineno:
@@ -116,7 +116,7 @@ def _branch_sites(text: str) -> list:
             return [stmt.body, *[h.body for h in stmt.handlers], stmt.orelse, stmt.finalbody]
         return []
 
-    def rec(node, prefix, counter):
+    def rec(node, prefix, counter) -> None:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 rec(child, prefix + child.name + ".", [0])
@@ -149,7 +149,7 @@ def _flip_sites(text: str) -> list:
     except SyntaxError:
         return out
 
-    def rec(node, prefix, counter):
+    def rec(node, prefix, counter) -> None:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 rec(child, prefix + child.name + ".", [0])

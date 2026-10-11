@@ -91,7 +91,7 @@ def _formula_alts(pdf: Path) -> tuple[int, int]:
         return (0, 0)
     alts: list = []
 
-    def walk(n, d=0):
+    def walk(n, d=0) -> None:
         if d > 20 or not hasattr(n, "get"):
             return
         if str(n.get("/S") or "") == "/Formula":

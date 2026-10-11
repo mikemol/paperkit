@@ -35,7 +35,7 @@ FLAG = paperkit.config.Param("syn-flag", "PAPERKIT_SYN_FLAG", config="syn_flag",
 SYN = [VAL, FLAG]
 
 
-def reset(p):
+def reset(p) -> None:
     paperkit.config._ARGS.clear()
     os.environ.pop(p.env, None)
 
@@ -77,7 +77,7 @@ def main() -> int:
 
     ran = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         # Λ·guard-must-not-copy — `ran` COUNTS the arms.  The summary line used to restate a
         # number authored beside the set it describes, and every one of the 26 suites carrying
         # such a line UNDERSTATED it (24 mismatched, none overstated): arms were added and the

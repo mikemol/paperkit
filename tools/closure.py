@@ -206,7 +206,7 @@ class MainArgs(argparse.Namespace):
     engine: list[str]
 
 
-def main(argv):
+def main(argv) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", required=True, help="the check module, e.g. paper/checks/claims.py")
     ap.add_argument(

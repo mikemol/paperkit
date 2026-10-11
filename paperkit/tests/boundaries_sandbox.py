@@ -27,7 +27,7 @@ def main() -> int:
 
     ran = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         # Λ·guard-must-not-copy — `ran` COUNTS the arms; the summary must not restate a number
         # authored beside the set it describes.  This suite printed a hardcoded "9 behaviors" while
         # 13 arms ran, and would have kept printing 9 however many were added or deleted: a reader

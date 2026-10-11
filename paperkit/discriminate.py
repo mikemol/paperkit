@@ -459,7 +459,7 @@ def main(argv: list) -> int:
     return rc
 
 
-def report(records, share, graded, n_cited, n_checked, consider_all):
+def report(records, share, graded, n_cited, n_checked, consider_all) -> None:
     scope = "all checked" if consider_all else f"of {n_cited} cited"
     print(f"paperkit-discriminate (Δ): {n_checked} {scope} warrant(s) carry a "
           f"check, {len(share)} distinct check(s)\n")

@@ -406,7 +406,7 @@ def _cpu_rlimit(seconds: int):
     expected cap kill).  Runs in the forked child before exec, so the whole check subprocess is
     bounded by WORK DONE, not wall time.
     """
-    def _set():
+    def _set() -> None:
         import resource
         # W78/W127 — setrlimit can LOWER but never RAISE a hard limit, so a NESTED invocation
         # (already running under a tighter parent-imposed hard limit, e.g. inside a mutant sweep

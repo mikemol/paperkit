@@ -50,7 +50,7 @@ def build_roster(text: str) -> set:
 def main() -> int:
     fails = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
         if not cond:
             fails.append(desc)

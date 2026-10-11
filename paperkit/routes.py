@@ -78,7 +78,7 @@ def leaves(routes: dict):
     """
     out = []
 
-    def rec(node, path):
+    def rec(node, path) -> None:
         for k, v in node.items():
             if isinstance(v, dict):
                 rec(v, path + [k])
@@ -134,7 +134,7 @@ def meta_family(routes: dict):
     libraries (an earlier version closed over its own `ROUTES` at module scope).
     """
 
-    def meta(which_and_target):
+    def meta(which_and_target) -> None:
         if "/" not in which_and_target:
             raise KeyError(which_and_target)
         op, fam = which_and_target.split("/", 1)

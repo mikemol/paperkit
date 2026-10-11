@@ -89,7 +89,7 @@ def main() -> int:
     fails = []
     ran = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         ran.append(desc)
         if not cond:
             fails.append(desc)

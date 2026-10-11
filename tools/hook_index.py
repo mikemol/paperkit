@@ -53,7 +53,7 @@ def divergent(porcelain, allow=ALLOW):
     return sorted(out)
 
 
-def main():
+def main() -> int:
     # Self-proof (in-memory, never the tree): the gate must refuse a dirty line and pass an
     # allowlisted one, every run — else it is unsound and refuses to bless anything.
     if divergent(" M paperkit/gate.py\0?? newfile.py\0") != ["newfile.py", "paperkit/gate.py"] \

@@ -25,7 +25,7 @@ N = 5
 class W:
     """A faithful 5-item pump-witness; pump can sleep a hair so a budget can bite."""
 
-    def __init__(self, slow=0.0):
+    def __init__(self, slow=0.0) -> None:
         self.slow = slow
 
     def initial(self):
@@ -64,7 +64,7 @@ def main() -> int:
 
     ran = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         # Λ·guard-must-not-copy — `ran` COUNTS the arms.  The summary line used to restate a
         # number authored beside the set it describes, and every one of the 26 suites carrying
         # such a line UNDERSTATED it (24 mismatched, none overstated): arms were added and the
@@ -127,7 +127,7 @@ def main() -> int:
     return 0
 
 
-def _raises(thunk):
+def _raises(thunk) -> bool | None:
     try:
         thunk()
         return False

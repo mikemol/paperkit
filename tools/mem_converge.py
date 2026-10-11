@@ -59,7 +59,7 @@ _MEM = re.compile(r"mem = (\d+)")
 #
 # So: ask the owner.  `bib.project(name = ..., project = ...)` is the declaration; parse it rather
 # than re-deriving a path from a repo name that only coincidentally matches for most projects.
-def _manifest_rel(root, proj):
+def _manifest_rel(root, proj) -> str:
     """<project path>/mem.json, resolved through MODULE.bazel's own name->path declaration."""
     mod = root / "MODULE.bazel"
     path = None

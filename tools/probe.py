@@ -72,7 +72,7 @@ class MainArgs(argparse.Namespace):
     no_resync: bool
 
 
-def main(argv):
+def main(argv) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("file", help="the tracked .py (or any text) file to null-edit")
     ap.add_argument(

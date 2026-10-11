@@ -11,7 +11,7 @@ import py_compile
 import sys
 
 
-def main(argv):
+def main(argv) -> int:
     src, out = argv
     py_compile.compile(src, cfile=out, doraise=True,
                        invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)

@@ -16,7 +16,7 @@ import json
 import sys
 
 
-def main(argv):
+def main(argv) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--baseline", required=True, help="the ∅-mutation eval record — MUST be flipped=false")
     ap.add_argument("evals", nargs="*", help="the per-site pk_eval records")

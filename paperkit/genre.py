@@ -142,7 +142,7 @@ def _collection(groups, records):
             i = parent[i]
         return i
 
-    def union(i, j):
+    def union(i, j) -> None:
         ri, rj = find(i), find(j)
         if ri != rj:
             parent[max(ri, rj)] = min(ri, rj)    # lower index wins: deterministic

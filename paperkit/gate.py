@@ -60,6 +60,7 @@ _REFUSE = 3
 import paperkit.resolver
 import paperkit.resolver
 import paperkit.checkenv
+from typing import NoReturn
 
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).  JSON and ONLY are also resolved by discriminate — it references
@@ -148,7 +149,7 @@ def main(argv: list) -> int:
     # runs them concurrently (default = all cores; jobs=1 forces serial).
     jobs = int(paperkit.config.resolve(JOBS) or (os.cpu_count() or 4))
 
-    def info(msg):              # human success lines — suppressed under --json
+    def info(msg) -> None:              # human success lines — suppressed under --json
         if not as_json:
             print(msg)
     cfg = paperkit.bib.load_config(project_dir)
@@ -407,7 +408,7 @@ def main(argv: list) -> int:
     return rc
 
 
-def _cli():
+def _cli() -> NoReturn:
     """Console-script entry point (pyproject [project.scripts]).
 
     A wheel cannot point an entry point at `__main__`, so the same one-liner is named here

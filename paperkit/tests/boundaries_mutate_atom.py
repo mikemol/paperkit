@@ -31,7 +31,7 @@ import paperkit.mutate
 def main() -> int:
     fails = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
@@ -70,7 +70,7 @@ def main() -> int:
         "        return None\n"
     )
 
-    def reaches_arm(src):
+    def reaches_arm(src) -> bool:
         """The if-then arm `return work()` is a branch: site iff its exact line is enumerated."""
         want = "        return work()" if src is SAFE else "            return work()"
         for _, _, (b0, bl) in paperkit.mutate._branch_sites(src):

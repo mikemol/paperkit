@@ -37,7 +37,7 @@ LOCAL = set(paperkit.resolver.VERBS) - CROSSING
 def main() -> int:
     fails = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 

@@ -78,7 +78,7 @@ def _linearize(records: list) -> dict:
     for s in secs:
         seen, out = set(), []
 
-        def visit(k):
+        def visit(k) -> None:
             if k in seen or k not in order[s]:
                 return
             seen.add(k)

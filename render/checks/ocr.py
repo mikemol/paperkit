@@ -17,6 +17,7 @@ seam (`paperkit/rematch.py`) is unreachable from a witness until `Ζ·runner·ve
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -26,6 +27,13 @@ from pathlib import Path
 WORD = re.compile(r"[a-z]{4,}")
 FLOOR = 0.90
 DPI = "150"
+# ⚑ tesseract is OpenMP: with no limit it starts a thread per core, and on an executor running two
+# dozen sweep actions at once those threads fight each other, so a page that takes seconds alone
+# can run past the 120 s timeout.  Two gates in a row (2026-10-10) failed here on DIFFERENT pages
+# (page-03, then page-11) after a re-run showed the same render OCR'ing in about ten seconds:
+# contention, not a defect in the render.  One thread each is the documented remedy, and it is
+# also correct when the check runs alone.
+TESSERACT_ENV = {**os.environ, "OMP_THREAD_LIMIT": "1"}
 
 
 def _words(text: str) -> set[str]:
@@ -40,7 +48,7 @@ def _ocr_pages(pdf: Path, d: Path) -> str:
                    check=True, timeout=120)
     out = ""
     for png in sorted(d.glob("page*.png")):
-        r = subprocess.run(["tesseract", str(png), "-"],
+        r = subprocess.run(["tesseract", str(png), "-"], env=TESSERACT_ENV,
                            capture_output=True, text=True, timeout=120, check=False)
         out += r.stdout.lower()
     return out

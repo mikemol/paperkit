@@ -18,7 +18,7 @@ def def_sites(text):
     except SyntaxError:
         return out
 
-    def rec(node, prefix):
+    def rec(node, prefix) -> None:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if child.body[0].lineno > child.lineno:
@@ -50,7 +50,7 @@ def def_lines(text):
     except SyntaxError:
         return out
 
-    def rec(node, prefix):
+    def rec(node, prefix) -> None:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) or isinstance(child, ast.ClassDef):
                 out[prefix + child.name] = (child.lineno, child.end_lineno)

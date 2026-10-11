@@ -99,7 +99,7 @@ class MainArgs(argparse.Namespace):
     summary: list[str] | None
 
 
-def main(argv):
+def main(argv) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--flips", nargs="*", default=[])
     ap.add_argument("--reach", nargs="*", default=[])

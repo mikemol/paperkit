@@ -28,7 +28,7 @@ CHECKS = [
 ]
 
 
-def main(argv):
+def main(argv) -> int:
     bad = []
     for path in argv:
         with open(path) as f:

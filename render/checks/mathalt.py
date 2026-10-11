@@ -48,7 +48,7 @@ def _formulas(doc: pikepdf.Pdf) -> list:
     """Every `/Formula` structure element in the struct tree, in traversal (document) order."""
     found = []
 
-    def walk(node, depth=0):
+    def walk(node, depth=0) -> None:
         if depth > 12 or not isinstance(node, pikepdf.Dictionary):
             return
         if str(node.get("/S")) == "/Formula":
@@ -98,7 +98,7 @@ def _selftest() -> int:
     import tempfile
     fails = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 

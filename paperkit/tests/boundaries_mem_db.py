@@ -22,7 +22,7 @@ _fails = []
 MB = 1048576
 
 
-def check(desc, ok):
+def check(desc, ok) -> None:
     print(f"  {'ok' if ok else 'XX'} {desc}")
     if not ok:
         _fails.append(desc)

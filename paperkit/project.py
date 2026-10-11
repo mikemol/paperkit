@@ -238,7 +238,7 @@ def transitive_reduction(rests: dict) -> dict:
     clutter, not new grounding).  The `drop` rung — the zero of the reference's
     materialization ladder (drop < cite < expound < figure), need-proportioned.
     """
-    def reaches(a, b):
+    def reaches(a, b) -> bool:
         seen, stk = set(), [x for x in rests.get(a, ()) if x != b]
         while stk:
             n = stk.pop()
@@ -389,16 +389,16 @@ def project(cfg: dict, target: str = "pandoc") -> str:
         run: list = []
         in_list = [False]
 
-        def _blank():
+        def _blank() -> None:
             if lines and lines[-1] != "":
                 lines.append("")
 
-        def _flush():
+        def _flush() -> None:
             if run:
                 lines.append(weave(run, F, primary, pos, reduced, footnotes, target))
                 run.clear()
 
-        def _close_list():
+        def _close_list() -> None:
             if in_list[0]:
                 _blank()
                 in_list[0] = False
@@ -627,6 +627,7 @@ CHECK = paperkit.config.Param("check", "PAPERKIT_CHECK", flag=True,
 import paperkit.resolver   # noqa: E402  — qualified, so the knobs stay HOSTED by resolver
 import paperkit.checkenv
 import paperkit.genre
+from typing import NoReturn
 
 REGISTRY = [TARGET, GENRE, GAMMA, OBSERVE, CHECK, paperkit.checkenv.PATH, paperkit.checkenv.ENGINE_PATH]
 
@@ -672,7 +673,7 @@ def main(argv: list) -> int:
     return 0
 
 
-def _cli():
+def _cli() -> NoReturn:
     """Console-script entry point (pyproject [project.scripts]).
 
     A wheel cannot point an entry point at `__main__`, so the same one-liner is named here

@@ -188,7 +188,7 @@ def _selftest() -> int:
     import pikepdf
     fails = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
@@ -216,7 +216,7 @@ def _selftest() -> int:
         if p_pdf.exists():
             doc = pikepdf.open(str(p_pdf))
 
-            def walk(n, dep=0):
+            def walk(n, dep=0) -> None:
                 nonlocal af
                 if dep > 12 or not isinstance(n, pikepdf.Dictionary):
                     return

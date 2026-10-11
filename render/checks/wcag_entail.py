@@ -402,7 +402,7 @@ def _selftest() -> int:
                 for w in ("rnd-a11y", "rnd-a11y-latex"):
                     _CONSUMED.pop(w, None)
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
         if not cond:
             fails.append(desc)

@@ -41,7 +41,7 @@ def _twinned(d: Path, name: str, body: str) -> tuple:
 def main() -> int:
     fails = []
 
-    def check(desc, cond):
+    def check(desc, cond) -> None:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
         if not cond:
             fails.append(desc)
@@ -78,7 +78,7 @@ def main() -> int:
         # write succeeds and the arm proves nothing.  Caught by this suite failing: the target read
         # back as the new content, not the old.  Use an object that genuinely breaks the write.
         class _Boom:
-            def __str__(self):
+            def __str__(self) -> str:
                 raise RuntimeError("boom")
         try:
             paperkit.durable.write_atomic(keep, _Boom())      # f.write() rejects a non-str → TypeError

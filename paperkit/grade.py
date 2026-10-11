@@ -138,13 +138,13 @@ class _ScopeC(dict):
 
     _loaded = False
 
-    def _fill(self):
+    def _fill(self) -> None:
         if not self._loaded:
             import paperkit.bib
             self.update({v: i for i, v in enumerate(paperkit.bib._SCOPES)})
             self._loaded = True
 
-    def __contains__(self, k):
+    def __contains__(self, k) -> bool:
         self._fill(); return dict.__contains__(self, k)
 
     def __getitem__(self, k):
@@ -153,7 +153,7 @@ class _ScopeC(dict):
     def __iter__(self):
         self._fill(); return dict.__iter__(self)
 
-    def __len__(self):
+    def __len__(self) -> int:
         self._fill(); return dict.__len__(self)
 
     def keys(self):

@@ -35,9 +35,10 @@ import paperkit.project  # noqa: E402  — the bib parser (Μ·model), for the c
 import paperkit.gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
 import paperkit.resolver  # noqa: E402  — VERBS, the engine's OWN verb set (never re-listed here; Λ·registry)
 import paperkit.routes  # noqa: E402  — Λ·key·graded, the shared graded-key walk (this library is grade 0)
+from typing import NoReturn
 
 
-def adequacy_pitch():
+def adequacy_pitch() -> None:
     import paperkit.tests._fixture_delta
     import paperkit.tests._fixture_model
     # the Δ grade ladder, the PITCH face — a passing check only proves a sentence named a verifier,
@@ -66,7 +67,7 @@ def _parse(text):
         shutil.rmtree(d, ignore_errors=True)
 
 
-def claim_is_record():
+def claim_is_record() -> None:
     # a claim is one bibliography entry: a statement, its section, its dependencies, its check.
     # Authored once here; README (rm-model) and paper (claim-is-record) both import this certificate.
     rec = _parse("@misc{k,\n  section = {s},\n  from = {d},\n  claim = {a statement},\n  check = {file:x}\n}\n")["k"]
@@ -74,7 +75,7 @@ def claim_is_record():
         assert rec.get(field), f"a claim record is missing its {field}"
 
 
-def claim_bears_check():
+def claim_bears_check() -> None:
     # each claim carries a machine-checkable verifier: the check field names a verb, and the gate
     # RESOLVES it (runs it).  Parser and resolver are engine, so the certificate's fingerprint IS them.
     rec = _parse("@misc{c,\n  section = {s},\n  claim = {x},\n  check = {cmd:true}\n}\n")["c"]
@@ -83,7 +84,7 @@ def claim_bears_check():
         "the verifier is not machine-checkable"
 
 
-def custom_type_resolves():
+def custom_type_resolves() -> None:
     # cmd is the escape hatch every check reduces to, and a new domain adds a verifier in config
     # without touching the engine: a config-supplied type resolves by running its cmd; an unregistered
     # one does not.  The resolver dispatch is engine, so mutating a dispatch def-site flips this.
@@ -93,7 +94,7 @@ def custom_type_resolves():
         "an unregistered check type resolved with nothing behind it"
 
 
-def failing_check_blocks():
+def failing_check_blocks() -> None:
     import paperkit.tests._fixture_gate
     import paperkit.tests._fixture_model
     import paperkit.tests._fixture_project
@@ -106,7 +107,7 @@ def failing_check_blocks():
     assert paperkit.tests._fixture_gate.gate(bad, out=good)[0] != 0, "a claim with a FAILING verifier still shipped"
 
 
-def gate_enforces_invariants():
+def gate_enforces_invariants() -> None:
     import paperkit.tests._fixture_gate
     import paperkit.tests._fixture_model
     import paperkit.tests._fixture_project
@@ -121,7 +122,7 @@ def gate_enforces_invariants():
     assert paperkit.tests._fixture_gate.gate(bad, out=paperkit.tests._fixture_project.project_text(bad))[0] != 0, "check-resolution not enforced"
 
 
-def adequacy_gap():
+def adequacy_gap() -> None:
     import paperkit.tests._fixture_gate
     import paperkit.tests._fixture_model
     # the GATE is blind to RELEVANCE: a passing check proves a sentence NAMED a verifier, not that
@@ -132,7 +133,7 @@ def adequacy_gap():
     assert paperkit.tests._fixture_gate.gate(w, assets={"a.txt": "TOKEN\n"})[0] == 0, "the gate cannot tell a check is irrelevant"
 
 
-def resolver_dispatches():
+def resolver_dispatches() -> None:
     # the resolver COMPONENT's certificate (Μ·kernel): a verifier is NAMED type:target (the prefix
     # selects the verb), every DECLARED verb dispatches to a real branch — read from resolver.VERBS,
     # no count, no list, nothing to drift (Λ·registry) — the built-in set is CLOSED, and a custom
@@ -151,7 +152,7 @@ def resolver_dispatches():
         "a custom [checks.X] type did not dispatch through the registry"
 
 
-def document_is_projection():
+def document_is_projection() -> None:
     import paperkit.tests._fixture_model
     import paperkit.tests._fixture_project
     # the PROJECTOR component's certificate: a document IS the projection of its claim-DAG — the
@@ -167,7 +168,7 @@ def document_is_projection():
         assert needle in low, f"the projection is missing {needle!r}"
 
 
-def graded_key_resolves():
+def graded_key_resolves() -> None:
     # Λ·key·graded — a concept key is GRADED: `family[/subfamily]/argument`, resolved by consuming
     # `/`-separated segments to a `(fn, arg)` leaf.  Two properties make the grading worth having,
     # and this asserts both against the REAL walk (routes.py), so mutating a walk def-site flips it.
@@ -194,7 +195,7 @@ def graded_key_resolves():
     # leaf's KeyError must read as 2, NOT 1 — "this argument is not one I serve" is indistinguishable
     # from an unresolved route, and reading it as failure would break the fallthrough resolver.py
     # depends on (Λ·library·fallthrough).
-    def boom(a):
+    def boom(a) -> NoReturn:
         raise {"miss": KeyError, "bad": AssertionError}[a](a)
     arm = {"x": {"miss": (boom, "miss"), "bad": (boom, "bad")}}
     assert paperkit.routes.dispatch(arm, "x/miss", "t", report=False) == 2, "a leaf's KeyError did not read as not-mine"
@@ -206,7 +207,7 @@ def graded_key_resolves():
     assert all(paperkit.routes.walk(ROUTES, k)[1] is None for k in CONCEPTS), "grade 0 is not nullary"
 
 
-def slice_cache_sound():
+def slice_cache_sound() -> None:
     # Λ·cache·slice — a check's verdict is reusable exactly when NOTHING IT CAN REACH has changed,
     # so the cache key is the check's SLICE: its witness function, the transitive closure of the
     # module-level names that function references, and the CONTENT of every module the slice reaches.
@@ -285,7 +286,7 @@ def slice_cache_sound():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def conclusion_needs_backing():
+def conclusion_needs_backing() -> None:
     # Λ·conclusion·backed — the check apparatus covers LANDED CLAIMS: each carries a command that
     # must pass.  PRINTED REASONING carries nothing, so an analysis script can print a conclusion
     # beside output from the same run that refutes it and no gate notices.  This is the gate for
@@ -311,7 +312,7 @@ def conclusion_needs_backing():
     assert u and "z" in u[0][2], f"an assertion about an unrelated name was accepted as backing: {u}"
 
 
-def label_records_carrier():
+def label_records_carrier() -> None:
     # Λ·label·carrier — a LABEL is a point in an orbit: it names a concept FROM THE CARRIER one was
     # standing in.  So a concept has ONE identity and MANY labels, and the map is
     # `concept -> {carrier: label}` rather than `label -> concept`.  What it BUYS is ingestion:
@@ -339,7 +340,7 @@ def label_records_carrier():
         "the index did not grow, or the collision went undetected"
 
 
-def boundary_is_a_triple():
+def boundary_is_a_triple() -> None:
     """<P, F, delta>: a pass arm, a flag arm, and the minimum delta between them.
 
     Interned as the SHAPE, proven on a constructed check — not by counting the boundary suites in
@@ -366,13 +367,13 @@ def boundary_is_a_triple():
         "applying the delta to F does not flip it — the delta is not sufficient"
 
     # a happy-path-only tool has an UNDEFINED boundary: no F arm distinguishes these two.
-    def always(text):
+    def always(text) -> bool:
         return True
     assert always(P) and always(F), "the degenerate tool should accept both"
     assert check(P) != check(F), "the real tool discriminates where the degenerate one cannot"
 
 
-def capability_owned_as_data():
+def capability_owned_as_data() -> None:
     """A capability matrix is DATA with a named exception, not prose with silent gaps.
 
     Proven against a CONSTRUCTED matrix, never by importing a project's own grid: the library
@@ -395,7 +396,7 @@ def capability_owned_as_data():
         "a removed cell is undetectable — the matrix is not owned as data"
 
 
-def pipeline_is_a_coalgebra():
+def pipeline_is_a_coalgebra() -> None:
     """Targets are OBJECTS, conversions are MORPHISMS, a route is a WALK over declared edges.
 
     Constructed, for the same staging reason as capability_owned_as_data.  The interned property is
@@ -413,7 +414,7 @@ def pipeline_is_a_coalgebra():
     assert not walks(["md", "epub"]), "a route reaches an object the graph does not declare"
 
 
-def derived_is_regenerated_not_trusted():
+def derived_is_regenerated_not_trusted() -> None:
     """Every derived artifact is regenerated and compared — the drift face, generalised.
 
     project_then_gate interns this for PROSE (project -> gate on a document).  This node is the
@@ -439,7 +440,7 @@ def derived_is_regenerated_not_trusted():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def project_then_gate():
+def project_then_gate() -> None:
     import paperkit.tests._fixture_gate
     import paperkit.tests._fixture_model
     import paperkit.tests._fixture_project
@@ -454,7 +455,7 @@ def project_then_gate():
 
 # ── delta component (Μ·kernel·certs·delta) — the Δ grader/coherence concepts, interned here as
 # canonical nodes (library-is-hash-cons: authored ONCE, the paper CITES via concept:). ────────
-def content_marks_relevance():
+def content_marks_relevance() -> None:
     import paperkit.tests._fixture_delta
     import paperkit.tests._fixture_model
     # Δ FLAGS the relevance gap without closing it: a check can grade behavioral yet be sensitive
@@ -468,7 +469,7 @@ def content_marks_relevance():
         f"a non-content-sensitive behavioral check should be flagged (content_sensitive={r.get('content_sensitive')})"
 
 
-def delegated_grade():
+def delegated_grade() -> None:
     import paperkit.bib
     import paperkit.grader
     import paperkit.project
@@ -487,7 +488,7 @@ def delegated_grade():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def sandbox_excludes_siblings():
+def sandbox_excludes_siblings() -> None:
     # grading runs in a sandbox copy whose mutation surface excludes SIBLING projects (a nested dir
     # with its own paper.toml), so a project grades independently of them.
     import paperkit.grader
@@ -507,7 +508,7 @@ def sandbox_excludes_siblings():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def grounding_reflected():
+def grounding_reflected() -> None:
     # ∂²'s grounding face — each DECLARED rests-on edge checked against MEASURED engine
     # sensitivity: overlap is reflected; a disjoint edge from a claim that tests engine capability
     # is a genuine miss (dischargeable by a `link`); one from a claim that tests nothing engine is
@@ -538,7 +539,7 @@ def grounding_reflected():
         "shared scaffolding counted as engine grounding — the engine restriction failed"
 
 
-def emergence_collapse():
+def emergence_collapse() -> None:
     # ∂²'s emergence face — the COVERAGE sibling of grounding: a claim whose engine fingerprint is
     # ⊆ its premises' COLLAPSES (its witness emerges by consuming them); a residual is an INCREMENT;
     # no grounding is a LEAF axiom.  STRICTER than grounding — an edge can OVERLAP yet the claim
@@ -558,7 +559,7 @@ def emergence_collapse():
         "emergence is not strictly finer than grounding (overlap should pass where coverage can fail)"
 
 
-def rests_on_clamps():
+def rests_on_clamps() -> None:
     # rests-on is a SEPARATE grounding edge: the EFFECTIVE grade clamps to the weakest premise
     # along it (a behavioral thesis resting on a vacuous atom clamps to vacuous), regardless of
     # prose order — the clamp (grade.clamp) over known premise grades.
@@ -572,7 +573,7 @@ def rests_on_clamps():
         f"rests-on did not clamp the thesis (self={th['grade']}, eff={th['effective_grade']})"
 
 
-def concept_imports_a_certificate():
+def concept_imports_a_certificate() -> None:
     # `concept:` IMPORTS rather than runs: the verb resolves a key against a library and yields
     # its certificate.  Δ therefore grades it `imported` — outside the falsifiability ladder,
     # delegated to the owner that graded it — exactly as a verdict-import is.
@@ -587,7 +588,7 @@ def concept_imports_a_certificate():
         f"a concept citation should grade imported (delegated to its library), got {rec['grade']}"
 
 
-def concept_interns_to_one_node():
+def concept_interns_to_one_node() -> None:
     # A library is a HASH-CONS table: two keys naming the same concept resolve to the SAME
     # canonical witness object, not to two copies that could drift.  The engine's own library
     # exhibits it — adequacy-pitch and grade-ladder are one node under two citations.
@@ -599,7 +600,7 @@ def concept_interns_to_one_node():
         "a singly-cited concept must still be one canonical node"
 
 
-def concept_carries_several_views():
+def concept_carries_several_views() -> None:
     # ONE truth, SEVERAL prose faces: distinct views cite the same concept and get the IDENTICAL
     # certificate, so their sentences cannot drift apart.
     #
@@ -633,7 +634,7 @@ def concept_carries_several_views():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def concept_resolves_consumer_first():
+def concept_resolves_consumer_first() -> None:
     # Λ·library·seam — a project's OWN library answers first; the engine's is the FALLBACK, and
     # the fallthrough is decided PER KEY so a downstream library cannot eclipse engine concepts.
     #
@@ -687,7 +688,7 @@ def concept_resolves_consumer_first():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def degeneracy_has_kinds():
+def degeneracy_has_kinds() -> None:
     """Δ·degeneracy·kinds — a degenerate report distinguishes WHY it is degenerate.
 
     A document with no grounding graph is degenerate for two different reasons, and one verdict

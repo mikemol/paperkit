@@ -41,7 +41,7 @@ import sys
 # does NOT red the gate (no false-red on a toolchain-less box) yet stays distinguishable from pass
 # (no false-green — it is honestly "not verified here", the ask-result-tristate shape at the record
 # layer).  A bool `ok` still maps pass/fail (the common path); a str verdict passes through verbatim.
-def _write_atomic(path, data):
+def _write_atomic(path, data) -> None:
     """Ζ·write·atomic — write a sibling temp, then rename over `path`.
 
     DUPLICATED from durable.write_atomic on purpose, and gated for agreement rather than trusted:
@@ -76,7 +76,7 @@ def _write_atomic(path, data):
         raise
 
 
-def _write(out, verb, verdict, why="", account=None):
+def _write(out, verb, verdict, why="", account=None) -> None:
     """Ζ·cohere·mute — the record may CARRY ITS REASON, and omitting it is a lossy verdict.
 
     `why` is optional and absent from the JSON when empty, so every existing record is
@@ -124,7 +124,7 @@ def _write(out, verb, verdict, why="", account=None):
     _write_atomic(out, json.dumps(rec, separators=(",", ":")) + "\n")
 
 
-def main(argv):
+def main(argv) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name, extra in [("emit", ["ok"]), ("exists", ["path"]), ("calc", ["calc"])]:

@@ -6,7 +6,7 @@ re-measured (pk_cmd runs the check, pk_grade_claim re-sweeps), here one sweep fe
 change re-runs only pk_calc; the readings are instant.  footaudit/emergence are the same shape.
 """
 
-load("//tools:cell.bzl", "cell_builds_env", "cell_module", "cell_pypath")
+load("//tools:cell.bzl", "cell_builds_env", "cell_dists", "cell_module", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
@@ -170,7 +170,7 @@ def _calc_impl(ctx):
     # to the image, `113 action cache hit`, four refuted footprint baselines served back stale.
     ctx.actions.run_shell(
         outputs = [c, p],
-        inputs = depset(ctx.files.data + [ctx.file._cap, ctx.info_file], transitive = [py.files]),
+        inputs = depset(ctx.files.data + ctx.files._dists + [ctx.file._cap, ctx.info_file], transitive = [py.files]),
         # ⚡ Ζ·account·calc — REPLAY THE SWEEP'S STDERR, because this cell discards it too.
         # Ζ·cell·account fixed exactly this for pk_cmd (verb.bzl tees BOTH streams into a file the
         # record carries) and the calc family was never reached: stdout is redirected INTO the
@@ -199,7 +199,7 @@ def _calc_impl(ctx):
         # inside the root copies itself into itself — measured as a 6MB shutil.Error of
         # .pk-scratch/paperkit-delta-…/.pk-scratch/paperkit-delta-…/… (b87dw6ihw).  `${PWD}.pk-scratch`
         # is unique per action (the execroot path is) and outside the tree; removed on exit below.
-        command = cell_pypath(py) + cell_builds_env(ctx.files.builds) +
+        command = cell_pypath(py) + cell_dists(ctx.files._dists) + cell_builds_env(ctx.files.builds) +
                   'export PAPERKIT_ROOT="$PWD" PAPERKIT_SCRATCH="${PWD}.pk-scratch"; PK_ACCT="$PWD/.pk-calc-account.$$"; ' +
                   _cap_prefix(ctx.file._cap.path, bucket) +
                   '"$(command -v python3)" -m paperkit.discriminate --only ' + ctx.attr.claim +
@@ -236,6 +236,8 @@ pk_calc = rule(
         # once to stage, once to name.  pk_cmd carries the same pair of attrs for the same reason.
         "builds": attr.label_list(allow_files = True),
         "_observe": attr.label(default = "//tools:observe"),
+        # paperkit:W316 — the mtools dists the claim's check imports, wheels on PYTHONPATH.
+        "_dists": attr.label(default = "@pk_dists//:site"),
     },
 )
 
@@ -459,7 +461,7 @@ def _eval_impl(ctx):
     ctx.actions.run_shell(
         outputs = [o, pk],
         # ctx.info_file: the default pool's image digest (STABLE_EXECUTOR_IMAGE) — see pk_calc.
-        inputs = depset(mut + [ctx.file._cap, ctx.info_file] + ctx.files.project,
+        inputs = depset(mut + [ctx.file._cap, ctx.info_file] + ctx.files.project + ctx.files._dists,
                         transitive = [closure_pyc, closure_py]),
         # ⚑ Ζ·cell·wire — `tools`, NOT `inputs`, AND THE DIFFERENCE IS THE RUNFILES TREE.
         # A first cut staged the launcher and its runfiles FILES through `inputs` and the cell
@@ -482,7 +484,8 @@ def _eval_impl(ctx):
         # records (the check re-spawns the projector as [sys.executable, …], and bare `python3`
         # left it '' — a spurious flip) is satisfied more strongly: the launcher execs a real
         # absolute interpreter, so there is no `command -v` to resolve differently under OCI.
-        command = _cap_prefix(ctx.file._cap.path, ctx.attr.mem if ctx.attr.mem else 4) +
+        command = cell_dists(ctx.files._dists) +
+                  _cap_prefix(ctx.file._cap.path, ctx.attr.mem if ctx.attr.mem else 4) +
                   ctx.executable._tool.path +
                   " --engine-dir paperkit" + marg + carg +
                   " --check " + ctx.attr.check + " --claim " + ctx.attr.claim +
@@ -539,6 +542,7 @@ pk_eval = rule(
         # the interpreter and PYTHONPATH itself — which is why the command below no longer needs
         # `"$(command -v python3)"` to find an interpreter by hand.
         "_tool": attr.label(default = "//tools:eval", executable = True, cfg = "exec"),
+        "_dists": attr.label(default = "@pk_dists//:site"),  # paperkit:W316 — the check imports mikemol
     },
 )
 
@@ -645,8 +649,8 @@ def _mutant_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".mutant.json")
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(ctx.files.data, transitive = [py.files]),
-        command = cell_pypath(py) + 'export PAPERKIT_ROOT="$PWD" PAPERKIT_SCRATCH="${PWD}.pk-scratch"; ' +  # Ζ·scratch·per-action (see pk_calc)
+        inputs = depset(ctx.files.data + ctx.files._dists, transitive = [py.files]),
+        command = cell_pypath(py) + cell_dists(ctx.files._dists) + 'export PAPERKIT_ROOT="$PWD" PAPERKIT_SCRATCH="${PWD}.pk-scratch"; ' +  # Ζ·scratch·per-action (see pk_calc)
                   '"$(command -v python3)" -m paperkit.discriminate --only ' + ctx.attr.claim +
                   " --mutant '" + ctx.attr.site + "' " + ctx.attr.project + " > " + o.path +
                   '; rm -rf "$PAPERKIT_SCRATCH"',
@@ -665,6 +669,7 @@ pk_mutant = rule(
         "project": attr.string(mandatory = True),
         "site": attr.string(mandatory = True, doc = "the mutation-site label (path or path::qualname)"),
         "data": attr.label_list(allow_files = True),
+        "_dists": attr.label(default = "@pk_dists//:site"),  # paperkit:W316
     },
 )
 

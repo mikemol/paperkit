@@ -36,6 +36,26 @@ def cell_module(tool):
         fail("cell_module: %s is not a python script" % path)
     return "-m " + path[:-len(".py")].replace("/", ".")
 
+def cell_dists(files):
+    """⚑ paperkit:W316 — THE MTOOLS DISTS A CELL IMPORTS, DELIVERED AS WHEELS ON PYTHONPATH.
+
+    A cell runs the hermetic interpreter with no third-party site-packages, so `import mikemol.*`
+    needs the dists handed to it.  `files` is `@pk_dists//:site` (tools/dists.bzl): the wheels built
+    at the ONE sha pyproject.toml pins, EXTRACTED into a single tree, whose root is the directory
+    holding the PK_DISTS_SITE marker.  Extracted, not zips on PYTHONPATH: the cells' CPython 3.13
+    does not merge a namespace across zip entries (3.14 does — measured both), a directory does on
+    every version.  No installer and no `.cellvenv`, only declared, content-addressed inputs.
+
+    The path is `$PWD`-anchored for the reason PAPERKIT_CONSUMED_RECORDS is: a check runs with
+    cwd=<project> after a `cd`, so a relative entry would resolve wrong.  A cell must not run
+    `python -I`, which ignores PYTHONPATH.  Empty string when the marker is absent.
+    """
+    marks = [f for f in files if f.basename == "PK_DISTS_SITE"]
+    if not marks:
+        return ""
+    site = marks[0].path[:-len("/PK_DISTS_SITE")]
+    return 'export PYTHONPATH="$PWD/' + site + '${PYTHONPATH:+:$PYTHONPATH}"; '
+
 def cell_builds_env(builds):
     """⚑ Ζ·builds·path — THE ARTIFACTS A WARRANT DECLARED, AS ABSOLUTE PATHS, FOR ANY CELL.
 

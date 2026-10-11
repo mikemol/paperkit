@@ -10,6 +10,7 @@ tracked risk (not an accident) -- see paths-forward.json W60/W63/W64.
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -72,7 +73,18 @@ def clean_env(env: dict | None = None) -> dict:
     # check to put it on sys.path itself, which is the bootstrap being retired. The checkout,
     # never `paperkit/paperkit`: that directory's `config`, `layout` and `bib` would shadow
     # whatever a check imports under those names.
-    out["PYTHONPATH"] = str(engine_path)
+    # ⚑ AND THE DISTS THE ENGINE IMPORTS (W317).  `mikemol.atomicwrite` is a third-party dist, so
+    # a check's bare python3 cannot find it from the checkout alone; the directory it is importable
+    # from is DERIVED from where this process found it, never copied, and appended after the engine.
+    spec = importlib.util.find_spec("mikemol")
+    # EVERY location of the namespace: an installed venv has one, but wheels delivered as zips on
+    # PYTHONPATH (a Bazel cell, tools/cell.bzl cell_dists) contribute one each.
+    dist_roots = (
+        list(dict.fromkeys(str(Path(loc).parent) for loc in spec.submodule_search_locations))
+        if spec is not None and spec.submodule_search_locations
+        else []
+    )
+    out["PYTHONPATH"] = os.pathsep.join([str(engine_path), *dist_roots])
     pinned = paperkit.config.resolve(PATH)
     if pinned is not None:
         raw = [p for p in pinned.split(os.pathsep) if Path(p).is_dir()]

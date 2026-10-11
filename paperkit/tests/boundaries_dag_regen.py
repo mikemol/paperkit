@@ -24,7 +24,7 @@ mutation is present before drawing any conclusion from it.)
 It was `tools/imports.py`, which recorded a path-shaped KEY against a bare-stem VALUE, so
 paperkit/BUILD.bazel had to translate between the two namespaces via a `_STEM_TO_TARGET` dict
 comprehension — silently last-wins over the three directories the engine spans.  The value is now
-`durable.py`, not `durable`, which is what this suite's own edge-landed arm asserts: both sides of
+`rematch.py`, not `rematch`, which is what this suite's own edge-landed arm asserts: both sides of
 an edge name the shape a Bazel target uses, and the translating map is deleted.
 
 ⟨P, F, δ⟩ per the boundary practice.
@@ -51,15 +51,15 @@ ROOT = ENG.parent
 def _edges_of(dag_text: str, module: str) -> list:
     """⚑ Ζ·dag·coedge — THE RECORDED EDGES OF ONE MODULE, PARSED, NOT SUBSTRING-MATCHED.
 
-    Two arms below asserted the rendered line verbatim — `\'"genre.py": ["durable.py"]\' in
+    Two arms below asserted the rendered line verbatim — `\'"genre.py": ["rematch.py"]\' in
     dag.read_text()` — which holds only while the probe module has NO OTHER EDGE.  That was true
     when they were written and stopped being true the moment `genre.py` gained one
     (Ζ·spawn·owner\'s `from resolver import spawn_declared` in its `__main__` block), so the line
-    renders `["durable.py", "resolver.py"]` and the substring misses.
+    renders `["rematch.py", "resolver.py"]` and the substring misses.
 
     MEASURED 2026-09-13: both arms red while every other arm — staleness, repair, round trip,
     idempotence, the package spelling — passed.  The GENERATOR was correct; the assertion was
-    coupled to a co-edge it never meant to constrain.  The property is MEMBERSHIP: `durable.py`
+    coupled to a co-edge it never meant to constrain.  The property is MEMBERSHIP: `rematch.py`
     is recorded among the probe module\'s edges, whatever else is.
     """
     import re as _re
@@ -68,12 +68,12 @@ def _edges_of(dag_text: str, module: str) -> list:
 
 
 ANCHOR = "import sys\n"
-EDGE = "import sys\nimport durable  # boundaries_dag_regen probe\n"
-# ⚑ Ζ·dagderive·pkg — THE SAME EDGE, WRITTEN THE OTHER WAY.  `import durable` and `from paperkit
-# import durable` are one dependency in two spellings, and the derivation MUST record both
+EDGE = "import sys\nimport rematch  # boundaries_dag_regen probe\n"
+# ⚑ Ζ·dagderive·pkg — THE SAME EDGE, WRITTEN THE OTHER WAY.  `import rematch` and `from paperkit
+# import rematch` are one dependency in two spellings, and the derivation MUST record both
 # identically or converting a file silently deletes its edges from dag.bzl — which is what Bazel
 # stages each cell's .pyc closure from.
-PKG_EDGE = "import sys\nfrom paperkit import durable  # boundaries_dag_regen probe\n"
+PKG_EDGE = "import sys\nfrom paperkit import rematch  # boundaries_dag_regen probe\n"
 
 
 def main() -> int:
@@ -107,7 +107,7 @@ def main() -> int:
             """Invoke the generator in the COPIED tree, as a module so its package edges resolve.
 
             ⚑ `-m tools.dagbzl` FROM THE WORK ROOT, not a path invocation.  `dagbzl` names its
-            siblings in full (`from tools import dagderive`, `from paperkit import durable`), so
+            siblings in full (`from tools import dagderive`, `from paperkit import rematch`), so
             it needs the work root as the import root — which is exactly what running it as a
             module with cwd=work provides, and what a bare path invocation would not.
             """
@@ -138,10 +138,10 @@ def main() -> int:
 
         rc, _ = run("--write")
         s.check("--write repairs it", rc == 0)
-        # ⚑ THE VALUE IS A PATH (Ξ·dag·dotted): `durable.py`, not `durable`.  This arm is what
+        # ⚑ THE VALUE IS A PATH (Ξ·dag·dotted): `rematch.py`, not `rematch`.  This arm is what
         # pins the rename — a regression to bare stems reds here rather than in a sweep.
         s.check("   ...and the new edge is actually IN the file, as a module PATH",
-                "durable.py" in _edges_of(dag.read_text(), "genre.py"))
+                "rematch.py" in _edges_of(dag.read_text(), "genre.py"))
         rc, _ = run("--check")
         s.check("   ...so --check is green again", rc == 0)
 
@@ -166,11 +166,11 @@ def main() -> int:
         # only that form.  This arm is the second form, asserting the identical output.
         probe.write_text(pristine_probe.replace(ANCHOR, PKG_EDGE, 1))
         s.check("the PACKAGE-spelling probe edit landed",
-                "from paperkit import durable" in probe.read_text())
+                "from paperkit import rematch" in probe.read_text())
         rc, _ = run("--write")
         s.check("--write accepts the package spelling", rc == 0)
         s.check("   ...and records the SAME edge the flat form does",
-                "durable.py" in _edges_of(dag.read_text(), "genre.py"))
+                "rematch.py" in _edges_of(dag.read_text(), "genre.py"))
 
         probe.write_text(pristine_probe)
         run("--write")

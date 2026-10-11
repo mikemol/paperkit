@@ -10,7 +10,7 @@ Proof: baseline + ONE mutant (a sensitive engine file) for a real check.  The fu
 fan-out + ladder + rests_on clamp is the scaled version.
 """
 
-load("//tools:cell.bzl", "cell_module", "cell_pypath")
+load("//tools:cell.bzl", "cell_dists", "cell_module", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
@@ -81,9 +81,9 @@ def _grade_claim_impl(ctx):
     v = ctx.actions.declare_file(ctx.label.name + ".grade.json")
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset(ctx.files.data, transitive = [py.files]),
+        inputs = depset(ctx.files.data + ctx.files._dists, transitive = [py.files]),
         command = ('PY=$(cd "$(dirname ' + interp + ')" && pwd)/$(basename ' + interp + '); ' +
-                   'export PATH="$(dirname "$PY"):$PATH"; export PAPERKIT_ROOT="$PWD"; ' +
+                   'export PATH="$(dirname "$PY"):$PATH"; export PAPERKIT_ROOT="$PWD"; ' + cell_dists(ctx.files._dists) +
                    '"$PY" -m paperkit.discriminate --only ' + ctx.attr.claim + " " + ctx.attr.project +
                    " > " + v.path),
         mnemonic = "PkGradeClaim",
@@ -99,6 +99,7 @@ pk_grade_claim = rule(
         "claim": attr.string(mandatory = True),
         "project": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
+        "_dists": attr.label(default = "@pk_dists//:site"),  # paperkit:W316
     },
 )
 
@@ -148,9 +149,9 @@ def _footprint_impl(ctx):
     v = ctx.actions.declare_file(ctx.label.name + ".foot.json")
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset(ctx.files.data, transitive = [py.files]),
+        inputs = depset(ctx.files.data + ctx.files._dists, transitive = [py.files]),
         command = ('PY=$(cd "$(dirname ' + interp + ')" && pwd)/$(basename ' + interp + '); ' +
-                   'export PATH="$(dirname "$PY"):$PATH"; ' +
+                   'export PATH="$(dirname "$PY"):$PATH"; ' + cell_dists(ctx.files._dists) +
                    '"$PY" -m paperkit.footdeps --only ' + ctx.attr.claim + " " + ctx.attr.project +
                    " > " + v.path),
         mnemonic = "PkFootprint",
@@ -166,6 +167,7 @@ pk_footprint = rule(
         "claim": attr.string(mandatory = True),
         "project": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
+        "_dists": attr.label(default = "@pk_dists//:site"),  # paperkit:W316
     },
 )
 

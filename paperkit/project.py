@@ -25,17 +25,15 @@ import sys
 import tomllib
 from pathlib import Path
 
-import paperkit.bib
-import paperkit.durable
+from mikemol.atomicwrite.durable import write_atomic
 
 # the projector parses then renders, so it uses the bib data model internally (short names).
 import paperkit.bib
+import paperkit.config
 
 # top-level now: after Μ·cycle rhetoric imports bib (a leaf), NOT project, so project→rhetoric is
 # one-way — the project↔rhetoric cycle is gone and this need no longer be a function-local import.
 import paperkit.rhetoric
-
-import paperkit.config
 
 # Minimal, domain-agnostic LaTeX -> Unicode for claim text (em/en dashes, a few
 # escapes, inline math).  A paper that needs more declares its own; this is the
@@ -624,10 +622,11 @@ CHECK = paperkit.config.Param("check", "PAPERKIT_CHECK", flag=True,
 # different relations, and satisfying the first with the second's mechanism violates ownership.
 # `discriminate.py:158` already had the right form — `resolver.PATH, resolver.ENGINE_PATH`, a
 # qualified reference that composes without binding.  Same here.
-import paperkit.resolver   # noqa: E402  — qualified, so the knobs stay HOSTED by resolver
+from typing import NoReturn
+
 import paperkit.checkenv
 import paperkit.genre
-from typing import NoReturn
+import paperkit.resolver  # noqa: E402  — qualified, so the knobs stay HOSTED by resolver
 
 REGISTRY = [TARGET, GENRE, GAMMA, OBSERVE, CHECK, paperkit.checkenv.PATH, paperkit.checkenv.ENGINE_PATH]
 
@@ -668,7 +667,7 @@ def main(argv: list) -> int:
     if "-o" in argv and argv[argv.index("-o") + 1] == "-":
         sys.stdout.write(out)
         return 0
-    paperkit.durable.write_atomic(cfg["out"], out)
+    write_atomic(cfg["out"], out)
     print(f"paperkit-project: wrote {cfg['out'].name} ({len(out.split())} words)", file=sys.stderr)
     return 0
 

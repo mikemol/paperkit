@@ -43,6 +43,11 @@ pip.parse(hub_name = "pk_build", python_version = "3.13", requirements_lock = "/
 # is a declaration that only looks like hermeticity (Λ·reduce).
 use_repo(pip, "pk_build")
 
+# Ζ·dists (paperkit:W315) — the mtools dists pyproject.toml pins, built to wheels at that ONE sha,
+# so a cell's hermetic python can import them (cell_venv deps).  pyproject owns the sha.
+pk_dists = use_repo_rule("//tools:dists.bzl", "pk_dists")
+pk_dists(name = "pk_dists", pyproject = "//:pyproject.toml")
+
 # Ζ·starlark — the bib IS the build graph: a module extension reads each project's warrants.bib
 # during the fetch phase and projects each claim into a target (no checked-in BUILD projection).
 bib = use_extension("//tools:bibtex.bzl", "bib")

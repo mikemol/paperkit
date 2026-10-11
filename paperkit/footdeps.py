@@ -17,6 +17,7 @@ projects" (the repo rule over-declares), never a silent under-declaration.
 """
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import os
 import re
@@ -117,6 +118,33 @@ def _imported(project_dir: Path, repo_root: Path) -> set:
     return out
 
 
+def _runtime_dependency_files(repo_root: Path) -> frozenset:
+    """Return the repo-relative files of the engine's own runtime dependencies (paperkit:W313).
+
+    These are the dists `[project].dependencies` names (mikemol-atomicwrite), read from the
+    installed metadata and never listed here.  The engine imports them in every check that imports
+    the engine, exactly as it imports its own sources, so a read of one is the engine's footprint
+    and not a claim's input to declare; without this every claim reported
+    `.venv/.../mikemol/atomicwrite/*.py` as undeclared.  Optional extras are not runtime
+    dependencies and are skipped.
+    """
+    out = set()
+    for req in importlib.metadata.requires("paperkit") or []:
+        name = re.match(r"[A-Za-z0-9._-]+", req)
+        if "extra ==" in req or name is None:
+            continue
+        try:
+            dist = importlib.metadata.distribution(name.group(0))
+        except importlib.metadata.PackageNotFoundError:
+            continue
+        for rel in dist.files or []:
+            try:
+                out.add(str(Path(dist.locate_file(rel)).resolve().relative_to(repo_root)))
+            except ValueError:
+                continue                 # a dependency installed outside the repo -- not in scope
+    return frozenset(out)
+
+
 def _label_path(label: str) -> str | None:
     """Ζ·foot·builds — the repo-relative FILE a `builds` label stages: `@@//report:gen.py` →
     `report/gen.py`, `@@//:MODULE.bazel` → `MODULE.bazel`.  None for anything that is not a
@@ -130,18 +158,18 @@ def _label_path(label: str) -> str | None:
 
 
 def _missing(fp: list, declared: set, projects: set, root_files: set, name: str, imported: set,
-             built: set = frozenset()) -> list:
+             built: set = frozenset(), deps: frozenset = frozenset()) -> list:
     """The reads tokens a check is MISSING: for each footprint file NOT already staged — by its own
     project, the engine, an imported warrant bib, a `builds` FILE label, or a DECLARED token's
     filegroup — the tokens that WOULD stage it (any one suffices).  [] iff every read is staged
     (the audit's soundness core).
     """
     return sorted(set().union(*_uncovered(fp, declared, projects, root_files, name, imported,
-                                          built).values()))
+                                          built, deps).values()))
 
 
 def _uncovered(fp: list, declared: set, projects: set, root_files: set, name: str, imported: set,
-               built: set = frozenset()) -> dict:
+               built: set = frozenset(), deps: frozenset = frozenset()) -> dict:
     """{footprint file: the reads tokens that WOULD stage it} for every read NOT already staged —
     `_missing` is its union.  Ζ·foot·files: the FILES are what a fix needs (a `builds` label names
     a file); a token like `report` says only which package, so the report printed tokens and left
@@ -158,6 +186,8 @@ def _uncovered(fp: list, declared: set, projects: set, root_files: set, name: st
             f = str(p.parent.parent / (p.name.split(".")[0] + ".py"))
         if f in imported:
             continue                     # staged via warrant-imports composition, not reads=
+        if f in deps:
+            continue                     # the engine's own runtime dependency (paperkit:W313)
         if Path(f).name == ".gitignore":
             # ⚑ Ζ·sandbox·declared — the Δ sandbox scope (layout._Scope) READS the repository's
             # ignore rules to drop non-content (caches, stale build copies, nested checkouts).  In a
@@ -257,6 +287,7 @@ def audit(repo_root: Path, names: list) -> list:
     live = build(repo_root, names)
     projects = {p.name for p in repo_root.iterdir() if (p / "paper.toml").is_file()}
     root_files = _root_files(repo_root)
+    runtime_deps = _runtime_dependency_files(repo_root)
     bad = []
     for name in names:
         pdir = repo_root if name == "." else repo_root / name
@@ -267,7 +298,7 @@ def audit(repo_root: Path, names: list) -> list:
             if "*" in fp:                            # degraded footprint (e.g. strace blocked) — skip
                 continue
             unc = _uncovered(fp, declared.get(k, set()), projects, root_files, name, imported,
-                             built.get(k, set()))
+                             built.get(k, set()), runtime_deps)
             if unc:
                 bad.append((name, k, sorted(set().union(*unc.values())),
                             sorted(declared.get(k, set())), sorted(unc)))
@@ -295,7 +326,8 @@ def audit_one(proj: str, claim: str) -> dict:
     if fp is None:
         return {"claim": claim, "ok": True, "degraded": True}  # strace blocked — over-declare, never fail
     missing = _missing(fp, declared, projects, _root_files(repo_root), name,
-                       _imported(project_dir, repo_root), _built(project_dir).get(claim, set()))
+                       _imported(project_dir, repo_root), _built(project_dir).get(claim, set()),
+                       _runtime_dependency_files(repo_root))
     # `engine` = the def-mutable surface (the modules whose def-sites the Ζ·mutant fanout sweeps);
     # pk_foot_learn aggregates it across claims → footprints.json (the def-scope manifest).
     return {"claim": claim, "ok": not missing, "missing": missing, "engine": _engine(fp)}

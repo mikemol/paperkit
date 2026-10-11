@@ -17,7 +17,7 @@ ARBITRARY command (pk_cmd's `sh -c cmd`, pk_agree's producers).  bazel = the pro
 record = the artifact downstream proofs depend on.
 """
 
-load("//tools:cell.bzl", "cell_builds_env", "cell_module", "cell_pypath")
+load("//tools:cell.bzl", "cell_builds_env", "cell_dists", "cell_module", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 _VERDICT = "//tools:verdict.py"
@@ -151,7 +151,7 @@ def _cmd_impl(ctx):
     # record itself is emitted by verdict.py (no JSON built in shell).
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool] + ctx.files.data + ctx.files.consumes + stamp_inputs, transitive = [py.files]),
+        inputs = depset([ctx.file._tool] + ctx.files.data + ctx.files.consumes + ctx.files._dists + stamp_inputs, transitive = [py.files]),
         env = env,
         # Ζ·sched-batch·phase2 — the check `inner` is an arbitrary compound shell command, not a
         # single exec, so we tune the ACTION SHELL ($$, single-threaded) and inner + the emit inherit
@@ -161,7 +161,7 @@ def _cmd_impl(ctx):
         # NOT `fail`.  rc 0 → pass · rc 3 → cannot-run (not verified here, but not a failure — the gate's
         # bad-set is {fail}, so it does not red the commit) · any other nonzero → fail (ran-and-failed).
         # Closes the false-red: on a toolchain-less box an honest "cannot verify" no longer blocks commits.
-        command = pyprefix + _engine_importable() + consume_prefix + '' +
+        command = pyprefix + _engine_importable() + cell_dists(ctx.files._dists) + consume_prefix + '' +
                   # Ζ·rungate·why — the check's own account of its failure goes to STDERR, not
                   # /dev/null.  This read `>/dev/null 2>&1`, so a red check reported `{"verdict":
                   # "fail"}` and NOTHING ELSE: the exit code survived and the reason never did.
@@ -239,6 +239,8 @@ pk_cmd = rule(
         "builds": attr.label_list(allow_files = True),
         "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
         "_tool": attr.label(default = _VERDICT, allow_single_file = True),
+        # paperkit:W316 — the mtools dists a check imports, as wheels on PYTHONPATH (tools/dists.bzl).
+        "_dists": attr.label(default = "@pk_dists//:site"),
     },
 )
 
@@ -282,9 +284,9 @@ def _json_impl(ctx):
     er, env, pyprefix, stamp_inputs = _tier_exec(ctx, py, ctx.attr.tier)
     ctx.actions.run_shell(
         outputs = [out, rc],
-        inputs = depset(ctx.files.data + stamp_inputs, transitive = [py.files]),
+        inputs = depset(ctx.files.data + ctx.files._dists + stamp_inputs, transitive = [py.files]),
         env = env,
-        command = pyprefix + _engine_importable() + 'O="$PWD/' + out.path + '"; R="$PWD/' + rc.path +
+        command = pyprefix + _engine_importable() + cell_dists(ctx.files._dists) + 'O="$PWD/' + out.path + '"; R="$PWD/' + rc.path +
                   '"; ( sh -c ' + _sq(ctx.attr.cmd) + ' ) > "$O" 2>/dev/null; echo "$?" > "$R"',
         mnemonic = "PkJson",
         execution_requirements = er,
@@ -300,6 +302,7 @@ pk_json = rule(
         "cmd": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
         "tier": attr.string(default = "sandbox", values = ["sandbox", "local", "toolchain"]),
+        "_dists": attr.label(default = "@pk_dists//:site"),
     },
 )
 
@@ -312,8 +315,8 @@ def _grades_impl(ctx):
     ctx.actions.write(meta, ctx.attr.meta)
     ctx.actions.run_shell(
         outputs = [out],
-        inputs = depset([ctx.file._tool, meta] + ctx.files.grades + ctx.files._engine, transitive = [py.files]),
-        command = cell_pypath(py) + _engine_importable() + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
+        inputs = depset([ctx.file._tool, meta] + ctx.files.grades + ctx.files._engine + ctx.files._dists, transitive = [py.files]),
+        command = cell_pypath(py) + _engine_importable() + cell_dists(ctx.files._dists) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " " + meta.path + " " + " ".join([g.path for g in ctx.files.grades]) + ' > "' + out.path + '"',
         mnemonic = "PkGrades",
     )
@@ -328,6 +331,7 @@ pk_grades = rule(
         "meta": attr.string(mandatory = True),     # JSON list, bib order: {key, check, section, rests-on, tier}
         "_tool": attr.label(default = "//tools:grades_rec.py", allow_single_file = True),
         "_engine": attr.label(default = "//paperkit:engine"),
+        "_dists": attr.label(default = "@pk_dists//:site"),
     },
 )
 

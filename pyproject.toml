@@ -40,10 +40,17 @@ name = "paperkit"
 version = "0.1.0"
 description = "Documents as projections of verified claim-DAGs"
 readme = "README.md"
-requires-python = ">=3.11"          # tomllib is stdlib from 3.11; the engine reads paper.toml with it
+requires-python = ">=3.13"          # mikemol-atomicwrite (a runtime dependency) requires 3.13; tomllib is stdlib from 3.11
 license = {text = "MIT"}
 authors = [{name = "Mike Mol"}]
-dependencies = []                    # STDLIB ONLY, deliberately — the engine adds no supply chain
+# ⚑ THE ENGINE'S FIRST RUNTIME DEPENDENCY (operator ruling 2026-10-11, paperkit:W313): the atomic
+# write moved to mtools (mikemol.atomicwrite.durable) and paperkit/durable.py was deleted rather than
+# kept as a copy, so `dependencies` is no longer empty.  It was "STDLIB ONLY, deliberately — the
+# engine adds no supply chain"; this one is a single owned dist at the SAME pin as the dev group
+# (mikemol-repin moves them together), and it requires Python >= 3.13, which the engine now does too.
+dependencies = [
+    "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=atomicwrite",
+]
 
 # ⚑ Ζ·render·pydeps — RENDER'S DEPS ARE OPTIONAL, NOT ENGINE DEPS.  `dependencies = []` above is
 # the ENGINE's stance and stays empty: a consumer installing paperkit gets no supply chain.  But
@@ -332,19 +339,19 @@ dev = [
     # needs Python >= 3.13 while paperkit's floor is 3.11 (what a CONSUMER installs against), and
     # uv refuses the lock outright otherwise.  Raising the ENGINE's floor for a DEV hook would change
     # the consumer contract for a tool no consumer runs; the dev venv is 3.13, so the hook is there.
-    "mikemol-hooks @ git+https://github.com/mikemol/mtools.git@6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#subdirectory=hooks ; python_full_version >= '3.13'",
-    "mikemol-pathsforward @ git+https://github.com/mikemol/mtools.git@6868dd2a7f3d113b7b505c8f023e2e477a33c0ec#subdirectory=pathsforward ; python_full_version >= '3.13'",
+    "mikemol-hooks @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=hooks ; python_full_version >= '3.13'",
+    "mikemol-pathsforward @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=pathsforward ; python_full_version >= '3.13'",
     # W142a -- the tools/ migration's landed packages (mtools:W531), pinned at ONE sha that holds all
     # ten and the judged-fix mode.  importdag is pinned because gatecheck and mutantcell DEPEND on it
     # (read from their pyproject.toml), though nothing is repointed onto it yet (mtools:W547).
-    "mikemol-pkgbuild @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=pkgbuild ; python_full_version >= '3.13'",
-    "mikemol-gatecheck @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=gatecheck ; python_full_version >= '3.13'",
-    "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=atomicwrite ; python_full_version >= '3.13'",
-    "mikemol-grade @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=grade ; python_full_version >= '3.13'",
-    "mikemol-mutation @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=mutation ; python_full_version >= '3.13'",
-    "mikemol-bibparse @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=bibparse ; python_full_version >= '3.13'",
-    "mikemol-mutantcell @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=mutantcell ; python_full_version >= '3.13'",
-    "mikemol-memres @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=memres ; python_full_version >= '3.13'",
-    "mikemol-buildtel @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=buildtel ; python_full_version >= '3.13'",
-    "mikemol-importdag @ git+https://github.com/mikemol/mtools.git@7d4a458a68fcd8f4ae1e9693316b1cccff38501f#subdirectory=importdag ; python_full_version >= '3.13'",
+    "mikemol-pkgbuild @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=pkgbuild ; python_full_version >= '3.13'",
+    "mikemol-gatecheck @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=gatecheck ; python_full_version >= '3.13'",
+    "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=atomicwrite ; python_full_version >= '3.13'",
+    "mikemol-grade @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=grade ; python_full_version >= '3.13'",
+    "mikemol-mutation @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=mutation ; python_full_version >= '3.13'",
+    "mikemol-bibparse @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=bibparse ; python_full_version >= '3.13'",
+    "mikemol-mutantcell @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=mutantcell ; python_full_version >= '3.13'",
+    "mikemol-memres @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=memres ; python_full_version >= '3.13'",
+    "mikemol-buildtel @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=buildtel ; python_full_version >= '3.13'",
+    "mikemol-importdag @ git+https://github.com/mikemol/mtools.git@ac854dc87c25b3161eb2dc0d44d3c0a959cc8ce4#subdirectory=importdag ; python_full_version >= '3.13'",
 ]

@@ -53,11 +53,14 @@ def main() -> int:
           e.get("PAPERKIT_CHECK_MB") == "256" and "MEMBUDGET_PARENT" not in e)
     check("DROPS injection vectors (LD_PRELOAD, IFS, BASH_ENV)",
           not any(k in e for k in ("LD_PRELOAD", "IFS", "BASH_ENV")))
-    # ⚑ PYTHONPATH IS NEVER INHERITED, BUT IT IS SET: the engine hands every check the one directory
-    # `paperkit` is importable from (the same value as PAPERKIT_PYTHONPATH), so a consumer imports
-    # the engine as the package it is. The caller's own value, "/x" above, does not survive.
-    check("PYTHONPATH is the engine's own, never the caller's",
-          e.get("PYTHONPATH") == e.get("PAPERKIT_PYTHONPATH") and e.get("PYTHONPATH") != "/x")
+    # ⚑ PYTHONPATH IS NEVER INHERITED, BUT IT IS SET: the engine hands every check the directory
+    # `paperkit` is importable from FIRST (the same value as PAPERKIT_PYTHONPATH), so a consumer
+    # imports the engine as the package it is, then the roots the ENGINE's own runtime dependency
+    # is importable from (mikemol-atomicwrite, paperkit:W313 -- derived, not inherited).  The
+    # caller's own value, "/x" above, does not survive.
+    entries = e.get("PYTHONPATH", "").split(os.pathsep)
+    check("PYTHONPATH is the engine's own (it first), never the caller's",
+          entries[0] == e.get("PAPERKIT_PYTHONPATH") and "/x" not in entries)
     check("DROPS unknown vars (FOO) — default-deny, not block-list", "FOO" not in e)
     print()
 

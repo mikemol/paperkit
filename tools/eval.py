@@ -285,11 +285,15 @@ def _run(check: str, claim: str, wall: int) -> tuple[bool, str]:
     # check").  Same argument, the other resource: a mutant that exhausts the process budget has
     # flipped it too, and the harness must SAY so rather than die of it.
     _become_subreaper()  # Ζ·cell·tree — orphaned descendants must stay countable and killable
+    # the staged engine is the `paperkit` package beside the cwd, so the cwd is its import root; the
+    # caller's entries FOLLOW it (paperkit:W316) -- the mtools dists the engine imports -- so the
+    # staged engine still wins
+    inherited = os.environ.get("PYTHONPATH")
+    pypath = os.pathsep.join(filter(None, [os.getcwd(), inherited]))
     try:
         p = subprocess.Popen(
             [sys.executable, check, claim],
-            # the staged engine is the `paperkit` package beside the cwd, so the cwd is its import root
-            env={**os.environ, "PYTHONPATH": os.getcwd()},
+            env={**os.environ, "PYTHONPATH": pypath},
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, process_group=0)
     except OSError as e:
         return True, f"could not spawn the check ({e.__class__.__name__}: {e}) — the mutation exhausted the cell's process budget, which is a flip"

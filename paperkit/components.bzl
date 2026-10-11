@@ -55,7 +55,6 @@ COMPONENTS = {
         "bib.py",
         "bibfidelity.py",
         "bibparse.py",
-        "durable.py",
         "rematch.py",
         "rhetoric.py",
     ],

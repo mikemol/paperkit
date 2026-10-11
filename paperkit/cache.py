@@ -10,7 +10,8 @@ import hashlib
 import json
 from pathlib import Path
 
-import paperkit.durable
+from mikemol.atomicwrite.durable import write_atomic
+
 import paperkit.layout
 
 
@@ -131,6 +132,6 @@ def load(project_dir: Path) -> dict:
 
 def save(project_dir: Path, data: dict) -> None:
     try:
-        paperkit.durable.write_atomic(project_dir / ".delta-cache.json", json.dumps(data))
+        write_atomic(project_dir / ".delta-cache.json", json.dumps(data))
     except Exception:
         pass

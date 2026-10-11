@@ -7,7 +7,7 @@
 # REGENERATE: python3 tools/dagbzl.py --write   ·   VERIFY: --check (byte-compare, gated)
 IMPORTS = {
     "bib.py": ["bibparse.py"],
-    "cache.py": ["durable.py", "layout.py", "mutate.py"],
+    "cache.py": ["layout.py", "mutate.py"],
     "checkcache.py": ["routes.py"],
     "checkenv.py": ["config.py"],
     "coherence.py": ["bib.py", "genre.py"],
@@ -18,7 +18,7 @@ IMPORTS = {
     "grade.py": ["bib.py"],
     "grader.py": ["config.py", "grade.py", "layout.py", "mutate.py", "resolver.py"],
     "layout.py": ["config.py"],
-    "project.py": ["bib.py", "checkenv.py", "config.py", "durable.py", "genre.py", "resolver.py", "rhetoric.py"],
+    "project.py": ["bib.py", "checkenv.py", "config.py", "genre.py", "resolver.py", "rhetoric.py"],
     "prove.py": ["grade.py"],
     "resolver.py": ["checkenv.py"],
     "rhetoric.py": ["bib.py"],
@@ -63,5 +63,4 @@ IMPORTS = {
     "tests/boundaries_toplevel.py": ["tests/boundaries_components.py"],
     "tests/boundaries_verdict.py": ["resolver.py"],
     "tests/boundaries_without_k.py": ["tests/_fixture_gate.py", "tests/_fixture_model.py"],
-    "tests/boundaries_write_atomic.py": ["durable.py"],
 }

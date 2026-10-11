@@ -210,13 +210,9 @@ line-length = 100
 target-version = "py311"        # matches requires-python; check the FLOOR, not the newest runtime
 extend-exclude = [
     ".venv", "bazel-*",
-    # ⚑ EXCLUDED BY OWNERSHIP, NOT BY STANDARD (linux-sources' precedent).  These are symlinks
-    # into ../substrate/scripts/ — adopted, not written here.  Linting them would report findings
-    # about code this repo cannot fix without forking, which is the one thing the symlink pattern
-    # exists to prevent.
-    "scripts/hook_cmdparse.py",
-    "scripts/hook_no_chaining.py",
-    "scripts/hook_structural_query.py",
+    # (W332: the three scripts/hook_*.py symlinks into ../substrate that were excluded here BY
+    # OWNERSHIP are gone — the pinned mikemol-hook-* console scripts replaced them, and a tracked
+    # symlink cannot ride an isolated commit's snapshot.)
 ]
 
 [tool.ruff.lint]

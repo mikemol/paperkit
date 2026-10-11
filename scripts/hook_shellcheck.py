@@ -1,1 +1,0 @@
-../../substrate/scripts/hook_shellcheck.py

@@ -13,7 +13,13 @@ cd "$(git rev-parse --show-toplevel)"
 # step used to run under `mise exec`, and a host without mise (luthen) failed the hook at its first
 # line — before any check ran — on a GREEN tree.  The venv is what uv built from the pin, so it is
 # the pinned interpreter wherever it exists; bare python3 is the fallback for an un-synced checkout.
-PY="$PWD/.venv/bin/python"; [ -x "$PY" ] || PY=python3
+# ⚑ W322 — ISOLATED COMMITS.  mikemol-commit gates a SNAPSHOT of the commit's tracked files (cwd = the
+# snapshot, MIKEMOL_REAL_ROOT = the real checkout) instead of holding .git/index.lock and refusing
+# every other edit for the length of a cold sweep; it does so only for a hook that NAMES this variable.
+# The snapshot holds tracked files only, so the HOST state — the venv, gitignored local config — is
+# looked up through the real root, with the cwd as the default for a plain `git commit`.
+_pk_real="${MIKEMOL_REAL_ROOT:-$PWD}"
+PY="$_pk_real/.venv/bin/python"; [ -x "$PY" ] || PY=python3
 # W59 — THE HOOK OWNS THE ENVIRONMENT IT RUNS IN, NOT THE CALLER'S SHELL.  A daemon restart left a
 # session with this repo's venv ACTIVE (VIRTUAL_ENV set, <root>/.venv/bin first on PATH): every check
 # the footprint audit traced resolved `python3` to the venv's 3.13 instead of the host's, read .venv/
@@ -25,7 +31,7 @@ unset VIRTUAL_ENV
 _pk_path=""
 _pk_ifs=$IFS; IFS=:
 for _pk_d in $PATH; do
-    case "$_pk_d" in "$PWD"|"$PWD"/*) continue ;; esac
+    case "$_pk_d" in "$PWD"|"$PWD"/*|"$_pk_real"|"$_pk_real"/*) continue ;; esac
     _pk_path="${_pk_path:+$_pk_path:}$_pk_d"
 done
 IFS=$_pk_ifs
@@ -36,7 +42,7 @@ unset _pk_path _pk_ifs _pk_d
 # operator points at their own), so it lives here, sourced if present, absent by default.
 # shellcheck source=/dev/null  # per-clone, gitignored, absent by default — there is no file to
 # follow at analysis time, and pointing at an example would check the wrong content.
-[ -f .githooks/local.env ] && . .githooks/local.env
+[ -f "$_pk_real/.githooks/local.env" ] && . "$_pk_real/.githooks/local.env"
 # ⚑ W44 — THE LOGS SINK BY SERVICE NAME, NOT BY A COPIED ADDRESS.  local.env's pointers are per-clone
 # COPIES of an address, and copies rot: all three went dead with the host move and pushed nowhere for
 # a day.  So the default is QUERIED from luthen's endpoint directory by NAME (the same directory

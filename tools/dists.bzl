@@ -51,9 +51,12 @@ def _impl(ctx):
             fail("pk_dists: %s failed: %s" % (" ".join(argv), r.stderr))
     # The verb ships in mikemol-hooks, a dev dependency, so it lives in the workspace venv rather
     # than on the PATH a bazel client happens to carry (measured: a bare-PATH client failed here).
-    tool = ctx.which("mikemol-wheel") or ctx.path(str(ctx.workspace_root) + "/.venv/bin/mikemol-wheel")
+    # Under an ISOLATED commit (paperkit:W322) the workspace is a snapshot of the tracked files and the
+    # venv stays in the REAL checkout, which the hook names in MIKEMOL_REAL_ROOT.
+    real_root = ctx.getenv("MIKEMOL_REAL_ROOT") or str(ctx.workspace_root)
+    tool = ctx.which("mikemol-wheel") or ctx.path(real_root + "/.venv/bin/mikemol-wheel")
     if not tool.exists:
-        fail("pk_dists: mikemol-wheel is on neither PATH nor .venv/bin (uv sync installs mikemol-hooks)")
+        fail("pk_dists: mikemol-wheel is on neither PATH nor %s/.venv/bin (uv sync installs mikemol-hooks)" % real_root)
     ctx.watch(tool)
     r = ctx.execute(unset + [tool] + dists +["--sha", sha, "--out", str(ctx.path("wheels")), "--mtools", str(ctx.path("mtools"))], timeout = 900)
     if r.return_code != 0:
@@ -77,5 +80,5 @@ def _impl(ctx):
 pk_dists = repository_rule(
     implementation = _impl,
     attrs = {"pyproject": attr.label(allow_single_file = True, mandatory = True)},
-    environ = ["PATH"],
+    environ = ["PATH", "MIKEMOL_REAL_ROOT"],
 )

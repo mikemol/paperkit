@@ -1,1 +1,0 @@
-../../substrate/scripts/pycheck_payload.py

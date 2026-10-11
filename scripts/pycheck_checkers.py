@@ -1,1 +1,0 @@
-../../substrate/scripts/pycheck_checkers.py

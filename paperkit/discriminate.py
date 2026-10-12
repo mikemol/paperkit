@@ -71,7 +71,16 @@ import sys
 import tomllib
 from pathlib import Path
 
+import mikemol.grade.grade
+
 import paperkit.bib
+
+# This file is the Δ CLI + report.  The grade CACHE, project TOPOLOGY, and the GRADER (the
+# mutation sweep + the grade ladder) are their own modules now; imported under the names the
+# CLI uses, and re-exported so discriminate.content_key / .grade_check callers keep working.
+import paperkit.cache
+import paperkit.checkenv
+import paperkit.config
 import paperkit.driver
 import paperkit.gate
 
@@ -82,17 +91,6 @@ import paperkit.grader
 import paperkit.layout
 import paperkit.project
 import paperkit.resolver
-
-# This file is the Δ CLI + report.  The grade CACHE, project TOPOLOGY, and the GRADER (the
-# mutation sweep + the grade ladder) are their own modules now; imported under the names the
-# CLI uses, and re-exported so discriminate.content_key / .grade_check callers keep working.
-import paperkit.cache
-import paperkit.cache
-import paperkit.grade
-import paperkit.grader
-
-import paperkit.config
-import paperkit.checkenv
 
 # Ζ·ladder·sentinel (exit alphabet) — main()'s returns are TYPED so a caller can tell "call me
 # again" from "you asked wrong".  0 done · 1 an adequacy FLOOR was not met · 2 INCOMPLETE, resume
@@ -160,10 +158,10 @@ def main(argv: list) -> int:
     # re-import grade into the kernel and put the ladder in every module's cone —
     # Μ·kernel·shrink·grade-edge).  Listing them would let the knob and the ladder disagree —
     # a floor the ladder cannot rank.
-    if min_strength is not None and min_strength not in paperkit.grade.ORDER:
-        raise SystemExit(f"paperkit: --min-strength must be one of {sorted(paperkit.grade.ORDER)} (got {min_strength!r})")
-    if min_corro is not None and min_corro not in paperkit.grade.CORRO_C:
-        raise SystemExit(f"paperkit: --min-corroboration must be one of {sorted(paperkit.grade.CORRO_C)} (got {min_corro!r})")
+    if min_strength is not None and min_strength not in mikemol.grade.grade.ORDER:
+        raise SystemExit(f"paperkit: --min-strength must be one of {sorted(mikemol.grade.grade.ORDER)} (got {min_strength!r})")
+    if min_corro is not None and min_corro not in mikemol.grade.grade.CORRO_C:
+        raise SystemExit(f"paperkit: --min-corroboration must be one of {sorted(mikemol.grade.grade.CORRO_C)} (got {min_corro!r})")
     resolution = paperkit.config.resolve(RESOLUTION, pol)
     state_file = paperkit.config.resolve(STATE)
     budget_raw = paperkit.config.resolve(BUDGET)     # None = batch grade; a value = resumable under a budget
@@ -421,10 +419,10 @@ def main(argv: list) -> int:
     # merely its config/engine).  The INTERPRETATION lives in grade (Μ·grade — calc vs interp):
     # mark content-sensitivity, then clamp the effective grade by entailment over rests-on.
     content = {p.name for p in cfg["bibs"]} | {cfg["rubric"].name, cfg["out"].name}
-    paperkit.grade.mark_content_sensitive(records, content)
+    mikemol.grade.grade.mark_content_sensitive(records, content)
     # Ζ·rests·unresolved — hand clamp the bib's key set so a `rests-on` target that was
     # never graded reads as a TRUNCATION rather than as an edge imposing no constraint.
-    paperkit.grade.clamp(records, keys=set(F))
+    mikemol.grade.grade.clamp(records, keys=set(F))
 
     if as_json:
         print(json.dumps(records, indent=2))
@@ -433,8 +431,8 @@ def main(argv: list) -> int:
 
     rc = 0
     if min_strength is not None:
-        floor = paperkit.grade.ORDER[min_strength]
-        weak = [r for r in records if paperkit.grade.STRENGTH.get(r["grade"], 0) < floor]
+        floor = mikemol.grade.grade.ORDER[min_strength]
+        weak = [r for r in records if mikemol.grade.grade.STRENGTH.get(r["grade"], 0) < floor]
         if weak:
             print(f"\npaperkit-discriminate: {len(weak)} warrant(s) below "
                   f"strength '{min_strength}':", file=sys.stderr)
@@ -445,8 +443,8 @@ def main(argv: list) -> int:
             print(f"\npaperkit-discriminate: all {len(records)} warrant(s) "
                   f"meet strength '{min_strength}'")
     if min_corro is not None:
-        floor = paperkit.grade.CORRO_C[min_corro]
-        weak = [r for r in records if paperkit.grade.CORRO_C.get(r.get("corroboration", "single"), 0) < floor]
+        floor = mikemol.grade.grade.CORRO_C[min_corro]
+        weak = [r for r in records if mikemol.grade.grade.CORRO_C.get(r.get("corroboration", "single"), 0) < floor]
         if weak:
             print(f"\npaperkit-discriminate: {len(weak)} warrant(s) below "
                   f"corroboration '{min_corro}':", file=sys.stderr)
@@ -464,7 +462,7 @@ def report(records, share, graded, n_cited, n_checked, consider_all) -> None:
     print(f"paperkit-discriminate (Δ): {n_checked} {scope} warrant(s) carry a "
           f"check, {len(share)} distinct check(s)\n")
     # Ζ·ladder — the ladder's own total order (grade.RANK_C), not a second copy of it.
-    order = paperkit.grade.RANK_C
+    order = mikemol.grade.grade.RANK_C
     for r in sorted(records, key=lambda r: (order.get(r["grade"], 9), r["key"])):
         share_n = len(r["shared_with"]) + 1
         dil = f"  (shared by {share_n} claims)" if share_n > 1 else ""

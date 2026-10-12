@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import gen  # noqa: E402
-from paperkit.grade import RANK_C  # noqa: E402  — the declared ladder, not a local copy
+from mikemol.grade.grade import RANK_C  # noqa: E402  — the declared ladder, not a local copy
 
 
 def main() -> int:

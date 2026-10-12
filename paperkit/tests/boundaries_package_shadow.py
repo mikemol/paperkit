@@ -30,6 +30,7 @@ the sufficient half — it fails whenever a competing package directory can win.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -39,6 +40,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent   # the repo root, which HOLDS `paperkit/`
 LIVE = ROOT / "paperkit"
+# ⚑ W310 — THE ENGINE'S OWN RUNTIME DEPENDENCIES, AFTER THE ENTRIES UNDER TEST.  `paperkit.bib` imports
+# mikemol.grade (the ladder is an mtools dist now), so a probe interpreter whose PYTHONPATH held only
+# the competing directories died on `import mikemol` before it could report which `paperkit` it
+# served.  Which directory WINS is decided by the entries' order; where the dependencies come from is
+# not under test, so their roots follow the entries (derived as checkenv.clean_env derives them).
+_SPEC = importlib.util.find_spec("mikemol")
+_DEP_ROOTS = (
+    list(dict.fromkeys(str(Path(loc).parent) for loc in _SPEC.submodule_search_locations))
+    if _SPEC is not None and _SPEC.submodule_search_locations
+    else []
+)
 
 # Resolve `paperkit.bib` in a FRESH interpreter and report the file it actually came from.
 # A subprocess, not an importlib.reload: this process already has the live package imported, and a
@@ -53,7 +65,7 @@ _PROBE = (
 def resolve(path_entries: list[str]) -> dict[str, object]:
     """Import `paperkit.bib` under an explicit sys.path prefix; return where it resolved."""
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join(path_entries)
+    env["PYTHONPATH"] = os.pathsep.join([*path_entries, *_DEP_ROOTS])
     env.pop("PYTHONHOME", None)
     r = subprocess.run(  # noqa: S603
         [sys.executable, "-c", _PROBE],

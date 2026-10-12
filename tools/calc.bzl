@@ -682,8 +682,8 @@ def _cohere_impl(ctx):
     calcs = " ".join([c.path for c in ctx.files.calcs])
     ctx.actions.run_shell(
         outputs = [v],
-        inputs = depset([ctx.file._tool] + ctx.files.calcs + ctx.files.data, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
+        inputs = depset([ctx.file._tool] + ctx.files.calcs + ctx.files.data + ctx.files._dists, transitive = [py.files]),
+        command = cell_pypath(py) + cell_dists(ctx.files._dists) + '"$(command -v python3)" ' + cell_module(ctx.file._tool) +
                   " cohere cohere " + ctx.attr.project + " " + v.path + " " + calcs,
         mnemonic = "PkCohere",
         progress_message = "Ζ·emerge·gate cohere " + ctx.label.name,
@@ -699,6 +699,8 @@ pk_cohere = rule(
         "project": attr.string(mandatory = True),
         "data": attr.label_list(allow_files = True),
         "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
+        # paperkit:W310 — coherence.py (run by `cohere`) imports bib, which imports mikemol.grade
+        "_dists": attr.label(default = "@pk_dists//:site"),
     },
 )
 
@@ -762,8 +764,8 @@ def _grade_impl(ctx):
     calc = ctx.file.calc
     ctx.actions.run_shell(
         outputs = [g],
-        inputs = depset([calc] + ctx.files.data, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" -m tools.read_grade ' + calc.path + " > " + g.path,
+        inputs = depset([calc] + ctx.files.data + ctx.files._dists, transitive = [py.files]),
+        command = cell_pypath(py) + cell_dists(ctx.files._dists) + '"$(command -v python3)" -m tools.read_grade ' + calc.path + " > " + g.path,
         mnemonic = "PkGradeRead",
         progress_message = "Ζ·calc grade " + ctx.label.name,
     )
@@ -771,10 +773,11 @@ def _grade_impl(ctx):
 
 pk_grade = rule(
     implementation = _grade_impl,
-    doc = "A cheap READING of a calc record: the grade via grader._grade_from_sens (no re-sweep).",
+    doc = "A cheap READING of a calc record: the grade via mikemol.grade.grade_from_sens (no re-sweep).",
     toolchains = [_PY],
     attrs = {
         "calc": attr.label(allow_single_file = True, mandatory = True),
         "data": attr.label_list(allow_files = True),
+        "_dists": attr.label(default = "@pk_dists//:site"),  # paperkit:W310 — the ladder is a dist
     },
 )

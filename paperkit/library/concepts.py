@@ -29,13 +29,15 @@ from pathlib import Path
 # `_fixture_model` import below found nothing and the witness could not establish its baseline.
 ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or Path(__file__).resolve().parents[1])
 ROOT = ENGINE.parent
-import paperkit.tests._fixture_model  # noqa: E402  (the validated fixture kernel; capability helpers
+from typing import NoReturn
+
+import paperkit.gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
+
 #   are imported FUNCTION-LOCALLY per witness — the minimal-capability discipline of Μ·kernel·fixture·split)
 import paperkit.project  # noqa: E402  — the bib parser (Μ·model), for the claim-is-record witness
-import paperkit.gate  # noqa: E402  — the resolver/gate, for the verifier concepts (parser+resolver are engine)
 import paperkit.resolver  # noqa: E402  — VERBS, the engine's OWN verb set (never re-listed here; Λ·registry)
 import paperkit.routes  # noqa: E402  — Λ·key·graded, the shared graded-key walk (this library is grade 0)
-from typing import NoReturn
+import paperkit.tests._fixture_model  # noqa: E402  (the validated fixture kernel; capability helpers
 
 
 def adequacy_pitch() -> None:
@@ -563,8 +565,8 @@ def rests_on_clamps() -> None:
     # rests-on is a SEPARATE grounding edge: the EFFECTIVE grade clamps to the weakest premise
     # along it (a behavioral thesis resting on a vacuous atom clamps to vacuous), regardless of
     # prose order — the clamp (grade.clamp) over known premise grades.
-    import paperkit.grade
-    recs = paperkit.grade.clamp([
+    import mikemol.grade.grade
+    recs = mikemol.grade.grade.clamp([
         {"key": "atom", "grade": "vacuous", "rests-on": []},
         {"key": "thesis", "grade": "behavioral", "rests-on": ["atom"]},
     ])

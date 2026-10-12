@@ -46,7 +46,7 @@ def certificate(key: str) -> dict:
         raise RuntimeError(f"prove {key}: the def-sweep failed — {r.stderr.strip()[-400:]}")
     calc = json.loads(r.stdout)
     baseline, sens = bool(calc.get("baseline")), calc.get("sens", [])
-    import paperkit.grade  # the ONE ladder — derived, never re-declared here
+    import mikemol.grade.grade  # the ONE ladder — derived, never re-declared here
     return {
         "concept": key,
         "owner": OWNER.name,
@@ -54,7 +54,7 @@ def certificate(key: str) -> dict:
         "claim": calc.get("claim", key),
         "verdict": "pass" if baseline else "fail",
         "baseline": baseline,
-        "grade": paperkit.grade._grade_from_sens(baseline, sens)["grade"],
+        "grade": mikemol.grade.grade.grade_from_sens(baseline, sens)["grade"],
         "sens": sens,
         "fingerprint": sens,                # alias: the ⟨verdict, fingerprint⟩ vocabulary
     }

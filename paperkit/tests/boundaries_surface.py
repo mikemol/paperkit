@@ -23,9 +23,10 @@ from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
 
+import mikemol.grade.grade
+
 import paperkit.grader
 import paperkit.layout
-import paperkit.grade
 
 
 def main() -> int:
@@ -67,9 +68,9 @@ def main() -> int:
 
         print("\n⟨it is an axis, not a rung⟩\n")
         check("`unmeasured` is not a rung on the ladder (incompleteness is not a grade)",
-              "unmeasured" not in paperkit.grade.RANK_C and "unmeasured" not in paperkit.grade.STRENGTH)
+              "unmeasured" not in mikemol.grade.grade.RANK_C and "unmeasured" not in mikemol.grade.grade.STRENGTH)
         check("...so no adequacy floor can fail a claim for it",
-              all("unmeasured" not in paperkit.grade.below(f) for f in paperkit.grade.ORDER))
+              all("unmeasured" not in mikemol.grade.grade.below(f) for f in mikemol.grade.grade.ORDER))
 
         print("\n⟨Φ·degrade⟩\n")
         check("no trace ⇒ no claim either way (never a false 'nothing is unmeasured')",

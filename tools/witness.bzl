@@ -9,7 +9,7 @@ paper's results = treating it as a library); the package boundary is not semanti
 CROSS one (`result:`, `concept:`) get no special case here.  pk_proof builds the whole DAG (every witness); building it proves the paper.
 """
 
-load("//tools:cell.bzl", "cell_pypath")
+load("//tools:cell.bzl", "cell_dists", "cell_pypath")
 
 _PY = "@bazel_tools//tools/python:toolchain_type"
 
@@ -30,8 +30,8 @@ def _witness_impl(ctx):
         inner = "cd " + _sq(ctx.attr.project) + " && " + inner
     ctx.actions.run_shell(
         outputs = [w],
-        inputs = depset(ctx.files.premises + ctx.files.data, transitive = [py.files]),
-        command = cell_pypath(py) + guard + "if ( " + inner + " ) >/dev/null 2>&1; then " +
+        inputs = depset(ctx.files.premises + ctx.files.data + ctx.files._dists, transitive = [py.files]),
+        command = cell_pypath(py) + cell_dists(ctx.files._dists) + guard + "if ( " + inner + " ) >/dev/null 2>&1; then " +
                   "echo '{\"claim\":\"" + ctx.label.name + "\",\"witness\":\"holds\"}' > " + w.path +
                   "; else echo 'witness " + ctx.label.name + " does not hold' >&2; exit 1; fi",
         mnemonic = "PkWitness",
@@ -48,6 +48,7 @@ pk_witness = rule(
         "project": attr.string(default = "."),
         "premises": attr.label_list(allow_files = True, doc = "rests-on ∪ imports: premise claims' witnesses (any package)"),
         "data": attr.label_list(allow_files = True),
+        "_dists": attr.label(default = "@pk_dists//:site"),  # paperkit:W310 — the engine a witness runs imports mikemol
     },
 )
 

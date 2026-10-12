@@ -126,7 +126,6 @@ COMPONENTS = {
         "discriminate.py",
         "driver.py",
         "footdeps.py",
-        "grade.py",
         "grader.py",
         "layout.py",
         "mutate.py",

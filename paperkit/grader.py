@@ -27,12 +27,12 @@ import time
 from pathlib import Path
 from typing import NamedTuple
 
-import paperkit.resolver
-import paperkit.grade
-import paperkit.layout
-import paperkit.mutate
+import mikemol.grade.grade
 
 import paperkit.config
+import paperkit.layout
+import paperkit.mutate
+import paperkit.resolver
 
 
 class _Unreachable(int):
@@ -513,7 +513,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir, footprint, root_copy)
     # Ζ·broken·offaxis — hand the ladder the third state.  `baseline` is UNREACHABLE (falsy,
     # but not plain False) when the check could not be reached at all.
-    rec = paperkit.grade._grade_from_sens(baseline, sens, reachable=(baseline is not UNREACHABLE))
+    rec = mikemol.grade.grade.grade_from_sens(baseline, sens, reachable=(baseline is not UNREACHABLE))
     rec["baseline"] = baseline   # Ζ·calc — the measured baseline (the verdict), part of the CALCULATION
     # Ζ·calc·why — the CHECK's own words, beside the grader's generic ones.  Present only when the
     # check said something, so a passing record stays byte-identical (the non-breaking widening
@@ -551,7 +551,7 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     # check REACHES, which does it never ASSERT on?  Only meaningful at def resolution (branch:/flip:
     # sites live in the engine surface) and only when the sweep found reached arms; the flip: probe is
     # a SEPARATE, non-monotone measurement barred from `sens` by construction (FlipSite).  Never fed to
-    # _grade_from_sens: an unasserted decision names a gap, it does not lower the grade.
+    # grade_from_sens: an unasserted decision names a gap, it does not lower the grade.
     if engine_dir is not None and rec.get("grade") == "behavioral":
         unasserted = decisions_unasserted(chk, sandbox_project, custom, engine_dir, sens)
         if unasserted:
@@ -644,7 +644,7 @@ def decisions_unasserted(chk: str, sandbox_project: Path, custom: dict,
                                 cannot see (no fixture coincidence survives, since both arms are reached).
 
     Returns the labels of unasserted decisions.  An orthogonal AXIS, never a rung, never fed to
-    _grade_from_sens — an unasserted decision names a coverage gap, it does not lower the grade.
+    grade_from_sens — an unasserted decision names a coverage gap, it does not lower the grade.
     """
     out = []
     branch_arms = _branch_arms_by_qn(sandbox_project, engine_dir)

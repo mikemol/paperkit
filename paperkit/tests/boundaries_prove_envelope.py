@@ -10,7 +10,7 @@ oracle command and wraps it with the shared grade leaf — so if the two command
 agree by SOURCE, their {claim,baseline,sens,grade} agree by construction.
 
 What this PROVES (structural equivalence, gated): --prove and __dcalc invoke the same discriminate
-oracle (identical flags, same def frame) and grade via the same _grade_from_sens leaf.
+oracle (identical flags, same def frame) and grade via the same grade_from_sens leaf.
 What it does NOT prove (names-not-entails, a declared residue): that the two independent EXECUTIONS
 emit byte-identical output — that is entailed by action idempotency (result = f(inputs)), an engine
 invariant owned elsewhere, not re-checked here.  So the plumbing can no longer silently diverge;
@@ -104,8 +104,8 @@ def main() -> int:
 
     # ⟨same ladder⟩ — prove.py grades via the shared leaf, re-declares no rung order.
     prove_src = PROVE.read_text()
-    check("prove.py grades via the imported grade._grade_from_sens (the shared ladder leaf)",
-          "paperkit.grade._grade_from_sens(baseline, sens)" in prove_src)
+    check("prove.py grades via the imported grade.grade_from_sens (the shared ladder leaf)",
+          "mikemol.grade.grade.grade_from_sens(baseline, sens)" in prove_src)
     check("prove.py re-declares NO ladder (no STRENGTH/RANK_C/ORDER of its own — the boundaries_ladder rule)",
           not any(re.search(rf"\b{n}\s*=", prove_src) for n in ("STRENGTH", "RANK_C", "GRADE_C")))
 
@@ -121,7 +121,7 @@ def main() -> int:
             pr == "def", (f_res == "file") and (f_res != dr),
             p="intact:  prove resolution == 'def' == __dcalc's frame → same oracle",
             f="drifted: resolution → 'file' → cert measures a weaker frame than the cached record",
-            d="one token, the resolution literal (prove.py) — or the _grade_from_sens import")
+            d="one token, the resolution literal (prove.py) — or the grade_from_sens import")
     return s.finish()
 
 

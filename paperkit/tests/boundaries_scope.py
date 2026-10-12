@@ -21,14 +21,14 @@ the one direction the evidence genuinely contradicts: `fragment` on a witness no
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
-ENGINE = Path(__file__).resolve().parents[1]
+import mikemol.grade.grade
 
 import paperkit.bib
 import paperkit.coherence
-import paperkit.grade
 
 ran: list = []
 
@@ -50,8 +50,8 @@ def main() -> int:
 
     # ── the axis is an axis: it does NOT move the grade ────────────────────────────────────
     print("scope never clamps\n")
-    frag = paperkit.grade.clamp([_rec("f", "behavioral", ["a.py:1"], entails="fragment")])[0]
-    full = paperkit.grade.clamp([_rec("g", "behavioral", ["a.py:1"])])[0]
+    frag = mikemol.grade.grade.clamp([_rec("f", "behavioral", ["a.py:1"], entails="fragment")])[0]
+    full = mikemol.grade.grade.clamp([_rec("g", "behavioral", ["a.py:1"])])[0]
     check("a `fragment` claim keeps its measured grade",
           frag["effective_grade"] == "behavioral" and frag["clamp"] == 0)
     check("...and is pinned by nothing (clamped_by stays for PREMISES)",
@@ -60,7 +60,7 @@ def main() -> int:
           frag["effective_grade"] == full["effective_grade"])
 
     # a premise still clamps, so removing the scope-clamp did not disable clamping itself
-    pair = paperkit.grade.clamp([_rec("weak", "vacuous", []),
+    pair = mikemol.grade.grade.clamp([_rec("weak", "vacuous", []),
                         _rec("strong", "behavioral", ["a.py:1"],
                              entails="fragment", **{"rests-on": ["weak"]})])
     strong = [r for r in pair if r["key"] == "strong"][0]
@@ -72,32 +72,25 @@ def main() -> int:
     check("`scope` is on the record for a fragment", frag["scope"] == "fragment")
     check("absence defaults to `full`, not missing", full["scope"] == "full")
     # ⚑ ONE owner, and the direction is load-bearing.  The parser must refuse a typo'd scope, and
-    # bib.py (model) may not import grade.py (delta) to learn the legal set — the partition check
-    # catches that edge, and did.  So bib._SCOPES owns the vocabulary and grade.SCOPE_C ranks it.
-    # A second hand-written list in either place would drift in silence, and the direction that
-    # drifts WORST is the parser's: it would accept a value the ranking cannot rank.
-    check("bib._SCOPES owns the vocabulary; SCOPE_C derives its keys from it",
-          set(paperkit.grade.SCOPE_C) == set(paperkit.bib._SCOPES))
+    # the legal set is owned by mikemol.grade (W310: `SCOPES`), which ranks it as SCOPE_C and imports
+    # nothing of paperkit, so bib (model) reaches it without a cycle.  A second hand-written list in
+    # either place would drift in silence, and the direction that drifts WORST is the parser's: it
+    # would accept a value the ranking cannot rank.  So bib._SCOPES must BE the dist's tuple.
+    check("bib._SCOPES is mikemol.grade's SCOPES, and SCOPE_C derives its keys from it",
+          paperkit.bib._SCOPES is mikemol.grade.grade.SCOPES
+          and set(mikemol.grade.grade.SCOPE_C) == set(paperkit.bib._SCOPES))
     check("...and ranks them fragment < full (less coverage is the lower end)",
-          paperkit.grade.SCOPE_C["fragment"] < paperkit.grade.SCOPE_C["full"])
-    # ⚑ MEASURED, not source-scanned.  An eager `SCOPE_C = _scopes()` passed every local test
-    # (python3 had both modules on sys.path) and then died in the sandbox: tools/read_grade.py
-    # stages grade ALONE, and every Ζ·calc cell raised ModuleNotFoundError before running.  A
-    # module-level CALL is a module-level dependency even when its `import` sits inside a
-    # function — what matters is when it EXECUTES.  So import grade with bib UNREACHABLE, the
-    # way the sandbox does, rather than grepping the source for an import statement.
-    import shutil
+          mikemol.grade.grade.SCOPE_C["fragment"] < mikemol.grade.grade.SCOPE_C["full"])
+    # ⚑ MEASURED, not source-scanned.  The old arm copied grade.py alone into an empty directory and
+    # imported it, because tools/read_grade.py staged grade alone in a cell and an eager call to a
+    # sibling died there.  The dist carries that property by construction, so the arm now measures
+    # it where it lives: importing mikemol.grade.grade must not load paperkit at all.
     import subprocess
-    import tempfile
-    _d = tempfile.mkdtemp()
-    try:
-        shutil.copy(ENGINE / "grade.py", _d)
-        rc = subprocess.run([sys.executable, "-c", "import grade"], cwd=_d,
-                            env={"PYTHONPATH": _d, "PATH": "/usr/bin:/bin"},
-                            capture_output=True).returncode
-        check("grade imports with bib UNREACHABLE (read_grade.py stages it alone)", rc == 0)
-    finally:
-        shutil.rmtree(_d, ignore_errors=True)
+    probe = "import sys, mikemol.grade.grade; sys.exit(int('paperkit' in sys.modules))"
+    rc = subprocess.run([sys.executable, "-c", probe], capture_output=True,
+                        env={"PYTHONPATH": os.pathsep.join(sys.path), "PATH": "/usr/bin:/bin"},
+                        check=False).returncode
+    check("mikemol.grade imports WITHOUT loading paperkit (the dist stands alone)", rc == 0)
 
     # ── the face holds the declaration to the evidence ─────────────────────────────────────
     print("\nthe sixth face judges the contradicted direction\n")

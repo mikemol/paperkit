@@ -25,7 +25,7 @@ from pathlib import Path
 ENGINE = Path(__file__).resolve().parents[1]
 ROOT = ENGINE.parent
 
-import paperkit.grade  # noqa: E402
+import mikemol.grade.grade as ladder  # noqa: E402
 
 # Every consumer that orders/displays/gates on the ladder, and the file it lives in.
 CONSUMERS = {
@@ -37,7 +37,7 @@ CONSUMERS = {
 }
 # A rung name appearing in a LIST or comma-run is a re-declaration; one appearing in a comment or
 # a single-key lookup is not.  Match runs of >=3 quoted-or-bare rung names — the shape of a copy.
-RUNGS = sorted(paperkit.grade.RANK_C)
+RUNGS = sorted(ladder.RANK_C)
 _RUN = re.compile(r"(?:[\"'`]?(?:" + "|".join(RUNGS) + r")[\"'`]?\s*[,:]\s*){3,}")
 
 
@@ -51,30 +51,30 @@ def main() -> int:
     print("Ζ·ladder — the grade ladder's boundary\n")
     print("⟨one owner⟩\n")
     check(f"grade.RANK_C totally orders the {len(RUNGS)} rungs (distinct ranks, no ties)",
-          len(set(paperkit.grade.RANK_C.values())) == len(paperkit.grade.RANK_C))
+          len(set(ladder.RANK_C.values())) == len(ladder.RANK_C))
     check("rungs() is that order, descending — the display order, derived",
-          paperkit.grade.rungs() == sorted(paperkit.grade.RANK_C, key=paperkit.grade.RANK_C.get, reverse=True))
+          ladder.rungs() == sorted(ladder.RANK_C, key=ladder.RANK_C.get, reverse=True))
     check("every --min-strength floor is a real rung (the knob cannot name what the ladder cannot rank)",
-          set(paperkit.grade.ORDER) <= set(paperkit.grade.RANK_C))
+          set(ladder.ORDER) <= set(ladder.RANK_C))
 
     print("\n⟨the floor fails CLOSED⟩\n")
     # below() must be a function of the ORDER, not a list: for every floor, exactly the lower rungs.
-    ok = all(set(paperkit.grade.below(f)) == {g for g in paperkit.grade.RANK_C if paperkit.grade.RANK_C[g] < paperkit.grade.RANK_C[f]}
-             for f in paperkit.grade.RANK_C)
+    ok = all(set(ladder.below(f)) == {g for g in ladder.RANK_C if ladder.RANK_C[g] < ladder.RANK_C[f]}
+             for f in ladder.RANK_C)
     check("below(floor) is exactly the rungs ranked under it, for EVERY floor", ok)
     check("`imported` clears the behavioral floor (a delegation is not a weak grade)",
-          "imported" not in paperkit.grade.below("behavioral"))
+          "imported" not in ladder.below("behavioral"))
     check("`indeterminate` does NOT clear it (the grade a missing delegation arm produces)",
-          "indeterminate" in paperkit.grade.below("behavioral"))
+          "indeterminate" in ladder.below("behavioral"))
     # the fail-open property, stated positively: a rung inserted BELOW the floor is caught by
     # derivation, and would have been missed by any list written before it existed.
-    was = dict(paperkit.grade.RANK_C)
+    was = dict(ladder.RANK_C)
     try:
-        paperkit.grade.RANK_C["hypothetical"] = -2
-        caught = "hypothetical" in paperkit.grade.below("behavioral")
+        ladder.RANK_C["hypothetical"] = -2
+        caught = "hypothetical" in ladder.below("behavioral")
     finally:
-        paperkit.grade.RANK_C.clear()
-        paperkit.grade.RANK_C.update(was)
+        ladder.RANK_C.clear()
+        ladder.RANK_C.update(was)
     check("a NEW sub-floor rung is failed the moment it exists (a blacklist would pass it)", caught)
 
     print("\n⟨every consumer derives⟩\n")
@@ -86,13 +86,13 @@ def main() -> int:
     check("tools/verdict.py derives an adequacy floor via grade.below (not a literal bad-set)",
           "grade.below(" in (ROOT / "tools" / "verdict.py").read_text())
     gbzl = (ROOT / "tools" / "grade.bzl").read_text()
-    check("tools/grade.bzl names a FLOOR (below:<rung>) and stages the ladder as an input",
-          "below:" in gbzl and "//paperkit:grade.py" in gbzl)
+    check("tools/grade.bzl names a FLOOR (below:<rung>) and stages the ladder (the pinned dist) as an input",
+          "below:" in gbzl and "@pk_dists//:site" in gbzl)
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # F = the blacklist as it was actually written, and the rung it was actually blind to.
     literal = ",".join(["vacuous", "existence", "indeterminate", "broken"])   # the list as written
-    blind = [g for g in paperkit.grade.below("behavioral") if g not in literal.split(",")]
+    blind = [g for g in ladder.below("behavioral") if g not in literal.split(",")]
     caught = ("below:behavioral" in gbzl and literal not in gbzl)
     fails.append("ladder-delta") if not caught else None
     print(f"  {'ok ' if caught else 'XX '}re-hardcoding the adequacy blacklist is CAUGHT")

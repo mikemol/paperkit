@@ -24,7 +24,7 @@ import json
 import sys
 from pathlib import Path
 
-import paperkit.grade  # noqa: E402
+import mikemol.grade.grade as ladder  # noqa: E402
 
 meta = json.loads(Path(sys.argv[1]).read_text())
 recs = {}
@@ -56,5 +56,5 @@ for r in out:
 for r in out:
     r["shared_with"] = [o for o in by_check[r["check"]] if o != r["key"]]
 
-paperkit.grade.clamp(graded, keys={m["key"] for m in meta})   # mutates the graded records in place
+ladder.clamp(graded, keys={m["key"] for m in meta})   # mutates the graded records in place
 print(json.dumps(out))

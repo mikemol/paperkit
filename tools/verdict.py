@@ -173,9 +173,8 @@ def main(argv) -> int:
         # place.)  Asking grade.below() judges a new rung the moment it exists, and a floor that is
         # not a rung raises rather than quietly grading everything green.
         if a.bad.startswith("below:"):
-            sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "paperkit"))
-            import paperkit.grade
-            bad = set(paperkit.grade.below(a.bad.split(":", 1)[1]))
+            import mikemol.grade.grade
+            bad = set(mikemol.grade.grade.below(a.bad.split(":", 1)[1]))
         else:
             bad = {b.lower() for b in a.bad.split(",")}
 

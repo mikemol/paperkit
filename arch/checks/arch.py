@@ -43,15 +43,37 @@ def arch_components():
     assert set(deps) == set(comps), "DEPS and COMPONENTS name different sets"
 
 
+_ONES = ("ZERO ONE TWO THREE FOUR FIVE SIX SEVEN EIGHT NINE TEN ELEVEN TWELVE THIRTEEN FOURTEEN "
+         "FIFTEEN SIXTEEN SEVENTEEN EIGHTEEN NINETEEN").split()
+_TENS = "TWENTY THIRTY FORTY FIFTY SIXTY SEVENTY EIGHTY NINETY".split()
+
+
+def _spelled(word):
+    """The integer a spelled-out number names (ZERO..NINETY-NINE): `TWENTY-SEVEN` -> 27."""
+    head, _, tail = word.partition("-")
+    if head in _TENS:
+        return 20 + 10 * _TENS.index(head) + (_ONES.index(tail) if tail else 0)
+    return _ONES.index(head)
+
+
 def arch_modules():
     # "modules" = the NON-TEST files in the partition.  Stated separately from the component count
     # precisely because the prose conflated the two.
+    #
+    # ⚑ THE NUMBER LIVES IN THE PROSE ONLY.  This witness used to carry a literal beside the claim's
+    # spelled-out count, so every module added or deleted (W295, W310) edited two copies and a gate
+    # run was lost each time one was forgotten.  It now READS the count the claim states and
+    # compares it with the count the owner (components.bzl) yields, so the code holds no copy.
     comps, _ = _components()
     files = [f for fs in comps.values() for f in fs]
     non_test = [f for f in files if not f.startswith("tests/")]
-    assert len(non_test) == 27, (
-        f"the engine has {len(non_test)} non-test modules, not 27 — update the claim, and note "
-        f"that this count is NOT the component count ({len(comps)})")
+    claim = (ROOT / "arch" / "warrants.bib").read_text()
+    stated = re.search(r"hold ([A-Z]+(?:-[A-Z]+)?) non-test modules", claim)
+    assert stated, "the arch-modules claim no longer states a spelled-out 'hold N non-test modules'"
+    assert _spelled(stated.group(1)) == len(non_test), (
+        f"the engine has {len(non_test)} non-test modules, the claim says {stated.group(1)} — "
+        f"update the claim's prose, and note that this count is NOT the component count "
+        f"({len(comps)})")
 
 
 def arch_projects():

@@ -48,8 +48,10 @@ authors = [{name = "Mike Mol"}]
 # kept as a copy, so `dependencies` is no longer empty.  It was "STDLIB ONLY, deliberately — the
 # engine adds no supply chain"; this one is a single owned dist at the SAME pin as the dev group
 # (mikemol-repin moves them together), and it requires Python >= 3.13, which the engine now does too.
+# W310 added the grade ladder (mikemol.grade, replacing paperkit/grade.py) as the second.
 dependencies = [
     "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@f04f0a2f6b93b69e8e479d341f50ac786f801995#subdirectory=atomicwrite",
+    "mikemol-grade @ git+https://github.com/mikemol/mtools.git@f04f0a2f6b93b69e8e479d341f50ac786f801995#subdirectory=grade",
 ]
 
 # ⚑ Ζ·render·pydeps — RENDER'S DEPS ARE OPTIONAL, NOT ENGINE DEPS.  `dependencies = []` above is

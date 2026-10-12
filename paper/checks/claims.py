@@ -326,8 +326,8 @@ def edge_chiral():
     # grounding is independent of prose adjacency: rests-on clamps even when the premise is NOT a
     # from-neighbor (the two graphs diverge / reverse).  Π — tests the CLAMP (grade.clamp) over
     # known grades: the thesis grounds on `atom` but is a prose-neighbor of `mid`, yet clamps to atom.
-    import paperkit.grade
-    recs = paperkit.grade.clamp([
+    import mikemol.grade.grade as ladder
+    recs = ladder.clamp([
         {"key": "atom", "grade": "vacuous", "rests-on": []},
         {"key": "mid", "grade": "behavioral", "rests-on": []},               # the prose neighbor
         {"key": "thesis", "grade": "behavioral", "from": ["mid"], "rests-on": ["atom"]},
@@ -337,6 +337,15 @@ def edge_chiral():
         "fixture should ground on a non-prose-neighbor"
     assert th["effective_grade"] == "vacuous", \
         "rests-on did not clamp despite atom not being a from-neighbor"
+    # ...and the OTHER direction, which is paperkit's own code: `from` orders the prose and
+    # `rests-on` does not.  The clamp above lives in mtools' ladder (W310), so by itself it gave
+    # the mutation sweep nothing in this repo to flip and the claim graded INDETERMINATE; the
+    # prose order is bib.dep_order, so asserting it here makes the witness answer to the engine.
+    import paperkit.bib
+    order = paperkit.bib.dep_order(["thesis", "mid", "atom"], {r["key"]: r for r in recs})
+    assert order.index("mid") < order.index("thesis"), "from did not order the prose mid→thesis"
+    assert order.index("atom") > order.index("thesis"), \
+        "rests-on leaked into the prose order (the grounding premise was pulled before its dependent)"
 
 
 def edge_move_types():
@@ -533,7 +542,7 @@ def module_split():
     # runs a check, a grader that sweeps it, a grade ladder that interprets the sweep, a cache,
     # a topology — each importable on its own; the leaf modules do not import the orchestrators,
     # so a change to one has a small blast radius.
-    for mod in ("resolver", "grader", "grade", "cache", "layout"):
+    for mod in ("resolver", "grader", "cache", "layout"):
         assert (ENGINE / f"{mod}.py").exists(), f"engine module {mod}.py is missing"
     resolver_src = _src("resolver.py")
     assert "import gate" not in resolver_src and "concurrent.futures" not in resolver_src, \
@@ -541,7 +550,8 @@ def module_split():
     grader_src = (ENGINE / "grader.py").read_text()
     assert "import gate" not in grader_src and "import project" not in grader_src, \
         "the grader imports gate/project — it would not be testable on its own"
-    grade_src = (ENGINE / "grade.py").read_text()
+    import mikemol.grade.grade as ladder  # W310: the ladder is mtools' dist; read the leaf from it
+    grade_src = Path(ladder.__file__).read_text()
     assert not any(f"import {m}" in grade_src for m in ("gate", "project", "grader", "resolver", "cache")), \
         "the grade ladder imports an orchestrator — it must be a pure leaf (Μ·grade: calc vs interp)"
 
@@ -968,7 +978,8 @@ def genre_collection():
 def observe_regroups_on_grounding():
     # Ρ·deck·residual·wire — observe() cuts on the GROUNDING-derived partition, not the authored
     # sections, and one owner computes that partition for both the projector and the ∂² grade.
-    import paperkit.genre, paperkit.coherence
+    import paperkit.coherence
+    import paperkit.genre
     # ONE OWNER: the grade's partition IS the projector's, not a second copy that could drift.
     recs = [{"key": "a", "section": "A", "rests-on": []},
             {"key": "b", "section": "B", "rests-on": ["a"]},
@@ -1095,7 +1106,8 @@ def genre_declared_gated():
 def gamma_is_reachable():
     # Ρ·deck·gamma·declare — γ is the resolution dial and must be REACHABLE, not frozen into each
     # genre.  An explicit γ overrides the genre's own; absent, the genre's declared value stands.
-    import paperkit.genre, paperkit.project
+    import paperkit.genre
+    import paperkit.project
     recs = ([{"key": f"a{i}", "section": "A", "rests-on": [f"a{j}" for j in range(3) if j != i]}
              for i in range(3)]
             + [{"key": f"b{i}", "section": "B",

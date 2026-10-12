@@ -18,10 +18,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = ROOT / "paperkit"
+import paperkit.bib
 import paperkit.gate
 import paperkit.project
 import paperkit.resolver
-import paperkit.bib
 
 # (Μ·kernel·fixture·reads — no module-level source reads: a witness that inspects a module's
 # SOURCE reads it inside its own body, so only that witness stages the module and sweeps its
@@ -132,11 +132,11 @@ def rm_delta_tbl():
     # Ζ·ladder: read from grade.py, never re-listed here.  The old form hardcoded its own 4-tuple
     # and asserted only membership, so it was green while the table omitted `broken` and
     # `imported` — a witness that carries its own copy of the set it guards proves a tautology.
-    import paperkit.grade
+    import mikemol.grade.grade
     tbl = (ROOT / "assets" / "grades.md").read_text()
     tabled = re.findall(r"\| `(\w+)` \|", tbl)
-    assert tabled == paperkit.grade.rungs(), \
-        f"the grade table and the engine's ladder disagree: table={tabled} ladder={paperkit.grade.rungs()}"
+    assert tabled == mikemol.grade.grade.rungs(), \
+        f"the grade table and the engine's ladder disagree: table={tabled} ladder={mikemol.grade.grade.rungs()}"
 
 
 def rm_resolver_tbl():

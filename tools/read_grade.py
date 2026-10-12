@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Ζ·calc·interp — the GRADE as a cheap READING over a calc record, not a re-measurement.
 Reads a pk_calc record {claim, baseline, sens} and emits the grade via the pure interpreter
-grade._grade_from_sens(baseline, sens).  No sweep — the expensive calculation already ran in
-pk_calc; this is an instant function of its output.  Imports paperkit.grade, the LADDER LEAF
+grade.grade_from_sens(baseline, sens).  No sweep — the expensive calculation already ran in
+pk_calc; this is an instant function of its output.  Imports mikemol.grade.grade, the LADDER LEAF
 (Μ·grade), not the whole grader: a reading needs the interpretation, never the sweep.
 
 ⚑ Ψ·grade·carry — CONSTRUCT ONCE, READ MANY.  CARRY THE WHOLE READING, NOT JUST THE RUNG.
@@ -12,11 +12,11 @@ claim in the build graph.  Several READINGS sit over that one artifact, and Ζ·
 says so — "ONE cached sweep (pk_calc) feeds the verdict reading here (and the grade reading
 below); the redundant verdict run + the adequacy re-sweep collapse into it."
 
-  * grade      — this file: _grade_from_sens, pure, per-claim
+  * grade      — this file: grade_from_sens, pure, per-claim
   * coherence  — coherence._records_from_calcs + the ∂² faces, over a whole project's records
   * clamp      — a pure fold over the same assembled records (what _delta_section needs)
 
-`_grade_from_sens` returns {grade, tests, baseline, why, not_higher, not_lower} — the rung AND the
+`grade_from_sens` returns {grade, tests, baseline, why, not_higher, not_lower} — the rung AND the
 justification for it.  This file read `["grade"]` and DISCARDED FIVE OF SIX FIELDS before writing,
 so every `<claim>__grade.grade.json` in the build graph was a bare {claim, grade}.  That is a
 READING throwing away what the CONSTRUCTION produced, and it is load-bearing twice:
@@ -36,7 +36,7 @@ read before — ADDITIVE, not a shape change.
 import json
 import sys
 
-import paperkit.grade
+import mikemol.grade.grade
 
 c = json.load(open(sys.argv[1]))
 # ⚑ Ζ·broken·offaxis — READ THE TRISTATE.  `baseline` serializes UNREACHABLE and False both as 0
@@ -45,7 +45,7 @@ c = json.load(open(sys.argv[1]))
 # the honest default for every record written before the axis existed and for every check that ran.
 # Without this the reading defaults reachable=True and reports "repo is not green" about a check
 # that merely could not RUN — the false statement grade.py:86-92 records as measured twice.
-r = paperkit.grade._grade_from_sens(c["baseline"], c["sens"], reachable=c.get("reachable", True))
+r = mikemol.grade.grade.grade_from_sens(c["baseline"], c["sens"], reachable=c.get("reachable", True))
 print(json.dumps({"claim": c["claim"], "grade": r["grade"], "tests": r.get("tests", []),
                   "baseline": r.get("baseline", ""), "why": r.get("why", ""),
                   "not_higher": r.get("not_higher", ""), "not_lower": r.get("not_lower", "")}))

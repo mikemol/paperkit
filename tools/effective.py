@@ -28,8 +28,9 @@ import json
 import sys
 from pathlib import Path
 
+import mikemol.grade.grade
+
 import paperkit.bib
-import paperkit.grade
 
 
 def _delegation(check: str) -> dict | None:
@@ -107,7 +108,7 @@ def main(argv: list) -> int:
         rest.append(argv[i])
         i += 1
     project_dir, grade_files = Path(rest[0]), rest[1:]
-    rs = paperkit.grade.clamp(records(project_dir, grade_files), owner_grades(owners))
+    rs = mikemol.grade.grade.clamp(records(project_dir, grade_files), owner_grades(owners))
     print(json.dumps({"project": project_dir.name or str(project_dir),
                       "claims": [{"key": r["key"], "grade": r["grade"],
                                   "effective_grade": r["effective_grade"],

@@ -111,16 +111,17 @@ def _adequacy_impl(ctx):
     v = ctx.actions.declare_file(ctx.label.name + ".verdict.json")
     paths = " ".join([g.path for g in ctx.files.grades])
     # PARSES each grade record (verdict.py agg) — fail iff any grade is below the behavioral FLOOR.
-    # Ζ·ladder: the floor is named, and verdict.py derives the failing set from paperkit/grade.py.
+    # Ζ·ladder: the floor is named, and verdict.py derives the failing set from the ladder, which
+    # since W310 is mtools' mikemol.grade dist (staged as `_dists`, on PYTHONPATH).
     # It used to be a literal blacklist here, which fails OPEN — a rung added to the ladder after
     # this line was written is not in the list, so it would silently PASS adequacy.
     ctx.actions.run_shell(
         outputs = [v],
         inputs = depset(
-            [ctx.file._tool, ctx.file._ladder] + ctx.files.grades,
+            [ctx.file._tool] + ctx.files._dists + ctx.files.grades,
             transitive = [py.files],
         ),
-        command = _verdict_tool(py, ctx.file._tool) +
+        command = cell_dists(ctx.files._dists) + _verdict_tool(py, ctx.file._tool) +
                   "agg adequacy " + v.path + " grade below:behavioral " + paths,
         mnemonic = "PkAdequacy",
     )
@@ -133,8 +134,9 @@ pk_adequacy = rule(
     attrs = {
         "grades": attr.label_list(allow_files = True, mandatory = True),
         "_tool": attr.label(default = "//tools:verdict.py", allow_single_file = True),
-        # the ladder LEAF — the floor's failing set is derived from it, so it is a real input
-        "_ladder": attr.label(default = "//paperkit:grade.py", allow_single_file = True),
+        # the ladder LEAF (mikemol.grade, a pinned dist) — the floor's failing set is derived from
+        # it, so it is a real input
+        "_dists": attr.label(default = "@pk_dists//:site"),
     },
 )
 

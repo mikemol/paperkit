@@ -33,6 +33,8 @@ if TYPE_CHECKING:
 # the import is one-directional (bibparse knows nothing about _SCALAR, sections or the DAG), so
 # the grammar can be replaced — by the EBNF-driven table this arc is heading for — without the
 # data model noticing.
+import mikemol.grade.grade
+
 import paperkit.bibparse
 
 # paperkit:W295 — the rubric's READER, also one-directional: rubric.py reads files and knows
@@ -67,10 +69,10 @@ _SCALAR = ("title", "author", "year", "note", "section", "claim",
 #
 # `builds` = Bazel LABELS of built artifacts / exported files this check reads (not dirs, not keys).
 _LIST = ("from", "rests-on", "reads", "consumes", "builds")
-# Ξ·entails — the legal `entails` values.  Owned at the MODEL layer because the parser is
-# what must refuse a typo, and the parser may not reach up into the delta layer for a
-# constant.  grade.SCOPE_C ranks these; it does not re-list them.
-_SCOPES = ("fragment", "full")
+# Ξ·entails — the legal `entails` values.  The parser is what must refuse a typo; the list is
+# owned by mikemol.grade (W310: `SCOPES`), which ranks these as SCOPE_C and does not re-list them,
+# and which imports nothing of paperkit, so the model layer reaches it without a cycle.
+_SCOPES = mikemol.grade.grade.SCOPES
 # Ζ·bib·declare — THERE IS NO BIBTEX ROSTER HERE, AND ITS ABSENCE IS THE DESIGN.
 #
 # A `_BIBTEX` frozenset of 24 standard reference fields used to sit at this line, and it bought

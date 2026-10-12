@@ -29,7 +29,8 @@ from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
 
-import paperkit.grade
+import mikemol.grade.grade
+
 import paperkit.grader
 
 _MOD = (
@@ -108,11 +109,11 @@ def main() -> int:
 
     # ── the axis is orthogonal, never a rung ─────────────────────────────────────────────────────
     check("decisions_unasserted is NOT a rung (absent from RANK_C — incompleteness is not a grade)",
-          "decisions_unasserted" not in paperkit.grade.RANK_C and "unasserted" not in paperkit.grade.RANK_C)
+          "decisions_unasserted" not in mikemol.grade.grade.RANK_C and "unasserted" not in mikemol.grade.grade.RANK_C)
     check("decisions_unasserted is NOT in STRENGTH (never gates min-strength)",
-          "decisions_unasserted" not in paperkit.grade.STRENGTH and "unasserted" not in paperkit.grade.STRENGTH)
+          "decisions_unasserted" not in mikemol.grade.grade.STRENGTH and "unasserted" not in mikemol.grade.grade.STRENGTH)
     check("DECISIONS_C declares the axis (unasserted < asserted), like CORRO_C",
-          paperkit.grade.DECISIONS_C == {"unasserted": 0, "asserted": 1})
+          mikemol.grade.grade.DECISIONS_C == {"unasserted": 0, "asserted": 1})
 
     print()
     if fails:

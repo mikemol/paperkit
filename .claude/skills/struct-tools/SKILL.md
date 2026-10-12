@@ -6,9 +6,10 @@ description: The structural readers for paperkit's artifacts — ask the tool th
 # struct-tools — ask the owner, don't read the bytes
 
 ⚑ **ADOPTED, NOT INVENTED.** The routing-table shape and the two PreToolUse hooks that
-read it are substrate's (`scripts/hook_structural_query.py`, `scripts/hook_no_chaining.py`,
-symlinked from `scripts/`). Only this table is paperkit's, because only the artifacts differ.
-**Ownership is not claimed.**
+read it are mtools' pinned console scripts (`mikemol-hook-structural-query`,
+`mikemol-hook-no-chaining`, from `mikemol-hooks` in the dev group; they were symlinks into
+substrate's `scripts/` until paperkit:W440/W332). Only this table is paperkit's, because only
+the artifacts differ. **Ownership is not claimed.**
 
 ## Why this repo needs it particularly
 

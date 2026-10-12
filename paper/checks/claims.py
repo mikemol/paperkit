@@ -699,7 +699,7 @@ def local_ci():
     # not the behaviour); the entailing witness is bnd-hook-index over the predicate's core.
     hook = (Path(__file__).resolve().parents[2] / ".githooks" / "pre-commit").read_text()
     assert "bazel test //:hook" in hook, "the pre-commit hook does not run `bazel test //:hook`"
-    assert "-m tools.hook_index" in hook, "the pre-commit hook does not verify worktree≡index (Ζ·hook·index)"
+    assert "mikemol-hook-index" in hook, "the pre-commit hook does not verify worktree≡index (Ζ·hook·index)"
     assert "-m paperkit.footdeps" in hook,"the pre-commit hook does not run the footprint audit (Ξ·dag·reads — declared reads ⊇ Φ·footprint)"
 
 

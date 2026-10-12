@@ -1,6 +1,10 @@
 """Ζ·hook·index — the worktree≡index precondition's boundary (the PURE core, gated).
 
-The hook-layer half (tools/hook_index.py main(): the live `git status` + the refusal) cannot
+W309 — the checker is mtools' mikemol-gatecheck now (mikemol.gatecheck.hook_index and
+.indexdiverge, delivered to a cell as the pinned dists), not a copy in tools/; the repo-root
+`sys.path.append` that made `tools` importable is gone with it.
+
+The hook-layer half (hook_index.main(): the live `git status` + the refusal) cannot
 run in the hermetic //:hook sandbox (no git) — like cotype-monotone it lives in the
 pre-commit.  Its PURE core CAN be gated here: `divergent(porcelain, allow)` decides, from a
 porcelain -z transcript alone, which paths make the worktree verdict differ from the index
@@ -25,16 +29,9 @@ for all 43 suites, so no file has a number to type.
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-# ⚑ Ζ·engine·reach — the bib spells bare `python3`, which has no virtualenv and therefore no
-# editable install.  Appending the repo root makes `paperkit` and `tools` importable as
-# DIRECTORIES.  APPEND, not insert: it adds a namespace rather than shadowing one.
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+from mikemol.gatecheck.indexdiverge import ALLOW, divergent
 
 from paperkit.tests._boundary import Suite
-from tools.indexdiverge import ALLOW, divergent
 
 
 def main() -> int:

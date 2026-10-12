@@ -53,8 +53,8 @@ filegroup(name = "files", srcs = [
         "paper.toml",
         "rubric.tsv",
         "warrants.bib",
-        # Ξ·lint·wire — the .bzl + the lint tool, so the boundaries bnd-lint check can lint them.
-        "//tools:lint_bzl.py",
+        # Ξ·lint·wire — the .bzl, so the boundaries bnd-lint check can lint them (the lint tool is
+        # mtools' mikemol.gatecheck.lint_bzl since W309, delivered as a pinned dist).
         "//tools:calc.bzl",
         "//tools:verb.bzl",
         "//tools:grade.bzl",
@@ -73,8 +73,6 @@ filegroup(name = "files", srcs = [
         "//tools:imports.py",
         # Ζ·bnd·toplevel derives its read semantics from the owner (closure.py's _reads).
         "//tools:closure.py",
-        # Ζ·hook·index — bnd-hook-index gates the equivalence predicate's pure core.
-        "//tools:hook_index.py",
         # ⚑ Ζ·cell·account — bnd-logs-push and bnd-mem-db raised ModuleNotFoundError INSIDE
         # the cell while passing on the host, which is the failure this manifest's
         # Ζ·pyc·package note already records ("five boundary suites reddened exactly that
@@ -111,7 +109,6 @@ filegroup(name = "files", srcs = [
         # engine cone their declared closure does not cover.  It reads closure.py's OWN output
         # (never a re-derivation), so it is staged beside the tool it audits.
         "//tools:closure_census.py",
-        "//tools:indexdiverge.py",
     ], visibility = ["//visibility:public"])
 
 # The local CI: `bazel test //:hook` IS the pre-commit (Ζ·hook / Ζ·foot·hook) — it gates AND grades

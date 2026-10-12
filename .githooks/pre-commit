@@ -99,7 +99,9 @@ run() {                       # run "label" cmd...; STDERR streams live (progres
 # any path outside the allowlist (cotype/ — bazel-invisible AND index-gated by its own check
 # below).  Refusal is instant, BEFORE any build cost, and NAMES the paths;
 # PK_HOOK_ALLOW_DIRTY=1 downgrades it to a loud advisory for a deliberate split commit.
-run "hook-index (worktree ≡ index)"   "$PY" -m tools.hook_index
+# W309: the checker is mtools' mikemol-gatecheck (mikemol-hook-index), looked up through the real
+# root like the interpreter; it takes no argument and refuses one (exit 2) where the old copy ignored it.
+run "hook-index (worktree ≡ index)"   "$_pk_real/.venv/bin/mikemol-hook-index"
 
 # Η·hook·grid (H3) — //:hook's member list is a per-project x per-kind GRID that tools/bibtex.bzl
 # already knows and that is transcribed BY HAND into BUILD.bazel, in a file the generator cannot
@@ -113,7 +115,7 @@ run "hook-index (worktree ≡ index)"   "$PY" -m tools.hook_index
 # is what makes bnd-check's completeness proof sound: it compares two INDEPENDENT textual sources,
 # and generating the list would let the audited graph supply its own audit ([[instrument-vs-gate]]).
 # Cheap and text-only, so it lands here beside hook-index — before any build cost.
-run "hook-grid (//:hook ≡ MODULE)"    "$PY" -m tools.hook_grid
+run "hook-grid (//:hook ≡ MODULE)"    "$_pk_real/.venv/bin/mikemol-hook-grid" --root .
 
 # Ζ·cell·admit — the grid's CPU share is governed by ONE lever: a proportional cpu.weight on the
 # build's own cgroup (set below, next to the RAM budget).  The per-cell SCHED_BATCH + nice 19 +

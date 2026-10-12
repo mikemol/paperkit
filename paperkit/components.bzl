@@ -189,6 +189,7 @@ COMPONENTS = {
         # invisible to the build, and the cell could not say so until the verdict record
         # started carrying the check's stderr.
         "tests/boundaries_wheel.py",
+        "tests/boundaries_lint.py",
         "tests/boundaries_memoize.py",
         "tests/boundaries_mutate_atom.py",
         "tests/boundaries_mutable.py",

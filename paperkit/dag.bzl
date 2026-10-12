@@ -6,7 +6,7 @@
 #   paperkit/components.bzl   the module partition the edges are derived over
 # REGENERATE: python3 tools/dagbzl.py --write   ·   VERIFY: --check (byte-compare, gated)
 IMPORTS = {
-    "bib.py": ["bibparse.py"],
+    "bib.py": ["bibparse.py", "rubric.py"],
     "cache.py": ["layout.py", "mutate.py"],
     "checkcache.py": ["routes.py"],
     "checkenv.py": ["config.py"],
@@ -56,6 +56,7 @@ IMPORTS = {
     "tests/boundaries_prove_envelope.py": ["tests/_boundary.py"],
     "tests/boundaries_references.py": ["project.py"],
     "tests/boundaries_result_addr.py": ["resolver.py"],
+    "tests/boundaries_rubric.py": ["bib.py", "rubric.py"],
     "tests/boundaries_sandbox.py": ["grader.py", "layout.py"],
     "tests/boundaries_scope.py": ["bib.py", "coherence.py", "grade.py"],
     "tests/boundaries_surface.py": ["grade.py", "grader.py", "layout.py", "tests/_boundary.py"],

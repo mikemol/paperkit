@@ -57,6 +57,9 @@ COMPONENTS = {
         "bibparse.py",
         "rematch.py",
         "rhetoric.py",
+        # paperkit:W295 — the rubric's reader (TSV + JSON Lines), a data-reading leaf like bibparse:
+        # stdlib imports only, so no DEPS edge; bib.rubric_rows delegates to it.
+        "rubric.py",
     ],
     "resolver": [
         "checkenv.py",
@@ -197,6 +200,7 @@ COMPONENTS = {
         "tests/boundaries_result_addr.py",
         "tests/boundaries_roster_sync.py",
         "tests/boundaries_roster_wired.py",
+        "tests/boundaries_rubric.py",
         "tests/boundaries_sandbox.py",
         "tests/boundaries_scope.py",
         "tests/boundaries_surface.py",

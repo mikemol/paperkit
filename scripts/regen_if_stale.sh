@@ -30,6 +30,14 @@
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 0
+# ⚑ W318 — THE PROJECT'S INTERPRETER, NOT THE HOST'S.  Every generator below used to run under a bare
+# `python3` with `> out 2>/dev/null`.  Once the engine imported mikemol.atomicwrite (W313) the host
+# python could not run them, the shell had ALREADY truncated each redirect target, and stderr went to
+# /dev/null: a tracked file (render/assets/paper-units.tsv, assets/fields.md) was silently replaced
+# by an EMPTY one whenever its source was newer.  The venv is the pinned interpreter wherever it
+# exists; python3 stays the fallback for an un-synced checkout, as in .githooks/pre-commit.
+PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY=python3
+export PY
 
 # ── the gate-running check, by CWD and not by argv (hook_gate_running.py's finding: a sibling
 # repo's bazel has its own cwd, and argv is the producer's account of itself while /proc/<pid>/cwd
@@ -55,6 +63,14 @@ newer_than() {                       # $1 = artifact, $2… = sources; true if a
 
 # shellcheck disable=SC2329  # invoked indirectly via `declare -f` at the foot of this file
 regen() {
+  # Write a generator's stdout to OUT only if the generator SUCCEEDED: the output goes to a sibling
+  # temp file and replaces OUT by rename, so a failing generator leaves the committed file exactly as
+  # it was (a `> OUT` redirect truncates it before the command even starts — W318).
+  regen_to() {                       # $1 = OUT, $2… = the generator command
+    local target="$1" tmp="$1.regen.$$"
+    shift
+    if "$@" >"$tmp" 2>/dev/null; then mv -f "$tmp" "$target"; else rm -f "$tmp"; fi
+  }
   # paperkit projects: <project>/<out>.md is a projection of its bibs + rubric + the projector.
   for proj in . paper library talk config setup boundaries render report image; do
     [ -f "$proj/paper.toml" ] || continue
@@ -67,22 +83,22 @@ PY
 )"
     [ -n "$out" ] || continue
     if newer_than "$out" "$proj"/*.bib "$proj/paper.toml" "$proj/rubric.tsv" paperkit/project.py; then
-      python3 -m paperkit.project "$proj" >/dev/null 2>&1
+      "$PY" -m paperkit.project "$proj" >/dev/null 2>&1
     fi
   done
   # the deck segmentation manifests (render/checks/units.py --check owns the comparison)
   if newer_than render/assets/paper-units.tsv paper/*.bib paperkit/project.py paperkit/genre.py; then
-    python3 -m paperkit.project --observe --genre talk paper > render/assets/paper-units.tsv 2>/dev/null
+    regen_to render/assets/paper-units.tsv "$PY" -m paperkit.project --observe --genre talk paper
   fi
   # the generated field + knob tables
   if newer_than paper/assets/formulas.md paper/checks/gen_formulas.py; then
-    python3 paper/checks/gen_formulas.py > paper/assets/formulas.md 2>/dev/null
+    regen_to paper/assets/formulas.md "$PY" paper/checks/gen_formulas.py
   fi
   if newer_than assets/fields.md paperkit/bib.py paperkit/config.py checks/gen_fields.py; then
-    python3 checks/gen_fields.py > assets/fields.md 2>/dev/null
+    regen_to assets/fields.md "$PY" checks/gen_fields.py
   fi
   if newer_than config/assets/knobs.md paperkit/config.py config/checks/gen_knobs.py; then
-    python3 config/checks/gen_knobs.py > config/assets/knobs.md 2>/dev/null
+    regen_to config/assets/knobs.md "$PY" config/checks/gen_knobs.py
   fi
 }
 

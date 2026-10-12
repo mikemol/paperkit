@@ -78,6 +78,12 @@
   check   = {cmd:python3 ../paperkit/tests/boundaries_write_atomic.py},
   reads   = {.}
 }
+@misc{bnd-rubric,
+  section = {engine}, from = {bnd-write-atomic}, join = {. },
+  claim   = {the rubric is read in TWO formats to the SAME rows, and a malformed row is REFUSED by file and line (paperkit:W295) --- a TAB lost in an edit broke a commit gate twice in one day, so the section-order file moves from TSV to JSON Lines, one object per line with no positional column to lose; paperkit.rubric reads either by suffix into the shape every consumer already takes, so nothing downstream changed, and the converter and the key lister are strict about argv so an unknown flag is a usage error that writes nothing --- measured on every malformed form (invalid JSON, a comment line, a non-object, an unknown field, a repeated field, a missing key or title, an empty scheme, a duplicate key), each of which names the file and the line instead of crashing on an index or being half-read},
+  check   = {cmd:python3 ../paperkit/tests/boundaries_rubric.py},
+  reads   = {.}
+}
 @misc{bnd-concept-route,
   section = {engine}, from = {bnd-write-atomic}, join = {. },
   claim   = {ONE citation must not name two owners (Λ·library·seam) --- a concept: is resolved by two different mechanisms, the CLI deciding ownership AT RUNTIME per key by the exit-2 not-mine sentinel (the consuming project's library first, the engine's on fallthrough) and the build deciding it AT ANALYSIS TIME by a label built from the key alone, which cannot probe because a dependency exists in the graph before anything runs or it does not; those are two rules rather than two implementations of one, they agree in this repository only because a single project declares ownership so the fallthrough never fires, and the divergence is therefore invisible in-repo and waits for the downstream consumer the seam exists to serve --- measured here on a constructed consumer that owns an engine key and gets a DIFFERENT witness by route},

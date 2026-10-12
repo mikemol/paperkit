@@ -73,6 +73,7 @@ render = [
 # The invocations a consumer runs today as `python3 paperkit/<mod>.py`.
 paperkit-gate = "paperkit.gate:_cli"
 paperkit-project = "paperkit.project:_cli"
+paperkit-rubric = "paperkit.rubric:main"          # W295: convert a rubric to JSON Lines / list its keys
 
 [tool.setuptools]
 # ⚑ AND THE REASON IS NAMESPACE CAPTURE, NOT TASTE — WHICH THIS BLOCK DID NOT SAY.  It justified

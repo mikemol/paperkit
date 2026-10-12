@@ -19,7 +19,6 @@ render); the edge/token fields (`from`, `rests-on`, `reads`) are lists.
 from __future__ import annotations
 
 import ast as _ast
-import csv
 import inspect
 import re
 import sys
@@ -35,6 +34,10 @@ if TYPE_CHECKING:
 # the grammar can be replaced — by the EBNF-driven table this arc is heading for — without the
 # data model noticing.
 import paperkit.bibparse
+
+# paperkit:W295 — the rubric's READER, also one-directional: rubric.py reads files and knows
+# nothing of the data model, so the format (TSV, JSON Lines beside it) can change unnoticed here.
+import paperkit.rubric
 
 # scalar fields carried verbatim (the projector + checks read these).  `tier` is a per-warrant
 # enforcement-tier flag consumed by the GENERATOR (bibtex.bzl), not by any engine code here —
@@ -505,7 +508,7 @@ def load_config(project: Path) -> dict:
         # outside the project) is the SECOND anchor, for a project whose assets sit beside `out`
         # (the mirror layout).  The two coincide for an in-repo project.
         "project_dir": project,
-        "rubric": project / p.get("rubric", "rubric.tsv"),
+        "rubric": rubric_path(project, p.get("rubric")),
         "bibs": [_bibpath(project, b) for b in p.get("warrants", ["warrants.bib"])],
         "out": project / p.get("out", "paper.md"),
         "numbered": p.get("numbered", True),
@@ -599,38 +602,31 @@ def load_bib(bib_path: Path, project_dir: Path) -> dict:
     return parse(bib_path, load_config(project_dir)["consumer_fields"])
 
 
-_RUBRIC_MIN_COLS = 2
+def rubric_path(project: Path, declared: str | None) -> Path:
+    """Return the project's rubric file.
 
-
-def rubric_rows(path: Path) -> list:
-    """Return the rubric's DATA ROWS, parsed by the csv module — the ONE reader of the format.
-
-    Ζ·rubric·csv — this was two hand-rolled splitters: `rubric` took columns 1-2 and
-    rhetoric.schemes_from_rubric took column 3, each re-implementing the same strip/comment/tab
-    skip.  Two readers of one format drift, and they had already diverged on ROBUSTNESS: the
-    scheme reader guarded `len(parts) >= 3` while this one indexed `parts[1]` bare, so a line
-    carrying a tab but no second field raised IndexError out of the parser rather than being
-    reported as a malformed rubric.  csv is stdlib and project.py already reads .tsv with it —
-    the right tool was in the repo, used by a sibling, and unused here.
-
-    A row is skipped when blank or comment-led; a data row must carry at least a key and a title,
-    and one that does not is REFUSED by name rather than crashing on an index.  Returns the full
-    row so every consumer reads the same parse and takes the columns it owns.
+    The declared `[paper] rubric` wins, else rubric.jsonl when it exists, else rubric.tsv
+    (paperkit:W295 — a project that has converted needs no paper.toml edit, and one that has
+    not is unchanged).
     """
-    rows = []
-    with path.open(newline="") as fh:
-        for n, row in enumerate(csv.reader(fh, delimiter="\t"), 1):
-            if not row or not row[0].strip() or row[0].lstrip().startswith("#"):
-                continue
-            if len(row) < _RUBRIC_MIN_COLS or not row[1].strip():
-                msg = (f"paperkit-bib: {path.name}:{n}: rubric row '{row[0].strip()}' has no "
-                       f"title — a row is `key<TAB>title[<TAB>scheme]`")
-                raise SystemExit(msg)
-            rows.append([c.strip() for c in row])
-    return rows
+    if declared is not None:
+        return project / declared
+    jsonl = project / "rubric.jsonl"
+    return jsonl if jsonl.exists() else project / "rubric.tsv"
 
 
-def rubric(path: Path) -> list:
+def rubric_rows(path: Path) -> list[list[str]]:
+    """Return the rubric's DATA ROWS — the ONE reader of the format is paperkit.rubric.
+
+    Ζ·rubric·csv made this a single csv-based reader in place of two hand-rolled splitters (`rubric`
+    took columns 1-2, rhetoric.schemes_from_rubric column 3, and they had diverged on robustness).
+    paperkit:W295 moved it to paperkit/rubric.py, which reads TSV and JSON Lines (by suffix) to the
+    same `[key, title[, scheme]]` rows, so every consumer here is unchanged.
+    """
+    return paperkit.rubric.rows(path)
+
+
+def rubric(path: Path) -> list[tuple[str, str]]:
     """(key, title) per section, in file order — columns 1-2 of rubric_rows."""
     return [(r[0], r[1]) for r in rubric_rows(path)]
 

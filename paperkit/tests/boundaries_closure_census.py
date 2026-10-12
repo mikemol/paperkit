@@ -165,7 +165,7 @@ def _synthetic(s: Suite) -> None:
 
         with_edge = _roots(check, live)
         s.check("the generator's engine import is staged (bib)", "bib" in with_edge)
-        s.check("its TRANSITIVE cone is staged too (bibparse)", "bibparse" in with_edge)
+        s.check("its TRANSITIVE cone is staged too (rubric)", "rubric" in with_edge)
 
         without = _roots(check, _without_edge(tmp))
         s.check("with the edge REMOVED, the generator's cone is gone", "bib" not in without)
@@ -179,7 +179,7 @@ def _synthetic(s: Suite) -> None:
         s.section("P, F, delta minimum-delta pairs")
         s.delta("the Xi-dag-script edge is what carries a subprocess generator's cone",
                 "bib" in with_edge, "bib" not in without,
-                p="P: with the edge, the witness stages bib + bibparse",
+                p="P: with the edge, the witness stages bib + rubric",
                 f="F: with the edge removed, the identical witness stages neither",
                 d="one line — `wi |= _script_roots(fn)` in closure.py's per-claim loop")
         s.delta("and it stages a cone only where the generator asks for one",

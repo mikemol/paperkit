@@ -6,7 +6,7 @@
 #   paperkit/components.bzl   the module partition the edges are derived over
 # REGENERATE: python3 tools/dagbzl.py --write   ·   VERIFY: --check (byte-compare, gated)
 IMPORTS = {
-    "bib.py": ["bibparse.py", "rubric.py"],
+    "bib.py": ["rubric.py"],
     "cache.py": ["layout.py", "mutate.py"],
     "checkcache.py": ["routes.py"],
     "checkenv.py": ["config.py"],

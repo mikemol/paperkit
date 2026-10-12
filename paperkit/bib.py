@@ -33,9 +33,8 @@ if TYPE_CHECKING:
 # the import is one-directional (bibparse knows nothing about _SCALAR, sections or the DAG), so
 # the grammar can be replaced — by the EBNF-driven table this arc is heading for — without the
 # data model noticing.
+import mikemol.bibparse.bibparse
 import mikemol.grade.grade
-
-import paperkit.bibparse
 
 # paperkit:W295 — the rubric's READER, also one-directional: rubric.py reads files and knows
 # nothing of the data model, so the format (TSV, JSON Lines beside it) can change unnoticed here.
@@ -238,7 +237,7 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
         # construct absent from this corpus — each naming a line and column.  The scanner it
         # replaces had no answer for those: a value whose brace never closed either swallowed the
         # fields after it or vanished, depending on which patch was in the tree that hour.
-        for e in paperkit.bibparse.parse(path.read_text(), path):
+        for e in mikemol.bibparse.bibparse.parse(path.read_text(), path):
             key = e.key
             # `_type` is the BibTeX entry type (@misc/@article/@book) — carried so a reader can
             # ask what a file uses without parsing the bytes itself.  Engine-inert, like `note`.

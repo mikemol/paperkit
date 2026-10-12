@@ -54,7 +54,6 @@ COMPONENTS = {
     "model": [
         "bib.py",
         "bibfidelity.py",
-        "bibparse.py",
         "rematch.py",
         "rhetoric.py",
         # paperkit:W295 — the rubric's reader (TSV + JSON Lines), a data-reading leaf like bibparse:

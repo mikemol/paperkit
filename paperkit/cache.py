@@ -1,65 +1,82 @@
-#!/usr/bin/env python3
-"""The Δ grade CACHE — content hashing and the on-disk cache file, factored out of the
-grader/CLI so it can be tested on its own.  A Δ grade is a pure function of the content a
-check reads, so it is cached PER CHECK on its read footprint (Φ) over a global engine
-EPOCH; content_key is the coarse soundness basis the per-check key refines.
+"""The Δ grade CACHE — content hashing and the on-disk cache file.
+
+Factored out of the grader/CLI so it can be tested on its own.  A Δ grade is a pure function of
+the content a check reads, so it is cached PER CHECK on its read footprint (Φ) over a global
+engine EPOCH; content_key is the coarse soundness basis the per-check key refines.
 """
+
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
+import mikemol.mutation.mutate
 from mikemol.atomicwrite.durable import write_atomic
 
 import paperkit.layout
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from pathlib import Path
+
 
 def content_key(project_dir: Path) -> str:
-    """A hash of every file a check in this project could read — the project's own files
-    plus the engine.  A Δ grade is a pure function of these (the mutation probe only ever
-    reads them): the SOUNDNESS BASIS of caching.  The cache itself keys finer — per check,
-    on its read footprint plus the engine epoch (see _footprint_hash / _engine_hash) — so
-    this whole-project key is no longer the cache key, but the invariant it expresses is
-    what makes the finer key sound (a footprint ⊆ this content).
+    """Return a hash of every file a check in this project could read.
+
+    The project's own files plus the engine.  A Δ grade is a pure function of these (the
+    mutation probe only ever reads them): the SOUNDNESS BASIS of caching.  The cache itself keys
+    finer — per check, on its read footprint plus the engine epoch (see footprint_hash /
+    engine_hash) — so this whole-project key is no longer the cache key, but the invariant it
+    expresses is what makes the finer key sound (a footprint ⊆ this content).
     """
-    parts = []
-    for tag, base in (("proj", project_dir), ("engine", paperkit.layout._ENGINE)):
-        nested = paperkit.layout._nested_roots(base) if tag == "proj" else []
-        # Ζ·sandbox·declared — hash the repository's own content (layout._Scope), not every file
+    parts: list[str] = []
+    for tag, base in (("proj", project_dir), ("engine", paperkit.layout.ENGINE)):
+        nested = paperkit.layout.nested_roots(base) if tag == "proj" else []
+        # Ζ·sandbox·declared — hash the repository's own content (layout.Scope), not every file
         # on disk: a cache or stale build copy in the tree must not change a soundness key.
-        for f in paperkit.layout._Scope.for_path(base).files(base):
-            if (paperkit.layout._mutable(f) and not any(p in paperkit.layout.SKIP_DIRS for p in f.parts)
-                    and not any(nr in f.parents for nr in nested)):
-                parts.append(f"{tag}/{f.relative_to(base)}:{hashlib.sha256(f.read_bytes()).hexdigest()}")
+        files = paperkit.layout.Scope.for_path(base).files(base)
+        parts.extend(
+            f"{tag}/{f.relative_to(base)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
+            for f in files
+            if paperkit.layout.mutable(f)
+            and not any(p in paperkit.layout.SKIP_DIRS for p in f.parts)
+            and not any(nr in f.parents for nr in nested)
+        )
     return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
 
 
 def engine_hash() -> str:
-    """A hash of the engine alone — its own global cache EPOCH.  The engine is a universal
-    dependency (every check runs through the gate), and footprint() reports only files under
-    a project (the engine usually sits OUTSIDE it at ../paperkit), so the read footprint is
-    completed by this: an engine edit invalidates every check; a project edit invalidates
-    only the checks whose footprint touched it.
+    """Return a hash of the engine alone — its own global cache EPOCH.
+
+    The engine is a universal dependency (every check runs through the gate), and footprint()
+    reports only files under a project (the engine usually sits OUTSIDE it at ../paperkit), so
+    the read footprint is completed by this: an engine edit invalidates every check; a project
+    edit invalidates only the checks whose footprint touched it.
     """
-    parts = [f"{f.relative_to(paperkit.layout._ENGINE)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
-             for f in paperkit.layout._Scope.for_path(paperkit.layout._ENGINE).files(paperkit.layout._ENGINE)      # Ζ·sandbox·declared
-             if paperkit.layout._mutable(f) and not any(p in paperkit.layout.SKIP_DIRS for p in f.parts)]
+    engine = paperkit.layout.ENGINE
+    # Ζ·sandbox·declared
+    files = paperkit.layout.Scope.for_path(engine).files(engine)
+    parts = [
+        f"{f.relative_to(engine)}:{hashlib.sha256(f.read_bytes()).hexdigest()}"
+        for f in files
+        if paperkit.layout.mutable(f) and not any(p in paperkit.layout.SKIP_DIRS for p in f.parts)
+    ]
     return hashlib.sha256("\n".join(sorted(parts)).encode()).hexdigest()
 
 
-def _def_index(text: str) -> dict:
-    """{qualname: body-source} for a .py source — the DEFINITION granularity Δ already mutates at."""
-    import paperkit.mutate
+def _def_index(text: str) -> dict[str, str]:
+    """Return {qualname: body-source} for a .py source — the DEFINITION granularity Δ mutates at."""
     lines = text.splitlines(keepends=True)
-    out = {}
-    for qual, node in paperkit.mutate._def_sites(text):
-        out[qual] = "".join(lines[node.body[0].lineno - 1:node.end_lineno])
+    out: dict[str, str] = {}
+    for qual, node in mikemol.mutation.mutate.def_sites(text):
+        out[qual] = "".join(lines[node.body[0].lineno - 1 : node.end_lineno])
     return out
 
 
-def footprint_hash(project_dir: Path, files: list, sensitive: list | None = None) -> str:
-    """A hash of the current content of a check's recorded footprint — the per-check cache key.
+def footprint_hash(project_dir: Path, files: list[str], sensitive: list[str] | None = None) -> str:
+    """Return a hash of the current content of a check's recorded footprint — the cache key.
 
     Δ·grain — keyed at DEFINITION granularity when the grade supplies one, because the file is
     far too coarse a unit to invalidate on.  Measured on a 124-claim consumer: editing
@@ -94,7 +111,7 @@ def footprint_hash(project_dir: Path, files: list, sensitive: list | None = None
     not merely present, before a .py is hashed at definition granularity.
     """
     h = hashlib.sha256()
-    fine = {}
+    fine: dict[str, set[str]] = {}
     if sensitive:
         for t in sensitive:
             rel, _, qual = t.partition("::")
@@ -106,13 +123,13 @@ def footprint_hash(project_dir: Path, files: list, sensitive: list | None = None
         h.update(b"\0")
         if fine and rel.endswith(".py") and f.is_file():
             try:
-                idx = _def_index(f.read_text())
-            except Exception:
+                idx: dict[str, str] | None = _def_index(f.read_text())
+            except (OSError, ValueError, SyntaxError, RecursionError):
                 idx = None
             if idx is not None:
-                h.update("|".join(sorted(idx)).encode())      # the SURFACE: add/remove/rename
+                h.update("|".join(sorted(idx)).encode())  # the SURFACE: add/remove/rename
                 h.update(b"\0")
-                for q in sorted(fine.get(rel, ())):           # only what this check depends on
+                for q in sorted(fine.get(rel, ())):  # only what this check depends on
                     h.update(q.encode())
                     h.update(idx.get(q, "\0GONE\0").encode())
                 h.update(b"\n")
@@ -122,16 +139,21 @@ def footprint_hash(project_dir: Path, files: list, sensitive: list | None = None
     return h.hexdigest()
 
 
-def load(project_dir: Path) -> dict:
+def load(project_dir: Path) -> dict[str, object]:
+    """Return the project's Δ cache, or {} when absent, unreadable or not a JSON object."""
     p = project_dir / ".delta-cache.json"
-    try:
-        return json.loads(p.read_text()) if p.exists() else {}
-    except Exception:
+    if not p.exists():
         return {}
-
-
-def save(project_dir: Path, data: dict) -> None:
     try:
+        raw: object = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): v for k, v in raw.items()}
+
+
+def save(project_dir: Path, data: Mapping[str, object]) -> None:
+    """Write the project's Δ cache atomically; a failed write is a cache miss, never an error."""
+    with contextlib.suppress(OSError, TypeError, ValueError):
         write_atomic(project_dir / ".delta-cache.json", json.dumps(data))
-    except Exception:
-        pass

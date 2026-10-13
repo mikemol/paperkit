@@ -7,7 +7,7 @@
 # REGENERATE: python3 tools/dagbzl.py --write   ·   VERIFY: --check (byte-compare, gated)
 IMPORTS = {
     "bib.py": ["rubric.py"],
-    "cache.py": ["layout.py", "mutate.py"],
+    "cache.py": ["layout.py"],
     "checkcache.py": ["routes.py"],
     "checkenv.py": ["config.py"],
     "coherence.py": ["bib.py", "genre.py"],

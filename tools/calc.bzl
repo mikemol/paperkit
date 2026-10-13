@@ -283,8 +283,9 @@ def _mutate_impl(ctx):
     o = ctx.actions.declare_file(ctx.label.name + ".mutated.py")
     ctx.actions.run_shell(
         outputs = [o],
-        inputs = depset(ctx.files.data, transitive = [py.files]),
-        command = cell_pypath(py) + '"$(command -v python3)" -m paperkit.mutate ' +
+        inputs = depset(ctx.files.data + ctx.files._dists, transitive = [py.files]),
+        command = cell_pypath(py) + cell_dists(ctx.files._dists) +
+                  '"$(command -v python3)" -m mikemol.mutation.mutate ' +
                   ctx.attr.module + " '" + ctx.attr.site + "' > " + o.path,
         mnemonic = "PkMutate",
         progress_message = "Ζ·mutate " + ctx.label.name,
@@ -298,7 +299,9 @@ pk_mutate = rule(
     attrs = {
         "module": attr.string(mandatory = True, doc = "path of the .py module to mutate, e.g. paperkit/grader.py"),
         "site": attr.string(mandatory = True, doc = "the def-site qualname whose body is replaced"),
-        "data": attr.label_list(allow_files = True, doc = "the staged files (mutate.py + the module)"),
+        "data": attr.label_list(allow_files = True, doc = "the staged files (the module)"),
+        # paperkit:W311 — the mutation leaf is the mtools dist, so the action needs the dists.
+        "_dists": attr.label(default = "@pk_dists//:site"),
     },
 )
 

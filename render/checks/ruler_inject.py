@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import rulerseq
+from mikemol import rulerseq
 
 _OFF = "%ruler:off"                       # the typed exception marker (a raw-latex comment)
 # A table, optionally preceded by the %ruler:off marker on its own line — the marker travels WITH the

@@ -24,8 +24,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ruler_inject
-import rulerseq
 import source
+from mikemol import rulerseq
 
 
 def _paper_body(paper_md: Path) -> str:
@@ -41,8 +41,8 @@ def _paper_body(paper_md: Path) -> str:
 
 def main() -> int:
     ok = 0
-    # 1) the generator's own ⟨P,F,δ⟩ (rulerseq.py) must pass — the encoding is sound.
-    if subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "rulerseq.py")],
+    # 1) the generator's own ⟨P,F,δ⟩ (mikemol.rulerseq) must pass — the encoding is sound.
+    if subprocess.run([sys.executable, "-m", "mikemol.rulerseq"],
                       capture_output=True).returncode != 0:
         ok = 1
 

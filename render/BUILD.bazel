@@ -51,7 +51,6 @@ filegroup(name = "files", srcs = [
         "checks/route.py",
         "checks/ruler.py",
         "checks/ruler_inject.py",
-        "checks/rulerseq.py",
         "checks/slides.py",
         "checks/source.py",
         "checks/units.py",

@@ -268,6 +268,14 @@ ignore = [
 # reporting a verdict, a projector reporting what it wrote), and a SELFTEST arm printing its
 # ⟨P, F, δ⟩ record.  Library modules are NOT on this list, deliberately: `resolver.py` and
 # `bibparse.py` have zero prints today and T201 is what keeps it that way.
+# ⚑ S602 (shell=True) IS SCOPED TO THE ONE SPAWN SITE OF DECLARED COMMANDS (paperkit:W345).  A
+# project's `cmd:` is a shell string BY DESIGN — `python3 a.py && python3 b.py`, pipes and
+# redirects are part of what a claim's author writes, and paperkit runs PATH programs on purpose
+# (the execution surface is declared, not hidden).  `checkenv.spawn_declared` is the single place
+# that runs one, under a sanitized environment; a rule that is right about arbitrary input and
+# wrong about a declared one belongs on that one responsibility, not tree-wide.  resolver.py's
+# duplicate spawn sites do NOT get this entry: they are to be cut over to spawn_declared (W64).
+"paperkit/checkenv.py" = ["S602"]
 "paperkit/gate.py" = ["T201"]
 "paperkit/project.py" = ["T201"]
 "paperkit/discriminate.py" = ["T201"]

@@ -16,8 +16,12 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import paperkit.config
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _ENV_KEEP = {
     "PATH",
@@ -52,7 +56,27 @@ ENGINE_PATH = paperkit.config.Param(
 )
 
 
-def clean_env(env: dict | None = None) -> dict:
+def _dist_roots() -> list[str]:
+    """Return every directory the `mikemol` namespace is importable from, first-found first.
+
+    ⚑ AND THE DISTS THE ENGINE IMPORTS (W317).  `mikemol.atomicwrite` is a third-party dist, so
+    a check's bare python3 cannot find it from the checkout alone; the directory it is importable
+    from is DERIVED from where this process found it, never copied, and appended after the
+    engine.  EVERY location of the namespace: an installed venv has one, but wheels delivered as
+    zips on PYTHONPATH (a Bazel cell, tools/cell.bzl cell_dists) contribute one each.
+    """
+    spec = importlib.util.find_spec("mikemol")
+    if spec is None or not spec.submodule_search_locations:
+        return []
+    roots: list[str] = []
+    for loc in spec.submodule_search_locations:
+        parent = str(Path(loc).parent)
+        if parent not in roots:
+            roots.append(parent)
+    return roots
+
+
+def clean_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
     """Build a sanitized environment for running a check: the controlled allow-list only."""
     src = os.environ if env is None else env
     out = {
@@ -65,28 +89,22 @@ def clean_env(env: dict | None = None) -> dict:
     # depth resolver.py did -- one .parent reaches the paperkit/ package dir, not the repo root
     # a caller needs on sys.path to `import paperkit`. Two .parent, matching resolver.py's
     # original `Path(__file__).resolve().parent.parent`.
-    engine_path = paperkit.config.resolve(ENGINE_PATH) or str(Path(__file__).resolve().parent.parent)
-    out["PAPERKIT_PYTHONPATH"] = str(engine_path)
+    declared = paperkit.config.resolve(ENGINE_PATH)
+    engine_path = (
+        declared
+        if isinstance(declared, str) and declared
+        else str(Path(__file__).resolve().parent.parent)
+    )
+    out["PAPERKIT_PYTHONPATH"] = engine_path
     # ⚑ AND THE SAME DIRECTORY AS PYTHONPATH, SET BY THE ENGINE AND NEVER INHERITED (paperkit:W297).
     # Consumers import the engine as the package it is (`import paperkit.bib`), which needs it
     # importable the way an install would make it; the PAPERKIT_PYTHONPATH hint alone asked every
     # check to put it on sys.path itself, which is the bootstrap being retired. The checkout,
     # never `paperkit/paperkit`: that directory's `config`, `layout` and `bib` would shadow
     # whatever a check imports under those names.
-    # ⚑ AND THE DISTS THE ENGINE IMPORTS (W317).  `mikemol.atomicwrite` is a third-party dist, so
-    # a check's bare python3 cannot find it from the checkout alone; the directory it is importable
-    # from is DERIVED from where this process found it, never copied, and appended after the engine.
-    spec = importlib.util.find_spec("mikemol")
-    # EVERY location of the namespace: an installed venv has one, but wheels delivered as zips on
-    # PYTHONPATH (a Bazel cell, tools/cell.bzl cell_dists) contribute one each.
-    dist_roots = (
-        list(dict.fromkeys(str(Path(loc).parent) for loc in spec.submodule_search_locations))
-        if spec is not None and spec.submodule_search_locations
-        else []
-    )
-    out["PYTHONPATH"] = os.pathsep.join([str(engine_path), *dist_roots])
+    out["PYTHONPATH"] = os.pathsep.join([engine_path, *_dist_roots()])
     pinned = paperkit.config.resolve(PATH)
-    if pinned is not None:
+    if isinstance(pinned, str):
         raw = [p for p in pinned.split(os.pathsep) if Path(p).is_dir()]
     elif "PATH" in out:
         raw = out["PATH"].split(os.pathsep)
@@ -108,7 +126,7 @@ def clean_env(env: dict | None = None) -> dict:
 
 
 def spawn_declared(
-    cmd: str, cwd: Path, payload: str, records: list[dict] | None = None
+    cmd: str, cwd: Path, payload: str, records: list[dict[str, object]] | None = None
 ) -> subprocess.CompletedProcess[str]:
     """Run a project-declared command as a gated check."""
     env = clean_env()
@@ -122,7 +140,7 @@ def spawn_declared(
             cmd,
             shell=True,
             cwd=cwd,
-            input=payload,  # noqa: S602
+            input=payload,
             capture_output=True,
             text=True,
             env=env,

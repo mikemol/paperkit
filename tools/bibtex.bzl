@@ -496,6 +496,17 @@ def _host_py(module_ctx, who):
         fail(who + ": python3 not on PATH")
     return py
 
+def _dist_env(module_ctx):
+    """The environment under which the extension's host python can import the mikemol dists (W311).
+
+    sites.py and closure.py import `mikemol.mutation` / `mikemol.atomicwrite`, which the host's bare
+    python3 does not carry.  `@pk_dists` is the ONE delivery of those dists (tools/dists.bzl), so the
+    extension points PYTHONPATH at the same merged site tree a cell gets, rather than at whatever
+    venv the bazel client happens to have on its PATH.
+    """
+    marker = module_ctx.path(Label("@pk_dists//:site/PK_DISTS_SITE"))
+    return {"PYTHONPATH": str(marker.dirname)}
+
 def _surface(module_ctx, core):
     """·gen·surface — enumerate the engine PERTURBATION surface ONCE via sites.py over the core modules
     (host-python AST — build-graph metadata like the bib parse, NOT check execution, so the
@@ -513,7 +524,7 @@ def _surface(module_ctx, core):
     root = str(module_ctx.path(Label("@@//:MODULE.bazel")).dirname)
     # ⚑ RUN BY PACKAGE, NEVER BY PATH (paperkit:W297): `-m tools.sites` from the root puts the root
     # first on sys.path, so `paperkit` and `tools` are importable with no bootstrap and no environment.
-    res = module_ctx.execute([str(py), "-m", "tools.sites"] + core, working_directory = root)
+    res = module_ctx.execute([str(py), "-m", "tools.sites"] + core, working_directory = root, environment = _dist_env(module_ctx))
     if res.return_code != 0:
         fail("·gen·surface: sites.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]
@@ -640,7 +651,7 @@ def _closures(module_ctx, project, core):
     # --relpath — the check's REPO-RELATIVE path (paper/checks/claims.py, checks/readme.py), so
     # closure.py resolves Path(__file__).parents[N] to the SANDBOX prefix a file toggle must hit.
     relpath = script if project == "." else project + "/" + script
-    res = module_ctx.execute([str(py), "-m", "tools.closure", "--check", str(check), "--relpath", relpath] + core, working_directory = root)
+    res = module_ctx.execute([str(py), "-m", "tools.closure", "--check", str(check), "--relpath", relpath] + core, working_directory = root, environment = _dist_env(module_ctx))
     if res.return_code != 0:
         fail("·gen·closure: closure.py failed (%d): %s" % (res.return_code, res.stderr))
     return [l for l in res.stdout.splitlines() if "\t" in l]

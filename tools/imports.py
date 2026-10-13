@@ -1,21 +1,46 @@
-#!/usr/bin/env python3
-"""Ξ·dag — enumerate a .py module's ENGINE-INTERNAL imports (the import edges), the analog of
-def_sites.py for the mutation surface.  Emits `module<TAB>imported` per edge, where `imported` is
-another module in the given set (a bare `import x` / `from x import …`, since the engine is on
-sys.path).  Derived from the AST, never a grep (a grep matches the name in comments/strings — the
-project↔rhetoric "cycle" was such a phantom).
+"""Ξ·dag — enumerate a .py module's ENGINE-INTERNAL imports (the import edges).
+
+The analog of def_sites.py for the mutation surface.  Emits `module<TAB>imported` per edge, where
+`imported` is another module in the given set (a bare `import x` / `from x import …`, since the
+engine is on sys.path).  Derived from the AST, never a grep (a grep matches the name in
+comments/strings — the project↔rhetoric "cycle" was such a phantom).
 
 The build DAG is a PROJECTION of this: each module's .pyc is a target whose deps are its imports, so
 a consumer stages a module's transitive closure, not the flat engine — the incrementality is exact
 by construction (Ξ·dag·build).  Usage: imports.py <module.py>… → the edges over that module set.
+
+⚑ THE dag.bzl GENERATOR IS NOT HERE ANY MORE.  Its CLI half (`--write` / `--check`, the header, the
+rendering) is `tools/dagbzl.py` over `tools/dagderive.py`; this module kept a second copy that
+nothing ran and that disagreed with the file it claimed to own (`--check` read STALE at HEAD).
+What is left is the one function other tools import (`imports`, used by closure.py and sites.py)
+and its CLI, so this module imports nothing outside the standard library — closure.py runs in
+sandboxes whose PYTHONPATH carries no dists.
 """
+
+from __future__ import annotations
+
 import ast
 import sys
 from pathlib import Path
 
+# ⚑ THE ENGINE IMPORTS ITSELF AS A PACKAGE (paperkit:W296): `import paperkit.layout`,
+# `import paperkit.tests._fixture_model`, `from paperkit import layout`. An engine module is
+# named by its stem whichever spelling reaches it, so the flat `import layout` and the package
+# one are the same edge.
+PACKAGES = ("paperkit", "paperkit.tests", "paperkit.library")
 
-def imports(text, names):
-    out = set()
+
+def _engine_module(dotted: str) -> str:
+    """Return the stem an import names: `layout` for `layout` and for `paperkit[.tests].layout`."""
+    parts = dotted.split(".")
+    if parts[0] == "paperkit" and len(parts) > 1:
+        return parts[-1]
+    return dotted
+
+
+def imports(text: str, names: set[str]) -> set[str]:
+    """Return the members of `names` that the module `text` imports."""
+    out: set[str] = set()
     try:
         tree = ast.parse(text)
     except SyntaxError:
@@ -31,116 +56,15 @@ def imports(text, names):
     return out
 
 
-# ⚑ THE ENGINE IMPORTS ITSELF AS A PACKAGE (paperkit:W296): `import paperkit.layout`,
-# `import paperkit.tests._fixture_model`, `from paperkit import layout`. An engine module is named by
-# its stem whichever spelling reaches it, so the flat `import layout` and the package one are the
-# same edge.
-PACKAGES = ("paperkit", "paperkit.tests", "paperkit.library")
-
-
-def _engine_module(dotted):
-    """The stem an import names: `layout` for `layout` and for `paperkit[.tests].layout`."""
-    parts = dotted.split(".")
-    if parts[0] == "paperkit" and len(parts) > 1:
-        return parts[-1]
-    return dotted
-
-
-def _literal(path, name):
-    """The one value `name` is bound to in a .bzl file, read as a python literal."""
-    src = path.read_text()
-    i = src.index(name + " = ")
-    return ast.literal_eval(src[src.index("{", i):src.index("\n}", i) + 2])
-
-
-def engine_srcs(eng):
-    """The module set the BUILD consumes — derived from the component partition, never a glob.
-
-    paperkit/BUILD.bazel builds ENGINE_SRCS this exact way ("EXPLICIT srcs (no globs), DERIVED from
-    the component partition so the union is total by construction"), and dag.bzl's header names the
-    same set.  Reading COMPONENTS here keeps the generator's input equal to the build's by
-    construction rather than by a second enumeration that agrees today.  boundaries_components.py
-    separately checks that partition against the real tree, which is where a NEW file that nobody
-    placed gets caught — a job this function must not also try to do.
-    """
-    return sorted(f for fs in _literal(eng / "components.bzl", "COMPONENTS").values() for f in fs)
-
-
-def edges(eng, paths):
-    names = {Path(p).stem for p in paths}
-    out = []
-    for p in paths:
+def main(argv: list[str]) -> int:
+    """Print `module<TAB>imported` for each edge over the named modules."""
+    names = {Path(p).stem for p in argv}
+    for p in argv:
         stem = Path(p).stem
-        for imp in sorted(imports((eng / p).read_text(), names) - {stem}):
-            out.append((p, imp))
-    return out
-
-
-# Ζ·header·preserved — the generator OWNS the header, and the header CITES rather than restates.
-#
-# `render` used to split the existing file on "IMPORTS = {" and copy whatever preceded it, so
-# four lines of hand-maintained prose describing the mechanism lived INSIDE a regenerated
-# artifact, carried verbatim through every regeneration, authored by nobody the generator knew
-# about and compared to nothing.  Every assertion in it happened to still be true — accurate by
-# luck rather than by construction, and one design change from being a retired premise stamped
-# into a fresh artifact on every run.
-#
-# ⚑ A peer hit exactly that in their own tree the same week: their ledger's header described a
-# suballocation design that had been REPLACED, and it was being written into every new ledger,
-# contradicting a block eighty lines above it in the same file.  A derived artifact carrying a
-# retired premise is worse than stale prose because it LOOKS LIKE DATA.
-#
-# The rule they named and we already had under another name (project-dont-author): CITE THE
-# AUTHORITY, NEVER RESTATE IT.  So the header is now emitted from here — one owner, changing
-# with the code that makes it true — and it points at the source instead of paraphrasing it.
-_HEADER = """# GENERATED by tools/imports.py — do not edit, and do not add prose here: this whole file
-# is rewritten, header included, so anything written by hand is lost or (worse) preserved past
-# the point it stays true.  What this file IS, and why, is documented at the owner:
-#   tools/imports.py      how the edges are derived (AST, never grep)
-#   paperkit/components.bzl   the module partition the edges are derived over
-# REGENERATE: python3 tools/imports.py --write   ·   VERIFY: --check (byte-compare, gated)
-"""
-
-
-def render(eng, rows):
-    """dag.bzl in full — header INCLUDED, so nothing hand-written survives a regeneration."""
-    by_mod = {}
-    for m, i in rows:
-        by_mod.setdefault(m, set()).add(i)
-    body = "".join('    "%s": [%s],\n' % (m, ", ".join('"%s"' % x for x in sorted(v)))
-                   for m, v in sorted(by_mod.items()))
-    return _HEADER + "IMPORTS = {\n" + body + "}\n"
+        for imp in sorted(imports(Path(p).read_text(), names) - {stem}):
+            sys.stdout.write(f"{p}\t{imp}\n")
+    return 0
 
 
 if __name__ == "__main__":
-    argv = sys.argv[1:]
-    # Ζ·dag·regen — the generator OWNS dag.bzl, so it can also WRITE it.  It emitted edges and
-    # nothing invoked it, so every import edge added anywhere in the engine red the freshness check
-    # until a human regenerated by hand — a generator built and left unwired (project-dont-author).
-    # --check is the same computation asserting instead of writing: the gate runs THIS code path,
-    # not a second reimplementation of it, so the check cannot drift from the writer.
-    if argv and argv[0] in ("--write", "--check"):
-        eng = Path(__file__).resolve().parents[1] / "paperkit"
-        want = render(eng, edges(eng, engine_srcs(eng)))
-        dag = eng / "dag.bzl"
-        if argv[0] == "--check":
-            if dag.read_text() != want:
-                print("imports.py --check: paperkit/dag.bzl is STALE — regenerate with "
-                      "`python3 tools/imports.py --write`", file=sys.stderr)
-                raise SystemExit(1)
-            print("imports.py --check: dag.bzl is fresh")
-            raise SystemExit(0)
-        if dag.read_text() == want:
-            print("imports.py --write: dag.bzl already fresh")
-            raise SystemExit(0)
-        import mikemol.atomicwrite.durable
-        mikemol.atomicwrite.durable.write_atomic(dag, want)      # Ζ·write·atomic — the generator eats its own cooking
-        print("imports.py --write: regenerated paperkit/dag.bzl")
-        raise SystemExit(0)
-
-    paths = argv
-    names = {Path(p).stem for p in paths}
-    for p in paths:
-        stem = Path(p).stem
-        for imp in sorted(imports(Path(p).read_text(), names) - {stem}):
-            print(f"{p}\t{imp}")
+    raise SystemExit(main(sys.argv[1:]))

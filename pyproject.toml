@@ -304,7 +304,7 @@ convention = "pep257"
 # exempted, the exemption outlives its reason, and the next reader cannot tell a deliberate
 # carve-out from an abandoned one.  If something here cannot be typed, that is a FINDING ABOUT
 # THE DESIGN, not a category of code that is inherently dynamic.
-python_version = "3.11"         # the declared FLOOR in requires-python, not the newest runtime
+python_version = "3.13"         # requires-python's floor (W340): the mikemol dists use 3.12 `type` aliases
 strict = true
 # ⚑ BEYOND `strict`, WHICH IS NOT MYPY'S MAXIMUM.  disallow_any_expr is the load-bearing one:
 # every `json.load()` / `tomllib.loads()` / `getattr()` result is Any and poisons every expression

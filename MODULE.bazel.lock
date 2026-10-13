@@ -144,7 +144,7 @@
   "moduleExtensions": {
     "//tools:bibtex.bzl%bib": {
       "general": {
-        "bzlTransitiveDigest": "ZjhB64VO9Oe0ShkyyweyI6KcnW3gbHsajpCGWb6bRFk=",
+        "bzlTransitiveDigest": "GSaGwmz5J2AkFqg+NulJSfqImESgzeaiSZPVXyO7CuM=",
         "usagesDigest": "ZTg9qMWPSyxGY6veR9abcyw/0JPtpp/F+2wGOcH1xGY=",
         "recordedFileInputs": {
           "@@//arch/paper.toml": "430eccadfd174196bf9cf0fd54a51b0b552b66ed1e761c34fd4f9ea8da878995",
@@ -198,9 +198,9 @@
           "@@//setup/paper.toml": "3e8a4dab25f21f2f661d7cf7a79817f5f084789f418baeea41e951435df460f5",
           "@@//talk/paper.toml": "768609d35515be72ea3e2bb255754e5fb670960c9584c887a34efa1c412e0dff",
           "@@//tools/closure.py": "e28ea723daf578d2433ba5c8eac740289dfbe540dae2f136c7b7ec31e3cf2f81",
-          "@@//tools/def_sites.py": "ffa7df3a64046495aa8ce15a5f1e6b28b89b1684b2a40582742e8d9591d276b3",
-          "@@//tools/imports.py": "24ff4ee641bd5c88894f6b4cd65f273ff8e056fdd7feaa651d4483040921d538",
-          "@@//tools/sites.py": "bd53e382ffa10965fd5deda94e963a4136bd143da45259eb997a440993591aa1"
+          "@@//tools/def_sites.py": "210b3674d5a6eb06989cdd5970e270bd18f75fc100bea68a42c19ffdff944a7c",
+          "@@//tools/imports.py": "e302665c17ee971d2b5439aecc8c17ac1d850e3d62100164bce017381134047f",
+          "@@//tools/sites.py": "646aa2c486bd30194158d555f66989ff4cf1c11c23577a195503a94048bdc30a"
         },
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -12526,7 +12526,13 @@
             }
           }
         },
-        "recordedRepoMappingEntries": []
+        "recordedRepoMappingEntries": [
+          [
+            "",
+            "pk_dists",
+            "+_repo_rules+pk_dists"
+          ]
+        ]
       }
     },
     "@@pybind11_bazel+//:python_configure.bzl%extension": {

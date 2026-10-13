@@ -26,6 +26,7 @@ hypothetical the suite was shaped around after the fix.
 
     python3 paperkit/tests/boundaries_wheel.py
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -39,7 +40,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 # uv's absence says nothing and gating on it would report cannot-run on a box that builds fine.
 # What the build genuinely cannot proceed without is setuptools — so that is what is asked.
 _BACKEND = importlib.util.find_spec("setuptools") is not None
-_CANNOT_RUN = 3         # engine-aligned (gate.py _REFUSE): "could not verify", not "failed"
+_CANNOT_RUN = 3  # engine-aligned (gate.py _REFUSE): "could not verify", not "failed"
 
 
 def built_wheel() -> Path | None:
@@ -132,20 +133,28 @@ def main() -> int:
     t = tops(whl)
     dist = [k for k in t if k.endswith(".dist-info")]
 
-    check(f"the wheel ships the engine package (paperkit: {t.get('paperkit', 0)} entries)",
-          t.get("paperkit", 0) > 0)
+    check(
+        f"the wheel ships the engine package (paperkit: {t.get('paperkit', 0)} entries)",
+        t.get("paperkit", 0) > 0,
+    )
     check("the wheel carries exactly one .dist-info", len(dist) == 1)
     # ⚑ THE ARM THAT FAILS TODAY.  pyproject.toml: "THE WHEEL MUST NOT CARRY `tools`".
-    check(f"the wheel does NOT carry `tools` (found: {t.get('tools', 0)} entries)",
-          "tools" not in t)
+    check(
+        f"the wheel does NOT carry `tools` (found: {t.get('tools', 0)} entries)", "tools" not in t
+    )
     # ⚑ AND SUBPACKAGES ARE PART OF THE SURFACE, which the top-level read alone cannot see.
     # Measured while fixing Ζ·wheel·tools: `include = ["paperkit*"]` is a GLOB, and it swept
     # `paperkit/tests/` — the boundary suites — into a consumer's install.  A top-level-only
     # arm passes that, so the arm that catches it reads one level down.  The dev-facing
     # subpackages are named as the set they are (tests, tools), not counted.
     with zipfile.ZipFile(whl) as z:
-        subs = sorted({n.split("/")[1] for n in z.namelist()
-                       if n.startswith("paperkit/") and n.count("/") > 1})
+        subs = sorted(
+            {
+                n.split("/")[1]
+                for n in z.namelist()
+                if n.startswith("paperkit/") and n.count("/") > 1
+            }
+        )
     # ⚑ AND THE ARM THAT USED TO SIT HERE ASSERTED THE OPPOSITE, WRONGLY.  It refused `tests`
     # as dev-only — reasoning about a consumer's install without asking who IMPORTS it — and
     # removing it broke five checks with `No module named 'paperkit.tests'`, because the cells
@@ -153,10 +162,11 @@ def main() -> int:
     # sweep's cell runner, which nothing in the engine imports as a package); what it must
     # INCLUDE is the recorder five suites depend on.  Both directions are asserted, so neither
     # can be restored by accident.
-    check(f"the wheel ships the suites' shared recorder (paperkit.tests: {'tests' in subs})",
-          "tests" in subs)
-    check(f"the wheel ships no `tools` subpackage (found: {'tools' in subs})",
-          "tools" not in subs)
+    check(
+        f"the wheel ships the suites' shared recorder (paperkit.tests: {'tests' in subs})",
+        "tests" in subs,
+    )
+    check(f"the wheel ships no `tools` subpackage (found: {'tools' in subs})", "tools" not in subs)
 
     # Ζ·cite·resolve — the library is the terminal owner of the per-key `concept:` fallthrough,
     # and it lives OUTSIDE the package (resolver._LIBRARY walks up), so a wheel omits it and an
@@ -168,16 +178,20 @@ def main() -> int:
     # where it now lives: package data under paperkit/.
     with zipfile.ZipFile(whl) as _z:
         libn = sum(1 for n in _z.namelist() if n.startswith("paperkit/library/"))
-    check(f"the wheel carries the concept library as package data (paperkit/library: {libn})",
-          libn > 0)
+    check(
+        f"the wheel carries the concept library as package data (paperkit/library: {libn})",
+        libn > 0,
+    )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # The delta is one line of pyproject.toml: whether `packages` names `tools`.  P reads the
     # engine's own top-level set from the artifact; F is what that set becomes with the extra
     # package declared — which is TODAY's wheel, so the F arm is measured, not synthesized.
     shipped = sorted(k for k in t if not k.endswith(".dist-info"))
-    print(f"  {'XX ' if 'tools' in shipped else 'ok '}the wheel's top-level names are the "
-          "DISTRIBUTION's surface, not the dev environment's")
+    print(
+        f"  {'XX ' if 'tools' in shipped else 'ok '}the wheel's top-level names are the "
+        "DISTRIBUTION's surface, not the dev environment's"
+    )
     print("      P (intended):  ['library', 'paperkit']")
     print(f"      F (measured):  {shipped}")
     print("      δ (min delta): one name in pyproject.toml's `packages`\n")

@@ -32,6 +32,7 @@ on a record, or the lattice is rearranged so project may read the grader, this r
 correct response is to DELETE it and build troubleshooting, not to relax it.  That is what makes a
 BLOCKED verdict falsifiable rather than permanent.
 """
+
 import sys
 from pathlib import Path
 
@@ -57,12 +58,14 @@ def engine_vocabulary() -> set:
     — and a project's `consumer_fields` are checked separately, since those CARRY verbatim.
     """
     import paperkit.bib
+
     return set(paperkit.bib._SCALAR) | set(paperkit.bib._LIST)
 
 
 def declared_consumer_fields() -> set:
     """Every `consumer_fields` name any project declares — the other route onto a record."""
     import tomllib
+
     # ⚑ Ζ·genre·pure·vacuous — THE POPULATION COMES FROM ITS OWNER, NOT FROM A GLOB.
     #
     # This globbed `*/paper.toml` and skipped what it could not open.  Three defects in one line:
@@ -85,12 +88,15 @@ def declared_consumer_fields() -> set:
     # roster is read from there and every named toml must be readable — an absent one is a
     # CANNOT-RUN, because an absence computed over a short population is not evidence.
     import re
-    roster = re.findall(r'bib\.project\([^)]*project = "([^"]+)"',
-                        (ROOT / "MODULE.bazel").read_text())
+
+    roster = re.findall(
+        r'bib\.project\([^)]*project = "([^"]+)"', (ROOT / "MODULE.bazel").read_text()
+    )
     if len(roster) < 2:
         raise SystemExit(
             "bnd-genre-pure: CANNOT RUN — MODULE.bazel names fewer than two projects, so the "
-            "consumer_fields population cannot be derived (is it staged?)")
+            "consumer_fields population cannot be derived (is it staged?)"
+        )
     out = set()
     for proj in roster:
         toml = (ROOT if proj == "." else ROOT / proj) / "paper.toml"
@@ -98,10 +104,11 @@ def declared_consumer_fields() -> set:
             raise SystemExit(
                 f"bnd-genre-pure: CANNOT RUN — {toml} is not staged, so the consumer_fields "
                 f"{proj!r} may declare are unreadable and the absence below would be vacuous "
-                f"(declare the project paper.tomls in the warrant's `builds`)")
+                f"(declare the project paper.tomls in the warrant's `builds`)"
+            )
         try:
             p_ = tomllib.loads(toml.read_text()).get("paper", {})
-        except Exception:                                # noqa: BLE001 — a probe reports
+        except Exception:  # noqa: BLE001 — a probe reports
             continue
         out |= set(p_.get("consumer_fields", ()))
     return out
@@ -110,8 +117,7 @@ def declared_consumer_fields() -> set:
 def lattice_forbids_grader() -> tuple:
     """(forbidden, why) — does the component DAG bar `project` from importing the grader?"""
     ns: dict = {}
-    exec(compile((ROOT / "paperkit" / "components.bzl").read_text(),
-                 "components.bzl", "exec"), ns)          # noqa: S102 — a data file, by design
+    exec(compile((ROOT / "paperkit" / "components.bzl").read_text(), "components.bzl", "exec"), ns)  # noqa: S102 — a data file, by design
     deps = ns.get("DEPS") or {}
     comps = ns.get("COMPONENTS") or {}
     if not deps or not comps:
@@ -122,8 +128,10 @@ def lattice_forbids_grader() -> tuple:
     # ...and project must NOT list delta (that would be the cycle)
     if "delta" in deps.get("project", []):
         return False, "`project` declares a dep on `delta` — the lattice permits it"
-    return True, ("`delta` depends on `project`, so a project→delta import is an UPWARD edge "
-                  "bnd-components refuses")
+    return True, (
+        "`delta` depends on `project`, so a project→delta import is an UPWARD edge "
+        "bnd-components refuses"
+    )
 
 
 def main() -> int:
@@ -136,17 +144,22 @@ def main() -> int:
     leaked = sorted(VERDICT_FIELDS & (vocab | consumer))
     if leaked:
         where = "the engine vocabulary" if VERDICT_FIELDS & vocab else "a project's consumer_fields"
-        print(f"  XX {leaked} is carried by {where} — a genre CAN see failure state",
-              file=sys.stderr)
+        print(
+            f"  XX {leaked} is carried by {where} — a genre CAN see failure state", file=sys.stderr
+        )
         bad += 1
     else:
-        print(f"  ok no verdict-shaped name in the engine's {len(vocab)} field(s) "
-              f"nor in {len(consumer)} declared consumer_field(s)")
+        print(
+            f"  ok no verdict-shaped name in the engine's {len(vocab)} field(s) "
+            f"nor in {len(consumer)} declared consumer_field(s)"
+        )
     if "check" in vocab:
         print("  ok `check` IS in the vocabulary — the DECLARED VERIFIER, never its result")
     else:
-        print("  XX `check` absent from the vocabulary — the claim cannot be exercised",
-              file=sys.stderr)
+        print(
+            "  XX `check` absent from the vocabulary — the claim cannot be exercised",
+            file=sys.stderr,
+        )
         bad += 1
 
     print("\n⟨the projector cannot compute one⟩\n")
@@ -162,8 +175,11 @@ def main() -> int:
     print("      δ (min delta): one field name, or one DEPS edge")
 
     if bad:
-        print(f"\nbnd-genre-pure: {bad} half/halves REFUTED — the obstacle is GONE.  Delete this "
-              f"check and build troubleshooting; do NOT relax it.", file=sys.stderr)
+        print(
+            f"\nbnd-genre-pure: {bad} half/halves REFUTED — the obstacle is GONE.  Delete this "
+            f"check and build troubleshooting; do NOT relax it.",
+            file=sys.stderr,
+        )
         return 1
     print("\nBOUNDARIES: PASS (2 independent halves, 1 delta) — PK-GENRE-PURE stands")
     return 0

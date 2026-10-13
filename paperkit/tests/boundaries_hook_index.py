@@ -27,6 +27,7 @@ for all 43 suites, so no file has a number to type.
 
     python3 paperkit/tests/boundaries_hook_index.py
 """
+
 from __future__ import annotations
 
 from mikemol.gatecheck.indexdiverge import ALLOW, divergent
@@ -39,31 +40,49 @@ def main() -> int:
     s = Suite("HOOK-INDEX", "Ζ·hook·index — worktree≡index, the pure core")
 
     s.check("a clean tree diverges nowhere", divergent("") == [])
-    s.check("a fully-STAGED change is equivalence-preserving (M in the index column only)",
-            divergent("M  paperkit/gate.py\0") == [])
-    s.check("an UNSTAGED edit diverges (the worktree column is live)",
-            divergent(" M paperkit/gate.py\0") == ["paperkit/gate.py"])
-    s.check("a staged-then-re-edited file diverges (MM — the commit lands the FIRST version)",
-            divergent("MM paperkit/gate.py\0") == ["paperkit/gate.py"])
-    s.check("an untracked file diverges (?? — referenced-but-never-added is the whole hole)",
-            divergent("?? paperkit/new.py\0") == ["paperkit/new.py"])
-    s.check("a staged RENAME is equivalence-preserving and its origin field is consumed",
-            divergent("R  paperkit/new.py\0paperkit/old.py\0") == [])
-    s.check("a rename re-edited in the worktree diverges, naming the NEW path (what lands)",
-            divergent("RM paperkit/new.py\0paperkit/old.py\0") == ["paperkit/new.py"])
-    s.check("the allowlist admits its prefix (ownership-justified: bazel-invisible + index-gated)",
-            divergent(" M cotype/ledger.md\0?? cotype/notes.md\0") == [])
-    s.check("the allowlist is a PREFIX, not a grep (cotype2/ is not cotype/)",
-            divergent(" M cotype2/x.md\0") == ["cotype2/x.md"])
+    s.check(
+        "a fully-STAGED change is equivalence-preserving (M in the index column only)",
+        divergent("M  paperkit/gate.py\0") == [],
+    )
+    s.check(
+        "an UNSTAGED edit diverges (the worktree column is live)",
+        divergent(" M paperkit/gate.py\0") == ["paperkit/gate.py"],
+    )
+    s.check(
+        "a staged-then-re-edited file diverges (MM — the commit lands the FIRST version)",
+        divergent("MM paperkit/gate.py\0") == ["paperkit/gate.py"],
+    )
+    s.check(
+        "an untracked file diverges (?? — referenced-but-never-added is the whole hole)",
+        divergent("?? paperkit/new.py\0") == ["paperkit/new.py"],
+    )
+    s.check(
+        "a staged RENAME is equivalence-preserving and its origin field is consumed",
+        divergent("R  paperkit/new.py\0paperkit/old.py\0") == [],
+    )
+    s.check(
+        "a rename re-edited in the worktree diverges, naming the NEW path (what lands)",
+        divergent("RM paperkit/new.py\0paperkit/old.py\0") == ["paperkit/new.py"],
+    )
+    s.check(
+        "the allowlist admits its prefix (ownership-justified: bazel-invisible + index-gated)",
+        divergent(" M cotype/ledger.md\0?? cotype/notes.md\0") == [],
+    )
+    s.check(
+        "the allowlist is a PREFIX, not a grep (cotype2/ is not cotype/)",
+        divergent(" M cotype2/x.md\0") == ["cotype2/x.md"],
+    )
     s.check(f"the allowlist is the declared owned set: {ALLOW}", ALLOW == ("cotype/",))
 
     s.section("P, F, δ minimum-delta pair")
-    s.delta("one worktree-column bit flips the verdict",
-            divergent("M  paperkit/grade.py\0") == [],
-            divergent("MM paperkit/grade.py\0") == ["paperkit/grade.py"],
-            p="M  → worktree ≡ index; the hook's verdict is the commit's",
-            f="MM → the hook would gate bytes the commit does not land",
-            d="one unstaged edit to one staged file")
+    s.delta(
+        "one worktree-column bit flips the verdict",
+        divergent("M  paperkit/grade.py\0") == [],
+        divergent("MM paperkit/grade.py\0") == ["paperkit/grade.py"],
+        p="M  → worktree ≡ index; the hook's verdict is the commit's",
+        f="MM → the hook would gate bytes the commit does not land",
+        d="one unstaged edit to one staged file",
+    )
     return s.finish()
 
 

@@ -27,6 +27,7 @@ flagged gap):
     python3 checks/wcag_model.py            # print the standards model (counts + skew)
     python3 checks/wcag_model.py --check     # completeness: 86 SCs, 31/24/31 by level, mappings sourced
 """
+
 from __future__ import annotations
 
 import sys
@@ -34,12 +35,12 @@ import sys
 # — Provenance: every datum below traces to one of these primary sources. —
 SOURCES = {
     "WCAG22": "W3C Recommendation, Web Content Accessibility Guidelines (WCAG) 2.2, 2024-12-12 "
-              "(https://www.w3.org/TR/WCAG22/)",
+    "(https://www.w3.org/TR/WCAG22/)",
     "508": "Revised Section 508 Standards, US Access Board 2017, 36 CFR Part 1194 — incorporates "
-           "WCAG 2.0 Level A and AA by reference (E207); no published per-SC crosswalk (column DERIVED)",
+    "WCAG 2.0 Level A and AA by reference (E207); no published per-SC crosswalk (column DERIVED)",
     "EN301549": "ETSI EN 301 549 V3.2.1 (2021-03), Chapter 10 (Non-web documents) — references "
-                "WCAG 2.1; clause = 10.<SC> for adopted rows, Void/absent as recorded "
-                "(https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf)",
+    "WCAG 2.1; clause = 10.<SC> for adopted rows, Void/absent as recorded "
+    "(https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf)",
 }
 
 # The WCAG version each standard references (the skew — a criterion is out of scope BY VERSION).
@@ -137,26 +138,78 @@ SC = {
 }
 
 # SCs first introduced in WCAG 2.1 (out of 508's WCAG-2.0 scope; present in EN's WCAG-2.1 scope).
-WCAG21_NEW = frozenset({
-    "1.3.4", "1.3.5", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "2.1.4",
-    "2.5.1", "2.5.2", "2.5.3", "2.5.4", "4.1.3",
-})
+WCAG21_NEW = frozenset(
+    {
+        "1.3.4",
+        "1.3.5",
+        "1.4.10",
+        "1.4.11",
+        "1.4.12",
+        "1.4.13",
+        "2.1.4",
+        "2.5.1",
+        "2.5.2",
+        "2.5.3",
+        "2.5.4",
+        "4.1.3",
+    }
+)
 # SCs first introduced in WCAG 2.2 (out of 508 AND out of EN V3.2.1 scope — no clause exists yet).
-WCAG22_NEW = frozenset({
-    "2.4.11", "2.4.12", "2.4.13", "2.5.7", "2.5.8", "3.2.6", "3.3.7", "3.3.8", "3.3.9",
-})
+WCAG22_NEW = frozenset(
+    {
+        "2.4.11",
+        "2.4.12",
+        "2.4.13",
+        "2.5.7",
+        "2.5.8",
+        "3.2.6",
+        "3.3.7",
+        "3.3.8",
+        "3.3.9",
+    }
+)
 
 # EN 301 549 V3.2.1 §10 EXCEPTIONS (the only stored EN data; every other adopted row is "10."+SC).
 # "Void" = the standard adopts the clause number but marks it not-applicable to a document (AAA, or a
 # web-only criterion N/A to non-web docs).  A post-2.1 SC has NO clause and is handled via WCAG22_NEW.
-EN_VOID = frozenset({
-    # AAA criteria — Void in EN's non-web chapter
-    "1.2.6", "1.2.7", "1.2.8", "1.2.9", "1.3.6", "1.4.6", "1.4.7", "1.4.8", "1.4.9",
-    "2.1.3", "2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.3.2", "2.3.3", "2.4.8", "2.4.9",
-    "2.4.10", "2.5.5", "2.5.6", "3.1.3", "3.1.4", "3.1.5", "3.1.6", "3.2.5", "3.3.5", "3.3.6",
-    # web-only criteria — Void because N/A to a non-web document
-    "2.4.1", "2.4.5", "3.2.3", "3.2.4",
-})
+EN_VOID = frozenset(
+    {
+        # AAA criteria — Void in EN's non-web chapter
+        "1.2.6",
+        "1.2.7",
+        "1.2.8",
+        "1.2.9",
+        "1.3.6",
+        "1.4.6",
+        "1.4.7",
+        "1.4.8",
+        "1.4.9",
+        "2.1.3",
+        "2.2.3",
+        "2.2.4",
+        "2.2.5",
+        "2.2.6",
+        "2.3.2",
+        "2.3.3",
+        "2.4.8",
+        "2.4.9",
+        "2.4.10",
+        "2.5.5",
+        "2.5.6",
+        "3.1.3",
+        "3.1.4",
+        "3.1.5",
+        "3.1.6",
+        "3.2.5",
+        "3.3.5",
+        "3.3.6",
+        # web-only criteria — Void because N/A to a non-web document
+        "2.4.1",
+        "2.4.5",
+        "3.2.3",
+        "3.2.4",
+    }
+)
 
 # WCAG SCs REMOVED in 2.2 (kept for provenance; NOT an active criterion — never scored).
 REMOVED_IN_22 = {"4.1.1": ("Parsing", "removed in WCAG 2.2; was 508-required under 2.0")}
@@ -179,8 +232,8 @@ def en_clause(sc: str) -> str | None:
     represented as the clause with a Void flag via en_status().
     """
     if sc in WCAG22_NEW:
-        return None                      # no clause in V3.2.1 (post-2.1)
-    return "10." + sc                    # the pure-function clause for every 2.0/2.1 row (incl. Void)
+        return None  # no clause in V3.2.1 (post-2.1)
+    return "10." + sc  # the pure-function clause for every 2.0/2.1 row (incl. Void)
 
 
 def en_status(sc: str) -> str:
@@ -211,15 +264,21 @@ def check() -> tuple[bool, list[str]]:
     # "87" figures either predate the 4.1.1 removal or omit the −1.)  Removing the Level-A 4.1.1 from a
     # 2.1-era "32 A" gives 31 A, so the post-removal breakdown is 31 A / 24 AA / 31 AAA = 86.
     WCAG21_TOTAL = 78
-    want_total = WCAG21_TOTAL + len(WCAG22_NEW) - len(REMOVED_IN_22)   # 78 + 9 − 1 = 86, checkable
+    want_total = WCAG21_TOTAL + len(WCAG22_NEW) - len(REMOVED_IN_22)  # 78 + 9 − 1 = 86, checkable
     want = {"A": 31, "AA": 24, "AAA": 31}
     if c != want:
-        problems.append(f"level counts {c} != WCAG 2.2 published {want} (a criterion is missing or extra)")
+        problems.append(
+            f"level counts {c} != WCAG 2.2 published {want} (a criterion is missing or extra)"
+        )
     if len(SC) != want_total:
-        problems.append(f"{len(SC)} success criteria, WCAG 2.2 has {want_total} "
-                        f"(WCAG 2.1's {WCAG21_TOTAL} + {len(WCAG22_NEW)} new − {len(REMOVED_IN_22)} removed)")
+        problems.append(
+            f"{len(SC)} success criteria, WCAG 2.2 has {want_total} "
+            f"(WCAG 2.1's {WCAG21_TOTAL} + {len(WCAG22_NEW)} new − {len(REMOVED_IN_22)} removed)"
+        )
     if "4.1.1" in SC:
-        problems.append("4.1.1 Parsing is present but was REMOVED in WCAG 2.2 — it must not be an active SC")
+        problems.append(
+            "4.1.1 Parsing is present but was REMOVED in WCAG 2.2 — it must not be an active SC"
+        )
     # every level is one of A/AA/AAA
     for sc, (_, lv) in SC.items():
         if lv not in ("A", "AA", "AAA"):
@@ -229,7 +288,9 @@ def check() -> tuple[bool, list[str]]:
         if s not in SC:
             problems.append(f"version-new set names {s}, absent from the SC list")
     if WCAG21_NEW & WCAG22_NEW:
-        problems.append(f"a SC is marked both 2.1-new and 2.2-new: {sorted(WCAG21_NEW & WCAG22_NEW)}")
+        problems.append(
+            f"a SC is marked both 2.1-new and 2.2-new: {sorted(WCAG21_NEW & WCAG22_NEW)}"
+        )
     # EN_VOID rows are real 2.0/2.1 SCs (a post-2.1 SC has no clause to void)
     for s in EN_VOID:
         if s not in SC:
@@ -253,10 +314,12 @@ def main(argv: list[str]) -> int:
         c = counts()
         n508 = sum(1 for sc in SC if sc_508_required(sc))
         nen = sum(1 for sc in SC if en_status(sc) == "clause")
-        print(f"wcag-model --check: WCAG 2.2 complete — {len(SC)} SCs "
-              f"({c['A']} A, {c['AA']} AA, {c['AAA']} AAA = 78+9−1, 4.1.1 Parsing removed); "
-              f"{n508} 508-required (WCAG 2.0 A/AA, derived); {nen} EN 301 549 V3.2.1 non-web clauses; "
-              f"version skew modeled (2.2/2.0/2.1); all sourced")
+        print(
+            f"wcag-model --check: WCAG 2.2 complete — {len(SC)} SCs "
+            f"({c['A']} A, {c['AA']} AA, {c['AAA']} AAA = 78+9−1, 4.1.1 Parsing removed); "
+            f"{n508} 508-required (WCAG 2.0 A/AA, derived); {nen} EN 301 549 V3.2.1 non-web clauses; "
+            f"version skew modeled (2.2/2.0/2.1); all sourced"
+        )
         return 0
     print("accessibility standards model — WCAG 2.2 with 508 + EN 301 549 mappings\n")
     print("version skew (the WCAG baseline each standard references):")
@@ -264,10 +327,12 @@ def main(argv: list[str]) -> int:
         print(f"  {k:10} → WCAG {v}")
     print(f"\nWCAG 2.2: {len(SC)} success criteria — {counts()}")
     print(f"508-required (derived, WCAG 2.0 A/AA): {sum(1 for sc in SC if sc_508_required(sc))}")
-    print(f"EN 301 549 V3.2.1 non-web: "
-          f"{sum(1 for sc in SC if en_status(sc)=='clause')} clause, "
-          f"{sum(1 for sc in SC if en_status(sc)=='void')} void, "
-          f"{sum(1 for sc in SC if en_status(sc)=='absent')} absent (post-2.1)")
+    print(
+        f"EN 301 549 V3.2.1 non-web: "
+        f"{sum(1 for sc in SC if en_status(sc) == 'clause')} clause, "
+        f"{sum(1 for sc in SC if en_status(sc) == 'void')} void, "
+        f"{sum(1 for sc in SC if en_status(sc) == 'absent')} absent (post-2.1)"
+    )
     return 0
 
 

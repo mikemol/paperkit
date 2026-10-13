@@ -20,6 +20,7 @@ or route on through to a .pdf.  ROUTES enumerates the composed paths to the term
     python3 checks/graph.py            # print the morphism matrix (the graph, as a table)
     python3 checks/graph.py --check    # assert the declared edges match the tools actually present
 """
+
 from __future__ import annotations
 
 import itertools
@@ -61,28 +62,28 @@ class Morphism(TypedDict):
 # PDF/UA by construction), "post" (reaches PDF/UA only after post-processing), or None (not a
 # pdf-producing edge, so a11y does not apply).  MANY-TO-MANY: md fans out; pdf fans in.
 MORPHISMS: dict[tuple[str, str], Morphism] = {
-    ("md", "docx"):  {"tool": "pandoc",   "a11y": None},
-    ("md", "odt"):   {"tool": "pandoc",   "a11y": None},
-    ("md", "latex"): {"tool": "pandoc",   "a11y": None},
+    ("md", "docx"): {"tool": "pandoc", "a11y": None},
+    ("md", "odt"): {"tool": "pandoc", "a11y": None},
+    ("md", "latex"): {"tool": "pandoc", "a11y": None},
     # the office pdf edges reach PDF/UA-1 only after linkalt/mathalt/widen post-processing
-    ("docx", "pdf"): {"tool": "soffice",  "a11y": "post"},
-    ("odt", "pdf"):  {"tool": "soffice",  "a11y": "post"},
+    ("docx", "pdf"): {"tool": "soffice", "a11y": "post"},
+    ("odt", "pdf"): {"tool": "soffice", "a11y": "post"},
     # \DocumentMetadata tagging → PDF/UA-2, by construction
     ("latex", "pdf"): {"tool": "lualatex", "a11y": "native"},
     # the office hub converts between them
-    ("docx", "odt"): {"tool": "soffice",  "a11y": None},
-    ("odt", "docx"): {"tool": "soffice",  "a11y": None},
+    ("docx", "odt"): {"tool": "soffice", "a11y": None},
+    ("odt", "docx"): {"tool": "soffice", "a11y": None},
     # The SLIDE objects (Ρ·deck·node).  pandoc emits pptx from markdown; the office hub converts
     # pptx↔odp exactly as it does docx↔odt.  See DECK BOUND: these are TRANSFORM edges of the
     # pandoc observation, not a new observation of the claim-DAG.
-    ("md", "pptx"):  {"tool": "pandoc",   "a11y": None},
+    ("md", "pptx"): {"tool": "pandoc", "a11y": None},
     # Ρ·deck·route — the UNIT-carrying edge.  Its source is `units` (the observation), not `md`
     # (the linearization), which is what makes the route's deliverable a PROJECTION of the DAG
     # rather than a reflow of finished prose.  Same tool; different source object, and the object
     # is the whole difference.
-    ("units", "pptx"): {"tool": "pandoc",   "a11y": None},
-    ("pptx", "odp"): {"tool": "soffice",  "a11y": None},
-    ("odp", "pptx"): {"tool": "soffice",  "a11y": None},
+    ("units", "pptx"): {"tool": "pandoc", "a11y": None},
+    ("pptx", "odp"): {"tool": "soffice", "a11y": None},
+    ("odp", "pptx"): {"tool": "soffice", "a11y": None},
 }
 
 # ── DECK BOUND (Ρ·deck·node) ─────────────────────────────────────────────────────────────────
@@ -110,8 +111,8 @@ MORPHISMS: dict[tuple[str, str], Morphism] = {
 # here, but `pairwise` over an inferred value still carried `Any` into the membership test below
 # — so the composition guard was type-checking nothing.  Stating it keeps the guard honest.
 ROUTES: dict[str, list[str]] = {
-    "docx":  ["md", "docx", "pdf"],
-    "odf":   ["md", "odt", "pdf"],
+    "docx": ["md", "docx", "pdf"],
+    "odf": ["md", "odt", "pdf"],
     "latex": ["md", "latex", "pdf"],
 }
 
@@ -122,12 +123,12 @@ ROUTES: dict[str, list[str]] = {
 # declared morphisms (deck --check asserts it, exactly as ROUTES does).
 SLIDE_ROUTES: dict[str, list[str]] = {
     "pptx": ["md", "pptx"],
-    "odp":  ["md", "pptx", "odp"],
+    "odp": ["md", "pptx", "odp"],
     # the OBSERVED routes (Ρ·deck·route): same terminal formats, sourced from the segmentation.
     # A consumer asking for a deck picks between them by which SOURCE it wants, and the graph
     # names the difference instead of leaving two things that look alike indistinguishable.
     "pptx-observed": ["units", "pptx"],
-    "odp-observed":  ["units", "pptx", "odp"],
+    "odp-observed": ["units", "pptx", "odp"],
 }
 
 
@@ -149,7 +150,7 @@ def _matrix() -> str:
     head = " " * w + "".join(f"{d:<{w}}" for d in OBJECTS)
     rows = [head]
     for s in OBJECTS:
-        cells = "".join((tool_for(s, d) or "·")[:w - 1].ljust(w) for d in OBJECTS)
+        cells = "".join((tool_for(s, d) or "·")[: w - 1].ljust(w) for d in OBJECTS)
         rows.append(f"{s:<{w}}{cells}")
     return "\n".join(rows)
 
@@ -161,16 +162,19 @@ def main(argv: list[str]) -> int:
         # the toolchain cannot perform).  A missing tool is a graph that lies about its reach.
         missing = sorted({m["tool"] for m in MORPHISMS.values() if not shutil.which(m["tool"])})
         if missing:
-            sys.stderr.write(f"graph --check: declared morphism tool(s) absent: {missing} — the "
-                             f"graph claims an edge the toolchain cannot perform\n")
+            sys.stderr.write(
+                f"graph --check: declared morphism tool(s) absent: {missing} — the "
+                f"graph claims an edge the toolchain cannot perform\n"
+            )
             return 1
         # every route composes real edges (each consecutive pair is a declared morphism)
         for label, table in (("route", ROUTES), ("slide route", SLIDE_ROUTES)):
             for name, path in table.items():
                 for a, b in itertools.pairwise(path):
                     if (a, b) not in MORPHISMS:
-                        sys.stderr.write(f"graph --check: {label} {name} uses undeclared edge "
-                                         f"{a}->{b}\n")
+                        sys.stderr.write(
+                            f"graph --check: {label} {name} uses undeclared edge {a}->{b}\n"
+                        )
                         return 1
         # every declared object is REACHED by some morphism (an object no edge produces or
         # consumes is a node the graph claims but cannot deliver — the OBJECTS/MORPHISMS drift
@@ -178,21 +182,27 @@ def main(argv: list[str]) -> int:
         touched = {o for pair in MORPHISMS for o in pair}
         orphans = sorted(set(OBJECTS) - touched)
         if orphans:
-            sys.stderr.write(f"graph --check: object(s) {orphans} appear in no morphism — the "
-                             f"graph declares a node it cannot reach\n")
+            sys.stderr.write(
+                f"graph --check: object(s) {orphans} appear in no morphism — the "
+                f"graph declares a node it cannot reach\n"
+            )
             return 1
-        sys.stdout.write(f"graph --check: {len(MORPHISMS)} morphisms over {len(OBJECTS)} objects, "
-                         f"{len(ROUTES)} pdf routes + {len(SLIDE_ROUTES)} slide routes — every "
-                         f"edge's tool is present, every object is reachable, and every route "
-                         f"composes\n")
+        sys.stdout.write(
+            f"graph --check: {len(MORPHISMS)} morphisms over {len(OBJECTS)} objects, "
+            f"{len(ROUTES)} pdf routes + {len(SLIDE_ROUTES)} slide routes — every "
+            f"edge's tool is present, every object is reachable, and every route "
+            f"composes\n"
+        )
         return 0
     sys.stdout.write("render coalgebra — conversion morphisms (row = from, col = to):\n\n")
     sys.stdout.write(_matrix() + "\n")
     sys.stdout.write("\nroutes to the terminal PDF:\n")
     for name, path in ROUTES.items():
         sys.stdout.write(f"  {name:<6} {' → '.join(path)}   (a11y: {route_a11y(name)})\n")
-    sys.stdout.write("\nroutes to a terminal SLIDE deliverable (transforms, not observations — "
-                     "see DECK BOUND):\n")
+    sys.stdout.write(
+        "\nroutes to a terminal SLIDE deliverable (transforms, not observations — "
+        "see DECK BOUND):\n"
+    )
     for name, path in SLIDE_ROUTES.items():
         sys.stdout.write(f"  {name:<6} {' → '.join(path)}\n")
     return 0

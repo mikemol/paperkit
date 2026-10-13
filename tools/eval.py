@@ -29,6 +29,7 @@ annotating 76 expressions downstream.
 Idempotency: invoke by an ABSOLUTE interpreter path so `sys.executable` is populated — the check
 re-spawns the projector as `[sys.executable, …]` (the history of the '' spurious-flip bug).
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -174,6 +175,7 @@ def _become_subreaper() -> None:
     count then still covers every descendant whose parent is alive, which is the recursion's shape.
     """
     import ctypes  # noqa: PLC0415 — Linux-only, used once, at the one site that needs it
+
     with contextlib.suppress(OSError, AttributeError):
         libc = ctypes.CDLL(None, use_errno=True)
         libc.prctl(_PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
@@ -294,9 +296,15 @@ def _run(check: str, claim: str, wall: int) -> tuple[bool, str]:
         p = subprocess.Popen(
             [sys.executable, check, claim],
             env={**os.environ, "PYTHONPATH": pypath},
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, process_group=0)
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            process_group=0,
+        )
     except OSError as e:
-        return True, f"could not spawn the check ({e.__class__.__name__}: {e}) — the mutation exhausted the cell's process budget, which is a flip"
+        return (
+            True,
+            f"could not spawn the check ({e.__class__.__name__}: {e}) — the mutation exhausted the cell's process budget, which is a flip",
+        )
     # ⚑ communicate(), NEVER wait() — a PIPE nothing drains DEADLOCKS the child the moment it
     # writes past the 64KB buffer.  Measured 2026-08-26 on the in-process path: a cell sat at
     # 0.0% CPU for 11+ minutes and `wchan` named both halves.  Capturing output and wait()ing
@@ -314,8 +322,10 @@ def _run(check: str, claim: str, wall: int) -> tuple[bool, str]:
         size = len(_descendants(os.getpid()))
         if size > tree_max:
             _kill_tree(p)
-            return True, (f"process tree reached {size} > {tree_max} (killed) — the mutation "
-                          "recursed by forking, which is a flip")
+            return True, (
+                f"process tree reached {size} > {tree_max} (killed) — the mutation "
+                "recursed by forking, which is a flip"
+            )
         if waited >= wall:
             _kill_tree(p)
             return True, f"did not terminate within {wall}s (killed) — the mutation flipped it"
@@ -334,8 +344,10 @@ def _run(check: str, claim: str, wall: int) -> tuple[bool, str]:
         # under it (measured: a 2s cap reported <2.0).  An OOM kill (-9 too) burns far less, so
         # the margin still separates the two.
         if cap != resource.RLIM_INFINITY and cpu_s >= 0.9 * cap:
-            return True, (f"exceeded its {cap}s CPU cap ({cpu_s:.1f}s used; killed by "
-                          f"{signal.Signals(-rc).name}) — the mutation made it spin, which is a flip")
+            return True, (
+                f"exceeded its {cap}s CPU cap ({cpu_s:.1f}s used; killed by "
+                f"{signal.Signals(-rc).name}) — the mutation made it spin, which is a flip"
+            )
     return rc != 0, _last_line(out)
 
 
@@ -356,8 +368,11 @@ def main(argv: list[str]) -> int:
     tag = cellstage.cache_tag()
     cellstage.place_engine(a.engine_dir, tag)
     cellstage.deliver(
-        cellstage.Site(a.site, a.module, a.mutant_py, a.mutant_pyc,
-                       a.content_path, a.content_textfile), tag)
+        cellstage.Site(
+            a.site, a.module, a.mutant_py, a.mutant_pyc, a.content_path, a.content_textfile
+        ),
+        tag,
+    )
 
     _cap_cpu(_env_int("PAPERKIT_CHECK_CPU", 60))
     # Ζ·cell·rlimit — 2048MB: an order of magnitude above the 28 MB a real witness peaks at,
@@ -369,8 +384,10 @@ def main(argv: list[str]) -> int:
     if a.site == BASELINE and flipped:
         # the ∅ cell is the canary: sens.py FAILS LOUD on it rather than emitting a
         # plausible-but-wrong sens set, and it must say WHY on the spot.
-        sys.stderr.write("eval: BASELINE FLIPPED (the identity mutation broke the check) — "
-                         f"{why or 'no output'}\n")
+        sys.stderr.write(
+            "eval: BASELINE FLIPPED (the identity mutation broke the check) — "
+            f"{why or 'no output'}\n"
+        )
 
     # Ζ·climb·oom·signal — an OOM is NOT a flip.  `rc != 0` is right for a HANG (a mutant that
     # never answers HAS changed behaviour) and wrong for a cell the kernel killed for memory:
@@ -379,8 +396,9 @@ def main(argv: list[str]) -> int:
     # alone.  Exiting non-zero hands the signal back to the layer that OWNS the retry
     # (cgroup-scope retries on a nonzero PAYLOAD exit, and this process IS the payload).
     if flipped and cellcgroup.oom_happened(before, cellcgroup.oom_counts()):
-        sys.stderr.write("eval: OOM-KILLED at this cell's cap (not a flip) — deferring to the "
-                         "climb\n")
+        sys.stderr.write(
+            "eval: OOM-KILLED at this cell's cap (not a flip) — deferring to the climb\n"
+        )
         cellcgroup.write_peak(a.peak)
         return CANNOT_RUN
 

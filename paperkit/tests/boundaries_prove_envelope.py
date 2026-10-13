@@ -18,6 +18,7 @@ only idempotency itself breaking could split them.
 
     python3 paperkit/tests/boundaries_prove_envelope.py
 """
+
 from __future__ import annotations
 
 import ast
@@ -37,16 +38,19 @@ def prove_oracle_flags():
     """
     tree = ast.parse(PROVE.read_text())
     for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "argv" for t in node.targets) \
-                and isinstance(node.value, ast.List):
+        if (
+            isinstance(node, ast.Assign)
+            and any(getattr(t, "id", None) == "argv" for t in node.targets)
+            and isinstance(node.value, ast.List)
+        ):
             out = []
             for el in node.value.elts:
                 if isinstance(el, ast.Constant):
-                    out.append(el.value)                      # a literal flag ("--only", "--calc", …)
+                    out.append(el.value)  # a literal flag ("--only", "--calc", …)
                 elif isinstance(el, ast.Name):
-                    out.append("<" + el.id + ">")             # a variable (key, resolution)
+                    out.append("<" + el.id + ">")  # a variable (key, resolution)
                 else:
-                    out.append("<expr>")                      # sys.executable, ENGINE/…, str(OWNER)
+                    out.append("<expr>")  # sys.executable, ENGINE/…, str(OWNER)
             return out
     return []
 
@@ -54,8 +58,11 @@ def prove_oracle_flags():
 def prove_resolution():
     """certificate()'s resolution literal (prove.py: `resolution = "def"`), derived from source."""
     for node in ast.walk(ast.parse(PROVE.read_text())):
-        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "resolution" for t in node.targets) \
-                and isinstance(node.value, ast.Constant):
+        if (
+            isinstance(node, ast.Assign)
+            and any(getattr(t, "id", None) == "resolution" for t in node.targets)
+            and isinstance(node.value, ast.Constant)
+        ):
             return node.value.value
     return None
 
@@ -81,47 +88,68 @@ def main() -> int:
     # missed this file entirely.  A derived count has no vocabulary to miss.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import paperkit.tests._boundary
-    s = paperkit.tests._boundary.Suite("PROVE-ENVELOPE", "Ζ·prove-gate — --prove and __dcalc run the same oracle")
+
+    s = paperkit.tests._boundary.Suite(
+        "PROVE-ENVELOPE", "Ζ·prove-gate — --prove and __dcalc run the same oracle"
+    )
     check = s.check
 
     # ⟨same oracle command⟩ — prove.py's argv IS the discriminate --calc def command pk_calc runs.
     flags = prove_oracle_flags()
     # the meaningful sequence: --only <key> --calc --resolution <res> (the project path is the last <expr>)
     seq = [f for f in flags if f.startswith("--") or f in ("<key>", "<resolution>")]
-    check(f"prove.py runs `--only <key> --calc --resolution <res>` (derived argv: {seq})",
-          seq == ["--only", "<key>", "--calc", "--resolution", "<resolution>"])
+    check(
+        f"prove.py runs `--only <key> --calc --resolution <res>` (derived argv: {seq})",
+        seq == ["--only", "<key>", "--calc", "--resolution", "<resolution>"],
+    )
 
     # pk_calc (calc.bzl) builds `discriminate.py --only <claim> --calc [ --resolution <attr> ]`
     calc_src = CALC.read_text()
-    check("pk_calc emits the SAME oracle: `discriminate.py --only <claim> --calc` + `--resolution <attr>`",
-          "paperkit.discriminate --only " in calc_src and "--calc" in calc_src
-          and '" --resolution " + ctx.attr.resolution' in calc_src)
+    check(
+        "pk_calc emits the SAME oracle: `discriminate.py --only <claim> --calc` + `--resolution <attr>`",
+        "paperkit.discriminate --only " in calc_src
+        and "--calc" in calc_src
+        and '" --resolution " + ctx.attr.resolution' in calc_src,
+    )
 
     # ⟨same def frame⟩ — prove.py measures resolution="def"; the build emits __dcalc at resolution="def".
     pr, dr = prove_resolution(), dcalc_resolution()
     check(f"prove.py's frame is def ({pr!r})", pr == "def")
-    check(f"the build caches __dcalc at the SAME frame ({dr!r}) — prove's def ≡ __dcalc's def", dr == "def")
+    check(
+        f"the build caches __dcalc at the SAME frame ({dr!r}) — prove's def ≡ __dcalc's def",
+        dr == "def",
+    )
 
     # ⟨same ladder⟩ — prove.py grades via the shared leaf, re-declares no rung order.
     prove_src = PROVE.read_text()
-    check("prove.py grades via the imported grade.grade_from_sens (the shared ladder leaf)",
-          "mikemol.grade.grade.grade_from_sens(baseline, sens)" in prove_src)
-    check("prove.py re-declares NO ladder (no STRENGTH/RANK_C/ORDER of its own — the boundaries_ladder rule)",
-          not any(re.search(rf"\b{n}\s*=", prove_src) for n in ("STRENGTH", "RANK_C", "GRADE_C")))
+    check(
+        "prove.py grades via the imported grade.grade_from_sens (the shared ladder leaf)",
+        "mikemol.grade.grade.grade_from_sens(baseline, sens)" in prove_src,
+    )
+    check(
+        "prove.py re-declares NO ladder (no STRENGTH/RANK_C/ORDER of its own — the boundaries_ladder rule)",
+        not any(re.search(rf"\b{n}\s*=", prove_src) for n in ("STRENGTH", "RANK_C", "GRADE_C")),
+    )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # F = certificate silently measures FILE resolution (≠ __dcalc's def) — one token.
     f_src = prove_src.replace('resolution = "def"', 'resolution = "file"')
     f_res = None
     for node in ast.walk(ast.parse(f_src)):
-        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "resolution" for t in node.targets) \
-                and isinstance(node.value, ast.Constant):
+        if (
+            isinstance(node, ast.Assign)
+            and any(getattr(t, "id", None) == "resolution" for t in node.targets)
+            and isinstance(node.value, ast.Constant)
+        ):
             f_res = node.value.value
-    s.delta("a cert that silently measures a DIFFERENT frame than __dcalc is CAUGHT",
-            pr == "def", (f_res == "file") and (f_res != dr),
-            p="intact:  prove resolution == 'def' == __dcalc's frame → same oracle",
-            f="drifted: resolution → 'file' → cert measures a weaker frame than the cached record",
-            d="one token, the resolution literal (prove.py) — or the grade_from_sens import")
+    s.delta(
+        "a cert that silently measures a DIFFERENT frame than __dcalc is CAUGHT",
+        pr == "def",
+        (f_res == "file") and (f_res != dr),
+        p="intact:  prove resolution == 'def' == __dcalc's frame → same oracle",
+        f="drifted: resolution → 'file' → cert measures a weaker frame than the cached record",
+        d="one token, the resolution literal (prove.py) — or the grade_from_sens import",
+    )
     return s.finish()
 
 

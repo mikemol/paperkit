@@ -15,6 +15,7 @@ The mutation RESOLUTION (granularity) is THREADED as a parameter, not a module g
 A function downstream of _grade_one needs no resolution string: engine_dir IS the mode
 (None ⇒ file, a path ⇒ def), so the sweep branches on it.
 """
+
 from __future__ import annotations
 
 import json
@@ -42,6 +43,7 @@ class _Unreachable(int):
 
     def __new__(cls):
         return super().__new__(cls, 0)
+
     def __repr__(self) -> str:
         return "UNREACHABLE"
 
@@ -54,10 +56,18 @@ CORRUPT = b"\x00\x00DELTA-CORRUPTION\x00\x00\n"
 
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).
-DELTA_REPEAT = paperkit.config.Param("delta-repeat", "PAPERKIT_DELTA_REPEAT", default="1",
-                            help="re-run the pristine baseline N times to detect a flaky (non-deterministic) check")
-DELTA_PULSE = paperkit.config.Param("delta-pulse", "PAPERKIT_DELTA_PULSE", default="2",
-                           help="min seconds between Δ progress pulses to a log (0 = silent)")
+DELTA_REPEAT = paperkit.config.Param(
+    "delta-repeat",
+    "PAPERKIT_DELTA_REPEAT",
+    default="1",
+    help="re-run the pristine baseline N times to detect a flaky (non-deterministic) check",
+)
+DELTA_PULSE = paperkit.config.Param(
+    "delta-pulse",
+    "PAPERKIT_DELTA_PULSE",
+    default="2",
+    help="min seconds between Δ progress pulses to a log (0 = silent)",
+)
 
 
 def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
@@ -71,7 +81,9 @@ def presupposed_inputs(project_dir: Path, cfg: dict) -> set:
     return {p.resolve() for p in req}
 
 
-def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path | None = None) -> list:
+def sandbox_files(
+    sandbox_project: Path, exclude_scripts: set, engine_dir: Path | None = None
+) -> list:
     """Mutable text inputs Δ may corrupt: the sandboxed project's own files PLUS the
     engine the checks run through (`engine_dir`) — so an engine-claim's witness is
     sensitive to the engine source it tests, not only to its own script.  The verifier
@@ -84,7 +96,9 @@ def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path 
         # Ζ·sandbox·declared — the repository's own content (layout._Scope), not `rglob("*")`,
         # which enumerated every cache, stale build copy and nested checkout on disk.
         for f in paperkit.layout._Scope.for_path(base).files(base):
-            if not paperkit.layout._mutable(f) or any(part in paperkit.layout.SKIP_DIRS for part in f.parts):
+            if not paperkit.layout._mutable(f) or any(
+                part in paperkit.layout.SKIP_DIRS for part in f.parts
+            ):
                 continue
             if any(nr in f.parents for nr in nested):
                 continue  # a sibling project's file — not this project's to mutate
@@ -97,12 +111,16 @@ def sandbox_files(sandbox_project: Path, exclude_scripts: set, engine_dir: Path 
 
     collect(sandbox_project, skip_nested=True)
     if engine_dir is not None:
-        collect(engine_dir, skip_nested=False)   # the engine the checks run through
+        collect(engine_dir, skip_nested=False)  # the engine the checks run through
     return out
 
 
-def surface_of(footprint: list | None, sandbox_project: Path, root_copy: Path | None,
-               engine_dir: Path | None = None) -> list:
+def surface_of(
+    footprint: list | None,
+    sandbox_project: Path,
+    root_copy: Path | None,
+    engine_dir: Path | None = None,
+) -> list:
     """Ζ·surface — the candidate files a claim's falsifiability is measured against: its SUBJECT,
     CONSTRUCTED from the check's root-scoped read footprint.
 
@@ -124,11 +142,13 @@ def surface_of(footprint: list | None, sandbox_project: Path, root_copy: Path | 
     base = root_copy or sandbox_project
     named = {(base / p).resolve() for p in footprint}
     out, seen = [], set()
-    for f in paperkit.layout._Scope.for_path(base).files(base):          # Ζ·sandbox·declared
-        if not paperkit.layout._mutable(f) or any(part in paperkit.layout.SKIP_DIRS for part in f.parts):
+    for f in paperkit.layout._Scope.for_path(base).files(base):  # Ζ·sandbox·declared
+        if not paperkit.layout._mutable(f) or any(
+            part in paperkit.layout.SKIP_DIRS for part in f.parts
+        ):
             continue
         if f.suffix == ".sh" and "checks" in f.parts:
-            continue                      # a verifier script; its corruption tests itself
+            continue  # a verifier script; its corruption tests itself
         r = f.resolve()
         if r in named and r not in seen:
             seen.add(r)
@@ -163,19 +183,20 @@ def unmeasured_reads(footprint: list | None, root_copy: Path | None) -> list:
     gap; see the pyc-is-a-build-artifact reading).
     """
     if footprint is None or root_copy is None:
-        return []                                     # Φ·degrade: no trace ⇒ no claim either way
+        return []  # Φ·degrade: no trace ⇒ no claim either way
     out = []
     for p in footprint:
         f = root_copy / p
         if any(part in paperkit.layout.SKIP_DIRS for part in Path(p).parts):
-            continue                                  # a derived artifact; its SOURCE is measured
+            continue  # a derived artifact; its SOURCE is measured
         if f.is_file() and not paperkit.layout._mutable(f):
             out.append(p)
     return sorted(out)
 
 
-def _rel(f: Path, sandbox_project: Path, engine_dir: Path | None,
-         root_copy: Path | None = None) -> str:
+def _rel(
+    f: Path, sandbox_project: Path, engine_dir: Path | None, root_copy: Path | None = None
+) -> str:
     """Label a corrupted file: relative to the project, or tagged engine/<…> when it is the engine
     (outside the project, e.g. the paper's ../paperkit).  Ζ·surface: a constructed surface can also
     name a THIRD tree (a claim about a sibling's content), labelled root-relative — the engine's own
@@ -230,8 +251,12 @@ class _DataNode:
         self.spec = f"data-:{qualname}#{n}"
 
 
-def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = None,
-           root_copy: Path | None = None) -> list:
+def _sites(
+    sandbox_project: Path,
+    engine_dir: Path | None,
+    files: list | None = None,
+    root_copy: Path | None = None,
+) -> list:
     """Every def-resolution mutation SITE as (file, node | None, label): a .py file's
     DEFINITIONS (label `path::qualname`, body→uncatchable-raise) and any other file as one
     whole-file site (label `path`, corrupted).  The unit set the group-testing sweep bisects
@@ -245,7 +270,7 @@ def _sites(sandbox_project: Path, engine_dir: Path | None, files: list | None = 
     structurally unable to consume; see _flip_sites_of.
     """
     sites = []
-    for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
+    for f in sandbox_files(sandbox_project, set(), engine_dir) if files is None else files:
         label = _rel(f, sandbox_project, engine_dir, root_copy)
         if f.suffix == ".py":
             text = f.read_text()
@@ -266,8 +291,8 @@ def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
     group-testing sweep (sensitivity) and the single-site probe (flip_one).
     """
     saved: dict = {}
-    linenodes: dict = {}   # def/branch nodes → _mutate_lines (body-span → raise)
-    dataspecs: dict = {}   # Μ·sweep·atom — _DataNode specs → emit_mutant (literal rewrite)
+    linenodes: dict = {}  # def/branch nodes → _mutate_lines (body-span → raise)
+    dataspecs: dict = {}  # Μ·sweep·atom — _DataNode specs → emit_mutant (literal rewrite)
     try:
         for f, node, _ in group:
             saved.setdefault(f, f.read_bytes())
@@ -278,7 +303,9 @@ def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
         for f in set(list(linenodes) + list(dataspecs)):
             text = saved[f].decode()
             if f in linenodes:
-                text = paperkit.mutate._mutate_lines(text, linenodes[f])   # def/branch body-drops (line-span)
+                text = paperkit.mutate._mutate_lines(
+                    text, linenodes[f]
+                )  # def/branch body-drops (line-span)
             if f in dataspecs:
                 # Μ·sweep·atom — resolve every data-: DROP's (qualname, index) against the CURRENT
                 # text ONCE and remove them per-literal in a single index-stable rebuild.  A sequential
@@ -301,9 +328,14 @@ def _apply(chk: str, sandbox_project: Path, custom: dict, group: list) -> bool:
 _LAST_WHY = ""
 
 
-def sensitivity(chk: str, sandbox_project: Path, custom: dict,
-                engine_dir: Path | None = None, footprint: list | None = None,
-                root_copy: Path | None = None) -> tuple[bool, list]:
+def sensitivity(
+    chk: str,
+    sandbox_project: Path,
+    custom: dict,
+    engine_dir: Path | None = None,
+    footprint: list | None = None,
+    root_copy: Path | None = None,
+) -> tuple[bool, list]:
     """The sensitivity set — the mutations that flip chk red — found by BINARY-SPLIT
     GROUP TESTING, not a linear scan over every site.  Mutate a whole group of sites
     at once: if it does NOT flip, the entire group is proven clear in ONE run (the
@@ -374,7 +406,7 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
             # read footprint under-reported; a real flip there means behavioral, not vacuous.
             sens = scan([f for f in files if f not in set(scoped)])
         return True, sorted(sens)
-    sites = _sites(sandbox_project, engine_dir)   # (file, node | None, label)
+    sites = _sites(sandbox_project, engine_dir)  # (file, node | None, label)
 
     def apply(group) -> bool:
         return _apply(chk, sandbox_project, custom, group)
@@ -384,9 +416,9 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
 
         def split(g) -> None:
             if not g or not apply(g):
-                return                   # cleared in one run: no flipper here
+                return  # cleared in one run: no flipper here
             if len(g) == 1:
-                flips.append(g[0][2])    # a confirmed single-mutation flip
+                flips.append(g[0][2])  # a confirmed single-mutation flip
                 return
             m = len(g) // 2
             split(g[:m])
@@ -407,8 +439,9 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     # Ζ·surface — same construction at def granularity: the subject decides the ROOTS, the
     # granularity knob decides that each candidate contributes its def-sites rather than one
     # whole-file site.  The two axes are now set independently.
-    scoped = _sites(sandbox_project, engine_dir,
-                    surface_of(footprint, sandbox_project, root, engine_dir), root)
+    scoped = _sites(
+        sandbox_project, engine_dir, surface_of(footprint, sandbox_project, root, engine_dir), root
+    )
     flips = run(scoped)
     if not flips and len(scoped) < len(sites):
         keep = {s[2] for s in scoped}
@@ -416,8 +449,9 @@ def sensitivity(chk: str, sandbox_project: Path, custom: dict,
     return True, flips
 
 
-def flip_one(chk: str, sandbox_project: Path, custom: dict,
-             engine_dir: Path | None, site_label: str) -> bool:
+def flip_one(
+    chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None, site_label: str
+) -> bool:
     """Ζ·mutant — the SINGLE-SITE probe: does mutating exactly `site_label` flip chk red?
     The atomic unit the in-process group-testing sweep is built from, exposed so BAZEL can own
     the fanout — one pk_mutant action per (claim, site) — instead of an adaptive in-process
@@ -431,9 +465,16 @@ def flip_one(chk: str, sandbox_project: Path, custom: dict,
     raise RuntimeError(f"Ν·loud: site '{site_label}' is not in the mutation surface")
 
 
-def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
-                sandbox_project: Path, engine_dir: Path | None = None,
-                footprint: list | None = None, root_copy: Path | None = None) -> dict:
+def grade_check(
+    chk: str,
+    project_dir: Path,
+    presupposed: set,
+    custom: dict,
+    sandbox_project: Path,
+    engine_dir: Path | None = None,
+    footprint: list | None = None,
+    root_copy: Path | None = None,
+) -> dict:
     typ, _, target = chk.partition(":")
     if typ == "result":
         # Ξ·result-imported: a verdict-import is adequacy DELEGATED to a separately-gated sibling.
@@ -443,22 +484,25 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
         # its own gate AND Δ in //:hook, and the GATE (not Δ) resolves result: live — so a broken or
         # bogus sibling fails THERE.  The falsifiability tier need not, and does not, re-verify it.
         sproj, _, sclaim = target.partition("#")
-        return {"grade": "imported", "tests": [target],
-                # Λ·pi·carry — the DELEGATION EDGE, carried as data rather than collapsed into the
-                # tag.  `imported` alone is an EXISTENTIAL ("somebody vouched") and forgets the
-                # owner, which is why a cross-boundary clamp could not be written: the value to
-                # clamp against had nowhere to come from.  Naming (owner, claim) makes this a
-                # dependent PAIR — the fiber and the point in it — so a reader holding the owner's
-                # grade record can resolve the import to a real grade (grade.clamp does exactly
-                # this).  The CLI cannot resolve it ITSELF: certificates are build artifacts, and
-                # re-deriving one here is the rm-status cost bomb the delegation exists to avoid.
-                # So this returns the MAP, not its value; whoever holds the certificate applies it.
-                "delegates_to": {"owner": sproj, "claim": sclaim or None, "verb": "result"},
-                "why": f"adequacy delegated to the separately-gated sibling project '{target}' "
-                       "(composition, not re-derivation — its own gate + Δ are the guarantee)",
-                "not_higher": "imported is a delegation, not a falsifiability tier",
-                "not_lower": "the sibling is gated independently in the hook; the gate, not Δ, "
-                             "resolves the import live, so a broken sibling fails there"}
+        return {
+            "grade": "imported",
+            "tests": [target],
+            # Λ·pi·carry — the DELEGATION EDGE, carried as data rather than collapsed into the
+            # tag.  `imported` alone is an EXISTENTIAL ("somebody vouched") and forgets the
+            # owner, which is why a cross-boundary clamp could not be written: the value to
+            # clamp against had nowhere to come from.  Naming (owner, claim) makes this a
+            # dependent PAIR — the fiber and the point in it — so a reader holding the owner's
+            # grade record can resolve the import to a real grade (grade.clamp does exactly
+            # this).  The CLI cannot resolve it ITSELF: certificates are build artifacts, and
+            # re-deriving one here is the rm-status cost bomb the delegation exists to avoid.
+            # So this returns the MAP, not its value; whoever holds the certificate applies it.
+            "delegates_to": {"owner": sproj, "claim": sclaim or None, "verb": "result"},
+            "why": f"adequacy delegated to the separately-gated sibling project '{target}' "
+            "(composition, not re-derivation — its own gate + Δ are the guarantee)",
+            "not_higher": "imported is a delegation, not a falsifiability tier",
+            "not_lower": "the sibling is gated independently in the hook; the gate, not Δ, "
+            "resolves the import live, so a broken sibling fails there",
+        }
     if typ == "concept":
         # Λ·witness — a concept: check IMPORTS a witness the concept LIBRARY owns, grades ONCE (a
         # def-sweep whose sensitivity fingerprint IS the engine) and gates in //:hook.  Graded
@@ -469,30 +513,39 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
         # AND Δ in //:hook, so a weak or broken concept fails THERE.  The Bazel path additionally
         # imports the certificate's measured engine fingerprint into this view's adequacy and :cohere
         # (pk_grade over @paperkit_library//:<key>__dcalc), so the proof itself travels with the import.
-        return {"grade": "imported", "tests": [f"library/{target}"],
-                # Λ·pi·carry — see result: above.  The owner here is the concept LIBRARY, and the
-                # Bazel path already resolves this edge for real: pk_grade reads the library's
-                # __dcalc certificate, so the importing view's grade record carries the OWNER'S
-                # measured grade (verified: paper's paper-is-projection record reads "behavioral",
-                # byte-identical to the library's, and paper holds no calc of its own to derive it
-                # from).  Naming the edge here lets the in-process clamp reach the same value.
-                "delegates_to": {"owner": "library", "claim": target, "verb": "concept"},
-                "why": f"adequacy delegated to the concept library, which owns, grades and gates the "
-                       f"'{target}' witness (composition, not re-derivation)",
-                "not_higher": "imported is a delegation, not a falsifiability tier",
-                "not_lower": "the library is gated independently in the hook; a weak or broken concept "
-                             "fails there, and the Bazel path imports its measured engine fingerprint"}
+        return {
+            "grade": "imported",
+            "tests": [f"library/{target}"],
+            # Λ·pi·carry — see result: above.  The owner here is the concept LIBRARY, and the
+            # Bazel path already resolves this edge for real: pk_grade reads the library's
+            # __dcalc certificate, so the importing view's grade record carries the OWNER'S
+            # measured grade (verified: paper's paper-is-projection record reads "behavioral",
+            # byte-identical to the library's, and paper holds no calc of its own to derive it
+            # from).  Naming the edge here lets the in-process clamp reach the same value.
+            "delegates_to": {"owner": "library", "claim": target, "verb": "concept"},
+            "why": f"adequacy delegated to the concept library, which owns, grades and gates the "
+            f"'{target}' witness (composition, not re-derivation)",
+            "not_higher": "imported is a delegation, not a falsifiability tier",
+            "not_lower": "the library is gated independently in the hook; a weak or broken concept "
+            "fails there, and the Bazel path imports its measured engine fingerprint",
+        }
     if typ == "file":
         resolved = (project_dir / target).resolve()
         if resolved in presupposed:
-            return {"grade": "vacuous", "tests": [target],
-                    "why": "existence of a required project/engine source — presupposed by the build",
-                    "not_higher": "to rise: give it a check that can FAIL — a file: of a presupposed input is removed by no real change",
-                    "not_lower": "vacuous is the floor"}
-        return {"grade": "existence", "tests": [target],
-                "why": "existence of a contingent artifact — presence only, not content",
-                "not_higher": "to rise: test the artifact's CONTENT, not just its presence (a content-sensitive cmd:)",
-                "not_lower": "not vacuous: the artifact is contingent, not a presupposed build input, so its absence is a real failure"}
+            return {
+                "grade": "vacuous",
+                "tests": [target],
+                "why": "existence of a required project/engine source — presupposed by the build",
+                "not_higher": "to rise: give it a check that can FAIL — a file: of a presupposed input is removed by no real change",
+                "not_lower": "vacuous is the floor",
+            }
+        return {
+            "grade": "existence",
+            "tests": [target],
+            "why": "existence of a contingent artifact — presence only, not content",
+            "not_higher": "to rise: test the artifact's CONTENT, not just its presence (a content-sensitive cmd:)",
+            "not_lower": "not vacuous: the artifact is contingent, not a presupposed build input, so its absence is a real failure",
+        }
     # cmd: / custom — Δ·det: determinism guard, then empirically probe falsifiability.
     # Δ assumes a check is a PURE FUNCTION of project content; a flaky check (wall-clock,
     # load, iteration order, the date, network) gets a single-sample grade that is noise.
@@ -503,18 +556,29 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     # IS a real non-determinism (the verdict is not a function of project content), and collapsing
     # via `.passed` to {False, False} would HIDE it as a stable fail.  Verdict is identity-hashable
     # with no __bool__ precisely so this set has three distinguishable outcomes (ask-result-tristate).
-    if reps > 1 and len({paperkit.resolver.resolves(chk, sandbox_project, custom) for _ in range(reps)}) > 1:
-        return {"grade": "broken", "tests": [], "determinism": "flaky",
-                "why": f"non-deterministic — {reps} baseline runs in a pristine sandbox disagreed; "
-                       "the verdict is not a function of project content (wall-clock / load / "
-                       "iteration order / network?), so a single-sample mutation sweep is noise",
-                "not_higher": "to rise: make the check a pure function of project content, then Δ can grade it",
-                "not_lower": "—"}
+    if (
+        reps > 1
+        and len({paperkit.resolver.resolves(chk, sandbox_project, custom) for _ in range(reps)}) > 1
+    ):
+        return {
+            "grade": "broken",
+            "tests": [],
+            "determinism": "flaky",
+            "why": f"non-deterministic — {reps} baseline runs in a pristine sandbox disagreed; "
+            "the verdict is not a function of project content (wall-clock / load / "
+            "iteration order / network?), so a single-sample mutation sweep is noise",
+            "not_higher": "to rise: make the check a pure function of project content, then Δ can grade it",
+            "not_lower": "—",
+        }
     baseline, sens = sensitivity(chk, sandbox_project, custom, engine_dir, footprint, root_copy)
     # Ζ·broken·offaxis — hand the ladder the third state.  `baseline` is UNREACHABLE (falsy,
     # but not plain False) when the check could not be reached at all.
-    rec = mikemol.grade.grade.grade_from_sens(baseline, sens, reachable=(baseline is not UNREACHABLE))
-    rec["baseline"] = baseline   # Ζ·calc — the measured baseline (the verdict), part of the CALCULATION
+    rec = mikemol.grade.grade.grade_from_sens(
+        baseline, sens, reachable=(baseline is not UNREACHABLE)
+    )
+    rec["baseline"] = (
+        baseline  # Ζ·calc — the measured baseline (the verdict), part of the CALCULATION
+    )
     # Ζ·calc·why — the CHECK's own words, beside the grader's generic ones.  Present only when the
     # check said something, so a passing record stays byte-identical (the non-breaking widening
     # `why` and `account` already took in verdict.py).
@@ -559,8 +623,9 @@ def grade_check(chk: str, project_dir: Path, presupposed: set, custom: dict,
     return rec
 
 
-def _vacuity_source(rec: dict, chk: str, sandbox_project: Path,
-                    custom: dict, engine_dir: Path | None) -> dict:
+def _vacuity_source(
+    rec: dict, chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None
+) -> dict:
     """Δ·vacuity-source — split the indeterminate verdict by the ALL-CORRUPTED probe.
     No SINGLE mutation flipped it; corrupt EVERY mutable input at once and look again.
     Still green ⇒ insensitive to all project content: it reads only external/live state,
@@ -578,18 +643,24 @@ def _vacuity_source(rec: dict, chk: str, sandbox_project: Path,
         for f, b in saved.items():
             f.write_bytes(b)
     if still_green:
-        return {**rec, "vacuity": "total",
-                "why": "corrupting EVERY project input AT ONCE leaves it green — it is blind to all "
-                       "project content: it reads only external/live state, or asserts the absence "
-                       "of content no corruption supplies; Δ cannot falsify it by mutation",
-                "not_higher": "to rise: read a PROJECT input a mutation can corrupt (a captured "
-                              "dataset — the dataset-backed pattern), or supply a Π counter-fixture "
-                              "(only the latter helps a negative assertion; an external read needs the former)"}
-    return {**rec, "vacuity": "combination",
-            "why": "no single input flips it, but corrupting all of them at once does — it depends "
-                   "on project content in concert, not on any one file",
-            "not_higher": "to rise: a Π counter-fixture isolating the responsible inputs proves it behavioral",
-            "not_lower": "not external: corrupting all inputs DOES flip it, so it reads project content"}
+        return {
+            **rec,
+            "vacuity": "total",
+            "why": "corrupting EVERY project input AT ONCE leaves it green — it is blind to all "
+            "project content: it reads only external/live state, or asserts the absence "
+            "of content no corruption supplies; Δ cannot falsify it by mutation",
+            "not_higher": "to rise: read a PROJECT input a mutation can corrupt (a captured "
+            "dataset — the dataset-backed pattern), or supply a Π counter-fixture "
+            "(only the latter helps a negative assertion; an external read needs the former)",
+        }
+    return {
+        **rec,
+        "vacuity": "combination",
+        "why": "no single input flips it, but corrupting all of them at once does — it depends "
+        "on project content in concert, not on any one file",
+        "not_higher": "to rise: a Π counter-fixture isolating the responsible inputs proves it behavioral",
+        "not_lower": "not external: corrupting all inputs DOES flip it, so it reads project content",
+    }
 
 
 class FlipSite(NamedTuple):
@@ -608,13 +679,17 @@ class FlipSite(NamedTuple):
     label: str
 
 
-def _flip_sites_of(sandbox_project: Path, engine_dir: Path | None,
-                   files: list | None = None, root_copy: Path | None = None) -> list:
+def _flip_sites_of(
+    sandbox_project: Path,
+    engine_dir: Path | None,
+    files: list | None = None,
+    root_copy: Path | None = None,
+) -> list:
     """Every flip: condition site as a FlipSite — a SEPARATE generator from _sites, so a flip: site
     is never in the list the sensitivity sweep group-tests (revision c, the structural bar).
     """
     out = []
-    for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
+    for f in sandbox_files(sandbox_project, set(), engine_dir) if files is None else files:
         if f.suffix != ".py":
             continue
         label = _rel(f, sandbox_project, engine_dir, root_copy)
@@ -623,8 +698,9 @@ def _flip_sites_of(sandbox_project: Path, engine_dir: Path | None,
     return out
 
 
-def decisions_unasserted(chk: str, sandbox_project: Path, custom: dict,
-                         engine_dir: Path | None, sens: list) -> list:
+def decisions_unasserted(
+    chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None, sens: list
+) -> list:
     """Μ·sweep·atom — of the decisions a check REACHES, which does it never ASSERT on?  For each flip:
     condition, invert it (a NON-monotone value swap) and read it against the SECOND, independent
     probe that keeps this instrument sound (revision d — the analog of _vacuity_source's disambiguation
@@ -652,7 +728,8 @@ def decisions_unasserted(chk: str, sandbox_project: Path, custom: dict,
         arms = branch_arms.get((fs.file, fs.qualname), [])
         # BOTH sibling arms genuinely reached (per-arm flip_one, not the correlated `sens`).
         if len(arms) < 2 or not all(
-                flip_one(chk, sandbox_project, custom, engine_dir, lbl) for lbl in arms):
+            flip_one(chk, sandbox_project, custom, engine_dir, lbl) for lbl in arms
+        ):
             continue
         if not _flip_flips(chk, sandbox_project, custom, engine_dir, fs):
             out.append(fs.label)
@@ -664,7 +741,7 @@ def decisions_unasserted(chk: str, sandbox_project: Path, custom: dict,
     for ds in _dflip_sites_of(sandbox_project, engine_dir):
         drop_label = f"{_rel(ds.file, sandbox_project, engine_dir)}::data-:{ds.qualname}#{ds.n}"
         if not flip_one(chk, sandbox_project, custom, engine_dir, drop_label):
-            continue                                     # key not read → not a gap, just unreached
+            continue  # key not read → not a gap, just unreached
         if not _perturb_flips(chk, sandbox_project, custom, engine_dir, ds):
             out.append(ds.label)
     return sorted(out)
@@ -682,8 +759,9 @@ def _branch_arms_by_qn(sandbox_project: Path, engine_dir: Path | None) -> dict:
     return by_qn
 
 
-def _flip_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None,
-                fs: FlipSite) -> bool:
+def _flip_flips(
+    chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None, fs: FlipSite
+) -> bool:
     """Invert fs's condition in-place, run the check, restore.  True iff the inversion flips chk red —
     the witness asserts on the decision.  A NON-monotone probe (a value swap, not a raise), which is
     exactly why fs is a FlipSite the sensitivity sweep cannot receive.
@@ -711,33 +789,40 @@ class DflipSite(NamedTuple):
     label: str
 
 
-def _dflip_sites_of(sandbox_project: Path, engine_dir: Path | None,
-                    files: list | None = None, root_copy: Path | None = None) -> list:
+def _dflip_sites_of(
+    sandbox_project: Path,
+    engine_dir: Path | None,
+    files: list | None = None,
+    root_copy: Path | None = None,
+) -> list:
     """Every dflip: data-value site as a DflipSite — a SEPARATE generator from _sites (the structural
     bar), scoped to DICT VALUES and non-set elements (a bare set element has no value to perturb; only
     presence, which data-: already covers).  A set literal contributes NO dflip: sites.
     """
     out = []
-    for f in (sandbox_files(sandbox_project, set(), engine_dir) if files is None else files):
+    for f in sandbox_files(sandbox_project, set(), engine_dir) if files is None else files:
         if f.suffix != ".py":
             continue
         label = _rel(f, sandbox_project, engine_dir, root_copy)
         for qn, n, kind, _k, _v in paperkit.mutate._data_sites(f.read_text()):
             if kind == "Set":
-                continue                                 # a set element has no perturbable value
+                continue  # a set element has no perturbable value
             out.append(DflipSite(f, qn, n, kind, f"{label}::dflip:{qn}#{n}"))
     return out
 
 
-def _perturb_flips(chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None,
-                   ds: DflipSite) -> bool:
+def _perturb_flips(
+    chk: str, sandbox_project: Path, custom: dict, engine_dir: Path | None, ds: DflipSite
+) -> bool:
     """Perturb ds's value to a valid same-position counterfactual in-place, run the check, restore.
     True iff the perturb flips chk red — the witness ASSERTS on the value.  A NON-monotone probe (a
     value swap, not a drop), which is why ds is a DflipSite the sensitivity sweep cannot receive.
     """
     saved = ds.file.read_bytes()
     try:
-        ds.file.write_text(paperkit.mutate.emit_mutant(saved.decode(), f"dflip:{ds.qualname}#{ds.n}"))
+        ds.file.write_text(
+            paperkit.mutate.emit_mutant(saved.decode(), f"dflip:{ds.qualname}#{ds.n}")
+        )
         return not paperkit.resolver.resolves(chk, sandbox_project, custom).passed
     finally:
         ds.file.write_bytes(saved)
@@ -769,10 +854,12 @@ _SANDBOX_PREFIX = "paperkit-delta-"
 
 def _scratch_dir() -> str | None:
     """The parent for sweep sandboxes — disk-backed by preference.  None ⇒ platform default."""
-    for cand in (os.environ.get("PAPERKIT_SCRATCH"),
-                 os.environ.get("TMPDIR"),
-                 os.environ.get("XDG_CACHE_HOME"),
-                 os.path.expanduser("~/.cache") if os.path.expanduser("~") != "~" else None):
+    for cand in (
+        os.environ.get("PAPERKIT_SCRATCH"),
+        os.environ.get("TMPDIR"),
+        os.environ.get("XDG_CACHE_HOME"),
+        os.path.expanduser("~/.cache") if os.path.expanduser("~") != "~" else None,
+    ):
         if not cand:
             continue
         d = Path(cand) / "paperkit-sweep" if not os.environ.get("PAPERKIT_SCRATCH") else Path(cand)
@@ -782,7 +869,7 @@ def _scratch_dir() -> str | None:
                 return str(d)
         except OSError:
             continue
-    return None                                   # tempfile's default: never a hard failure
+    return None  # tempfile's default: never a hard failure
 
 
 _OWNER_FILE = ".paperkit-owner"
@@ -818,13 +905,13 @@ def _owner_live(d: Path) -> bool:
     except (OSError, ValueError):
         return False
     try:
-        os.kill(pid, 0)                # signal 0: existence probe, delivers nothing
+        os.kill(pid, 0)  # signal 0: existence probe, delivers nothing
     except ProcessLookupError:
         return False
     except PermissionError:
-        return True                    # exists, owned by another uid — live
+        return True  # exists, owned by another uid — live
     except OSError:
-        return True                    # unknown: refuse to reap on an ambiguous answer
+        return True  # unknown: refuse to reap on an ambiguous answer
     return True
 
 
@@ -843,7 +930,7 @@ def _reap_once() -> None:
     try:
         reap_sandboxes()
     except Exception:
-        pass                          # hygiene must never fail the grade it precedes
+        pass  # hygiene must never fail the grade it precedes
 
 
 def reap_sandboxes(older_than_s: int = 1800) -> int:
@@ -867,6 +954,7 @@ def reap_sandboxes(older_than_s: int = 1800) -> int:
     one's reap sees the elder's live pid stamp and skips it.
     """
     import time
+
     parent = Path(_scratch_dir() or tempfile.gettempdir())
     now, n = time.time(), 0
     for d in parent.glob(_SANDBOX_PREFIX + "*"):
@@ -904,7 +992,7 @@ def _sandbox_setup(project_dir, resolution="def"):
     # only unowned corpses, and our own copy does not exist yet.
     _reap_once()
     tmp = Path(tempfile.mkdtemp(prefix=_SANDBOX_PREFIX, dir=_scratch_dir()))
-    _claim_sandbox(tmp)               # stamp BEFORE the copy: a copy interrupted mid-write is owned
+    _claim_sandbox(tmp)  # stamp BEFORE the copy: a copy interrupted mid-write is owned
     root = paperkit.layout._sandbox_root(project_dir)
     paperkit.layout._copy_sandbox(root, tmp / root.name)
     root_copy = tmp / root.name
@@ -912,13 +1000,18 @@ def _sandbox_setup(project_dir, resolution="def"):
     sandbox = root_copy if rel == Path() else root_copy / rel
     engine = None
     if resolution == "def":
-        eng_rel = paperkit.layout._ENGINE.relative_to(root) if paperkit.layout._ENGINE.is_relative_to(root) else Path(paperkit.layout._ENGINE.name)
+        eng_rel = (
+            paperkit.layout._ENGINE.relative_to(root)
+            if paperkit.layout._ENGINE.is_relative_to(root)
+            else Path(paperkit.layout._ENGINE.name)
+        )
         engine = root_copy / eng_rel
         if not engine.is_dir():
             raise RuntimeError(
                 f"Ν·loud: def-resolution sweep cannot find the engine in the sandbox "
                 f"(expected a directory at {engine}, under the copied root {root}); refusing "
-                f"to silently degrade to file resolution and emit a vacuous fingerprint.")
+                f"to silently degrade to file resolution and emit a vacuous fingerprint."
+            )
     return tmp, sandbox, engine, root_copy
 
 
@@ -943,11 +1036,13 @@ def _grade_one(project_dir, chk, custom, presupposed, resolution="file"):
         if sweep_fp is None:
             fp = None
         elif sandbox == root_copy:
-            fp = sweep_fp                                        # the root project: its scope IS root
+            fp = sweep_fp  # the root project: its scope IS root
         else:
             pre = str(sandbox.relative_to(root_copy)) + "/"
-            fp = sorted(p[len(pre):] for p in sweep_fp if p.startswith(pre))
-        rec = grade_check(chk, project_dir, presupposed, custom, sandbox, engine, sweep_fp, root_copy)
+            fp = sorted(p[len(pre) :] for p in sweep_fp if p.startswith(pre))
+        rec = grade_check(
+            chk, project_dir, presupposed, custom, sandbox, engine, sweep_fp, root_copy
+        )
         rec["_footprint"] = fp
         # Ζ·surface·kind — how much of the claim the grade actually LOOKED AT.  Orthogonal to the
         # rung: a grade over an incomplete surface is not a weaker grade, it is a narrower one.
@@ -980,10 +1075,11 @@ def _grade_parallel(project_dir, checks, custom, presupposed, resolution="file")
     throttled newline pulses to a log/pipe; PAPERKIT_DELTA_PULSE=0 silences it.
     """
     from concurrent.futures import ThreadPoolExecutor
+
     jobs = max(1, min(len(checks), os.cpu_count() or 4))
     total, done, lock, t0 = len(checks), [0], threading.Lock(), time.monotonic()
     tty = sys.stderr.isatty()
-    every = float(paperkit.config.resolve(DELTA_PULSE))   # min seconds between log pulses; 0 = off
+    every = float(paperkit.config.resolve(DELTA_PULSE))  # min seconds between log pulses; 0 = off
     last = [t0]
 
     def pulse_grade(c):
@@ -994,18 +1090,25 @@ def _grade_parallel(project_dir, checks, custom, presupposed, resolution="file")
             if not every:
                 return r
             if tty:
-                print(f"paperkit-discriminate: graded {done[0]}/{total} ({now - t0:.0f}s)",
-                      end="\r", file=sys.stderr, flush=True)
+                print(
+                    f"paperkit-discriminate: graded {done[0]}/{total} ({now - t0:.0f}s)",
+                    end="\r",
+                    file=sys.stderr,
+                    flush=True,
+                )
             elif now - last[0] >= every or done[0] == total:
                 last[0] = now
-                print(f"paperkit-discriminate: graded {done[0]}/{total} ({now - t0:.0f}s)",
-                      file=sys.stderr, flush=True)
+                print(
+                    f"paperkit-discriminate: graded {done[0]}/{total} ({now - t0:.0f}s)",
+                    file=sys.stderr,
+                    flush=True,
+                )
         return r
 
     with ThreadPoolExecutor(max_workers=jobs) as ex:
         graded = list(ex.map(pulse_grade, checks))
     if tty and every:
-        print(file=sys.stderr)                                  # close the \r-updated line
+        print(file=sys.stderr)  # close the \r-updated line
     return dict(zip(checks, graded))
 
 
@@ -1035,8 +1138,11 @@ class GradeWitness:
         return {"cursor": i + 1, "graded": {**state["graded"], chk: g}}
 
     def parse(self, state):
-        return {"done": state["cursor"] >= len(self.checks), "graded": state["graded"],
-                "progress": f'{state["cursor"]}/{len(self.checks)}'}
+        return {
+            "done": state["cursor"] >= len(self.checks),
+            "graded": state["graded"],
+            "progress": f"{state['cursor']}/{len(self.checks)}",
+        }
 
     def serialize(self, state):
         return json.dumps(state, sort_keys=True)

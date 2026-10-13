@@ -12,6 +12,7 @@ the same triple for the GATE: minimal fixture, append one drift line (δ), pass�
 
     python3 paperkit/tests/boundaries_discriminate.py
 """
+
 from __future__ import annotations
 
 import json
@@ -26,7 +27,11 @@ TOKEN = "WARRANT-TOKEN-A1B2"
 
 
 def W(check):
-    return [paperkit.tests._fixture_model.entry("w", claim=f"a claim that mentions {TOKEN}", check=check)]
+    return [
+        paperkit.tests._fixture_model.entry(
+            "w", claim=f"a claim that mentions {TOKEN}", check=check
+        )
+    ]
 
 
 def grade_of(check, assets=None):
@@ -76,8 +81,12 @@ def pulse_lines(warrants, off=False):
 # equivalence is checked on a discriminating set, not a degenerate all-same one.
 MIXED = [
     paperkit.tests._fixture_model.entry("v", claim="a presupposed input", check="file:w.bib"),
-    paperkit.tests._fixture_model.entry("b", claim=f"content that mentions {TOKEN}", check=f"cmd:grep -q {TOKEN} w.bib"),
-    paperkit.tests._fixture_model.entry("i", claim="a check blind to the project", check="cmd:true"),
+    paperkit.tests._fixture_model.entry(
+        "b", claim=f"content that mentions {TOKEN}", check=f"cmd:grep -q {TOKEN} w.bib"
+    ),
+    paperkit.tests._fixture_model.entry(
+        "i", claim="a check blind to the project", check="cmd:true"
+    ),
 ]
 
 
@@ -85,75 +94,123 @@ def compose_sub(green=True):
     # Ξ·seam: assets for a nested sibling project 'g' that GATES GREEN (a passing file:
     # check) or RED (a failing cmd:false) — the verdict a `result:g` import imports.  The
     # paper.toml/rubric/title MUST match _fixture's so g/out.md == project(g) (prose≡proj).
-    w = paperkit.tests._fixture_model.entry("c", claim="a sibling claim", check=("file:w.bib" if green else "cmd:false"))
-    toml = ('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
-            'out = "out.md"\nnumbered = false\nreferences = false\n')
-    return {"g/paper.toml": toml, "g/r.tsv": "s\tSec\n", "g/w.bib": w,
-            "g/out.md": paperkit.tests._fixture_project.project_text([w])}
+    w = paperkit.tests._fixture_model.entry(
+        "c", claim="a sibling claim", check=("file:w.bib" if green else "cmd:false")
+    )
+    toml = (
+        '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
+        'out = "out.md"\nnumbered = false\nreferences = false\n'
+    )
+    return {
+        "g/paper.toml": toml,
+        "g/r.tsv": "s\tSec\n",
+        "g/w.bib": w,
+        "g/out.md": paperkit.tests._fixture_project.project_text([w]),
+    }
 
 
 def gate_exit(check, cited):
     # cited-only gating: control whether [@w] appears in the projection directly
     out = "the claim [@w]\n" if cited else "no citation here\n"
-    rc, _ = paperkit.tests._fixture_delta.discriminate(W(check), "--min-strength", "behavioral", out=out)
+    rc, _ = paperkit.tests._fixture_delta.discriminate(
+        W(check), "--min-strength", "behavioral", out=out
+    )
     return rc
 
 
 # ── ⟨grade⟩ examples: one minimal warrant per grade Δ can assign ──────────────
 GRADE_CASES = [
-    ("vacuous",       "file:w.bib",
-     "presupposed input — exists because the build requires it"),
-    ("existence",     "file:fig.svg",
-     "contingent artifact — its absence is a real failure, but content is untested",
-     {"fig.svg": "<svg/>\n"}),
-    ("behavioral",    f"cmd:grep -q {TOKEN} w.bib",
-     "content-sensitive — flips when the cited token leaves w.bib"),
-    ("indeterminate", "cmd:true",
-     "always passes; no mutation flips it (vacuous OR negative-assertion)"),
-    ("imported",      "result:g",
-     "Ξ·result-imported — adequacy DELEGATED to a separately-gated sibling; graded imported WITHOUT running it",
-     compose_sub(True)),
+    ("vacuous", "file:w.bib", "presupposed input — exists because the build requires it"),
+    (
+        "existence",
+        "file:fig.svg",
+        "contingent artifact — its absence is a real failure, but content is untested",
+        {"fig.svg": "<svg/>\n"},
+    ),
+    (
+        "behavioral",
+        f"cmd:grep -q {TOKEN} w.bib",
+        "content-sensitive — flips when the cited token leaves w.bib",
+    ),
+    (
+        "indeterminate",
+        "cmd:true",
+        "always passes; no mutation flips it (vacuous OR negative-assertion)",
+    ),
+    (
+        "imported",
+        "result:g",
+        "Ξ·result-imported — adequacy DELEGATED to a separately-gated sibling; graded imported WITHOUT running it",
+        compose_sub(True),
+    ),
 ]
 
 # ── ⟨P, F, δ⟩ pairs: the minimum delta that flips a verdict ───────────────────
 DELTA_CASES = [
-    {"name": "Δ-grade flip: vacuous → behavioral",
-     "axis": "the check field of one warrant",
-     "P": ("behavioral", f"cmd:grep -q {TOKEN} w.bib"), "F": ("vacuous", "file:w.bib"),
-     "delta": f"check: file:w.bib  →  cmd:grep -q {TOKEN} w.bib", "kind": "grade"},
-    {"name": "Δ gate flip: exit 0 → exit 1  (--min-strength behavioral)",
-     "axis": "the check field of one cited warrant",
-     "P": (0, f"cmd:grep -q {TOKEN} w.bib", True), "F": (1, "file:w.bib", True),
-     "delta": f"check: cmd:grep -q {TOKEN} w.bib  →  file:w.bib", "kind": "gate"},
-    {"name": "Δ gate scope: exit 0 → exit 1  (same vacuous check, citation toggled)",
-     "axis": "whether the projection cites the warrant",
-     "P": (0, "file:w.bib", False), "F": (1, "file:w.bib", True),
-     "delta": "out.md: (no citation)  →  …the claim [@w]", "kind": "gate"},
-    {"name": "Δ grader provenance: _grade_parallel → GradeWitness  (Σ·flat·witness)",
-     "axis": "whether grading is resumable (--budget selects the pump-witness, RECORDED not inferred)",
-     "P": ("_grade_parallel", f"cmd:grep -q {TOKEN} w.bib", False),
-     "F": ("GradeWitness", f"cmd:grep -q {TOKEN} w.bib", True),
-     "delta": "flags: (none)  →  --budget 0", "kind": "grader"},
-    {"name": "Δ vacuity-source: behavioral → total  (corruption-blind, Δ·vacuity-source)",
-     "axis": "whether the check reads a corruptible PROJECT input at all",
-     "P": ("behavioral", f"cmd:grep -q {TOKEN} w.bib"),
-     "F": ("total", "cmd:true"),
-     "delta": f"check: cmd:grep -q {TOKEN} w.bib  →  cmd:true", "kind": "vacuity"},
-    {"name": "Δ determinism: gradable → flaky  (Δ·det, PAPERKIT_DELTA_REPEAT=2)",
-     "axis": "whether the verdict is a function of project content (stable across baseline runs)",
-     "P": ("indeterminate", "cmd:true"),
-     "F": ("flaky", FLAKY),
-     "delta": "the check toggles a stored bit each run (its verdict depends on hidden state)",
-     "kind": "determinism"},
-    {"name": "Δ pulse: heartbeat → silent  (Δ·pulse)",
-     "axis": "PAPERKIT_DELTA_PULSE — a slow grade must read as LIVE, not stalled",
-     "P": ("heartbeat emitted", "default"),
-     "F": ("silenced", "PAPERKIT_DELTA_PULSE=0"),
-     "delta": "env: (default ~2s) → PAPERKIT_DELTA_PULSE=0", "kind": "pulse"},
-    {"name": "Δ compose: result: → imported by DELEGATION, INVARIANT to sibling state  (Ξ·result-imported)",
-     "axis": "Δ delegates without running the sibling, so its greenness does NOT change the grade — the gate enforces it",
-     "P": ("imported", "result:g (sibling green)"), "F": ("imported", "result:g (sibling RED)"),
-     "delta": "sibling g's check: file:w.bib (green) → cmd:false (red) — grade UNCHANGED: imported", "kind": "compose"},
+    {
+        "name": "Δ-grade flip: vacuous → behavioral",
+        "axis": "the check field of one warrant",
+        "P": ("behavioral", f"cmd:grep -q {TOKEN} w.bib"),
+        "F": ("vacuous", "file:w.bib"),
+        "delta": f"check: file:w.bib  →  cmd:grep -q {TOKEN} w.bib",
+        "kind": "grade",
+    },
+    {
+        "name": "Δ gate flip: exit 0 → exit 1  (--min-strength behavioral)",
+        "axis": "the check field of one cited warrant",
+        "P": (0, f"cmd:grep -q {TOKEN} w.bib", True),
+        "F": (1, "file:w.bib", True),
+        "delta": f"check: cmd:grep -q {TOKEN} w.bib  →  file:w.bib",
+        "kind": "gate",
+    },
+    {
+        "name": "Δ gate scope: exit 0 → exit 1  (same vacuous check, citation toggled)",
+        "axis": "whether the projection cites the warrant",
+        "P": (0, "file:w.bib", False),
+        "F": (1, "file:w.bib", True),
+        "delta": "out.md: (no citation)  →  …the claim [@w]",
+        "kind": "gate",
+    },
+    {
+        "name": "Δ grader provenance: _grade_parallel → GradeWitness  (Σ·flat·witness)",
+        "axis": "whether grading is resumable (--budget selects the pump-witness, RECORDED not inferred)",
+        "P": ("_grade_parallel", f"cmd:grep -q {TOKEN} w.bib", False),
+        "F": ("GradeWitness", f"cmd:grep -q {TOKEN} w.bib", True),
+        "delta": "flags: (none)  →  --budget 0",
+        "kind": "grader",
+    },
+    {
+        "name": "Δ vacuity-source: behavioral → total  (corruption-blind, Δ·vacuity-source)",
+        "axis": "whether the check reads a corruptible PROJECT input at all",
+        "P": ("behavioral", f"cmd:grep -q {TOKEN} w.bib"),
+        "F": ("total", "cmd:true"),
+        "delta": f"check: cmd:grep -q {TOKEN} w.bib  →  cmd:true",
+        "kind": "vacuity",
+    },
+    {
+        "name": "Δ determinism: gradable → flaky  (Δ·det, PAPERKIT_DELTA_REPEAT=2)",
+        "axis": "whether the verdict is a function of project content (stable across baseline runs)",
+        "P": ("indeterminate", "cmd:true"),
+        "F": ("flaky", FLAKY),
+        "delta": "the check toggles a stored bit each run (its verdict depends on hidden state)",
+        "kind": "determinism",
+    },
+    {
+        "name": "Δ pulse: heartbeat → silent  (Δ·pulse)",
+        "axis": "PAPERKIT_DELTA_PULSE — a slow grade must read as LIVE, not stalled",
+        "P": ("heartbeat emitted", "default"),
+        "F": ("silenced", "PAPERKIT_DELTA_PULSE=0"),
+        "delta": "env: (default ~2s) → PAPERKIT_DELTA_PULSE=0",
+        "kind": "pulse",
+    },
+    {
+        "name": "Δ compose: result: → imported by DELEGATION, INVARIANT to sibling state  (Ξ·result-imported)",
+        "axis": "Δ delegates without running the sibling, so its greenness does NOT change the grade — the gate enforces it",
+        "P": ("imported", "result:g (sibling green)"),
+        "F": ("imported", "result:g (sibling RED)"),
+        "delta": "sibling g's check: file:w.bib (green) → cmd:false (red) — grade UNCHANGED: imported",
+        "kind": "compose",
+    },
 ]
 
 
@@ -231,42 +288,62 @@ def main() -> int:
     print("Δ grader equivalence — Σ·flat·agree\n")
     par, wit = grades_via(MIXED, resumable=False), grades_via(MIXED, resumable=True)
     distinct = sorted(set(par.values()))
-    mixed_ok = len(distinct) >= 3                       # genuinely discriminating, not degenerate
+    mixed_ok = len(distinct) >= 3  # genuinely discriminating, not degenerate
     agree_ok = par == wit
     if not (mixed_ok and agree_ok):
         fails.append(("agree", par, wit))
-    print(f"  {'ok ' if mixed_ok and agree_ok else 'XX '}batch (_grade_parallel) ≡ resumable (GradeWitness)")
+    print(
+        f"  {'ok ' if mixed_ok and agree_ok else 'XX '}batch (_grade_parallel) ≡ resumable (GradeWitness)"
+    )
     print(f"      parallel: {par}")
     print(f"      witness : {wit}")
-    print(f"      distinct grades: {distinct}  ({'mixed' if mixed_ok else 'DEGENERATE — proves nothing'})\n")
+    print(
+        f"      distinct grades: {distinct}  ({'mixed' if mixed_ok else 'DEGENERATE — proves nothing'})\n"
+    )
 
     # ── Ξ·seam adequacy-composes: --min-strength behavioral ACCEPTS an imported verdict
     # (delegated to a separately-gated sibling) but REJECTS a vacuous file: — the gate-mode
     # proof that composition meets the behavioral floor without re-deriving the sibling.
     print("Δ adequacy-composes — Ξ·seam\n")
-    imp_rc, _ = paperkit.tests._fixture_delta.discriminate(W("result:g"), "--min-strength", "behavioral", assets=compose_sub(True))
-    vac_rc, _ = paperkit.tests._fixture_delta.discriminate(W("file:w.bib"), "--min-strength", "behavioral")
+    imp_rc, _ = paperkit.tests._fixture_delta.discriminate(
+        W("result:g"), "--min-strength", "behavioral", assets=compose_sub(True)
+    )
+    vac_rc, _ = paperkit.tests._fixture_delta.discriminate(
+        W("file:w.bib"), "--min-strength", "behavioral"
+    )
     compose_ok = imp_rc == 0 and vac_rc == 1
     if not compose_ok:
         fails.append(("adequacy-composes", imp_rc, vac_rc))
-    print(f"  {'ok ' if compose_ok else 'XX '}--min-strength behavioral: imported PASSES, vacuous FAILS")
+    print(
+        f"  {'ok ' if compose_ok else 'XX '}--min-strength behavioral: imported PASSES, vacuous FAILS"
+    )
     print(f"      P (pass side): result:g (imported) → exit {imp_rc}")
     print(f"      F (flag side): file:w.bib (vacuous) → exit {vac_rc}")
-    print("      δ (min delta): the check's grade meets the behavioral floor by DELEGATION, not derivation\n")
+    print(
+        "      δ (min delta): the check's grade meets the behavioral floor by DELEGATION, not derivation\n"
+    )
 
     # ── Ν·loud: a def-resolution sweep with no engine in its sandbox FAILS rather than silently
     # degrading to file resolution (the degeneracy that once shipped a vacuous emergence gate).
     # The fixture project has no engine, so def must fail loud; file resolution needs none, passes.
     print("Δ def-resolution engine guard — Ν·loud\n")
     chk = f"cmd:grep -q {TOKEN} w.bib"
-    def_rc, _ = paperkit.tests._fixture_delta.discriminate(W(chk), "--all", "--json", "--resolution", "def")
-    file_rc, _ = paperkit.tests._fixture_delta.discriminate(W(chk), "--all", "--json", "--resolution", "file")
+    def_rc, _ = paperkit.tests._fixture_delta.discriminate(
+        W(chk), "--all", "--json", "--resolution", "def"
+    )
+    file_rc, _ = paperkit.tests._fixture_delta.discriminate(
+        W(chk), "--all", "--json", "--resolution", "file"
+    )
     loud_ok = def_rc != 0 and file_rc == 0
     if not loud_ok:
         fails.append(("N-loud", def_rc, file_rc))
-    print(f"  {'ok ' if loud_ok else 'XX '}def with no engine in the sandbox FAILS; file resolution passes")
+    print(
+        f"  {'ok ' if loud_ok else 'XX '}def with no engine in the sandbox FAILS; file resolution passes"
+    )
     print(f"      P (pass side): --resolution file → exit {file_rc} (no engine in the surface)")
-    print(f"      F (flag side): --resolution def  → exit {def_rc} (engine absent → loud, not silent degrade)")
+    print(
+        f"      F (flag side): --resolution def  → exit {def_rc} (engine absent → loud, not silent degrade)"
+    )
     print("      δ (min delta): the --resolution flag (file → def)\n")
 
     # ── Ζ·ladder floor-refusal: a floor the ladder cannot rank is REFUSED loud with the
@@ -274,14 +351,22 @@ def main() -> int:
     # moved validation to the ladder's ONE consumer — the set is derived from grade.py, listed
     # nowhere).  P = a real rung gates (adequacy-composes above); F = a bogus floor is refused.
     print("Δ floor validation — Ζ·ladder\n")
-    bogus_rc, _ = paperkit.tests._fixture_delta.discriminate(W("cmd:true"), "--min-strength", "bogus")
-    bogus_msg = paperkit.tests._fixture_delta.discriminate_stderr(W("cmd:true"), "--min-strength", "bogus")
+    bogus_rc, _ = paperkit.tests._fixture_delta.discriminate(
+        W("cmd:true"), "--min-strength", "bogus"
+    )
+    bogus_msg = paperkit.tests._fixture_delta.discriminate_stderr(
+        W("cmd:true"), "--min-strength", "bogus"
+    )
     floor_ok = bogus_rc != 0 and "--min-strength must be one of" in bogus_msg
     if not floor_ok:
         fails.append(("floor-refusal", bogus_rc, bogus_msg))
-    print(f"  {'ok ' if floor_ok else 'XX '}--min-strength bogus is refused, message names the valid set")
+    print(
+        f"  {'ok ' if floor_ok else 'XX '}--min-strength bogus is refused, message names the valid set"
+    )
     print("      P (pass side): --min-strength behavioral → gates (adequacy-composes above)")
-    print(f"      F (flag side): --min-strength bogus → exit {bogus_rc}, 'must be one of' on stderr")
+    print(
+        f"      F (flag side): --min-strength bogus → exit {bogus_rc}, 'must be one of' on stderr"
+    )
     print("      δ (min delta): one membership test against the ladder (bogus ∉ grade.ORDER)\n")
 
     # ── Ζ·ladder·sentinel (finding A): the exit alphabet is TYPED so a resume loop can tell
@@ -290,22 +375,32 @@ def main() -> int:
     # typo instead of spinning (a downstream consumer measured 29 iterations in 15s on the old
     # overloaded code).  A real key grades and exits 0.
     print("Δ exit alphabet — Ζ·ladder·sentinel (finding A)\n")
-    refuse_rc, _ = paperkit.tests._fixture_delta.discriminate(W("cmd:true"), "--only", "no-such-key")
+    refuse_rc, _ = paperkit.tests._fixture_delta.discriminate(
+        W("cmd:true"), "--only", "no-such-key"
+    )
     ok_rc, _ = paperkit.tests._fixture_delta.discriminate(W("cmd:true"), "--only", "w")
     refuse_ok = refuse_rc == 3 and ok_rc == 0
     if not refuse_ok:
         fails.append(("refuse-code", refuse_rc, ok_rc))
-    print(f"  {'ok ' if refuse_ok else 'XX '}an unknown --only key REFUSES with 3 (≠ 2 resume); a real key exits 0")
+    print(
+        f"  {'ok ' if refuse_ok else 'XX '}an unknown --only key REFUSES with 3 (≠ 2 resume); a real key exits 0"
+    )
     print(f"      P (pass side): --only w          → exit {ok_rc} (grades the named check)")
-    print(f"      F (flag side): --only no-such-key → exit {refuse_rc} (refuse: a key naming nothing)")
-    print("      δ (min delta): whether the --only key names a check (present → grade; absent → refuse)\n")
+    print(
+        f"      F (flag side): --only no-such-key → exit {refuse_rc} (refuse: a key naming nothing)"
+    )
+    print(
+        "      δ (min delta): whether the --only key names a check (present → grade; absent → refuse)\n"
+    )
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} case(s) drifted)")
         return 1
-    print(f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas, "
-          f"1 grader-equivalence, 1 adequacy-composes, 1 def-engine-guard, 1 floor-refusal, "
-          f"1 exit-alphabet)")
+    print(
+        f"BOUNDARIES: PASS ({len(GRADE_CASES)} grades, {len(DELTA_CASES)} deltas, "
+        f"1 grader-equivalence, 1 adequacy-composes, 1 def-engine-guard, 1 floor-refusal, "
+        f"1 exit-alphabet)"
+    )
     return 0
 
 

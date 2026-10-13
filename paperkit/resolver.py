@@ -18,6 +18,7 @@ traces a check's READ footprint (footprint, Φ — the files it opens, the sound
 grade on).  Deps: only the stdlib + two of paperkit's own scripts as subprocesses (gate.py for
 result:, the library's concepts.py for concept:), never the rest of the engine.
 """
+
 from __future__ import annotations
 
 import json
@@ -40,7 +41,7 @@ from pathlib import Path
 # here is deliberate and safe, not guesswork.
 import paperkit.checkenv
 
-_GATE = Path(__file__).resolve().parent / "gate.py"   # invoked as a subprocess for result:
+_GATE = Path(__file__).resolve().parent / "gate.py"  # invoked as a subprocess for result:
 # ⚑ Ζ·lib·land — ONE `.parent`, LIKE `_GATE` ABOVE, because the library now lives INSIDE the
 # package.  This read `.parent.parent / "library"` — walking UP out of `paperkit/` to a sibling
 # directory — which is the exact defect pyproject.toml:6 records as the open question the move was
@@ -209,8 +210,8 @@ def _sibling_for(project_dir: Path | None, name: str) -> Path:
     cands = []
     if project_dir is not None:
         p = Path(project_dir).resolve()
-        cands += [p / name, p.parent / name]           # a nested sub-project, then a true sibling
-    cands.append(_LIBRARY.parent / name)               # the engine's own tree, by FALLBACK
+        cands += [p / name, p.parent / name]  # a nested sub-project, then a true sibling
+    cands.append(_LIBRARY.parent / name)  # the engine's own tree, by FALLBACK
     for c in cands:
         if (c / "paper.toml").is_file():
             return c
@@ -299,11 +300,11 @@ def _library_for(project_dir: Path | None) -> Path:
     # one in the test.
     if project_dir is not None:
         p = Path(project_dir).resolve()
-        for base in (p, p.parent):                    # the project's own, then its repo root's
+        for base in (p, p.parent):  # the project's own, then its repo root's
             cand = base / "library"
             if (cand / "paper.toml").is_file():
                 return cand
-        for base in (p, p.parent):                    # compatibility: a pre-contract library
+        for base in (p, p.parent):  # compatibility: a pre-contract library
             cand = base / "library"
             if (cand / "concepts.py").is_file():
                 return cand
@@ -327,6 +328,7 @@ def _library_cmd(lib: Path, target: str) -> list:
     fallback = [sys.executable, str(lib / "concepts.py"), target]
     try:
         import tomllib
+
         cfg = tomllib.loads((lib / "paper.toml").read_text())
         cmd = ((cfg.get("checks") or {}).get("claim") or {}).get("cmd")
         if not cmd:
@@ -336,8 +338,9 @@ def _library_cmd(lib: Path, target: str) -> list:
         # the declaration is written from the project's own directory, which is why the run below
         # sets cwd=lib.
         parts = shlex.split(cmd.replace("{target}", target))
-        return [str(lib / a) if a.endswith(".py") and not Path(a).is_absolute() else a
-                for a in parts]
+        return [
+            str(lib / a) if a.endswith(".py") and not Path(a).is_absolute() else a for a in parts
+        ]
     except Exception:
         return fallback
 
@@ -358,18 +361,27 @@ def _library_cmd(lib: Path, target: str) -> list:
 # this field each site carried its own hardcoded list, and adding `concept:` updated two of the
 # three — the footprint audit still read `result:` alone.  Now they ask the verb.
 VERBS = {
-    "file":    {"arg": "<path>",      "verb": "exists",  "crosses": False,
-                "passes": "the artifact exists"},
-    "cmd":     {"arg": "<script>",    "verb": "execs",   "crosses": False,
-                "passes": "the script exits `0`"},
-    "result":  {"arg": "<project>[#<claim>]", "verb": "parses", "crosses": True,
-                "passes": "the sibling project's gate verdict parses green --- for the whole "
-                          "project, or for the ONE named warrant"},
-    "agree":   {"arg": "<p>|||<q>",   "verb": "concurs", "crosses": False,
-                "passes": "the independent producers all exit `0` and emit identical output"},
-    "concept": {"arg": "<key>",       "verb": "imports", "crosses": True,
-                "passes": "the project's concept library --- else the engine's --- certifies "
-                          "that key"},
+    "file": {"arg": "<path>", "verb": "exists", "crosses": False, "passes": "the artifact exists"},
+    "cmd": {"arg": "<script>", "verb": "execs", "crosses": False, "passes": "the script exits `0`"},
+    "result": {
+        "arg": "<project>[#<claim>]",
+        "verb": "parses",
+        "crosses": True,
+        "passes": "the sibling project's gate verdict parses green --- for the whole "
+        "project, or for the ONE named warrant",
+    },
+    "agree": {
+        "arg": "<p>|||<q>",
+        "verb": "concurs",
+        "crosses": False,
+        "passes": "the independent producers all exit `0` and emit identical output",
+    },
+    "concept": {
+        "arg": "<key>",
+        "verb": "imports",
+        "crosses": True,
+        "passes": "the project's concept library --- else the engine's --- certifies that key",
+    },
 }
 
 # The `type:` prefixes of the boundary-crossing verbs — startswith()-ready, DERIVED so a consumer
@@ -394,9 +406,9 @@ CROSSING = tuple(f"{v}:" for v, spec in VERBS.items() if spec["crosses"])
 # deadlocked I/O wait a CPU limit would never trip). Ample for any single real check (a def-sweep's
 # minutes are MANY checks, not one CPU-heavy one); PAPERKIT_CHECK_CPU / PAPERKIT_CHECK_TIMEOUT
 # override.
-CHECK_CPU = 60          # seconds of CPU time — a busy hang trips this; a lease-queued check
-                        # does not
-CHECK_TIMEOUT = 600     # wall-clock BACKSTOP for a stuck-waiting (zero-CPU) process
+CHECK_CPU = 60  # seconds of CPU time — a busy hang trips this; a lease-queued check
+# does not
+CHECK_TIMEOUT = 600  # wall-clock BACKSTOP for a stuck-waiting (zero-CPU) process
 
 
 def _cpu_rlimit(seconds: int):
@@ -406,8 +418,10 @@ def _cpu_rlimit(seconds: int):
     expected cap kill).  Runs in the forked child before exec, so the whole check subprocess is
     bounded by WORK DONE, not wall time.
     """
+
     def _set() -> None:
         import resource
+
         # W78/W127 — setrlimit can LOWER but never RAISE a hard limit, so a NESTED invocation
         # (already running under a tighter parent-imposed hard limit, e.g. inside a mutant sweep
         # executor) must clamp to the inherited hard limit rather than assume `seconds` is
@@ -420,6 +434,7 @@ def _cpu_rlimit(seconds: int):
         # Ζ·core·off — SIGXCPU's default action dumps core; the verdict reads the exit, never a
         # core.
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+
     return _set
 
 
@@ -437,6 +452,7 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
     """
     import os
     import signal
+
     cpu = int(os.environ.get("PAPERKIT_CHECK_CPU", CHECK_CPU))
     wall = int(os.environ.get("PAPERKIT_CHECK_TIMEOUT", CHECK_TIMEOUT))
     # start_new_session so a hang kills the WHOLE process group — a `shell=True` timeout otherwise
@@ -463,9 +479,16 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
         # lines — to STDOUT"), and this site — the one that actually RUNS the check — kept it.  The
         # two streams stay on SEPARATE handles and are never merged; stdout is appended after
         # stderr only when composing the account, so a parse of either is unaffected.
-        p = subprocess.Popen(cmd, shell=True, cwd=cwd, env=paperkit.checkenv.clean_env(),
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             start_new_session=True, preexec_fn=_cpu_rlimit(cpu))
+        p = subprocess.Popen(
+            cmd,
+            shell=True,
+            cwd=cwd,
+            env=paperkit.checkenv.clean_env(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+            preexec_fn=_cpu_rlimit(cpu),
+        )
         try:
             # ⚑ communicate(), NEVER wait() — a PIPE that nothing drains DEADLOCKS the child the
             # moment it writes past the 64KB pipe buffer: the check blocks in anon_pipe_write, this
@@ -474,8 +497,9 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
             # stalled on its last action, and `wchan` named both halves of the deadlock.  The
             # stderr capture (Ζ·unavailable·why) is right and the wait() paired with it was not;
             # communicate() drains and waits in one call, so the timeout still bounds the run.
-            _out, _err = p.communicate(timeout=wall)   # both PIPEs; communicate() drains both
+            _out, _err = p.communicate(timeout=wall)  # both PIPEs; communicate() drains both
             rc = p.returncode
+
             # SIGXCPU (‑signal 24) / SIGKILL from the CPU rlimit ⇒ negative returncode ⇒ FAIL,
             # not PASS.
             #
@@ -498,8 +522,9 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
                 lines = []
                 for raw in (_err, _out):
                     if raw:
-                        lines += [ln for ln in raw.decode("utf-8", "replace").splitlines()
-                                  if ln.strip()]
+                        lines += [
+                            ln for ln in raw.decode("utf-8", "replace").splitlines() if ln.strip()
+                        ]
                 return lines
 
             if rc == _CANNOT_RUN:
@@ -514,16 +539,16 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
             # account carries the operand that diverged rather than the tally.
             acct = _account()
             marked = [ln for ln in acct if ln.lstrip().startswith("XX")]
-            pick = (marked[-1] if marked else (acct[-1] if acct else ""))
+            pick = marked[-1] if marked else (acct[-1] if acct else "")
             return _pf(False, pick.strip()[:400], owner)
         except subprocess.TimeoutExpired:
             try:
-                os.killpg(os.getpgid(p.pid), signal.SIGKILL)   # kill the whole tree, no orphans
+                os.killpg(os.getpgid(p.pid), signal.SIGKILL)  # kill the whole tree, no orphans
             except ProcessLookupError:
                 pass
             p.wait()
-            return _pf(False)                            # did not terminate → FAIL (the mutation
-                                                           # flipped it)
+            return _pf(False)  # did not terminate → FAIL (the mutation
+            # flipped it)
     except Exception:
         return UNAVAILABLE
 
@@ -531,8 +556,8 @@ def run_ok(cmd: str, cwd: Path, owner: str = "") -> Verdict:
 def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
     typ, _, target = check.partition(":")
     if typ == "file":
-        return _pf((project_dir / target).exists())   # EXISTS — no subprocess → no lease;
-                                                        # absence is FAIL
+        return _pf((project_dir / target).exists())  # EXISTS — no subprocess → no lease;
+        # absence is FAIL
     if typ == "result":
         # Ξ·seam — result PARSES (VERBS names every verb; no ordinal here, an ordinal would
         # hardcode the set's size).  It imports a sibling project's gate VERDICT (gate --json) and
@@ -560,17 +585,23 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
             if claim:
                 argv += ["--only", claim]
             argv.append(str(_sibling_for(project_dir, proj)))
-            r = subprocess.run(argv, cwd=project_dir, env=paperkit.checkenv.clean_env(),
-                               capture_output=True, text=True)
+            r = subprocess.run(
+                argv,
+                cwd=project_dir,
+                env=paperkit.checkenv.clean_env(),
+                capture_output=True,
+                text=True,
+            )
             rec = json.loads(r.stdout or "{}")
-            if rec.get("available") is False:         # the sibling's own cannot-run
+            if rec.get("available") is False:  # the sibling's own cannot-run
                 # Ζ·unavailable·why — carry the DELEGATE'S OWN account.  It already computed one
                 # ("its veraPDF validator CANNOT RUN here (toolchain absent)") and returns it in
                 # --json.reason; dropping it here left the citing gate printing a disjunction of
                 # everything the failure might have been.  A missing dependency is a solvable
                 # problem, and the delegate is the only party that knows WHICH one.
-                return unavailable(rec.get("reason") or "the delegate reported it cannot run",
-                                   target)
+                return unavailable(
+                    rec.get("reason") or "the delegate reported it cannot run", target
+                )
             return _pf(bool(rec.get("pass")))
         except Exception as e:
             # ⚑ Ζ·result·owner — THE UNREACHABLE PATH NAMES ITS OWNER TOO.  The widening above
@@ -584,8 +615,9 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
             #
             # The owner is the CITED TARGET, matching the arm above — a consumer reading a
             # cannot-run learns which delegation failed, not merely that one did.
-            return unavailable(f"the sibling could not be reached: {type(e).__name__}: {e}"[:400],
-                               target)
+            return unavailable(
+                f"the sibling could not be reached: {type(e).__name__}: {e}"[:400], target
+            )
     if typ == "concept":
         # Λ·witness — a concept: check IMPORTS a concept authored and GRADED once in the library.
         # For the LIVE verdict (the direct-CLI gate path; the Bazel //:hook path reads the
@@ -596,15 +628,23 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         # + engine fingerprint).
         try:
             lib = _library_for(project_dir)
-            r = subprocess.run(_library_cmd(lib, target),
-                               cwd=lib, env=paperkit.checkenv.clean_env(), capture_output=True)
+            r = subprocess.run(
+                _library_cmd(lib, target),
+                cwd=lib,
+                env=paperkit.checkenv.clean_env(),
+                capture_output=True,
+            )
             # Λ·library·fallthrough — per-KEY, not per-directory: exit 2 is the library's own
             # "not mine" sentinel, so a project library lacking the key falls through to the
             # engine's (the true owner answers); any other exit is the OWNING library's verdict.
             # The owning case runs ONCE; only a fallthrough pays the cheap rc-2 probe first.
             if r.returncode == 2 and lib != _LIBRARY:
-                r = subprocess.run(_library_cmd(_LIBRARY, target),
-                                   cwd=_LIBRARY, env=paperkit.checkenv.clean_env(), capture_output=True)
+                r = subprocess.run(
+                    _library_cmd(_LIBRARY, target),
+                    cwd=_LIBRARY,
+                    env=paperkit.checkenv.clean_env(),
+                    capture_output=True,
+                )
             # exit 2 from the FINAL owner = "nobody owns this key": the concept is UNAVAILABLE (no
             # library can witness it), NOT refuted.  Any other exit is the owning library's verdict.
             if r.returncode == 2:
@@ -617,7 +657,8 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
                 return unavailable(
                     f"no library owns concept {target!r} — asked {lib}"
                     + (f", then the engine's {_LIBRARY}" if lib != _LIBRARY else ""),
-                    str(lib))
+                    str(lib),
+                )
             # ⚑ Ζ·dispatch·pythonpath / Ε·fold — rc 3 IS CANNOT-RUN HERE TOO, and this was the
             # THIRD face of the fold.  `run_ok` took the arm at the tier work and `agree:` took it
             # at Ε·fold; `concept:` never did, so a library that RAN but could not establish its
@@ -631,14 +672,20 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
             # could not reach its toolchain, not from the engine being asked wrong.
             if r.returncode == _CANNOT_RUN:
                 last = (r.stderr or b"").decode("utf-8", "replace").strip().splitlines()
-                return unavailable((last[-1].strip()[:400] if last else
-                                    "the concept library reported it cannot run"), str(lib))
+                return unavailable(
+                    (
+                        last[-1].strip()[:400]
+                        if last
+                        else "the concept library reported it cannot run"
+                    ),
+                    str(lib),
+                )
             return _pf(r.returncode == 0)
         except Exception as e:
             # The library is unreachable — the concept analogue of the sibling case above.
             return unavailable(
-                f"the concept library could not be run: {type(e).__name__}: {e}"[:400],
-                target)
+                f"the concept library could not be run: {type(e).__name__}: {e}"[:400], target
+            )
     if typ == "agree":
         # Δ·agree (Ε·agree) — agree CONCURS (see VERBS; no ordinal, no count).
         # The SAME fact established by N INDEPENDENT producers (split on |||) that
@@ -647,16 +694,22 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         # single check cannot catch: stronger evidence, a distinct KIND.
         producers = [p.strip() for p in target.split("|||") if p.strip()]
         if len(producers) < 2:
-            return FAIL                               # agreement needs ≥2 producers — a real
-                                                        # defect, not unavailable
+            return FAIL  # agreement needs ≥2 producers — a real
+            # defect, not unavailable
         outs = set()
         for prod in producers:
             try:
-                r = subprocess.run(prod, shell=True, cwd=project_dir, env=paperkit.checkenv.clean_env(),
-                                   capture_output=True, text=True)
+                r = subprocess.run(
+                    prod,
+                    shell=True,
+                    cwd=project_dir,
+                    env=paperkit.checkenv.clean_env(),
+                    capture_output=True,
+                    text=True,
+                )
             except Exception:
-                return UNAVAILABLE                    # a producer could not be SPAWNED — cannot
-                                                       # evaluate
+                return UNAVAILABLE  # a producer could not be SPAWNED — cannot
+                # evaluate
             # ⚑ Ε·fold — rc 3 IS CANNOT-RUN HERE TOO, and `!= 0` was scoring it as a refutation.
             # `run_ok` has carried this arm since the tier work ("rc 0 → pass · rc 3 → cannot-run ·
             # any other nonzero → fail"), and its comment names the exact hazard: ONE check
@@ -673,12 +726,14 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
             # disagreement report must say WHICH producer, and why).
             if r.returncode == _CANNOT_RUN:
                 last = (r.stderr or "").strip().splitlines()
-                return unavailable((last[-1].strip()[:400] if last else
-                                    "a producer reported it cannot run"), prod[:120])
+                return unavailable(
+                    (last[-1].strip()[:400] if last else "a producer reported it cannot run"),
+                    prod[:120],
+                )
             if r.returncode != 0:
-                return FAIL                           # a producer that RAN and failed cannot concur
+                return FAIL  # a producer that RAN and failed cannot concur
             outs.add(r.stdout.rstrip())
-        return _pf(len(outs) == 1)                    # green iff every producer agreed
+        return _pf(len(outs) == 1)  # green iff every producer agreed
     if typ == "cmd":
         cmd = target
     elif typ in custom:
@@ -688,9 +743,11 @@ def resolves(check: str, project_dir: Path, custom: dict) -> Verdict:
         # UNAVAILABLE, not FAIL: an engine that lacks a verb a bib names has not REFUTED the claim,
         # it CANNOT CHECK it — so a bib written for a newer engine does not read as silently refuted
         # on an older one (the version-skew-as-silent-refutation hazard, ask-result-tristate).
-        return unavailable(f"this engine has no `{typ}:` verb — a bib written for a newer "
-                           f"engine, or a project [checks.{typ}] this project does not declare",
-                           typ)
+        return unavailable(
+            f"this engine has no `{typ}:` verb — a bib written for a newer "
+            f"engine, or a project [checks.{typ}] this project does not declare",
+            typ,
+        )
     return run_ok(cmd, project_dir, Path(project_dir).name)
 
 
@@ -713,17 +770,21 @@ def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str
     if typ == "result":
         proj, _, claim = target.partition("#")
         only = f"--only {shlex.quote(claim)} " if claim else ""
-        return (f"{sys.executable} {_GATE} --json --safe --without-K {only}"
-                f"{shlex.quote(str(_sibling_for(project_dir, proj)))}")
+        return (
+            f"{sys.executable} {_GATE} --json --safe --without-K {only}"
+            f"{shlex.quote(str(_sibling_for(project_dir, proj)))}"
+        )
     if typ == "concept":
         # The CANDIDATE library's command (the project's own first).  In the per-key fallthrough
         # case (Λ·library·fallthrough — the project library answers exit 2 and resolves() retries
         # the engine's) this traces the rc-2 probe, not the engine run: a bounded imprecision —
         # concept: carries no local footprint engine-side (bibtex.bzl skips it), and a downstream
         # fallthrough's footprint would need a run to discover, which a trace-string must not do.
-        return (f"{sys.executable} {shlex.quote(str(_library_for(project_dir) / 'concepts.py'))} "
-                f"{shlex.quote(target)}")
-    if typ == "agree":   # trace every producer's reads — the footprint is their union
+        return (
+            f"{sys.executable} {shlex.quote(str(_library_for(project_dir) / 'concepts.py'))} "
+            f"{shlex.quote(target)}"
+        )
+    if typ == "agree":  # trace every producer's reads — the footprint is their union
         return "; ".join(p.strip() for p in target.split("|||") if p.strip())
     if typ == "cmd":
         return target
@@ -735,7 +796,8 @@ def _check_cmd(check: str, custom: dict, project_dir: Path | None = None) -> str
 # strace open/openat line: open[at](… "PATH", FLAGS[, MODE]) = RC   (RC<0 ⇒ failed open)
 _OPEN_RE = re.compile(
     r'open(?:at)?\((?:AT_FDCWD, )?"(?P<path>(?:[^"\\]|\\.)*)", (?P<flags>[^),]*)[^)]*\)'
-    r'\s*=\s*(?P<rc>-?\d+)')
+    r"\s*=\s*(?P<rc>-?\d+)"
+)
 
 
 def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> list | None:
@@ -751,26 +813,27 @@ def parse_reads(trace_text: str, project_dir: Path, scope: Path) -> list | None:
     for line in trace_text.splitlines():
         m = _OPEN_RE.search(line)
         if not m:
-            continue                                  # unparsed line
-        traced = True                                 # an open logged — strace DID attach (any
-                                                        # real process opens libc)
+            continue  # unparsed line
+        traced = True  # an open logged — strace DID attach (any
+        # real process opens libc)
         if m.group("rc").startswith("-") or "O_WRONLY" in m.group("flags"):
-            continue                                  # failed open, or write-only = output, not
-                                                        # an input
+            continue  # failed open, or write-only = output, not
+            # an input
         raw = m.group("path")
         p = (Path(raw) if raw.startswith("/") else project_dir / raw).resolve()
         if not p.is_file():
-            continue                                  # directories (O_DIRECTORY), /dev nodes,
-                                                        # gone — not a hashable input
+            continue  # directories (O_DIRECTORY), /dev nodes,
+            # gone — not a hashable input
         try:
             reads.add(str(p.relative_to(scope)))
         except ValueError:
-            continue                                  # outside the scope — not an input we track
+            continue  # outside the scope — not an input we track
     return sorted(reads) if traced else None
 
 
-def producer_footprints(check: str, project_dir: Path, custom: dict,
-                        scope: Path | None = None) -> dict | None:
+def producer_footprints(
+    check: str, project_dir: Path, custom: dict, scope: Path | None = None
+) -> dict | None:
     """Ε·corro·phi — Φ per PRODUCER, for an `agree:` check.  {producer: [reads]}, or None.
 
     `footprint()` traces the whole check and returns ONE list; for `agree:` the traced command is
@@ -803,14 +866,15 @@ def producer_footprints(check: str, project_dir: Path, custom: dict,
         if not prod:
             continue
         reads = footprint("cmd:" + prod, project_dir, custom, scope)
-        if reads is None:                      # Φ·degrade on ANY producer ⇒ no partition at all
+        if reads is None:  # Φ·degrade on ANY producer ⇒ no partition at all
             return None
         out[prod] = reads
     return out or None
 
 
-def corroboration_of(check: str, project_dir: Path, custom: dict,
-                     scope: Path | None = None) -> tuple | None:
+def corroboration_of(
+    check: str, project_dir: Path, custom: dict, scope: Path | None = None
+) -> tuple | None:
     """Ε·corro·phi — the CORROBORATION verdict for an `agree:`, from measured footprints.
 
     Returns (value, shared) where value is `independent` (pairwise-disjoint reads — no shared
@@ -848,7 +912,7 @@ def footprint(check: str, project_dir: Path, custom: dict, scope: Path | None = 
     scope = Path(scope).resolve() if scope else project_dir
     typ, _, target = check.partition(":")
     if typ == "file":
-        return [target] if (project_dir / target).exists() else []   # opens only its target
+        return [target] if (project_dir / target).exists() else []  # opens only its target
     cmd = _check_cmd(check, custom, project_dir)
     if cmd is None:
         return []
@@ -856,10 +920,25 @@ def footprint(check: str, project_dir: Path, custom: dict, scope: Path | None = 
         trace = Path(tf.name)
     try:
         try:
-            subprocess.run(["strace", "-f", "-qq", "-e", "trace=openat,open", "-o", str(trace),
-                            "sh", "-c", cmd], cwd=project_dir, env=paperkit.checkenv.clean_env(), capture_output=True)
+            subprocess.run(
+                [
+                    "strace",
+                    "-f",
+                    "-qq",
+                    "-e",
+                    "trace=openat,open",
+                    "-o",
+                    str(trace),
+                    "sh",
+                    "-c",
+                    cmd,
+                ],
+                cwd=project_dir,
+                env=paperkit.checkenv.clean_env(),
+                capture_output=True,
+            )
         except FileNotFoundError:
-            return None                                   # Φ·degrade: strace not installed
+            return None  # Φ·degrade: strace not installed
         # Φ·degrade: when strace cannot trace — absent (above) or unable to ATTACH (no ptrace,
         # e.g. a hardened container → an EMPTY trace) — parse_reads returns None, never [].  []
         # means "reads nothing": it hashes stable (the cache would over-reuse a grade whose

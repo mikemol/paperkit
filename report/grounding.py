@@ -40,25 +40,32 @@ def main() -> int:
         # ⚑ NOT a refutation — a grader that could not RUN says nothing about the claim.  Since
         # Γ, _delta RAISES this rather than returning [], so a cannot-run and an ungraded corpus
         # are finally distinguishable here.  Exit 3 = resolver._CANNOT_RUN.
-        print(f"could not grade the paper: {e}\nNot evaluated; this is NOT a refutation of "
-              "rpt-dag.", file=sys.stderr)
+        print(
+            f"could not grade the paper: {e}\nNot evaluated; this is NOT a refutation of rpt-dag.",
+            file=sys.stderr,
+        )
         return 3
 
     if not records:
         # Now unambiguous: the grader RAN and graded nothing.  A paper whose cited set is empty
         # has no grounding DAG to walk, which IS a refutation of rpt-dag's claim.
-        print("discriminate --json paper graded NO claims — there is no grounding DAG to walk, "
-              "so rpt-dag's claim is not merely unwitnessed but false", file=sys.stderr)
+        print(
+            "discriminate --json paper graded NO claims — there is no grounding DAG to walk, "
+            "so rpt-dag's claim is not merely unwitnessed but false",
+            file=sys.stderr,
+        )
         return 1
 
     by_key = {d["key"]: d for d in records}
-    edges = {k: [p for p in (d.get("rests-on") or []) if p in by_key]
-             for k, d in by_key.items()}
+    edges = {k: [p for p in (d.get("rests-on") or []) if p in by_key] for k, d in by_key.items()}
     n_edges = sum(len(v) for v in edges.values())
     if not n_edges:
-        print(f"the paper's {len(by_key)} graded claims declare NO rests-on edges among "
-              "themselves — rpt-dag claims it is the one document with a grounding DAG, and "
-              "there is no DAG to walk", file=sys.stderr)
+        print(
+            f"the paper's {len(by_key)} graded claims declare NO rests-on edges among "
+            "themselves — rpt-dag claims it is the one document with a grounding DAG, and "
+            "there is no DAG to walk",
+            file=sys.stderr,
+        )
         return 1
 
     # depth = longest path to a foundational atom; a cycle makes "grounding depth" meaningless
@@ -80,28 +87,38 @@ def main() -> int:
         for k in edges:
             walk(k)
     except ValueError as e:
-        print(f"the grounding graph has a CYCLE through `{e}` — it is not a DAG, so grounding "
-              "depth is undefined and the walk rpt-dag describes does not terminate",
-              file=sys.stderr)
+        print(
+            f"the grounding graph has a CYCLE through `{e}` — it is not a DAG, so grounding "
+            "depth is undefined and the walk rpt-dag describes does not terminate",
+            file=sys.stderr,
+        )
         return 1
 
     atoms = [k for k, d in depth.items() if d == 0]
     above = [k for k, d in depth.items() if d > 0]
     if not atoms or not above:
-        print(f"the grounding graph is flat ({len(atoms)} atom(s), {len(above)} above) — there "
-              "is no foundational-to-thesis walk to plot", file=sys.stderr)
+        print(
+            f"the grounding graph is flat ({len(atoms)} atom(s), {len(above)} above) — there "
+            "is no foundational-to-thesis walk to plot",
+            file=sys.stderr,
+        )
         return 1
 
     ungraded = [k for k, d in by_key.items() if not d.get("effective_grade")]
     if ungraded:
-        print(f"{len(ungraded)} claim(s) carry no effective grade "
-              f"({', '.join(sorted(ungraded)[:5])}…) — rpt-dag plots grade against depth, and a "
-              "claim without one cannot be placed on the vertical axis", file=sys.stderr)
+        print(
+            f"{len(ungraded)} claim(s) carry no effective grade "
+            f"({', '.join(sorted(ungraded)[:5])}…) — rpt-dag plots grade against depth, and a "
+            "claim without one cannot be placed on the vertical axis",
+            file=sys.stderr,
+        )
         return 1
 
-    print(f"paper's grounding DAG: {len(by_key)} graded claims, {n_edges} rests-on edges, "
-          f"{len(atoms)} foundational atom(s), depth 0..{max(depth.values())}, acyclic; "
-          "every claim carries an effective (clamped) grade")
+    print(
+        f"paper's grounding DAG: {len(by_key)} graded claims, {n_edges} rests-on edges, "
+        f"{len(atoms)} foundational atom(s), depth 0..{max(depth.values())}, acyclic; "
+        "every claim carries an effective (clamped) grade"
+    )
     return 0
 
 

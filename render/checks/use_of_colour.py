@@ -16,6 +16,7 @@ before mat230 erases.  Paired with the producing side, WCAG 1.4.1 is covered fro
     use_of_colour(tex) -> (ok, detail)   # audit a LaTeX string
     python3 checks/use_of_colour.py      # ⟨P,F,δ⟩ over synthetic rows
 """
+
 from __future__ import annotations
 
 import re
@@ -39,7 +40,9 @@ def use_of_colour(tex: str) -> tuple[bool, list[str]]:
         if meaningful and not _WEIGHT.search(row):
             bad += 1
     if bad:
-        return False, [f"{bad} row(s) use a meaning colour with NO weight cue — colour is the sole cue"]
+        return False, [
+            f"{bad} row(s) use a meaning colour with NO weight cue — colour is the sole cue"
+        ]
     return True, ["every colour-marked row also carries a weight cue (bold)"]
 
 
@@ -55,7 +58,10 @@ def _selftest() -> int:
     if use_of_colour(failing)[0]:
         ok = 1
     # δ: the ONE difference is the weight cue — same colour, same row, presence of \textbf flips it.
-    if use_of_colour(r"\textcolor{red}{x}")[0] or not use_of_colour(r"\textcolor{red}{\textbf{x}}")[0]:
+    if (
+        use_of_colour(r"\textcolor{red}{x}")[0]
+        or not use_of_colour(r"\textcolor{red}{\textbf{x}}")[0]
+    ):
         ok = 1
     # a source with no \textcolor at all is vacuously OK (nothing to fail).
     if not use_of_colour(r"plain \\ rows \\ only")[0]:
@@ -64,7 +70,9 @@ def _selftest() -> int:
         print("use-of-colour: ok — WCAG 1.4.1 verifying side (colour never the sole cue)")
         print("  P: a meaning-colour row carrying a weight cue passes; black/no-colour is vacuous")
         print("  F: a meaning colour as the SOLE cue in a row fails")
-        print("  δ: the weight cue (\\textbf) in the row — same colour, its presence flips the verdict")
+        print(
+            "  δ: the weight cue (\\textbf) in the row — same colour, its presence flips the verdict"
+        )
         return 0
     print("use-of-colour: FAIL — the sole-cue predicate is wrong", file=sys.stderr)
     return 1

@@ -17,6 +17,7 @@ by source for the ones that are Starlark or a separate process.
 
     python3 paperkit/tests/boundaries_ladder.py     # exit 0 = every consumer derives from grade.py
 """
+
 from __future__ import annotations
 
 import re
@@ -50,22 +51,34 @@ def main() -> int:
 
     print("Ζ·ladder — the grade ladder's boundary\n")
     print("⟨one owner⟩\n")
-    check(f"grade.RANK_C totally orders the {len(RUNGS)} rungs (distinct ranks, no ties)",
-          len(set(ladder.RANK_C.values())) == len(ladder.RANK_C))
-    check("rungs() is that order, descending — the display order, derived",
-          ladder.rungs() == sorted(ladder.RANK_C, key=ladder.RANK_C.get, reverse=True))
-    check("every --min-strength floor is a real rung (the knob cannot name what the ladder cannot rank)",
-          set(ladder.ORDER) <= set(ladder.RANK_C))
+    check(
+        f"grade.RANK_C totally orders the {len(RUNGS)} rungs (distinct ranks, no ties)",
+        len(set(ladder.RANK_C.values())) == len(ladder.RANK_C),
+    )
+    check(
+        "rungs() is that order, descending — the display order, derived",
+        ladder.rungs() == sorted(ladder.RANK_C, key=ladder.RANK_C.get, reverse=True),
+    )
+    check(
+        "every --min-strength floor is a real rung (the knob cannot name what the ladder cannot rank)",
+        set(ladder.ORDER) <= set(ladder.RANK_C),
+    )
 
     print("\n⟨the floor fails CLOSED⟩\n")
     # below() must be a function of the ORDER, not a list: for every floor, exactly the lower rungs.
-    ok = all(set(ladder.below(f)) == {g for g in ladder.RANK_C if ladder.RANK_C[g] < ladder.RANK_C[f]}
-             for f in ladder.RANK_C)
+    ok = all(
+        set(ladder.below(f)) == {g for g in ladder.RANK_C if ladder.RANK_C[g] < ladder.RANK_C[f]}
+        for f in ladder.RANK_C
+    )
     check("below(floor) is exactly the rungs ranked under it, for EVERY floor", ok)
-    check("`imported` clears the behavioral floor (a delegation is not a weak grade)",
-          "imported" not in ladder.below("behavioral"))
-    check("`indeterminate` does NOT clear it (the grade a missing delegation arm produces)",
-          "indeterminate" in ladder.below("behavioral"))
+    check(
+        "`imported` clears the behavioral floor (a delegation is not a weak grade)",
+        "imported" not in ladder.below("behavioral"),
+    )
+    check(
+        "`indeterminate` does NOT clear it (the grade a missing delegation arm produces)",
+        "indeterminate" in ladder.below("behavioral"),
+    )
     # the fail-open property, stated positively: a rung inserted BELOW the floor is caught by
     # derivation, and would have been missed by any list written before it existed.
     was = dict(ladder.RANK_C)
@@ -81,24 +94,32 @@ def main() -> int:
     for name, path in CONSUMERS.items():
         src = path.read_text()
         copies = _RUN.findall(src)
-        check(f"{name} re-declares no rung list" + (f" (found {copies[:1]})" if copies else ""),
-              not copies)
-    check("tools/verdict.py derives an adequacy floor via grade.below (not a literal bad-set)",
-          "grade.below(" in (ROOT / "tools" / "verdict.py").read_text())
+        check(
+            f"{name} re-declares no rung list" + (f" (found {copies[:1]})" if copies else ""),
+            not copies,
+        )
+    check(
+        "tools/verdict.py derives an adequacy floor via grade.below (not a literal bad-set)",
+        "grade.below(" in (ROOT / "tools" / "verdict.py").read_text(),
+    )
     gbzl = (ROOT / "tools" / "grade.bzl").read_text()
-    check("tools/grade.bzl names a FLOOR (below:<rung>) and stages the ladder (the pinned dist) as an input",
-          "below:" in gbzl and "@pk_dists//:site" in gbzl)
+    check(
+        "tools/grade.bzl names a FLOOR (below:<rung>) and stages the ladder (the pinned dist) as an input",
+        "below:" in gbzl and "@pk_dists//:site" in gbzl,
+    )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # F = the blacklist as it was actually written, and the rung it was actually blind to.
-    literal = ",".join(["vacuous", "existence", "indeterminate", "broken"])   # the list as written
+    literal = ",".join(["vacuous", "existence", "indeterminate", "broken"])  # the list as written
     blind = [g for g in ladder.below("behavioral") if g not in literal.split(",")]
-    caught = ("below:behavioral" in gbzl and literal not in gbzl)
+    caught = "below:behavioral" in gbzl and literal not in gbzl
     fails.append("ladder-delta") if not caught else None
     print(f"  {'ok ' if caught else 'XX '}re-hardcoding the adequacy blacklist is CAUGHT")
     print(f"      P (intact):  grade.bzl names `below:behavioral` → the failing set is derived")
-    print(f"      F (literal): `{literal}` → any rung added later passes adequacy unjudged"
-          + (f"; ALREADY blind to {blind}" if blind else " (not yet blind — no rung added since)"))
+    print(
+        f"      F (literal): `{literal}` → any rung added later passes adequacy unjudged"
+        + (f"; ALREADY blind to {blind}" if blind else " (not yet blind — no rung added since)")
+    )
     print(f"      δ (min delta): one argument, a floor NAME → a frozen list of failing grades\n")
 
     if fails:

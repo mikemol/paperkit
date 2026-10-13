@@ -17,6 +17,7 @@ than suffix alone.
 
     python3 paperkit/tests/boundaries_mutable.py     # exit 0 = the surface admits the class
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -46,6 +47,7 @@ def main() -> int:
     print("Ζ·delta·extensionless — the extensionless-text mutation class\n")
 
     import tempfile
+
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
 
@@ -64,26 +66,38 @@ def main() -> int:
         image.write_bytes(b"\x89PNG\r\n\x00\x00")
 
         print("⟨the class⟩\n")
-        check("a suffixless TEXT command is mutable (Δ can corrupt what a witness reads)",
-              paperkit.layout._mutable(cmd))
-        check("a suffixless BINARY is NOT mutable (a NUL byte ⇒ binary, excluded)",
-              not paperkit.layout._mutable(binary))
-        check("the helper agrees: suffixless text is text, suffixless binary is not",
-              paperkit.layout._suffixless_text(cmd) and not paperkit.layout._suffixless_text(binary))
+        check(
+            "a suffixless TEXT command is mutable (Δ can corrupt what a witness reads)",
+            paperkit.layout._mutable(cmd),
+        )
+        check(
+            "a suffixless BINARY is NOT mutable (a NUL byte ⇒ binary, excluded)",
+            not paperkit.layout._mutable(binary),
+        )
+        check(
+            "the helper agrees: suffixless text is text, suffixless binary is not",
+            paperkit.layout._suffixless_text(cmd) and not paperkit.layout._suffixless_text(binary),
+        )
 
         print("\n⟨the suffix path is untouched⟩\n")
-        check("a suffixed text source is still mutable (MUTABLE_SUFFIXES owns it)",
-              paperkit.layout._mutable(suffixed))
-        check("a suffixed binary is still immutable",
-              not paperkit.layout._mutable(image))
-        check("_suffixless_text is FALSE for anything with a suffix (it owns only the bare ones)",
-              not paperkit.layout._suffixless_text(suffixed) and not paperkit.layout._suffixless_text(image))
+        check(
+            "a suffixed text source is still mutable (MUTABLE_SUFFIXES owns it)",
+            paperkit.layout._mutable(suffixed),
+        )
+        check("a suffixed binary is still immutable", not paperkit.layout._mutable(image))
+        check(
+            "_suffixless_text is FALSE for anything with a suffix (it owns only the bare ones)",
+            not paperkit.layout._suffixless_text(suffixed)
+            and not paperkit.layout._suffixless_text(image),
+        )
 
         print("\n⟨derived files stay out⟩\n")
         cache = root / ".delta-cache.json"
         cache.write_text("{}\n")
-        check("a DERIVED name is never mutable, suffix or not (it is an output)",
-              not paperkit.layout._mutable(cache))
+        check(
+            "a DERIVED name is never mutable, suffix or not (it is an output)",
+            not paperkit.layout._mutable(cache),
+        )
 
         print("\n⟨P, F, δ⟩ minimum-delta pair — δ is the NUL byte\n")
         # The whole class turns on ONE bit of content: the same suffixless file is mutable as
@@ -97,7 +111,9 @@ def main() -> int:
         ok = as_text and not as_binary
         deltas.append("mutable-delta")
         fails.append("mutable-delta") if not ok else None
-        print(f"  {'ok ' if ok else 'XX '}one NUL byte flips a suffixless command out of the surface")
+        print(
+            f"  {'ok ' if ok else 'XX '}one NUL byte flips a suffixless command out of the surface"
+        )
         print("      P (as shipped): a suffixless text command → mutable")
         print("      F (one NUL added): the same file → immutable (binary)")
         print("      δ (min delta): a single NUL byte in the first 4096\n")
@@ -105,8 +121,10 @@ def main() -> int:
     if fails:
         print(f"MUTABLE: FAIL ({len(fails)})")
         return 1
-    print(f"MUTABLE: PASS ({len(ran)} behaviors, {len(deltas)} delta"
-          f"{'' if len(deltas) == 1 else 's'})")
+    print(
+        f"MUTABLE: PASS ({len(ran)} behaviors, {len(deltas)} delta"
+        f"{'' if len(deltas) == 1 else 's'})"
+    )
     return 0
 
 

@@ -55,8 +55,9 @@ def _post(invocation_id: str, page_token: str) -> object:
         body["pageToken"] = page_token
     conn = http.client.HTTPConnection(HOST, PORT, timeout=TIMEOUT_S)
     try:
-        conn.request("POST", RPC, body=json.dumps(body),
-                     headers={"Content-Type": "application/json"})
+        conn.request(
+            "POST", RPC, body=json.dumps(body), headers={"Content-Type": "application/json"}
+        )
         resp = conn.getresponse()
         data = resp.read()
         if resp.status != HTTP_OK:
@@ -73,7 +74,7 @@ def _command(snippet: str) -> str:
     start = snippet.find(SNIPPET_MARK)
     if start < 0:
         return snippet[:SNIPPET_HEAD]
-    rest = snippet[start + len(SNIPPET_MARK):]
+    rest = snippet[start + len(SNIPPET_MARK) :]
     return rest.split("'", 1)[0]
 
 

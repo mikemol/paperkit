@@ -17,6 +17,7 @@ applies the route's accessibility by construction:
 
     python3 checks/pdf.py [--via docx|odf|latex]   # produce + gate the PDF via the chosen route
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -45,7 +46,7 @@ def _load(name, filename):
     return mod
 
 
-lo_export = _load("lo_export", "lo-export.py")   # docx/odt → tagged PDF/UA over the UNO bridge
+lo_export = _load("lo_export", "lo-export.py")  # docx/odt → tagged PDF/UA over the UNO bridge
 
 
 def _office_pdf(intermediate: Path, out_pdf: Path, work: Path) -> Path | None:
@@ -60,7 +61,7 @@ def _office_pdf(intermediate: Path, out_pdf: Path, work: Path) -> Path | None:
         return None
     if pdf != out_pdf:
         out_pdf.write_bytes(pdf.read_bytes())
-    linkalt.describe_links(out_pdf)                                              # 7.18
+    linkalt.describe_links(out_pdf)  # 7.18
     mathalt.describe_formulas(out_pdf, mathalt.paper_equations(Path("../paper/paper.md")))  # 7.7
     return out_pdf
 
@@ -69,12 +70,12 @@ def render(paper_md: Path, out_pdf: Path, via: str, work: Path) -> Path | None:
     """Produce `paper_md` as a PDF via route `via`, composing the graph's morphisms.  None if the
     route's toolchain is unavailable (loud) — so a box lacking one route's tools still serves another.
     """
-    path = graph.ROUTES[via]                                    # e.g. ["md","docx","pdf"]
-    a11y = graph.route_a11y(via)                                # "post" (office) | "native" (latex)
-    if a11y == "native":                                        # the latex route: tagging is in source
+    path = graph.ROUTES[via]  # e.g. ["md","docx","pdf"]
+    a11y = graph.route_a11y(via)  # "post" (office) | "native" (latex)
+    if a11y == "native":  # the latex route: tagging is in source
         return latex_node.build(paper_md, out_pdf, work)
     # an office route: produce the intermediate node, then the office pdf edge + post-a11y
-    inter_fmt = path[1]                                         # "docx" or "odt"
+    inter_fmt = path[1]  # "docx" or "odt"
     producer = {"docx": docx_node.docx, "odt": odf_node.odt}[inter_fmt]
     intermediate = producer(paper_md, work / f"p.{inter_fmt}")
     return _office_pdf(intermediate, out_pdf, work)
@@ -96,7 +97,7 @@ def _formula_alts(pdf: Path) -> tuple[int, int]:
             return
         if str(n.get("/S") or "") == "/Formula":
             alts.append(str(n.get("/Alt") or ""))
-        for k in (n.get("/K") or []):
+        for k in n.get("/K") or []:
             if hasattr(k, "get"):
                 walk(k, d + 1)
 
@@ -116,14 +117,17 @@ def _link_count(pdf: Path) -> int:
     except ImportError:
         return 0
     with pikepdf.open(str(pdf)) as doc:
-        return sum(1 for pg in doc.pages for a in (pg.get("/Annots") or [])
-                   if a.get("/Subtype") == "/Link")
+        return sum(
+            1 for pg in doc.pages for a in (pg.get("/Annots") or []) if a.get("/Subtype") == "/Link"
+        )
 
 
 def main(argv: list[str]) -> int:
     via = argv[argv.index("--via") + 1] if "--via" in argv else "docx"
     if via not in graph.ROUTES:
-        print(f"pdf: unknown route --via {via} (expected {'|'.join(graph.ROUTES)})", file=sys.stderr)
+        print(
+            f"pdf: unknown route --via {via} (expected {'|'.join(graph.ROUTES)})", file=sys.stderr
+        )
         return 3
     # Ζ·tier·exit — pikepdf is part of THIS route's toolchain too: `_office_pdf` calls
     # `linkalt.describe_links` (PDF/UA 7.18), which opens the PDF with it.  Absent, that raised
@@ -137,20 +141,28 @@ def main(argv: list[str]) -> int:
     # four in-module callers would each have to re-interpret; guarding the ENTRY POINT keeps one
     # owner for the verdict, which is why `linkalt` and `mathalt` guard in their own `main`.
     if linkalt.pikepdf is None:
-        print("pdf: pikepdf absent — CANNOT VERIFY the deliverable's link descriptions "
-              "(not a pass, not a failure)", file=sys.stderr)
+        print(
+            "pdf: pikepdf absent — CANNOT VERIFY the deliverable's link descriptions "
+            "(not a pass, not a failure)",
+            file=sys.stderr,
+        )
         return 3
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         pdf = render(Path("../paper/paper.md"), d / "p.pdf", via, d)
         if pdf is None:
-            print(f"pdf: CANNOT BUILD via {via} — the route's toolchain is unavailable", file=sys.stderr)
-            return 3                                            # cannot-run, not a false pass
+            print(
+                f"pdf: CANNOT BUILD via {via} — the route's toolchain is unavailable",
+                file=sys.stderr,
+            )
+            return 3  # cannot-run, not a false pass
         info = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout
         pages = int((re.search(r"Pages:\s*(\d+)", info) or [0, 0])[1])
         txt = subprocess.run(["pdftotext", str(pdf), "-"], capture_output=True, text=True).stdout
         bare = re.findall(r"\[@[A-Za-z][\w:.+-]*\]", txt)
-        words = sorted(set(re.findall(r"[a-z]{4,}", source.cite_split(Path("../paper/paper.md")).lower())))
+        words = sorted(
+            set(re.findall(r"[a-z]{4,}", source.cite_split(Path("../paper/paper.md")).lower()))
+        )
         seen = set(re.findall(r"[a-z]{4,}", txt.lower()))
         rate = sum(w in seen for w in words) / len(words)
         # Ρ·render·alt·live — the SHIPPED deliverable's link descriptions must actually say
@@ -185,14 +197,16 @@ def main(argv: list[str]) -> int:
         thin_ok = (not nlinks) or (len(thin) * 2 <= nlinks)
 
         ok = pages >= 1 and not bare and rate >= 0.85 and thin_ok and math_ok
-        print(f"pdf: {'ok' if ok else 'FAIL'} via {via} — {pages}-page deliverable "
-              f"({'no bare markers, ' if not bare else f'{len(bare)} bare markers, '}"
-              f"{rate:.0%} of body content present, "
-              f"{nlinks - len(thin)}/{nlinks} links informatively described, "
-              f"{formulas - empty_alt}/{formulas} formulas with a math alternative"
-              f"{'' if math_ok else f' — {empty_alt} EMPTY /Alt'}"
-              f"{'' if thin_ok else ' — MOST LINKS SAY NOTHING: ' + str(sorted({c for _, c in thin})[:6])}"
-              f")")
+        print(
+            f"pdf: {'ok' if ok else 'FAIL'} via {via} — {pages}-page deliverable "
+            f"({'no bare markers, ' if not bare else f'{len(bare)} bare markers, '}"
+            f"{rate:.0%} of body content present, "
+            f"{nlinks - len(thin)}/{nlinks} links informatively described, "
+            f"{formulas - empty_alt}/{formulas} formulas with a math alternative"
+            f"{'' if math_ok else f' — {empty_alt} EMPTY /Alt'}"
+            f"{'' if thin_ok else ' — MOST LINKS SAY NOTHING: ' + str(sorted({c for _, c in thin})[:6])}"
+            f")"
+        )
         return 0 if ok else 1
 
 

@@ -24,6 +24,7 @@ Two coupled hazards this closes:
 
 Every render check that shells out to libreoffice should convert through here.
 """
+
 import shutil
 import subprocess
 import tempfile
@@ -56,16 +57,26 @@ def convert_many(srcs, fmt, outdir, timeout=180):
         prof = tempfile.mkdtemp(prefix="lo.")
         try:
             subprocess.run(
-                ["libreoffice", "-env:UserInstallation=file://" + prof,
-                 "--headless", "--convert-to", fmt, "--outdir", str(outdir)]
+                [
+                    "libreoffice",
+                    "-env:UserInstallation=file://" + prof,
+                    "--headless",
+                    "--convert-to",
+                    fmt,
+                    "--outdir",
+                    str(outdir),
+                ]
                 + [str(s) for s in srcs],
-                capture_output=True, timeout=timeout)
+                capture_output=True,
+                timeout=timeout,
+            )
         finally:
             shutil.rmtree(prof, ignore_errors=True)
     return [o if o.exists() else None for o in outs]
 
 
-if __name__ == "__main__":   # lo.py SRC FMT OUTDIR — convert one file
+if __name__ == "__main__":  # lo.py SRC FMT OUTDIR — convert one file
     import sys
+
     out = convert(sys.argv[1], sys.argv[2], sys.argv[3])
     sys.exit(0 if out else 1)

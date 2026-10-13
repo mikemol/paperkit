@@ -31,6 +31,7 @@ FACTS that make the divergence real and checkable, so the eventual repair has a 
 
 Run:  python3 paperkit/tests/boundaries_concept_route.py
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -63,7 +64,8 @@ def _consumer(w: Path, body: str) -> Path:
     (proj / "library").mkdir(parents=True, exist_ok=True)
     (proj / "library" / "paper.toml").write_text(
         '[paper]\ntitle="c"\nrubric="r.tsv"\nwarrants=["concepts.bib"]\nout="l.md"\n'
-        '\n[checks.claim]\ncmd = "python3 witness.py {target}"\n')
+        '\n[checks.claim]\ncmd = "python3 witness.py {target}"\n'
+    )
     (proj / "library" / "witness.py").write_text(body)
     return proj
 
@@ -77,12 +79,11 @@ OWNS_AND_FAILS = (
     "import sys\n"
     "k = sys.argv[1]\n"
     "if k == 'rm-pitch':\n"
-    "    raise SystemExit(1)\n"          # OWNS it, and reports FAILED
-    "raise SystemExit(2)\n")            # disclaims everything else
+    "    raise SystemExit(1)\n"  # OWNS it, and reports FAILED
+    "raise SystemExit(2)\n"
+)  # disclaims everything else
 
-DISCLAIMS_ALL = (
-    "import sys\n"
-    "raise SystemExit(2)\n")            # owns nothing — every key falls through
+DISCLAIMS_ALL = "import sys\nraise SystemExit(2)\n"  # owns nothing — every key falls through
 
 
 def main() -> int:
@@ -102,8 +103,10 @@ def main() -> int:
 
         # ── the CLI route is CONSUMER-FIRST ──────────────────────────────────────────────────
         owns = _consumer(w, OWNS_AND_FAILS)
-        check("P: a consumer library that OWNS a key answers it (the seam's whole purpose)",
-              _verdict("concept:rm-pitch", owns) == "fail")
+        check(
+            "P: a consumer library that OWNS a key answers it (the seam's whole purpose)",
+            _verdict("concept:rm-pitch", owns) == "fail",
+        )
 
         shutil.rmtree(owns)
         none = _consumer(w, DISCLAIMS_ALL)
@@ -111,18 +114,26 @@ def main() -> int:
         # above — this suite does not declare and the sandbox does not stage.  Assert the arm
         # only where the terminal owner exists; elsewhere say so.  `cannot-run` there is the
         # ENGINE being right (no library can witness the key), not the seam misbehaving.
-        if (paperkit.resolver._LIBRARY / "concepts.py").is_file():   # the ENGINE's library, wherever it declares it
-            check("F: a consumer that DISCLAIMS the key falls through to the engine's library",
-                  _verdict("concept:rm-pitch", none) == "pass")
+        if (
+            paperkit.resolver._LIBRARY / "concepts.py"
+        ).is_file():  # the ENGINE's library, wherever it declares it
+            check(
+                "F: a consumer that DISCLAIMS the key falls through to the engine's library",
+                _verdict("concept:rm-pitch", none) == "pass",
+            )
         else:
             print("  --  the fallthrough arm CANNOT CHECK here: the engine library is not staged")
-        print("     δ: the consumer library's exit code for that key — 1 (mine, failed) vs 2 (not mine).\n")
+        print(
+            "     δ: the consumer library's exit code for that key — 1 (mine, failed) vs 2 (not mine).\n"
+        )
 
         # ── exit 2 is NOT-MINE, never FAILED ─────────────────────────────────────────────────
         shutil.rmtree(none)
         nobody = _consumer(w, DISCLAIMS_ALL)
-        check("a key NO library owns is cannot-run, not a refutation",
-              _verdict("concept:no-such-concept-anywhere", nobody) == "cannot-run")
+        check(
+            "a key NO library owns is cannot-run, not a refutation",
+            _verdict("concept:no-such-concept-anywhere", nobody) == "cannot-run",
+        )
 
     # ── the Bazel route's label is a function of the KEY ALONE ───────────────────────────────
     # Ζ·reads — the emitter's source is NOT staged for this suite (its warrant declares
@@ -187,8 +198,11 @@ def main() -> int:
     lines = bzl.splitlines()
     start = next((i for i, ln in enumerate(lines) if 'check[len("concept:"):]' in ln), -1)
     # the branch ends at its `continue`; that is Starlark control flow, not a spelling
-    end = next((i for i in range(start + 1, len(lines))
-                if lines[i].strip() == "continue"), -1) if start >= 0 else -1
+    end = (
+        next((i for i in range(start + 1, len(lines)) if lines[i].strip() == "continue"), -1)
+        if start >= 0
+        else -1
+    )
     branch = "\n".join(lines[start:end]) if start >= 0 and end > start else ""
     # ⚑ THE ABSENCE ARM MUST READ CODE, NOT PROSE — the fifth face of the same defect, caught
     # while repairing the fourth.  A first cut asserted `"@paperkit_" not in branch`, which was
@@ -197,16 +211,18 @@ def main() -> int:
     # measuring the branch's documentation — the very thing the re-anchor above exists to set
     # free.  Strip line comments and string literals first; what remains is what the generator
     # DOES, which is the only thing this suite has a claim on.
-    code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', re.sub(r'#[^\n]*', '', branch))
+    code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', re.sub(r"#[^\n]*", "", branch))
     # the label constructor, and the OWNER it is handed at this call site
-    m = re.search(r'_import_label\(\s*(.*?)\)', branch, re.S)
+    m = re.search(r"_import_label\(\s*(.*?)\)", branch, re.S)
     owner_arg = ""
     if m:
         args = [a.strip() for a in m.group(1).split(",")]
-        owner_arg = args[3] if len(args) > 3 else ""   # (verb, name, key, OWNER, ...)
+        owner_arg = args[3] if len(args) > 3 else ""  # (verb, name, key, OWNER, ...)
 
-    check("the Bazel emitter's concept branch is reachable to read, and builds a label",
-          bool(branch) and bool(m))
+    check(
+        "the Bazel emitter's concept branch is reachable to read, and builds a label",
+        bool(branch) and bool(m),
+    )
     # ⚑ THE PROPERTY IS ANALYSIS-TIME RESOLUTION, AND THIS ARM USED TO TEST A PROXY FOR IT.  It
     # asserted the owner argument is a STRING LITERAL (`owner == '"library"'`) — which held only
     # while the library sat at the repo root under a name somebody typed here.  Ζ·cite·resolve moved
@@ -220,9 +236,11 @@ def main() -> int:
     # asserts THAT: the owner expression is key-INDEPENDENT.  (guard-must-not-copy, one level up: a
     # literal-equality arm carries its own copy of the answer and reds when the answer legitimately
     # changes spelling.)
-    check("...and that label's owner is resolved ONCE, independent of the key — an analysis-time "
-          f"constant, never a per-key probe (owner={owner_arg or '<none>'})",
-          bool(owner_arg) and "key" not in owner_arg)
+    check(
+        "...and that label's owner is resolved ONCE, independent of the key — an analysis-time "
+        f"constant, never a per-key probe (owner={owner_arg or '<none>'})",
+        bool(owner_arg) and "key" not in owner_arg,
+    )
     # ⚑ AND THIS ARM ASSERTS AN ABSENCE, DELIBERATELY.  An earlier draft of it also matched
     # `_import_label`'s RETURN LINE verbatim — which would have been the defect above committed
     # inside its own repair, one function further away.  What this suite may honestly say about
@@ -230,8 +248,10 @@ def main() -> int:
     # `proj`, so if neither that name nor any repo name appears between the key extraction and
     # the `continue`, the label cannot vary with the citer.  How `_import_label` assembles the
     # string from a constant owner is ITS business, and the arm above already pins the owner.
-    check("...so nothing in the emitted label varies with WHO cites the key",
-          bool(code.strip()) and "@paperkit_" not in code and "proj" not in code)
+    check(
+        "...so nothing in the emitted label varies with WHO cites the key",
+        bool(code.strip()) and "@paperkit_" not in code and "proj" not in code,
+    )
 
     # ── therefore: the routes CAN disagree, and today they do ────────────────────────────────
     # An arm asserting True is a PRINTED STATEMENT, not a check (Λ·instrument-vs-gate: it would
@@ -240,16 +260,20 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as d2:
         w2 = Path(d2)
         owns2 = _consumer(w2, OWNS_AND_FAILS)
-        cli = _verdict("concept:rm-pitch", owns2)                      # consumer-first: its library
-        bazel_owner = "paperkit_library"                                # what the emitter hardcodes
+        cli = _verdict("concept:rm-pitch", owns2)  # consumer-first: its library
+        bazel_owner = "paperkit_library"  # what the emitter hardcodes
         cli_owner = "consumer" if cli == "fail" else "paperkit_library"
-        check(f"DIVERGENCE MEASURED: one citation, two owners — CLI picks {cli_owner!r}, "
-              f"Bazel picks {bazel_owner!r}",
-              cli_owner != bazel_owner)
-    print("     (not a red: no repair has been chosen.  Λ·library·manifest is the design question —\n"
-          "      the CLI probes for an owner at runtime, Bazel needs one at analysis time, so a\n"
-          "      library DAG must be DECLARED rather than discovered, with exit-2 demoted to a\n"
-          "      consistency check.  This fixture is what any such repair must satisfy.)")
+        check(
+            f"DIVERGENCE MEASURED: one citation, two owners — CLI picks {cli_owner!r}, "
+            f"Bazel picks {bazel_owner!r}",
+            cli_owner != bazel_owner,
+        )
+    print(
+        "     (not a red: no repair has been chosen.  Λ·library·manifest is the design question —\n"
+        "      the CLI probes for an owner at runtime, Bazel needs one at analysis time, so a\n"
+        "      library DAG must be DECLARED rather than discovered, with exit-2 demoted to a\n"
+        "      consistency check.  This fixture is what any such repair must satisfy.)"
+    )
 
     return _finish(fails, ran)
 
@@ -260,7 +284,8 @@ def _finish(fails, ran) -> int:
     # had a real failure branch, but it keyed only on `fails`: an assertion that printed XX and
     # appended False still exited 0.  Both lists are binding.
     fails = list(fails) + ["a behavior asserted False (see the XX lines above)"] * len(
-        [b for b in ran if not b])
+        [b for b in ran if not b]
+    )
     if fails:
         print(f"concept-route boundaries: FAIL ({len(fails)})")
         for f in fails:

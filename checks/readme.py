@@ -9,6 +9,7 @@ README project at the repo root (deps are paperkit/, not ../paperkit).
 
     python3 checks/readme.py <claim-key>      # run from the repo root; exit 0 = holds
 """
+
 import re
 import shutil
 import subprocess
@@ -43,7 +44,9 @@ def rm_selfhost():
     # this README is itself a projection: README.md == project(root warrants)
     cfg = paperkit.bib.load_config(ROOT)
     assert cfg["out"].name == "README.md", "the root project does not project to README.md"
-    assert paperkit.project.project(cfg) == cfg["out"].read_text(), "README.md is not the projection of the root warrants"
+    assert paperkit.project.project(cfg) == cfg["out"].read_text(), (
+        "README.md is not the projection of the root warrants"
+    )
 
 
 def rm_resolver_premise():
@@ -51,23 +54,31 @@ def rm_resolver_premise():
     # NOT one of the built-in resolving verbs — it surfaces an honest "not machine-checked" note and does
     # NOT dispatch in the gate's CLOSED built-in set.  Behavioral: drop the premise branch from
     # _verify_note, or let premise sneak in as a resolving verb, and this flips.
-    assert "not machine-checked" in paperkit.project._verify_note("premise:the-axiom"), \
+    assert "not machine-checked" in paperkit.project._verify_note("premise:the-axiom"), (
         "the premise provenance note does not surface 'not machine-checked'"
-    assert "Machine-verified" in paperkit.project._verify_note("cmd:true"), "the cmd provenance note regressed"
-    assert "Agda-proved" in paperkit.project._verify_note("agda:Foo.bar"), "the agda provenance note regressed"
-    assert paperkit.resolver.resolves("premise:x", ENGINE, {}).is_unavailable(), \
+    )
+    assert "Machine-verified" in paperkit.project._verify_note("cmd:true"), (
+        "the cmd provenance note regressed"
+    )
+    assert "Agda-proved" in paperkit.project._verify_note("agda:Foo.bar"), (
+        "the agda provenance note regressed"
+    )
+    assert paperkit.resolver.resolves("premise:x", ENGINE, {}).is_unavailable(), (
         "premise resolved as a built-in gate verb — it must be a provenance KIND, not a verb"
+    )
 
 
 # rm_delta REMOVED — the adequacy pitch is now imported from the concept library as [@adequacy-pitch]
 # and witnessed by the SHARED checks/concepts.py (which RUNS the grader over a fixture, a stronger
 # witness than this used to be by grepping engine source).
 
+
 def rm_next():
     # the roadmap is still pending: no packaged CLI or PDF renderer yet (when one ships,
     # this fails and the README's 'next' list must be updated)
-    assert not (ENGINE / "cli.py").exists() and not (ROOT / "mkdocx.sh").exists(), \
+    assert not (ENGINE / "cli.py").exists() and not (ROOT / "mkdocx.sh").exists(), (
         "a roadmap 'next' item shipped — update the README"
+    )
 
 
 # ── the local-CI + example-asset claims: each EXERCISES its proposition against the engine's
@@ -84,19 +95,24 @@ def rm_ci():
 def rm_ci_enable():
     # the enable script configures git's hooksPath at the .githooks dir, where the real hook lives
     script = (ROOT / "assets" / "enable-hooks.sh").read_text()
-    assert "core.hooksPath" in script and ".githooks" in script, \
+    assert "core.hooksPath" in script and ".githooks" in script, (
         "the enable script does not configure core.hooksPath .githooks"
-    assert (ROOT / ".githooks" / "pre-commit").exists(), \
+    )
+    assert (ROOT / ".githooks" / "pre-commit").exists(), (
         "the enabled hooks dir has no pre-commit hook"
+    )
 
 
 def rm_cmds_eg():
     # the example commands invoke real engine entrypoints (project makes, gate verifies)
     cmds = (ROOT / "assets" / "commands.sh").read_text()
-    assert "-m paperkit.project" in cmds and "-m paperkit.gate" in cmds, \
+    assert "-m paperkit.project" in cmds and "-m paperkit.gate" in cmds, (
         "the commands example does not show the project + gate entrypoints"
+    )
     for mod in re.findall(r"-m paperkit\.(\w+)", cmds):
-        assert (ENGINE / f"{mod}.py").exists(), f"the example runs a non-existent entrypoint paperkit.{mod}"
+        assert (ENGINE / f"{mod}.py").exists(), (
+            f"the example runs a non-existent entrypoint paperkit.{mod}"
+        )
 
 
 def rm_delta_cmds():
@@ -104,18 +120,21 @@ def rm_delta_cmds():
     cmds = (ROOT / "assets" / "delta-cmds.sh").read_text()
     assert "-m paperkit.discriminate" in cmds, "the Δ example does not run discriminate.py"
     assert (ENGINE / "discriminate.py").exists(), "discriminate.py (the Δ tool) is missing"
-    assert "--min-strength" in cmds and "--min-strength" in (ENGINE / "discriminate.py").read_text(), \
-        "the example uses a --min-strength flag discriminate.py does not define"
+    assert (
+        "--min-strength" in cmds and "--min-strength" in (ENGINE / "discriminate.py").read_text()
+    ), "the example uses a --min-strength flag discriminate.py does not define"
 
 
 def rm_layout():
     # the layout doc names the real top-level components — each string is in the doc AND on disk
     # (a FILE per component, so the on-disk half is a clean single-artifact toggle, not a dir)
     layout = (ROOT / "assets" / "layout.txt").read_text()
-    assert "paperkit/" in layout and "paper/" in layout and "README.md" in layout, \
+    assert "paperkit/" in layout and "paper/" in layout and "README.md" in layout, (
         "the layout omits a top-level component"
-    assert (ROOT / "paperkit" / "gate.py").exists() and (ROOT / "README.md").exists(), \
+    )
+    assert (ROOT / "paperkit" / "gate.py").exists() and (ROOT / "README.md").exists(), (
         "the layout describes components that are not on disk"
+    )
 
 
 def rm_model_eg():
@@ -133,10 +152,12 @@ def rm_delta_tbl():
     # and asserted only membership, so it was green while the table omitted `broken` and
     # `imported` — a witness that carries its own copy of the set it guards proves a tautology.
     import mikemol.grade.grade
+
     tbl = (ROOT / "assets" / "grades.md").read_text()
     tabled = re.findall(r"\| `(\w+)` \|", tbl)
-    assert tabled == mikemol.grade.grade.rungs(), \
+    assert tabled == mikemol.grade.grade.rungs(), (
         f"the grade table and the engine's ladder disagree: table={tabled} ladder={mikemol.grade.grade.rungs()}"
+    )
 
 
 def rm_resolver_tbl():
@@ -147,29 +168,38 @@ def rm_resolver_tbl():
     # So the assertion is set-EQUALITY, which fails on an omitted row AND on a row for a dead verb.
     tbl = (ROOT / "assets" / "resolver.md").read_text()
     tabled = set(re.findall(r"\|\s*`(\w+):", tbl))
-    assert tabled == set(paperkit.resolver.VERBS), \
+    assert tabled == set(paperkit.resolver.VERBS), (
         f"the resolver table and the engine's verb set disagree: {tabled ^ set(paperkit.resolver.VERBS)}"
+    )
     # every COLUMN is derived too, not just the key — otherwise VERBS' arg/passes would be declared
     # data that nothing reads, and the table's gloss could drift while the row stayed present.
     for typ, spec in paperkit.resolver.VERBS.items():
-        arg = spec["arg"].replace("|", r"\|")          # markdown escapes agree:'s ||| separator
+        arg = spec["arg"].replace("|", r"\|")  # markdown escapes agree:'s ||| separator
         row = f"| `{typ}:{arg}` | {spec['verb']} | {spec['passes']} |"
-        assert row in tbl, f"the table's {typ}: row does not match the engine's declaration\n  want: {row}"
-    assert paperkit.resolver.resolves("cmd:true", ENGINE, {}).passed and paperkit.resolver.resolves("file:gate.py", ENGINE, {}).passed, \
-        "the tabled built-in verbs do not dispatch"
-    assert paperkit.resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(), "the built-in set is not closed"
+        assert row in tbl, (
+            f"the table's {typ}: row does not match the engine's declaration\n  want: {row}"
+        )
+    assert (
+        paperkit.resolver.resolves("cmd:true", ENGINE, {}).passed
+        and paperkit.resolver.resolves("file:gate.py", ENGINE, {}).passed
+    ), "the tabled built-in verbs do not dispatch"
+    assert paperkit.resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(), (
+        "the built-in set is not closed"
+    )
 
 
 def rm_resolver_eg():
     # the example config declares custom check types in the shape the resolver consumes, and the
     # engine dispatches a type declared that way
     import tomllib
+
     checks = tomllib.loads((ROOT / "assets" / "resolver.toml").read_text()).get("checks", {})
     assert checks, "the example declares no [checks.<type>]"
     for typ, spec in checks.items():
         assert "{target}" in spec.get("cmd", ""), f"[checks.{typ}] has no {{target}} cmd template"
-    assert paperkit.resolver.resolves("demo:x", ENGINE, {"demo": {"cmd": "true {target}"}}).passed, \
-        "the resolver does not dispatch a config-declared custom type"
+    assert paperkit.resolver.resolves(
+        "demo:x", ENGINE, {"demo": {"cmd": "true {target}"}}
+    ).passed, "the resolver does not dispatch a config-declared custom type"
 
 
 def rm_fields():
@@ -178,10 +208,12 @@ def rm_fields():
     # undocumented: gen_fields RAISES on a field with no gloss (check=True surfaces that as a red
     # gate).  Fresh-by-construction, exactly as cfg-table gates config's knobs.md — the committed
     # asset must equal a fresh regeneration.  Project, don't author.
-    gen = subprocess.run([sys.executable, "checks/gen_fields.py"],
-                         capture_output=True, text=True, check=True).stdout
-    assert (ROOT / "assets" / "fields.md").read_text().strip() == gen.strip(), \
+    gen = subprocess.run(
+        [sys.executable, "checks/gen_fields.py"], capture_output=True, text=True, check=True
+    ).stdout
+    assert (ROOT / "assets" / "fields.md").read_text().strip() == gen.strip(), (
         "assets/fields.md drifted from bib's field set — regenerate: python3 checks/gen_fields.py > assets/fields.md"
+    )
 
 
 def rm_wheel_ships_library():
@@ -212,27 +244,39 @@ def rm_wheel_ships_library():
     import sys
     import tempfile
     import zipfile
+
     with tempfile.TemporaryDirectory() as td:
-        r = subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "-q",
-                            "--wheel-dir", td, str(ROOT)], capture_output=True, text=True)
+        r = subprocess.run(
+            [sys.executable, "-m", "pip", "wheel", "--no-deps", "-q", "--wheel-dir", td, str(ROOT)],
+            capture_output=True,
+            text=True,
+        )
         whls = list(Path(td).glob("*.whl"))
-        assert r.returncode == 0 and whls, \
+        assert r.returncode == 0 and whls, (
             f"the wheel must BUILD before it can be inspected: {r.stderr[-400:]}"
+        )
         names = zipfile.ZipFile(whls[0]).namelist()
     concepts = [n for n in names if n.endswith("concepts.py") and "library" in n]
     assert concepts, (
         f"the built wheel ships {len(names)} entries and NONE of them is the concept library's "
         "concepts.py — an installed paperkit cannot resolve any `concept:` check, because the "
-        "terminal owner of the per-key fallthrough is not installed (Ζ·cite·resolve)")
+        "terminal owner of the per-key fallthrough is not installed (Ζ·cite·resolve)"
+    )
 
 
 CLAIMS = {
     "rm-selfhost": rm_selfhost,
     "rm-resolver-premise": rm_resolver_premise,
     "rm-next": rm_next,
-    "rm-ci": rm_ci, "rm-ci-enable": rm_ci_enable, "rm-cmds-eg": rm_cmds_eg,
-    "rm-delta-cmds": rm_delta_cmds, "rm-layout": rm_layout, "rm-model-eg": rm_model_eg,
-    "rm-delta-tbl": rm_delta_tbl, "rm-resolver-tbl": rm_resolver_tbl, "rm-resolver-eg": rm_resolver_eg,
+    "rm-ci": rm_ci,
+    "rm-ci-enable": rm_ci_enable,
+    "rm-cmds-eg": rm_cmds_eg,
+    "rm-delta-cmds": rm_delta_cmds,
+    "rm-layout": rm_layout,
+    "rm-model-eg": rm_model_eg,
+    "rm-delta-tbl": rm_delta_tbl,
+    "rm-resolver-tbl": rm_resolver_tbl,
+    "rm-resolver-eg": rm_resolver_eg,
     "rm-fields": rm_fields,
 }
 
@@ -247,9 +291,12 @@ UNWIRED = {"rm-wheel-ships-library": rm_wheel_ships_library}
 
 def main(argv):
     if len(argv) != 2 or (argv[1] not in CLAIMS and argv[1] not in UNWIRED):
-        print(f"usage: readme.py <{'|'.join(CLAIMS)}>\n"
-              f"  unwired (a DECLARED debt, not gated — see each docstring): "
-              f"{'|'.join(UNWIRED)}", file=sys.stderr)
+        print(
+            f"usage: readme.py <{'|'.join(CLAIMS)}>\n"
+            f"  unwired (a DECLARED debt, not gated — see each docstring): "
+            f"{'|'.join(UNWIRED)}",
+            file=sys.stderr,
+        )
         return 2
     try:
         (CLAIMS.get(argv[1]) or UNWIRED[argv[1]])()

@@ -10,6 +10,7 @@ a downstream project living in a home that also holds a clone/cache would explod
 
     python3 paperkit/tests/boundaries_sandbox.py
 """
+
 from __future__ import annotations
 
 import os
@@ -41,17 +42,31 @@ def main() -> int:
     # ── whole copy: the bounded root is copied entire; the bound is the ROOT, not a skip ──
     with tempfile.TemporaryDirectory() as t, tempfile.TemporaryDirectory() as dt:
         root = Path(t)
-        (root / "proj").mkdir(); (root / "proj" / "paper.toml").write_text("x")
-        (root / ".githooks").mkdir(); (root / ".githooks" / "pre-commit").write_text("#!/bin/sh")
-        (root / "data").mkdir(); (root / "data" / "x.txt").write_text("d")   # not a project — still copied
-        (root / ".git").mkdir(); (root / ".git" / "HEAD").write_text("ref")  # SKIP_DIRS
-        (root / "bazel-out").mkdir(); (root / "bazel-out" / "huge").write_text("Z" * 9999)  # Ζ·skip: a bazel-* artifact
+        (root / "proj").mkdir()
+        (root / "proj" / "paper.toml").write_text("x")
+        (root / ".githooks").mkdir()
+        (root / ".githooks" / "pre-commit").write_text("#!/bin/sh")
+        (root / "data").mkdir()
+        (root / "data" / "x.txt").write_text("d")  # not a project — still copied
+        (root / ".git").mkdir()
+        (root / ".git" / "HEAD").write_text("ref")  # SKIP_DIRS
+        (root / "bazel-out").mkdir()
+        (root / "bazel-out" / "huge").write_text("Z" * 9999)  # Ζ·skip: a bazel-* artifact
         dest = Path(dt) / "sb"
         paperkit.layout._copy_sandbox(root, dest)
-        check(".githooks (a real input the paper reads) is copied — not skipped", (dest / ".githooks" / "pre-commit").is_file())
-        check("a non-project dir under the bounded root is copied too", (dest / "data" / "x.txt").is_file())
+        check(
+            ".githooks (a real input the paper reads) is copied — not skipped",
+            (dest / ".githooks" / "pre-commit").is_file(),
+        )
+        check(
+            "a non-project dir under the bounded root is copied too",
+            (dest / "data" / "x.txt").is_file(),
+        )
         check("SKIP_DIRS (.git) are still pruned", not (dest / ".git").exists())
-        check("a bazel-* artifact is pruned (Ζ·skip — never copy the GB cache)", not (dest / "bazel-out").exists())
+        check(
+            "a bazel-* artifact is pruned (Ζ·skip — never copy the GB cache)",
+            not (dest / "bazel-out").exists(),
+        )
 
     # ── Ζ·sandbox·copy·pin: the copy must give each file a FRESH INODE ────────────────────────
     # Δ mutates source files IN PLACE with write_text, which opens O_TRUNC and writes THROUGH the
@@ -72,16 +87,18 @@ def main() -> int:
         (root / "sub").mkdir(parents=True)
         src = root / "sub" / "mod.py"
         src.write_text("ORIGINAL\n")
-        twin = Path(t) / "twin.py"          # the deduped state: a second link, outside the root
+        twin = Path(t) / "twin.py"  # the deduped state: a second link, outside the root
         os.link(src, twin)
 
         dest = Path(dt) / "sb"
         paperkit.layout._copy_sandbox(root, dest)
         copied = dest / "sub" / "mod.py"
-        check("P: the copy gets a FRESH inode (links back to 1)",
-              copied.stat().st_nlink == 1 and copied.stat().st_ino != src.stat().st_ino)
+        check(
+            "P: the copy gets a FRESH inode (links back to 1)",
+            copied.stat().st_nlink == 1 and copied.stat().st_ino != src.stat().st_ino,
+        )
 
-        copied.write_text("MUTANT\n")       # exactly what the grader does to a sandbox file
+        copied.write_text("MUTANT\n")  # exactly what the grader does to a sandbox file
         check("P: mutating the copy leaves the ORIGINAL untouched", src.read_text() == "ORIGINAL\n")
         check("P: ...and leaves its hardlinked twin untouched", twin.read_text() == "ORIGINAL\n")
 
@@ -90,24 +107,33 @@ def main() -> int:
         shutil.copytree(root, linked, copy_function=os.link)
         lcopy = linked / "sub" / "mod.py"
         lcopy.write_text("MUTANT\n")
-        check("F: a LINK-PRESERVING copy corrupts the original (the regression this pins)",
-              src.read_text() == "MUTANT\n" and twin.read_text() == "MUTANT\n")
+        check(
+            "F: a LINK-PRESERVING copy corrupts the original (the regression this pins)",
+            src.read_text() == "MUTANT\n" and twin.read_text() == "MUTANT\n",
+        )
         print("     δ: copytree's copy_function — copy2 (fresh inode) vs os.link (shared inode).")
 
     # ── Ζ·skip: _nested_roots walks deep (finds a fixture) but skips SKIP_DIRS, never a bazel-* link ──
     with tempfile.TemporaryDirectory() as t:
         root = Path(t)
-        (root / "a" / "b").mkdir(parents=True); (root / "a" / "b" / "paper.toml").write_text("x")   # deep nested project
-        (root / "bazel-out").mkdir(); (root / "bazel-out" / "paper.toml").write_text("x")            # a bazel artifact
+        (root / "a" / "b").mkdir(parents=True)
+        (root / "a" / "b" / "paper.toml").write_text("x")  # deep nested project
+        (root / "bazel-out").mkdir()
+        (root / "bazel-out" / "paper.toml").write_text("x")  # a bazel artifact
         nested = {p.name for p in paperkit.layout._nested_roots(root)}
         check("_nested_roots finds a DEEP nested project (paper.toml at any depth)", "b" in nested)
-        check("_nested_roots skips a bazel-* dir (never descends the cache)", "bazel-out" not in nested)
+        check(
+            "_nested_roots skips a bazel-* dir (never descends the cache)",
+            "bazel-out" not in nested,
+        )
 
     # ── root resolution: declarable; env overrides config; both beat inference ──
     saved = os.environ.get("PAPERKIT_ROOT")
     try:
         with tempfile.TemporaryDirectory() as t:
-            root = Path(t); proj = root / "proj"; proj.mkdir()
+            root = Path(t)
+            proj = root / "proj"
+            proj.mkdir()
             os.environ.pop("PAPERKIT_ROOT", None)
             # Ζ·root·declare — nothing declared is a REFUSAL, not an inference.  This arm used to
             # assert `_sandbox_root(proj) == root` (the PARENT), which is the behaviour that
@@ -119,14 +145,24 @@ def main() -> int:
                 paperkit.layout._sandbox_root(proj)
             except SystemExit:
                 refused_undeclared = True
-            check("nothing declared → REFUSED (the parent is not inferred, at any size)",
-                  refused_undeclared)
+            check(
+                "nothing declared → REFUSED (the parent is not inferred, at any size)",
+                refused_undeclared,
+            )
             (proj / "paper.toml").write_text('[paper]\ntitle = "t"\nroot = "."\n')
-            check("paper.toml [paper] root DECLARES the root", paperkit.layout._sandbox_root(proj) == proj)
+            check(
+                "paper.toml [paper] root DECLARES the root",
+                paperkit.layout._sandbox_root(proj) == proj,
+            )
             os.environ["PAPERKIT_ROOT"] = str(root)
-            check("PAPERKIT_ROOT env overrides the paper.toml declaration", paperkit.layout._sandbox_root(proj) == root)
+            check(
+                "PAPERKIT_ROOT env overrides the paper.toml declaration",
+                paperkit.layout._sandbox_root(proj) == root,
+            )
     finally:
-        os.environ.pop("PAPERKIT_ROOT", None) if saved is None else os.environ.__setitem__("PAPERKIT_ROOT", saved)
+        os.environ.pop("PAPERKIT_ROOT", None) if saved is None else os.environ.__setitem__(
+            "PAPERKIT_ROOT", saved
+        )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair — the declaration\n")
     # Ζ·root·declare — the pair USED to be the home-guard, whose δ was "the inferred parent being
@@ -137,7 +173,9 @@ def main() -> int:
     saved_r = os.environ.get("PAPERKIT_ROOT")
     os.environ.pop("PAPERKIT_ROOT", None)
     with tempfile.TemporaryDirectory() as t:
-        parent = Path(t); hp = parent / "proj"; hp.mkdir()
+        parent = Path(t)
+        hp = parent / "proj"
+        hp.mkdir()
         try:
             # An ORDINARY parent — not $HOME, not oversized, nothing the old guard would refuse.
             # That is the point: the refusal must not depend on the parent looking dangerous.
@@ -147,17 +185,27 @@ def main() -> int:
                 paperkit.layout._sandbox_root(hp)
             except SystemExit:
                 refused = True
-            (hp / "paper.toml").write_text('[paper]\ntitle = "t"\nroot = "."\n')   # declare → resolves
+            (hp / "paper.toml").write_text(
+                '[paper]\ntitle = "t"\nroot = "."\n'
+            )  # declare → resolves
             ok = refused and paperkit.layout._sandbox_root(hp) == hp
             ran.append("declare-or-refuse")
             fails.append("declare-or-refuse") if not ok else None
-            print(f"  {'ok ' if ok else 'XX '}declaring a root is the difference between a sandbox and a refusal")
-            print("      P (declared): root = \".\" → the project IS the root, sandbox resolves")
-            print("      F (absent):   no declaration → SystemExit naming the three ways to declare")
+            print(
+                f"  {'ok ' if ok else 'XX '}declaring a root is the difference between a sandbox and a refusal"
+            )
+            print('      P (declared): root = "." → the project IS the root, sandbox resolves')
+            print(
+                "      F (absent):   no declaration → SystemExit naming the three ways to declare"
+            )
             print("      δ (min delta): one line of TOML — and the parent is an ORDINARY dir in")
-            print("                     BOTH arms, so nothing about its size or place decides this\n")
+            print(
+                "                     BOTH arms, so nothing about its size or place decides this\n"
+            )
         finally:
-            os.environ.pop("PAPERKIT_ROOT", None) if saved_r is None else os.environ.__setitem__("PAPERKIT_ROOT", saved_r)
+            os.environ.pop("PAPERKIT_ROOT", None) if saved_r is None else os.environ.__setitem__(
+                "PAPERKIT_ROOT", saved_r
+            )
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")
@@ -168,8 +216,10 @@ def main() -> int:
     old = os.environ.get("PAPERKIT_SCRATCH")
     try:
         os.environ["PAPERKIT_SCRATCH"] = "/tmp"
-        check("scratch: PAPERKIT_SCRATCH overrides it — a box that WANTS tmpfs can say so",
-              paperkit.grader._scratch_dir() == "/tmp")
+        check(
+            "scratch: PAPERKIT_SCRATCH overrides it — a box that WANTS tmpfs can say so",
+            paperkit.grader._scratch_dir() == "/tmp",
+        )
     finally:
         os.environ.pop("PAPERKIT_SCRATCH", None)
         if old is not None:
@@ -183,15 +233,18 @@ def main() -> int:
         os.environ["PAPERKIT_SCRATCH"] = str(d)
         husk = d / (paperkit.grader._SANDBOX_PREFIX + "husk")
         husk.mkdir()
-        os.utime(husk, (0, 0))                        # backdate it well past the window
+        os.utime(husk, (0, 0))  # backdate it well past the window
         live = d / (paperkit.grader._SANDBOX_PREFIX + "live")
-        live.mkdir()                                  # fresh: a running sweep's copy
+        live.mkdir()  # fresh: a running sweep's copy
         n = paperkit.grader.reap_sandboxes(older_than_s=1800)
         check("reap: an OLD sandbox with no live sweep is collected", n == 1 and not husk.exists())
-        check("reap: a FRESH one is left alone — a live sweep's copy is not a corpse",
-              live.exists())
-        check("reap: reaping an empty scratch is a no-op, not an error",
-              paperkit.grader.reap_sandboxes(older_than_s=1800) == 0)
+        check(
+            "reap: a FRESH one is left alone — a live sweep's copy is not a corpse", live.exists()
+        )
+        check(
+            "reap: reaping an empty scratch is a no-op, not an error",
+            paperkit.grader.reap_sandboxes(older_than_s=1800) == 0,
+        )
     finally:
         os.environ.pop("PAPERKIT_SCRATCH", None)
         if old is not None:

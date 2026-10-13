@@ -41,6 +41,7 @@ give every non-first claim a typed `move` whose kind the scheme admits.
     rhetoric.py [DIR]            # the rhythm map: each section's scheme + realized moves
     rhetoric.py --check [DIR]    # exit 1 if any section violates its declared scheme
 """
+
 from __future__ import annotations
 
 import sys
@@ -98,23 +99,23 @@ _is_placed: Callable[[Fields], bool] = paperkit.bib.is_placed
 # (kind, default connector).  kind is what SCHEMES constrain; connector is the
 # realization project.py falls back to when a claim gives no explicit `join`.
 MOVES: dict[str, tuple[str, str]] = {
-    "consequence":   ("entail",   "so "),
-    "amplification": ("extend",   "indeed, "),
-    "scope-shift":   ("extend",   ". "),
-    "concession":    ("turn",     "yet "),
-    "antithesis":    ("turn",     "but "),
-    "addition":      ("parallel", "and "),
-    "climax":        ("parallel", ", above all, "),
-    "apposition":    ("restate",  " — that is, "),
+    "consequence": ("entail", "so "),
+    "amplification": ("extend", "indeed, "),
+    "scope-shift": ("extend", ". "),
+    "concession": ("turn", "yet "),
+    "antithesis": ("turn", "but "),
+    "addition": ("parallel", "and "),
+    "climax": ("parallel", ", above all, "),
+    "apposition": ("restate", " — that is, "),
 }
 
 # scheme -> (min_claims, max_claims | None, admissible kinds for non-first claims).
 SCHEMES: dict[str, tuple[int, int | None, set[str]]] = {
-    "period":      (1, 1, set()),
-    "distich":     (2, 2, {"turn", "extend", "entail"}),
-    "tricolon":    (3, 3, {"parallel"}),
+    "period": (1, 1, set()),
+    "distich": (2, 2, {"turn", "extend", "entail"}),
+    "tricolon": (3, 3, {"parallel"}),
     "enumeration": (2, None, {"parallel"}),
-    "ladder":      (2, None, {"entail"}),
+    "ladder": (2, None, {"entail"}),
 }
 
 
@@ -150,8 +151,9 @@ def check_scheme(scheme: str, claims: list[str], moves: list[str | None]) -> lis
         elif mv not in MOVES:
             v.append(f"claim #{i} move '{mv}' is not in the vocabulary")
         elif kinds and kind_of(mv) not in kinds:
-            v.append(f"claim #{i} move '{mv}' is a {kind_of(mv)}, "
-                     f"but {scheme} admits {sorted(kinds)}")
+            v.append(
+                f"claim #{i} move '{mv}' is a {kind_of(mv)}, but {scheme} admits {sorted(kinds)}"
+            )
     return v
 
 
@@ -190,8 +192,9 @@ def analyze(project_dir: Path) -> list[Section]:
         # `move` is a _SCALAR field: a str when the claim declares one, None when it does not —
         # and the None is MEANINGFUL here, since a declared scheme requires a typed move on every
         # non-first beat and check_scheme reports its absence by name.
-        moves = [m if isinstance(m, str) else None
-                 for m in (fields[k].get("move") for k in claims[1:])]
+        moves = [
+            m if isinstance(m, str) else None for m in (fields[k].get("move") for k in claims[1:])
+        ]
         rows.append((sk, scheme, claims, moves, check_scheme(scheme, claims, moves)))
     return rows
 
@@ -209,7 +212,8 @@ def main(argv: list[str]) -> int:
     rows = analyze(project_dir)
     if not rows:
         sys.stdout.write(
-            "rhetoric: no section declares a scheme (rubric.tsv 3rd column) — nothing to check\n")
+            "rhetoric: no section declares a scheme (rubric.tsv 3rd column) — nothing to check\n"
+        )
         return 0
     rc = 0
     for sk, scheme, _claims, moves, viol in rows:

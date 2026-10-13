@@ -15,6 +15,7 @@ rasterize and OCR pass.  It is now a callable; `lo` is reached by declaration.
 ⚑⚑ The `re` narrowing is local, and duplicated — see fig_legible.py for the reason: the shared
 seam (`paperkit/rematch.py`) is unreachable from a witness until `Ζ·runner·venv` lands.
 """
+
 from __future__ import annotations
 
 import os
@@ -44,12 +45,19 @@ def _words(text: str) -> set[str]:
 
 def _ocr_pages(pdf: Path, d: Path) -> str:
     """Rasterize `pdf` and return the concatenated OCR text of every page."""
-    subprocess.run(["pdftoppm", "-r", DPI, "-png", str(pdf), str(d / "page")],
-                   check=True, timeout=120)
+    subprocess.run(
+        ["pdftoppm", "-r", DPI, "-png", str(pdf), str(d / "page")], check=True, timeout=120
+    )
     out = ""
     for png in sorted(d.glob("page*.png")):
-        r = subprocess.run(["tesseract", str(png), "-"], env=TESSERACT_ENV,
-                           capture_output=True, text=True, timeout=120, check=False)
+        r = subprocess.run(
+            ["tesseract", str(png), "-"],
+            env=TESSERACT_ENV,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
         out += r.stdout.lower()
     return out
 
@@ -62,8 +70,7 @@ def check() -> int:
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         docx = d / "p.docx"
-        subprocess.run(["pandoc", "../paper/paper.md", "-o", str(docx)],
-                       check=True)
+        subprocess.run(["pandoc", "../paper/paper.md", "-o", str(docx)], check=True)
         pdf = lo.convert(docx, "pdf", d)
         if pdf is None:
             sys.stderr.write("docx did not convert to a PDF (soffice produced no output)\n")
@@ -71,11 +78,15 @@ def check() -> int:
         seen = _words(_ocr_pages(pdf, d))
     rate = sum(w in seen for w in want) / len(want)
     if rate < FLOOR:
-        sys.stderr.write(f"OCR recovered only {rate:.0%} of the paper's words from the rendered "
-                         f"pixels — visual fidelity broken (tofu?)\n")
+        sys.stderr.write(
+            f"OCR recovered only {rate:.0%} of the paper's words from the rendered "
+            f"pixels — visual fidelity broken (tofu?)\n"
+        )
         return 1
-    sys.stdout.write(f"ocr ok: {rate:.0%} of {len(want)} body words OCR-recovered from the "
-                     f"rendered pixels — visually legible\n")
+    sys.stdout.write(
+        f"ocr ok: {rate:.0%} of {len(want)} body words OCR-recovered from the "
+        f"rendered pixels — visually legible\n"
+    )
     return 0
 
 

@@ -24,6 +24,7 @@ wrong) claim. This asserts that the numbers the PROSE quotes MATCH what the tree
 project is added the gate reds, the prose is corrected, and the gate goes green again. The red is
 the notification, not the verdict.
 """
+
 import re
 import sys
 import tomllib
@@ -34,8 +35,9 @@ LEDGER = ROOT / "cotype" / "leverage-ledger.md"
 
 
 def wired_projects() -> int:
-    return len(re.findall(r'bib\.project\(\s*name\s*=\s*"[^"]+"',
-                          (ROOT / "MODULE.bazel").read_text()))
+    return len(
+        re.findall(r'bib\.project\(\s*name\s*=\s*"[^"]+"', (ROOT / "MODULE.bazel").read_text())
+    )
 
 
 def rooted_projects() -> list:
@@ -47,8 +49,11 @@ def rooted_projects() -> list:
     could cover.  Measured before switching: both give the same ten projects.
     """
     out = []
-    for rel in sorted(re.findall(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"',
-                                 (ROOT / "MODULE.bazel").read_text())):
+    for rel in sorted(
+        re.findall(
+            r'bib\.project\([^)]*project\s*=\s*"([^"]+)"', (ROOT / "MODULE.bazel").read_text()
+        )
+    ):
         toml = (ROOT if rel == "." else ROOT / rel) / "paper.toml"
         try:
             p = tomllib.loads(toml.read_text()).get("paper", {})
@@ -61,8 +66,9 @@ def rooted_projects() -> list:
 
 def paper_entries() -> int:
     cfg = tomllib.loads((ROOT / "paper" / "paper.toml").read_text())["paper"]
-    return sum(len(re.findall(r"^@\w+\{", (ROOT / "paper" / b).read_text(), re.M))
-               for b in cfg["warrants"])
+    return sum(
+        len(re.findall(r"^@\w+\{", (ROOT / "paper" / b).read_text(), re.M)) for b in cfg["warrants"]
+    )
 
 
 def main() -> int:
@@ -89,23 +95,29 @@ def main() -> int:
     # correct history.  This is the distinction between a stale FACT and a dated RECORD.
     m = re.search(r"^## Environment$(.*?)^## ", text, re.M | re.S)
     if not m:
-        print("  XX no Environment section found — this witness cannot check what it exists for",
-              file=sys.stderr)
+        print(
+            "  XX no Environment section found — this witness cannot check what it exists for",
+            file=sys.stderr,
+        )
         return 1
     env = m.group(1)
 
     for label, value, pattern in (
-            # ⚑ `\s+`, NOT a space: markdown prose WRAPS, and "wires 13\n    projects" is the same
-            # sentence.  The first version required them adjacent and reported the statement
-            # MISSING — accusing the prose of a defect that was the pattern's blind spot, which is
-            # Μ-F3's shape (a scan window guessing at layout instead of reading structure).
-            ("wired projects", wired, r"wires (\d+)\s+projects"),
-            ("root-declaring projects", len(rooted), r"\*\*(\w+)\*\* declare a root"),
-            ("paper/ entries", claims, r"\*\*(\d+) entries\*\*")):
+        # ⚑ `\s+`, NOT a space: markdown prose WRAPS, and "wires 13\n    projects" is the same
+        # sentence.  The first version required them adjacent and reported the statement
+        # MISSING — accusing the prose of a defect that was the pattern's blind spot, which is
+        # Μ-F3's shape (a scan window guessing at layout instead of reading structure).
+        ("wired projects", wired, r"wires (\d+)\s+projects"),
+        ("root-declaring projects", len(rooted), r"\*\*(\w+)\*\* declare a root"),
+        ("paper/ entries", claims, r"\*\*(\d+) entries\*\*"),
+    ):
         found = re.search(pattern, env)
         if not found:
-            print(f"  XX the Environment section no longer states the {label} — it was corrected "
-                  f"at tick 40 and the statement has been removed or reworded", file=sys.stderr)
+            print(
+                f"  XX the Environment section no longer states the {label} — it was corrected "
+                f"at tick 40 and the statement has been removed or reworded",
+                file=sys.stderr,
+            )
             bad += 1
             continue
         raw = found.group(1)
@@ -114,8 +126,11 @@ def main() -> int:
         if got == value:
             print(f"  ok {label}: prose says {raw}, tree says {value}")
         else:
-            print(f"  XX {label}: the prose says {raw!r}, the tree says {value} — correct the "
-                  f"Environment section (this red IS the notification)", file=sys.stderr)
+            print(
+                f"  XX {label}: the prose says {raw!r}, the tree says {value} — correct the "
+                f"Environment section (this red IS the notification)",
+                file=sys.stderr,
+            )
             bad += 1
 
     print("\n⟨P, F, δ⟩\n")
@@ -124,9 +139,11 @@ def main() -> int:
     print("      δ (min delta): one bib.project tag, or one bib entry")
 
     if bad:
-        print(f"\nbnd-env-facts: {bad} figure(s) DRIFTED. Four of five went stale unnoticed before "
-              f"this gate existed; the repair is to correct the prose, never to relax the check.",
-              file=sys.stderr)
+        print(
+            f"\nbnd-env-facts: {bad} figure(s) DRIFTED. Four of five went stale unnoticed before "
+            f"this gate existed; the repair is to correct the prose, never to relax the check.",
+            file=sys.stderr,
+        )
         return 1
     print("\nBOUNDARIES: PASS (3 standing figures, 1 delta)")
     return 0

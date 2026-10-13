@@ -18,6 +18,7 @@ top, so the import DAG (tools/imports.py → paperkit/dag.bzl) carries the hones
 per-capability cone instead of one wide hub, and a witness stages exactly the
 subsystem it exercises.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -33,8 +34,21 @@ ENGINE = Path(__file__).resolve().parent.parent
 PROJECT, GATE, DISCRIMINATE = ENGINE / "project.py", ENGINE / "gate.py", ENGINE / "discriminate.py"
 
 
-def entry(key, *, claim=None, emit=None, as_=None, frm=None, rests=None, glue=None,
-          join=None, move=None, check="file:w.bib", section="s", mem=None):
+def entry(
+    key,
+    *,
+    claim=None,
+    emit=None,
+    as_=None,
+    frm=None,
+    rests=None,
+    glue=None,
+    join=None,
+    move=None,
+    check="file:w.bib",
+    section="s",
+    mem=None,
+):
     """A valid multi-line bibliography entry.  The parser requires the closing
     brace on its own line, so this never silently fails to parse.  section=None
     omits the field — a SECTIONLESS node (grounding-only, reachable via rests-on).
@@ -111,11 +125,14 @@ def _write(d, warrants, assets, rubric, title, numbered, references, paper=None)
     # machine rather than the project.
     (proj / "paper.toml").write_text(
         f'[paper]\ntitle = "{title}"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "out.md"\n'
-        'root = "."\n' + flags)
+        'root = "."\n' + flags
+    )
     (proj / "r.tsv").write_text("".join(f"{k}\t{t}\n" for k, t in rubric))
     (proj / "w.bib").write_text("".join(warrants))
     for name, content in (assets or {}).items():
-        (proj / name).parent.mkdir(parents=True, exist_ok=True)   # subdir keys → e.g. a nested subproject
+        (proj / name).parent.mkdir(
+            parents=True, exist_ok=True
+        )  # subdir keys → e.g. a nested subproject
         (proj / name).write_text(content)
     return proj
 

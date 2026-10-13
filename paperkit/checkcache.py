@@ -42,6 +42,7 @@ another witness reads (order-dependence defeats any verdict cache).  For `concep
 particular the engine reports NO local footprint by design — the verb is CROSSING (resolver.py) —
 so a concept's invalidation basis is the owning library's certificate, not a file list here.
 """
+
 from __future__ import annotations
 
 import ast
@@ -60,6 +61,7 @@ DEFAULT_CACHE = HERE / ".checkcache.json"
 
 
 # ── the slice ─────────────────────────────────────────────────────────────────────────────────
+
 
 def module_index(src: str):
     """Module-level definitions and assigned names, with their source segments, plus the module's
@@ -140,9 +142,9 @@ def slice_of(fn: str, fns, names, imports):
             for node in ast.walk(body):
                 if isinstance(node, ast.Name):
                     if node.id in local:
-                        mods.add(local[node.id])           # function-local import — the closed hole
+                        mods.add(local[node.id])  # function-local import — the closed hole
                     elif node.id in imports:
-                        mods.add(imports[node.id])         # module-level import
+                        mods.add(imports[node.id])  # module-level import
                     elif node.id in names and node.id not in seen:
                         seen.add(node.id)
                         nxt.add(node.id)
@@ -207,8 +209,16 @@ def _owned(f: Path) -> bool:
     Anything under a stdlib/site-packages/venv directory is somebody else's to version.
     """
     s = str(f)
-    return not any(seg in s for seg in ("/site-packages/", "/dist-packages/",
-                                        "/lib/python", "/.venv/", "/installs/python/"))
+    return not any(
+        seg in s
+        for seg in (
+            "/site-packages/",
+            "/dist-packages/",
+            "/lib/python",
+            "/.venv/",
+            "/installs/python/",
+        )
+    )
 
 
 def search_path(src_path: Path) -> list[Path]:
@@ -265,6 +275,7 @@ def slice_key(fn: str, route: str, fns, names, segs, imports, search: list[Path]
 
 # ── the dispatch table ────────────────────────────────────────────────────────────────────────
 
+
 def routes_and_owners(src_path: Path) -> dict[str, str]:
     """Map each route to the module-level function that serves it.
 
@@ -315,12 +326,13 @@ def routes_and_owners(src_path: Path) -> dict[str, str]:
 
 # ── the run ───────────────────────────────────────────────────────────────────────────────────
 
+
 def load_cache(cache_path: Path) -> dict:
     if cache_path.exists():
         try:
             return json.loads(cache_path.read_text())
         except Exception:
-            return {}                                      # unreadable → everything runs
+            return {}  # unreadable → everything runs
     return {}
 
 
@@ -330,8 +342,13 @@ def run_check(route: str, src_path: Path) -> bool | None:
     The three-way return is the exit-code protocol (routes.py), and collapsing it is a real bug:
     reading exit 2 as failure reports a route that merely fell through as a broken check.
     """
-    r = subprocess.run([sys.executable, src_path.name, route], cwd=src_path.parent,
-                       capture_output=True, text=True, timeout=900)
+    r = subprocess.run(
+        [sys.executable, src_path.name, route],
+        cwd=src_path.parent,
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
     if r.returncode == 2:
         return None
     return r.returncode == 0
@@ -412,8 +429,10 @@ def main(argv, src_path: Path = DEFAULT_SRC, cache_path: Path = DEFAULT_CACHE) -
                 sizes.append(len(sl[0]))
                 filecounts.append(len(sl[1]))
         if sizes:
-            print(f"slice size       : mean {sum(sizes)/len(sizes):.1f} names, max {max(sizes)}; "
-                  f"modules reached mean {sum(filecounts)/len(filecounts):.1f}, max {max(filecounts)}")
+            print(
+                f"slice size       : mean {sum(sizes) / len(sizes):.1f} names, max {max(sizes)}; "
+                f"modules reached mean {sum(filecounts) / len(filecounts):.1f}, max {max(filecounts)}"
+            )
         return 0
 
     t0 = time.time()
@@ -421,10 +440,10 @@ def main(argv, src_path: Path = DEFAULT_SRC, cache_path: Path = DEFAULT_CACHE) -
     for route in misses:
         ok = run_check(route, src_path)
         if ok is None:
-            skipped.append(route)                          # exit 2 — not this library's; never cached
+            skipped.append(route)  # exit 2 — not this library's; never cached
             continue
         if ok and route in keys:
-            cache[keys[route]] = True                      # only a PASS is ever recorded
+            cache[keys[route]] = True  # only a PASS is ever recorded
         if not ok:
             failed.append(route)
     # Ζ·write·atomic — replace the PATH, not the inode's contents: a hardlinked twin (a dedup
@@ -432,9 +451,11 @@ def main(argv, src_path: Path = DEFAULT_SRC, cache_path: Path = DEFAULT_CACHE) -
     _tmp = cache_path.with_name(f".{cache_path.name}.tmp")
     _tmp.write_text(json.dumps(cache))
     os.replace(_tmp, cache_path)
-    print(f"ran {len(misses)} check(s) in {time.time() - t0:.1f}s "
-          f"({'all pass' if not failed else f'{len(failed)} FAILED'}"
-          f"{f', {len(skipped)} not-mine' if skipped else ''})")
+    print(
+        f"ran {len(misses)} check(s) in {time.time() - t0:.1f}s "
+        f"({'all pass' if not failed else f'{len(failed)} FAILED'}"
+        f"{f', {len(skipped)} not-mine' if skipped else ''})"
+    )
     for f in failed[:10]:
         print(f"   FAILED: {f}")
     return 1 if failed else 0

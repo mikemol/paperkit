@@ -14,6 +14,7 @@ so the default is passing-by-construction-except-where-explicitly-excepted.
 
     python3 checks/ruler.py    # gate the paper's tables + demonstrate the exception
 """
+
 from __future__ import annotations
 
 import re
@@ -34,16 +35,28 @@ def _paper_body(paper_md: Path) -> str:
         md = Path(t) / "p.md"
         md.write_text(source.cite_split(paper_md))
         return subprocess.run(
-            ["pandoc", str(md), "-t", "latex", "--citeproc",
-             "--bibliography", str(paper_md.parent / "references.bib")],
-            capture_output=True, text=True, check=True).stdout
+            [
+                "pandoc",
+                str(md),
+                "-t",
+                "latex",
+                "--citeproc",
+                "--bibliography",
+                str(paper_md.parent / "references.bib"),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
 
 
 def main() -> int:
     ok = 0
     # 1) the generator's own ⟨P,F,δ⟩ (mikemol.rulerseq) must pass — the encoding is sound.
-    if subprocess.run([sys.executable, "-m", "mikemol.rulerseq"],
-                      capture_output=True).returncode != 0:
+    if (
+        subprocess.run([sys.executable, "-m", "mikemol.rulerseq"], capture_output=True).returncode
+        != 0
+    ):
         ok = 1
 
     # 2) POPULATION over the paper's real tables: every one is RULED or NAMED-EXCEPTION.
@@ -69,23 +82,48 @@ def main() -> int:
 
     # 3) the NAMED-EXCEPTION is real and legible (the disabled example, on a synthetic fixture — the
     #    paper's prose need not carry an artificial opted-out table for the exception to be proven).
-    fixture = (r"%ruler:off" "\n" r"\begin{longtable}[]{@{}cc@{}}" "\n"
-               r"\toprule\noalign{}" "\n" r"a & b \\" "\n" r"\midrule\noalign{}" "\n"
-               r"\endhead" "\n" r"\bottomrule\noalign{}" "\n" r"\endlastfoot" "\n"
-               r"1 & 2 \\" "\n" r"3 & 4 \\" "\n" r"\end{longtable}")
+    fixture = (
+        r"%ruler:off"
+        "\n"
+        r"\begin{longtable}[]{@{}cc@{}}"
+        "\n"
+        r"\toprule\noalign{}"
+        "\n"
+        r"a & b \\"
+        "\n"
+        r"\midrule\noalign{}"
+        "\n"
+        r"\endhead"
+        "\n"
+        r"\bottomrule\noalign{}"
+        "\n"
+        r"\endlastfoot"
+        "\n"
+        r"1 & 2 \\"
+        "\n"
+        r"3 & 4 \\"
+        "\n"
+        r"\end{longtable}"
+    )
     exc_body, exc_report = ruler_inject.inject(fixture)
     if not exc_report[0]["excepted"] or re.search(r"\\Rule\w+", exc_body):
-        ok = 1   # an excepted table must be RECORDED excepted and carry no rules (no silent drop)
+        ok = 1  # an excepted table must be RECORDED excepted and carry no rules (no silent drop)
 
     if ok == 0:
-        print(f"ruler: ok — {n_ruled} table(s) RULED by construction, {n_excepted} named-exception, "
-              f"{n_trivial} nothing-to-rule; the WCAG 1.4.1 non-colour cue is a passing-by-construction "
-              f"default with a named exception")
-        print("  the paper's formula table carries ruler-sequence rules (real-content demonstration)")
+        print(
+            f"ruler: ok — {n_ruled} table(s) RULED by construction, {n_excepted} named-exception, "
+            f"{n_trivial} nothing-to-rule; the WCAG 1.4.1 non-colour cue is a passing-by-construction "
+            f"default with a named exception"
+        )
+        print(
+            "  the paper's formula table carries ruler-sequence rules (real-content demonstration)"
+        )
         print("  the %ruler:off exception is real and legible (recorded, never a silent a11y gap)")
         return 0
-    print("ruler: FAIL — a rendered table is neither ruled nor a named exception, or the encoding is wrong",
-          file=sys.stderr)
+    print(
+        "ruler: FAIL — a rendered table is neither ruled nor a named exception, or the encoding is wrong",
+        file=sys.stderr,
+    )
     return 1
 
 

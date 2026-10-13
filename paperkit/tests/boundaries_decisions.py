@@ -22,6 +22,7 @@ Two soundness invariants of the finer atom's NON-monotone half:
 
     python3 paperkit/tests/boundaries_decisions.py     # exit 0 = the bar holds and the axis is sound
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -33,13 +34,7 @@ import mikemol.grade.grade
 
 import paperkit.grader
 
-_MOD = (
-    "def classify(x):\n"
-    "    if x > 0:\n"
-    "        return 'pos'\n"
-    "    else:\n"
-    "        return 'neg'\n"
-)
+_MOD = "def classify(x):\n    if x > 0:\n        return 'pos'\n    else:\n        return 'neg'\n"
 
 
 def _decisions(chk_src):
@@ -68,10 +63,13 @@ def main() -> int:
         paperkit.grader._apply("cmd:x", Path(), {}, [fs])
         barred = False
     except (ValueError, TypeError):
-        barred = True                                    # the sweep's `f, node, _ = …` cannot unpack it
+        barred = True  # the sweep's `f, node, _ = …` cannot unpack it
     check("(c) a FlipSite handed to _apply FAILS structurally (not a silent no-op)", barred)
-    check("(c) a FlipSite is a distinct 4-field type, not a (file, node, label) triple",
-          len(paperkit.grader.FlipSite._fields) == 4 and "node" not in paperkit.grader.FlipSite._fields)
+    check(
+        "(c) a FlipSite is a distinct 4-field type, not a (file, node, label) triple",
+        len(paperkit.grader.FlipSite._fields) == 4
+        and "node" not in paperkit.grader.FlipSite._fields,
+    )
 
     # A flip: site is NEVER produced by _sites (the sweep's surface) — only by _flip_sites_of.
     with tempfile.TemporaryDirectory() as d:
@@ -79,48 +77,70 @@ def main() -> int:
         (p / "m.py").write_text("def f(x):\n    if x:\n        return 1\n    return 0\n")
         site_labels = [s[2] for s in paperkit.grader._sites(p, p)]
         flip_labels = [f.label for f in paperkit.grader._flip_sites_of(p, p)]
-    check("(c) no flip: label appears in _sites (the sweep never sees a condition site)",
-          not any("::flip:" in lbl for lbl in site_labels))
-    check("(c) _flip_sites_of yields flip: sites separately",
-          bool(flip_labels) and all("::flip:" in lbl for lbl in flip_labels))
+    check(
+        "(c) no flip: label appears in _sites (the sweep never sees a condition site)",
+        not any("::flip:" in lbl for lbl in site_labels),
+    )
+    check(
+        "(c) _flip_sites_of yields flip: sites separately",
+        bool(flip_labels) and all("::flip:" in lbl for lbl in flip_labels),
+    )
 
     # ── (d) sound decision coverage ──────────────────────────────────────────────────────────────
     asserts_both = _decisions(
         "import sys; sys.path.insert(0, '.')\n"
         "from decision_module import classify\n"
         "assert classify(5) == 'pos'\n"
-        "assert classify(-5) == 'neg'\n")
+        "assert classify(-5) == 'neg'\n"
+    )
     check("(P) a check that ASSERTS the decision is NOT flagged unasserted", asserts_both == [])
 
     reaches_both = _decisions(
         "import sys; sys.path.insert(0, '.')\n"
         "from decision_module import classify\n"
         "classify(5)\n"
-        "classify(-5)\n")
-    check("(F) a check that REACHES both arms but never asserts IS flagged unasserted",
-          reaches_both == ["decision_module.py::flip:classify#0"])
+        "classify(-5)\n"
+    )
+    check(
+        "(F) a check that REACHES both arms but never asserts IS flagged unasserted",
+        reaches_both == ["decision_module.py::flip:classify#0"],
+    )
 
     one_arm = _decisions(
         "import sys; sys.path.insert(0, '.')\n"
         "from decision_module import classify\n"
-        "assert classify(5) == 'pos'\n")
-    check("(δ) a check that only exercises ONE arm is NOT flagged (both-arms gate rules out the "
-          "fixture-coincidence false positive)", one_arm == [])
+        "assert classify(5) == 'pos'\n"
+    )
+    check(
+        "(δ) a check that only exercises ONE arm is NOT flagged (both-arms gate rules out the "
+        "fixture-coincidence false positive)",
+        one_arm == [],
+    )
 
     # ── the axis is orthogonal, never a rung ─────────────────────────────────────────────────────
-    check("decisions_unasserted is NOT a rung (absent from RANK_C — incompleteness is not a grade)",
-          "decisions_unasserted" not in mikemol.grade.grade.RANK_C and "unasserted" not in mikemol.grade.grade.RANK_C)
-    check("decisions_unasserted is NOT in STRENGTH (never gates min-strength)",
-          "decisions_unasserted" not in mikemol.grade.grade.STRENGTH and "unasserted" not in mikemol.grade.grade.STRENGTH)
-    check("DECISIONS_C declares the axis (unasserted < asserted), like CORRO_C",
-          mikemol.grade.grade.DECISIONS_C == {"unasserted": 0, "asserted": 1})
+    check(
+        "decisions_unasserted is NOT a rung (absent from RANK_C — incompleteness is not a grade)",
+        "decisions_unasserted" not in mikemol.grade.grade.RANK_C
+        and "unasserted" not in mikemol.grade.grade.RANK_C,
+    )
+    check(
+        "decisions_unasserted is NOT in STRENGTH (never gates min-strength)",
+        "decisions_unasserted" not in mikemol.grade.grade.STRENGTH
+        and "unasserted" not in mikemol.grade.grade.STRENGTH,
+    )
+    check(
+        "DECISIONS_C declares the axis (unasserted < asserted), like CORRO_C",
+        mikemol.grade.grade.DECISIONS_C == {"unasserted": 0, "asserted": 1},
+    )
 
     print()
     if fails:
         print(f"FAIL — {len(fails)} broken: {fails}")
         return 1
-    print("ok — flip: is structurally barred from the sweep; decision-coverage is sound "
-          "(both-arms-reached gate, no fixture-coincidence)")
+    print(
+        "ok — flip: is structurally barred from the sweep; decision-coverage is sound "
+        "(both-arms-reached gate, no fixture-coincidence)"
+    )
     return 0
 
 

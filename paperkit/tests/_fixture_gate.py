@@ -9,6 +9,7 @@ The `import gate` is MODULE-TOP and honest: tools/imports.py derives the dag edg
 resolver, rhetoric, grade), so a witness importing this module stages exactly the
 gate's subsystem cone.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,21 +20,43 @@ import paperkit.tests._fixture_project
 import paperkit.gate
 
 
-def gate(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
-         title="t", numbered=False, references=False):
+def gate(
+    warrants,
+    *flags,
+    assets=None,
+    out=None,
+    rubric=(("s", "Sec"),),
+    title="t",
+    numbered=False,
+    references=False,
+):
     """(returncode, stderr).  Projects out.md before gating (or writes `out`)."""
     with tempfile.TemporaryDirectory() as d:
-        proj = paperkit.tests._fixture_model._write(d, warrants, assets, rubric, title, numbered, references)
+        proj = paperkit.tests._fixture_model._write(
+            d, warrants, assets, rubric, title, numbered, references
+        )
         paperkit.tests._fixture_project._projected(proj, out)
         rc, _o, e = paperkit.tests._fixture_model._call(paperkit.gate.main, [*flags, str(proj)])
         return rc, e
 
 
-def gate_json(warrants, *flags, assets=None, out=None, rubric=(("s", "Sec"),),
-              title="t", numbered=False, references=False):
+def gate_json(
+    warrants,
+    *flags,
+    assets=None,
+    out=None,
+    rubric=(("s", "Sec"),),
+    title="t",
+    numbered=False,
+    references=False,
+):
     """(returncode, parsed gate --json dict).  Projects out.md first (or writes `out`)."""
     with tempfile.TemporaryDirectory() as d:
-        proj = paperkit.tests._fixture_model._write(d, warrants, assets, rubric, title, numbered, references)
+        proj = paperkit.tests._fixture_model._write(
+            d, warrants, assets, rubric, title, numbered, references
+        )
         paperkit.tests._fixture_project._projected(proj, out)
-        rc, o, _e = paperkit.tests._fixture_model._call(paperkit.gate.main, ["--json", *flags, str(proj)])
+        rc, o, _e = paperkit.tests._fixture_model._call(
+            paperkit.gate.main, ["--json", *flags, str(proj)]
+        )
         return rc, json.loads(o or "{}")

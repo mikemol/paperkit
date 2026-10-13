@@ -9,6 +9,7 @@ that reads nothing under the project is legitimately [].
 
     python3 paperkit/tests/boundaries_degrade.py
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -39,37 +40,62 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         (d / "a.txt").write_text("FOO\n")
-        check("with strace, a cmd: footprint is the file it reads", paperkit.resolver.footprint("cmd:grep -q FOO a.txt", d, {}) == ["a.txt"])
-        check("file: needs no strace — always its target", paperkit.resolver.footprint("file:a.txt", d, {}) == ["a.txt"])
-        check("a check that reads nothing under the project is legitimately [] (cacheable)", paperkit.resolver.footprint("cmd:true", d, {}) == [])
+        check(
+            "with strace, a cmd: footprint is the file it reads",
+            paperkit.resolver.footprint("cmd:grep -q FOO a.txt", d, {}) == ["a.txt"],
+        )
+        check(
+            "file: needs no strace — always its target",
+            paperkit.resolver.footprint("file:a.txt", d, {}) == ["a.txt"],
+        )
+        check(
+            "a check that reads nothing under the project is legitimately [] (cacheable)",
+            paperkit.resolver.footprint("cmd:true", d, {}) == [],
+        )
         try:
-            paperkit.resolver.subprocess.run = lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("strace"))
+            paperkit.resolver.subprocess.run = lambda *a, **k: (_ for _ in ()).throw(
+                FileNotFoundError("strace")
+            )
             absent = paperkit.resolver.footprint("cmd:grep -q FOO a.txt", d, {})
 
             def empty_trace(argv, **k):
-                Path(argv[argv.index("-o") + 1]).write_text("")   # strace attached to nothing
+                Path(argv[argv.index("-o") + 1]).write_text("")  # strace attached to nothing
                 return types.SimpleNamespace(returncode=1)
+
             paperkit.resolver.subprocess.run = empty_trace
             no_ptrace = paperkit.resolver.footprint("cmd:grep -q FOO a.txt", d, {})
         finally:
             paperkit.resolver.subprocess.run = real_run
-        check("strace ABSENT (FileNotFoundError) → footprint degrades to None, not a crash", absent is None)
+        check(
+            "strace ABSENT (FileNotFoundError) → footprint degrades to None, not a crash",
+            absent is None,
+        )
         check("strace cannot ATTACH (empty trace) → None, not []", no_ptrace is None)
-        check("the live engine is restored after the test", paperkit.resolver.footprint("file:a.txt", d, {}) == ["a.txt"])
+        check(
+            "the live engine is restored after the test",
+            paperkit.resolver.footprint("file:a.txt", d, {}) == ["a.txt"],
+        )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     with tempfile.TemporaryDirectory() as t:
-        d = Path(t); (d / "a.txt").write_text("FOO\n")
+        d = Path(t)
+        (d / "a.txt").write_text("FOO\n")
         # [] hashes the SAME no matter the project content — a stored [] entry would ALWAYS cache-hit
         h1 = paperkit.cache.footprint_hash(d, [])
         (d / "a.txt").write_text("CHANGED\n")
         h2 = paperkit.cache.footprint_hash(d, [])
         stable = h1 == h2
         fails.append("empty-hashes-stable") if not stable else None
-        print(f"  {'ok ' if stable else 'XX '}the empty footprint [] hashes STABLE across an edit — so it must NOT hold an untraceable grade")
+        print(
+            f"  {'ok ' if stable else 'XX '}the empty footprint [] hashes STABLE across an edit — so it must NOT hold an untraceable grade"
+        )
         print("      P (unknown):  None  — uncacheable; re-grade every run, sweep the FULL surface")
-        print("      F (empty):    []    — content-independent hash; a genuine reads-nothing, cacheable")
-        print("      δ (min delta): None vs [] — collapsing them caches a grade whose inputs were never traced\n")
+        print(
+            "      F (empty):    []    — content-independent hash; a genuine reads-nothing, cacheable"
+        )
+        print(
+            "      δ (min delta): None vs [] — collapsing them caches a grade whose inputs were never traced\n"
+        )
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")

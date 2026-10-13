@@ -31,6 +31,7 @@ Does Not Support — never inferred from UA alone.
     python3 checks/wcag_entail.py [--route docx|latex]   # the per-SC entailment verdict for a route
     python3 checks/wcag_entail.py --check                # every Supports has verified entailment
 """
+
 from __future__ import annotations
 
 import json
@@ -67,6 +68,7 @@ def _consumed_verdict(warrant: str) -> str | None:
     except (OSError, ValueError):
         return None
 
+
 # The route → its final delivered format (matrix format names) + PDF/UA version.
 ROUTE_FINAL = {"docx": ("pdf-office", "UA-1"), "latex": ("pdf-latex", "UA-2")}
 
@@ -83,19 +85,19 @@ ROUTE_FINAL = {"docx": ("pdf-office", "UA-1"), "latex": ("pdf-latex", "UA-2")}
 # A warrant not listed here has NO proven entailment → its cells cannot yield "Supports".
 ENTAILMENT = {
     # ruler + use-of-colour prove 1.4.1 only within TABLES; 1.4.1 is document-wide → fragment.
-    "rnd-ruler":     ("farm",   ["python3", "checks/ruler.py"],                    "fragment"),
-    "rnd-colour":    ("farm",   ["python3", "checks/use_of_colour.py"],            "fragment"),
+    "rnd-ruler": ("farm", ["python3", "checks/ruler.py"], "fragment"),
+    "rnd-colour": ("farm", ["python3", "checks/use_of_colour.py"], "fragment"),
     # math-alt proves alt text for FORMULAS only; 1.1.1 covers all non-text (figures too) → fragment.
-    "rnd-math-alt":  ("farm",   ["python3", "checks/mathalt.py", "--selftest"],    "fragment"),
+    "rnd-math-alt": ("farm", ["python3", "checks/mathalt.py", "--selftest"], "fragment"),
     # link-alt proves a /Contents STRING exists; 2.4.4 needs the PURPOSE determinable → fragment.
-    "rnd-link-alt":  ("farm",   ["python3", "checks/linkalt.py", "--selftest"],    "fragment"),
+    "rnd-link-alt": ("farm", ["python3", "checks/linkalt.py", "--selftest"], "fragment"),
     # widen proves a wide table cell is sized to fit — it entails no WCAG criterion fully, so
     # "fragment" (defensive: it carries no WCAG tag today, but if it ever did, a column-widening check
     # must not grant a full Supports).
-    "rnd-widen":     ("farm",   ["python3", "checks/widen_tables.py", "--selftest"], "fragment"),
+    "rnd-widen": ("farm", ["python3", "checks/widen_tables.py", "--selftest"], "fragment"),
     # the veraPDF oracle validates the WHOLE deliverable against PDF/UA → full for the SCs UA covers.
-    "rnd-a11y":      ("oracle", None,                                              "full"),
-    "rnd-a11y-latex":("oracle", None,                                              "full"),
+    "rnd-a11y": ("oracle", None, "full"),
+    "rnd-a11y-latex": ("oracle", None, "full"),
     # rnd-wf / rnd-fidelity / rnd-fig-legible / rnd-fig-vector validate against the real artifact but
     # carry no synthetic F-arm and are not the UA oracle; their SCs are entailed (if at all) through
     # the PDF/UA oracle below, not through these warrants directly.  Left UNPROVEN here on purpose.
@@ -121,47 +123,116 @@ PDFUA_TO_WCAG = {
     # "equivalent purpose" 1.1.1 requires → fragment.  On the latex route the math is a tagged Formula
     # with an ASSOCIATED MathML file (/AF) — recoverable structure a screen reader reads (latex.py) →
     # full.  The adversary caught the docx-route overclaim; the route split is the fix.
-    "1.1.1": ({"docx": "fragment", "latex": "full"},
-              "veraPDF confirms /Alt PRESENT; on docx it is the raw-LaTeX source (not an equivalent a "
-              "screen reader can speak) → fragment, on latex it is recoverable MathML (/AF) → full"),
+    "1.1.1": (
+        {"docx": "fragment", "latex": "full"},
+        "veraPDF confirms /Alt PRESENT; on docx it is the raw-LaTeX source (not an equivalent a "
+        "screen reader can speak) → fragment, on latex it is recoverable MathML (/AF) → full",
+    ),
     # 2.4.2 is presence-not-completeness like 1.3.1/2.4.6: veraPDF checks a title EXISTS (+ DisplayDocTitle),
     # NOT that it DESCRIBES topic or purpose (the SC's actual bar) — a generic "Untitled" passes veraPDF
     # yet fails 2.4.2.  So UA establishes the machinery, not the criterion → fragment (the adversary's find).
-    "2.4.2": ("fragment", "UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it "
-                          "DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness"),
+    "2.4.2": (
+        "fragment",
+        "UA validates a title EXISTS and DisplayDocTitle, but veraPDF cannot confirm it "
+        "DESCRIBES topic/purpose (the SC's bar) — presence is not descriptiveness",
+    ),
     "3.1.1": ("full", "UA requires (and veraPDF checks) the document's primary language be set"),
     # valid tagging MACHINERY, but completeness-against-layout is a human checkpoint → fragment
-    "1.3.1": ("fragment", "UA validates the structure tree, but veraPDF cannot confirm EVERY visual "
-                          "relationship was tagged (completeness is a human PDF/UA checkpoint)"),
-    "1.3.2": ("fragment", "UA validates a reading order exists, but not that it matches the visual "
-                          "sequence (correctness is a human checkpoint)"),
-    "2.4.6": ("fragment", "UA validates tagged headings, but not that EVERY visual heading was tagged "
-                          "as one (completeness is a human checkpoint)"),
+    "1.3.1": (
+        "fragment",
+        "UA validates the structure tree, but veraPDF cannot confirm EVERY visual "
+        "relationship was tagged (completeness is a human PDF/UA checkpoint)",
+    ),
+    "1.3.2": (
+        "fragment",
+        "UA validates a reading order exists, but not that it matches the visual "
+        "sequence (correctness is a human checkpoint)",
+    ),
+    "2.4.6": (
+        "fragment",
+        "UA validates tagged headings, but not that EVERY visual heading was tagged "
+        "as one (completeness is a human checkpoint)",
+    ),
     # 4.1.2 Name, Role, Value is DELIBERATELY OMITTED.  UA tags STATIC structure roles, but 4.1.2
     # normatively covers the name/role/VALUE and change-notification of interactive components; the
     # paper's citation links are interactive annotations, and a tagged role does not establish their
     # name/value are exposed.  The ISO-14289 → 4.1.2 correspondence is plausible-but-incomplete on that
     # surface, so it is not claimed here (conservative — the adversary flagged it UNCERTAIN).
 }
-_UA_SOURCE = ("ISO 14289 (PDF/UA) tagging requirements ↔ WCAG, per the PDF/UA-WCAG correspondence "
-              "(Matterhorn Protocol / PDF Association guidance); only the directly-established "
-              "correspondences are claimed here")
+_UA_SOURCE = (
+    "ISO 14289 (PDF/UA) tagging requirements ↔ WCAG, per the PDF/UA-WCAG correspondence "
+    "(Matterhorn Protocol / PDF Association guidance); only the directly-established "
+    "correspondences are claimed here"
+)
 
 # WCAG SCs that do NOT apply to a static, non-interactive print PDF deliverable — Not Applicable.
 # Each with the reason it cannot apply (no media, no interaction, no viewport reflow, no forms).
 NOT_APPLICABLE = {
     # time-based media — none in a static document
-    "1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.5", "1.2.6", "1.2.7", "1.2.8", "1.2.9",
-    "1.4.2", "1.4.7",
+    "1.2.1",
+    "1.2.2",
+    "1.2.3",
+    "1.2.4",
+    "1.2.5",
+    "1.2.6",
+    "1.2.7",
+    "1.2.8",
+    "1.2.9",
+    "1.4.2",
+    "1.4.7",
     # orientation / input-purpose / reflow / spacing / hover — viewport or input properties
-    "1.3.4", "1.3.5", "1.4.4", "1.4.10", "1.4.12", "1.4.13",
+    "1.3.4",
+    "1.3.5",
+    "1.4.4",
+    "1.4.10",
+    "1.4.12",
+    "1.4.13",
     # keyboard / pointer / motion / timing / navigation — no interaction in a static PDF
-    "2.1.1", "2.1.2", "2.1.3", "2.1.4", "2.2.1", "2.2.2", "2.2.3", "2.2.4", "2.2.5", "2.2.6",
-    "2.3.1", "2.3.2", "2.3.3", "2.4.1", "2.4.3", "2.4.5", "2.4.7", "2.4.8", "2.4.11", "2.4.12", "2.4.13",
-    "2.5.1", "2.5.2", "2.5.3", "2.5.4", "2.5.5", "2.5.6", "2.5.7", "2.5.8",
+    "2.1.1",
+    "2.1.2",
+    "2.1.3",
+    "2.1.4",
+    "2.2.1",
+    "2.2.2",
+    "2.2.3",
+    "2.2.4",
+    "2.2.5",
+    "2.2.6",
+    "2.3.1",
+    "2.3.2",
+    "2.3.3",
+    "2.4.1",
+    "2.4.3",
+    "2.4.5",
+    "2.4.7",
+    "2.4.8",
+    "2.4.11",
+    "2.4.12",
+    "2.4.13",
+    "2.5.1",
+    "2.5.2",
+    "2.5.3",
+    "2.5.4",
+    "2.5.5",
+    "2.5.6",
+    "2.5.7",
+    "2.5.8",
     # predictable / input assistance / forms — no forms or dynamic behaviour
-    "3.2.1", "3.2.2", "3.2.3", "3.2.4", "3.2.5", "3.2.6",
-    "3.3.1", "3.3.2", "3.3.3", "3.3.4", "3.3.5", "3.3.6", "3.3.7", "3.3.8", "3.3.9",
+    "3.2.1",
+    "3.2.2",
+    "3.2.3",
+    "3.2.4",
+    "3.2.5",
+    "3.2.6",
+    "3.3.1",
+    "3.3.2",
+    "3.3.3",
+    "3.3.4",
+    "3.3.5",
+    "3.3.6",
+    "3.3.7",
+    "3.3.8",
+    "3.3.9",
     # status messages — no live region
     "4.1.3",
     # language of parts — single-language document
@@ -185,29 +256,52 @@ CLAUSE_TO_WCAG = {"7.7": "1.1.1", "7.18": "2.4.4"}
 # moves only the derived side) so the check is non-vacuous.  A scope correction updates this table in the
 # SAME commit (the corrected label + its pinned verdict together — no drift).
 SCOPE_EMIT = {
-    ("1.1.1", "docx"):  "Partially Supports",  ("1.1.1", "latex"): "Supports",
-    ("1.3.1", "docx"):  "Partially Supports",  ("1.3.1", "latex"): "Partially Supports",
-    ("1.3.2", "docx"):  "Partially Supports",  ("1.3.2", "latex"): "Partially Supports",
-    ("1.3.3", "docx"):  "Does Not Support",    ("1.3.3", "latex"): "Does Not Support",
-    ("1.3.6", "docx"):  "Does Not Support",    ("1.3.6", "latex"): "Does Not Support",
-    ("1.4.1", "docx"):  "Does Not Support",    ("1.4.1", "latex"): "Partially Supports",
-    ("1.4.3", "docx"):  "Does Not Support",    ("1.4.3", "latex"): "Does Not Support",
-    ("1.4.5", "docx"):  "Partially Supports",  ("1.4.5", "latex"): "Does Not Support",
-    ("1.4.6", "docx"):  "Does Not Support",    ("1.4.6", "latex"): "Does Not Support",
-    ("1.4.8", "docx"):  "Does Not Support",    ("1.4.8", "latex"): "Does Not Support",
-    ("1.4.9", "docx"):  "Does Not Support",    ("1.4.9", "latex"): "Does Not Support",
-    ("1.4.11", "docx"): "Does Not Support",    ("1.4.11", "latex"): "Does Not Support",
-    ("2.4.2", "docx"):  "Partially Supports",  ("2.4.2", "latex"): "Partially Supports",
-    ("2.4.4", "docx"):  "Partially Supports",  ("2.4.4", "latex"): "Does Not Support",
-    ("2.4.6", "docx"):  "Partially Supports",  ("2.4.6", "latex"): "Partially Supports",
-    ("2.4.9", "docx"):  "Does Not Support",    ("2.4.9", "latex"): "Does Not Support",
-    ("2.4.10", "docx"): "Does Not Support",    ("2.4.10", "latex"): "Does Not Support",
-    ("3.1.1", "docx"):  "Supports",            ("3.1.1", "latex"): "Supports",
-    ("3.1.3", "docx"):  "Does Not Support",    ("3.1.3", "latex"): "Does Not Support",
-    ("3.1.4", "docx"):  "Does Not Support",    ("3.1.4", "latex"): "Does Not Support",
-    ("3.1.5", "docx"):  "Does Not Support",    ("3.1.5", "latex"): "Does Not Support",
-    ("3.1.6", "docx"):  "Does Not Support",    ("3.1.6", "latex"): "Does Not Support",
-    ("4.1.2", "docx"):  "Does Not Support",    ("4.1.2", "latex"): "Does Not Support",
+    ("1.1.1", "docx"): "Partially Supports",
+    ("1.1.1", "latex"): "Supports",
+    ("1.3.1", "docx"): "Partially Supports",
+    ("1.3.1", "latex"): "Partially Supports",
+    ("1.3.2", "docx"): "Partially Supports",
+    ("1.3.2", "latex"): "Partially Supports",
+    ("1.3.3", "docx"): "Does Not Support",
+    ("1.3.3", "latex"): "Does Not Support",
+    ("1.3.6", "docx"): "Does Not Support",
+    ("1.3.6", "latex"): "Does Not Support",
+    ("1.4.1", "docx"): "Does Not Support",
+    ("1.4.1", "latex"): "Partially Supports",
+    ("1.4.3", "docx"): "Does Not Support",
+    ("1.4.3", "latex"): "Does Not Support",
+    ("1.4.5", "docx"): "Partially Supports",
+    ("1.4.5", "latex"): "Does Not Support",
+    ("1.4.6", "docx"): "Does Not Support",
+    ("1.4.6", "latex"): "Does Not Support",
+    ("1.4.8", "docx"): "Does Not Support",
+    ("1.4.8", "latex"): "Does Not Support",
+    ("1.4.9", "docx"): "Does Not Support",
+    ("1.4.9", "latex"): "Does Not Support",
+    ("1.4.11", "docx"): "Does Not Support",
+    ("1.4.11", "latex"): "Does Not Support",
+    ("2.4.2", "docx"): "Partially Supports",
+    ("2.4.2", "latex"): "Partially Supports",
+    ("2.4.4", "docx"): "Partially Supports",
+    ("2.4.4", "latex"): "Does Not Support",
+    ("2.4.6", "docx"): "Partially Supports",
+    ("2.4.6", "latex"): "Partially Supports",
+    ("2.4.9", "docx"): "Does Not Support",
+    ("2.4.9", "latex"): "Does Not Support",
+    ("2.4.10", "docx"): "Does Not Support",
+    ("2.4.10", "latex"): "Does Not Support",
+    ("3.1.1", "docx"): "Supports",
+    ("3.1.1", "latex"): "Supports",
+    ("3.1.3", "docx"): "Does Not Support",
+    ("3.1.3", "latex"): "Does Not Support",
+    ("3.1.4", "docx"): "Does Not Support",
+    ("3.1.4", "latex"): "Does Not Support",
+    ("3.1.5", "docx"): "Does Not Support",
+    ("3.1.5", "latex"): "Does Not Support",
+    ("3.1.6", "docx"): "Does Not Support",
+    ("3.1.6", "latex"): "Does Not Support",
+    ("4.1.2", "docx"): "Does Not Support",
+    ("4.1.2", "latex"): "Does Not Support",
 }
 
 
@@ -222,9 +316,9 @@ def _warrants_tagging(sc: str, fmt: str) -> list:
         if st not in ("native", "post"):
             continue
         tag = spec.get("wcag", "")
-        direct = (tag == sc)
-        via_ua = (cap == "pdf-ua" and sc in PDFUA_TO_WCAG)
-        via_clause = (CLAUSE_TO_WCAG.get(tag) == sc)
+        direct = tag == sc
+        via_ua = cap == "pdf-ua" and sc in PDFUA_TO_WCAG
+        via_clause = CLAUSE_TO_WCAG.get(tag) == sc
         if direct or via_ua or via_clause:
             out.append(warrant)
     return out
@@ -258,20 +352,21 @@ def _proven(warrant: str, run_farm: bool) -> str | None:
     if not run_farm:
         return kind
     if kind == "farm":
-        rc = subprocess.run(cmd, capture_output=True,
-                            cwd=Path(__file__).resolve().parent.parent).returncode
+        rc = subprocess.run(
+            cmd, capture_output=True, cwd=Path(__file__).resolve().parent.parent
+        ).returncode
         if rc == 0:
-            return "farm"           # F-arm proven → entails
+            return "farm"  # F-arm proven → entails
         if rc == 3:
-            return "cannot-run"     # toolchain absent → not verifiable here (not a fail)
-        return None                 # a farm whose selftest FAILED does NOT entail (a real defect)
+            return "cannot-run"  # toolchain absent → not verifiable here (not a fail)
+        return None  # a farm whose selftest FAILED does NOT entail (a real defect)
     if kind == "oracle":
         v = _consumed_verdict(warrant)
         if v == "pass":
-            return "oracle"         # veraPDF passed (consumed record) → entails
+            return "oracle"  # veraPDF passed (consumed record) → entails
         if v == "fail":
-            return None             # veraPDF FAILED → does NOT entail (false-green closed)
-        return "cannot-run"         # record not staged (standalone) or cannot-run → not verifiable here
+            return None  # veraPDF FAILED → does NOT entail (false-green closed)
+        return "cannot-run"  # record not staged (standalone) or cannot-run → not verifiable here
     return None
 
 
@@ -283,8 +378,12 @@ def entail(sc: str, route: str, run_farm: bool = False) -> dict:
     """
     fmt, _ua = ROUTE_FINAL[route]
     if sc in NOT_APPLICABLE:
-        return {"verdict": "Not Applicable", "warrant": None, "form": None,
-                "remark": "does not apply to a static, non-interactive print PDF"}
+        return {
+            "verdict": "Not Applicable",
+            "warrant": None,
+            "form": None,
+            "remark": "does not apply to a static, non-interactive print PDF",
+        }
     warrants = _warrants_tagging(sc, fmt)
 
     def _eff_scope(w: str) -> tuple:
@@ -296,42 +395,64 @@ def entail(sc: str, route: str, run_farm: bool = False) -> dict:
             sc_scope, why = PDFUA_TO_WCAG[sc]
             # a route-dependent SC (1.1.1) carries a {route: scope} dict; resolve it for THIS route.
             if isinstance(sc_scope, dict):
-                sc_scope = sc_scope.get(route, "fragment")   # unknown route → conservative fragment
+                sc_scope = sc_scope.get(route, "fragment")  # unknown route → conservative fragment
             return sc_scope, f"{w} (veraPDF): {why}"
         return _scope(w), f"{w} entails this"
 
     proven = [(w, _proven(w, run_farm)) for w in warrants]
+
     # Ζ·tier·exit — "cannot-run" is a proof STATE, not a proof: it must not read as truthy `form`
     # (which would grant Supports on an unverified proof), and it must not fall through to "Does Not
     # Support" (asserting a gap we did NOT verify absent is the OPPOSITE overclaim).  A criterion whose
     # only would-be proof could not run is Not Evaluated.
     def _is_proof(form: str | None) -> bool:
         return form in ("farm", "oracle")
+
     # a proven, FULL-scope warrant → Supports.  Scan for one before settling for a fragment.
     for w, form in proven:
         if _is_proof(form) and _eff_scope(w)[0] == "full":
-            return {"verdict": "Supports", "warrant": w, "form": form,
-                    "remark": f"{_eff_scope(w)[1]} ({form})"}
+            return {
+                "verdict": "Supports",
+                "warrant": w,
+                "form": form,
+                "remark": f"{_eff_scope(w)[1]} ({form})",
+            }
     # a proven FRAGMENT-scope warrant → Partially Supports (it proves a sub-part, not the whole SC).
     for w, form in proven:
         if _is_proof(form) and _eff_scope(w)[0] == "fragment":
-            return {"verdict": "Partially Supports", "warrant": w, "form": form,
-                    "remark": f"{_eff_scope(w)[1]} — only part of the criterion is proven ({form}), "
-                              f"not the whole; a full claim needs coverage the tool cannot confirm"}
+            return {
+                "verdict": "Partially Supports",
+                "warrant": w,
+                "form": form,
+                "remark": f"{_eff_scope(w)[1]} — only part of the criterion is proven ({form}), "
+                f"not the whole; a full claim needs coverage the tool cannot confirm",
+            }
     # tagged but no proven entailment (a "post"/"excepted" cell present but unproven) → Partially.
     if warrants:
-        return {"verdict": "Partially Supports", "warrant": warrants[0], "form": None,
-                "remark": f"{warrants[0]} addresses this but its entailment is not proven for a full claim"}
+        return {
+            "verdict": "Partially Supports",
+            "warrant": warrants[0],
+            "form": None,
+            "remark": f"{warrants[0]} addresses this but its entailment is not proven for a full claim",
+        }
     # the only would-be entailment could not RUN here (toolchain absent / record not staged) → Not
     # Evaluated, conservatively: neither claim Supports (unverified) nor a gap (not verified absent).
     if any(form == "cannot-run" for _w, form in proven):
         w = next(w for w, form in proven if form == "cannot-run")
-        return {"verdict": "Not Evaluated", "warrant": w, "form": "cannot-run",
-                "remark": f"{w}'s entailment could not be verified here — not claimed either way "
-                          f"(conservative under a missing validator or an unstaged consumed record)"}
+        return {
+            "verdict": "Not Evaluated",
+            "warrant": w,
+            "form": "cannot-run",
+            "remark": f"{w}'s entailment could not be verified here — not claimed either way "
+            f"(conservative under a missing validator or an unstaged consumed record)",
+        }
     # claimable for this content but no entailing warrant → Does Not Support (honest gap)
-    return {"verdict": "Does Not Support", "warrant": None, "form": None,
-            "remark": "no warrant entails this criterion for this deliverable (a known gap)"}
+    return {
+        "verdict": "Does Not Support",
+        "warrant": None,
+        "form": None,
+        "remark": "no warrant entails this criterion for this deliverable (a known gap)",
+    }
 
 
 def check() -> tuple[bool, list[str], list[str]]:
@@ -359,8 +480,10 @@ def check() -> tuple[bool, list[str], list[str]]:
         form = _proven(w, run_farm=True)
         what = "⟨P,F,δ⟩ selftest" if kind == "farm" else "veraPDF validator (consumed record)"
         if form == "cannot-run":
-            cannot_run.append(f"{w}: its {what} CANNOT RUN here (toolchain absent / record not staged)")
-        elif form is None:                              # ran-and-failed (a red validator)
+            cannot_run.append(
+                f"{w}: its {what} CANNOT RUN here (toolchain absent / record not staged)"
+            )
+        elif form is None:  # ran-and-failed (a red validator)
             problems.append(f"{w}: its {what} FAILS — cannot back a Supports")
     # every SC a route marks Supports must, on re-derivation with proofs RUN, still be Supports — UNLESS
     # its would-be full-scope proof CANNOT RUN (toolchain absent / consumed record not staged), which
@@ -376,7 +499,7 @@ def check() -> tuple[bool, list[str], list[str]]:
                 if vr["verdict"] == "Supports":
                     continue
                 if _proven(backer, run_farm=True) == "cannot-run":
-                    continue                            # its proof could not run — an honest downgrade
+                    continue  # its proof could not run — an honest downgrade
                 problems.append(f"{sc} × {route}: Supports without a passing entailment proof")
     return (not problems), problems, cannot_run
 
@@ -388,6 +511,7 @@ def _selftest() -> int:
     cheaply.  δ = the consumed record's verdict (pass vs fail) flips 3.1.1 (a full UA-bridge SC — /Lang presence IS its bar) between Supports and not.
     """
     import tempfile
+
     fails = []
 
     def _with_record(verdict: str, sc: str = "3.1.1", route: str = "docx") -> str:
@@ -409,25 +533,37 @@ def _selftest() -> int:
 
     print("Ρ·wcag·oracle-edge — the oracle Supports is proof-backed by the consumed record\n")
     # P: a consumed record that reads PASS backs a full Supports (3.1.1 = /Lang presence, a full UA-bridge SC).
-    check("consumed record = pass → 3.1.1 Supports (reads the cached veraPDF, no re-run)",
-          _with_record("pass") == "Supports")
+    check(
+        "consumed record = pass → 3.1.1 Supports (reads the cached veraPDF, no re-run)",
+        _with_record("pass") == "Supports",
+    )
     # F: a consumed record that reads FAIL drops the Supports — the adversary's counterexample, closed.
-    check("consumed record = fail → 3.1.1 NOT Supports (a red veraPDF cannot back a Supports)",
-          _with_record("fail") != "Supports")
+    check(
+        "consumed record = fail → 3.1.1 NOT Supports (a red veraPDF cannot back a Supports)",
+        _with_record("fail") != "Supports",
+    )
     # cannot-run: an absent/cannot-run record is Not-Evaluated-conservative, never a false Supports.
-    check("consumed record = cannot-run → 3.1.1 NOT Supports (unverified, conservative)",
-          _with_record("cannot-run") != "Supports")
+    check(
+        "consumed record = cannot-run → 3.1.1 NOT Supports (unverified, conservative)",
+        _with_record("cannot-run") != "Supports",
+    )
     # standalone (no record staged) → the oracle is cannot-run, never a false-asserted Supports.
-    check("no consumed record staged → 3.1.1 NOT Supports (standalone cannot assert the oracle)",
-          entail("3.1.1", "docx", run_farm=True)["verdict"] != "Supports")
+    check(
+        "no consumed record staged → 3.1.1 NOT Supports (standalone cannot assert the oracle)",
+        entail("3.1.1", "docx", run_farm=True)["verdict"] != "Supports",
+    )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     P, F = _with_record("pass"), _with_record("fail")
     ok = P == "Supports" and F != "Supports"
     fails.append("record-verdict-delta") if not ok else None
     print(f"  {'ok ' if ok else 'XX '}the consumed record's verdict flips 3.1.1 Supports on/off")
-    print("      P (pass side): consumed rnd-a11y record reads pass — 3.1.1 Supports (veraPDF passed)")
-    print("      F (flag side): consumed rnd-a11y record reads fail — 3.1.1 not Supports (veraPDF failed)")
+    print(
+        "      P (pass side): consumed rnd-a11y record reads pass — 3.1.1 Supports (veraPDF passed)"
+    )
+    print(
+        "      F (flag side): consumed rnd-a11y record reads fail — 3.1.1 not Supports (veraPDF failed)"
+    )
     print("      δ (min delta): the single verdict field pass→fail in the consumed record\n")
 
     # ── Ρ·wcag·scope-fixture ──────────────────────────────────────────────────────────────────────
@@ -446,7 +582,9 @@ def _selftest() -> int:
     # NON-VACUOUS by construction: SCOPE_EMIT is authored independently of PDFUA_TO_WCAG (a golden-file test,
     # like wcag_model's completeness arithmetic), so a wrong label moves the DERIVED side only → mismatch.
     # A (scope==full)==(Supports) invariant would be VACUOUS (both sides read the same dict) — verified.
-    print("\nΡ·wcag·scope-fixture — every disclosed verdict pinned; a scope-label mutation flips one\n")
+    print(
+        "\nΡ·wcag·scope-fixture — every disclosed verdict pinned; a scope-label mutation flips one\n"
+    )
     scope_fails = []
     # COMPLETENESS (Ζ·bnd·toplevel / guard-must-not-copy): the CONTENT loop below iterates SCOPE_EMIT
     # itself, so a data-: DROP of a golden entry would just SHRINK the loop — the dropped verdict would
@@ -455,19 +593,29 @@ def _selftest() -> int:
     # breaks domain-equality here even though the content loop can't see it.  This is the completeness
     # arithmetic wcag_model uses, applied to the golden table's key set: the guard must not derive its
     # own domain from the thing it guards.
-    expected_domain = {(sc, route) for sc in (set(wm.SC) - NOT_APPLICABLE) for route in ("docx", "latex")}
+    expected_domain = {
+        (sc, route) for sc in (set(wm.SC) - NOT_APPLICABLE) for route in ("docx", "latex")
+    }
     got_domain = set(SCOPE_EMIT)
     missing = sorted(expected_domain - got_domain)
     extra = sorted(got_domain - expected_domain)
     if missing:
-        scope_fails.append(f"SCOPE_EMIT is MISSING {len(missing)} disclosed (SC×route) entries: {missing[:6]}")
-        print(f"  XX SCOPE_EMIT domain incomplete — {len(missing)} non-NA (SC×route) unpinned: {missing[:6]}")
+        scope_fails.append(
+            f"SCOPE_EMIT is MISSING {len(missing)} disclosed (SC×route) entries: {missing[:6]}"
+        )
+        print(
+            f"  XX SCOPE_EMIT domain incomplete — {len(missing)} non-NA (SC×route) unpinned: {missing[:6]}"
+        )
     if extra:
-        scope_fails.append(f"SCOPE_EMIT pins {len(extra)} (SC×route) that are Not Applicable: {extra[:6]}")
+        scope_fails.append(
+            f"SCOPE_EMIT pins {len(extra)} (SC×route) that are Not Applicable: {extra[:6]}"
+        )
         print(f"  XX SCOPE_EMIT pins {len(extra)} NA (SC×route): {extra[:6]}")
     if not missing and not extra:
-        print(f"  ok SCOPE_EMIT domain == the {len(expected_domain)} non-NA (SC×route) — independently derived "
-              f"from wm.SC − NOT_APPLICABLE (a drop cannot hide)")
+        print(
+            f"  ok SCOPE_EMIT domain == the {len(expected_domain)} non-NA (SC×route) — independently derived "
+            f"from wm.SC − NOT_APPLICABLE (a drop cannot hide)"
+        )
     for (sc, route), expected in sorted(SCOPE_EMIT.items()):
         got = entail(sc, route, run_farm=False)["verdict"]
         ok = got == expected
@@ -476,8 +624,10 @@ def _selftest() -> int:
         # print only mismatches + a per-route roll-up (full enumeration is the committed SCOPE_EMIT)
         if not ok:
             print(f"  XX {sc:8} {route:6} emit={got!r} declared={expected!r}")
-    print(f"  {'ok ' if not scope_fails else 'XX '}{len(SCOPE_EMIT)} disclosed (SC×route) verdicts match "
-          f"the declared emit table ({len(scope_fails)} drifted)")
+    print(
+        f"  {'ok ' if not scope_fails else 'XX '}{len(SCOPE_EMIT)} disclosed (SC×route) verdicts match "
+        f"the declared emit table ({len(scope_fails)} drifted)"
+    )
     fails.extend(scope_fails)
 
     if fails:
@@ -503,23 +653,38 @@ def main(argv: list[str]) -> int:
         if not ok:
             for p in problems:
                 print(f"wcag-entail --check: {p}", file=sys.stderr)
-            return 1                                    # a real defect (a red validator) — RAN-AND-FAILED
-        if cannot_run:                                  # Ζ·tier·exit — no defect, but a validator could not run
+            return 1  # a real defect (a red validator) — RAN-AND-FAILED
+        if cannot_run:  # Ζ·tier·exit — no defect, but a validator could not run
             for c in cannot_run:
                 print(f"wcag-entail --check: {c}", file=sys.stderr)
-            print("wcag-entail --check: registry is sound; some validators CANNOT RUN here (toolchain "
-                  "absent / consumed record not staged — a standalone run) — those SCs disclose Not "
-                  "Evaluated, not Supports (conservative).", file=sys.stderr)
-            return 3                                    # cannot-run, not a failure
+            print(
+                "wcag-entail --check: registry is sound; some validators CANNOT RUN here (toolchain "
+                "absent / consumed record not staged — a standalone run) — those SCs disclose Not "
+                "Evaluated, not Supports (conservative).",
+                file=sys.stderr,
+            )
+            return 3  # cannot-run, not a failure
         parts = []
         for route in ROUTE_FINAL:
             t = summary(route, run_farm=False)
-            parts.append(f"{route} {ROUTE_FINAL[route][1]}: " +
-                         ", ".join(f"{t.get(v,0)} {v}" for v in
-                                   ("Supports", "Partially Supports", "Does Not Support",
-                                    "Not Applicable", "Not Evaluated") if t.get(v)))
-        print("wcag-entail --check: every Supports has proven entailment (farm selftests pass, "
-              "oracle = consumed veraPDF record); conservative — no Supports without proof.")
+            parts.append(
+                f"{route} {ROUTE_FINAL[route][1]}: "
+                + ", ".join(
+                    f"{t.get(v, 0)} {v}"
+                    for v in (
+                        "Supports",
+                        "Partially Supports",
+                        "Does Not Support",
+                        "Not Applicable",
+                        "Not Evaluated",
+                    )
+                    if t.get(v)
+                )
+            )
+        print(
+            "wcag-entail --check: every Supports has proven entailment (farm selftests pass, "
+            "oracle = consumed veraPDF record); conservative — no Supports without proof."
+        )
         for p in parts:
             print("  " + p)
         return 0

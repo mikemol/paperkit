@@ -9,6 +9,7 @@ this boundary test runs in CI; `gate --without-K` on the real documents does not
 
     python3 paperkit/tests/boundaries_without_k.py
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,10 +18,14 @@ import paperkit.tests._fixture_gate  # noqa: E402
 import paperkit.tests._fixture_model  # noqa: E402
 
 # Two cited claims; DISTINCT witnesses vs a SHARED one (both files exist in the proj).
-DISTINCT = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
-            paperkit.tests._fixture_model.entry("b", claim="beta", check="file:r.tsv", frm="a")]
-SHARED = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
-          paperkit.tests._fixture_model.entry("b", claim="beta", check="file:w.bib", frm="a")]
+DISTINCT = [
+    paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
+    paperkit.tests._fixture_model.entry("b", claim="beta", check="file:r.tsv", frm="a"),
+]
+SHARED = [
+    paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
+    paperkit.tests._fixture_model.entry("b", claim="beta", check="file:w.bib", frm="a"),
+]
 SINGLE = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib")]
 
 
@@ -40,22 +45,42 @@ def main() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     print("--without-K behaviors\n")
-    check("distinct witnesses pass --without-K", paperkit.tests._fixture_gate.gate(DISTINCT, "--without-K")[0] == 0)
-    check("shared witness fails --without-K", paperkit.tests._fixture_gate.gate(SHARED, "--without-K")[0] == 1)
-    check("shared witness passes by DEFAULT (Axiom K is the default)", paperkit.tests._fixture_gate.gate(SHARED)[0] == 0)
-    check("a lone cited claim is trivially distinct", paperkit.tests._fixture_gate.gate(SINGLE, "--without-K")[0] == 0)
+    check(
+        "distinct witnesses pass --without-K",
+        paperkit.tests._fixture_gate.gate(DISTINCT, "--without-K")[0] == 0,
+    )
+    check(
+        "shared witness fails --without-K",
+        paperkit.tests._fixture_gate.gate(SHARED, "--without-K")[0] == 1,
+    )
+    check(
+        "shared witness passes by DEFAULT (Axiom K is the default)",
+        paperkit.tests._fixture_gate.gate(SHARED)[0] == 0,
+    )
+    check(
+        "a lone cited claim is trivially distinct",
+        paperkit.tests._fixture_gate.gate(SINGLE, "--without-K")[0] == 0,
+    )
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
     pairs = [
-        ("witness distinctness (--without-K verdict)",
-         "the second claim's check (file:r.tsv → file:w.bib)",
-         "distinct → exit 0", paperkit.tests._fixture_gate.gate(DISTINCT, "--without-K")[0] == 0,
-         "shared   → exit 1", paperkit.tests._fixture_gate.gate(SHARED, "--without-K")[0] == 1),
-        ("--without-K is opt-in (same shared-witness document)",
-         "the --without-K flag",
-         "default      → exit 0", paperkit.tests._fixture_gate.gate(SHARED)[0] == 0,
-         "--without-K  → exit 1", paperkit.tests._fixture_gate.gate(SHARED, "--without-K")[0] == 1),
+        (
+            "witness distinctness (--without-K verdict)",
+            "the second claim's check (file:r.tsv → file:w.bib)",
+            "distinct → exit 0",
+            paperkit.tests._fixture_gate.gate(DISTINCT, "--without-K")[0] == 0,
+            "shared   → exit 1",
+            paperkit.tests._fixture_gate.gate(SHARED, "--without-K")[0] == 1,
+        ),
+        (
+            "--without-K is opt-in (same shared-witness document)",
+            "the --without-K flag",
+            "default      → exit 0",
+            paperkit.tests._fixture_gate.gate(SHARED)[0] == 0,
+            "--without-K  → exit 1",
+            paperkit.tests._fixture_gate.gate(SHARED, "--without-K")[0] == 1,
+        ),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok

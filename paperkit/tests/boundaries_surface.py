@@ -15,6 +15,7 @@ content_sensitive and corroboration), never as a rung.
 
     python3 paperkit/tests/boundaries_surface.py     # exit 0 = the axis measures what it says
 """
+
 from __future__ import annotations
 
 import sys
@@ -35,6 +36,7 @@ def main() -> int:
     # arm could move: "7 behaviors, 1 delta" tracked when it was typed, not what runs.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import paperkit.tests._boundary
+
     s = paperkit.tests._boundary.Suite("SURFACE", "Ζ·surface·kind — measured vs merely read")
     check = s.check
     # The gap-suffix is DELIBERATELY not a real one.  A first version of this check used `.json`
@@ -45,37 +47,51 @@ def main() -> int:
     # that the mechanism exists to help change.  The assert below is the guard: if this suffix ever
     # becomes real, this says so loudly instead of silently passing on a hollow premise.
     GAP = ".not-a-paperkit-input"
-    assert GAP not in paperkit.layout.MUTABLE_SUFFIXES, "the fixture's gap-suffix became a real input"
+    assert GAP not in paperkit.layout.MUTABLE_SUFFIXES, (
+        "the fixture's gap-suffix became a real input"
+    )
 
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
         (root / "proj").mkdir()
-        (root / "proj" / "doc.md").write_text("x\n")           # mutable     — measured
-        (root / "proj" / f"data{GAP}").write_text("{}\n")      # NOT mutable — a gap
+        (root / "proj" / "doc.md").write_text("x\n")  # mutable     — measured
+        (root / "proj" / f"data{GAP}").write_text("{}\n")  # NOT mutable — a gap
         (root / "proj" / "__pycache__").mkdir()
         (root / "proj" / "__pycache__" / "m.cpython-313.pyc").write_bytes(b"\x00")
         reads = ["proj/doc.md", f"proj/data{GAP}", "proj/__pycache__/m.cpython-313.pyc"]
         un = paperkit.grader.unmeasured_reads(reads, root)
 
         print("⟨the axis⟩\n")
-        check("a file the claim READS but the sweep CANNOT MUTATE is reported",
-              f"proj/data{GAP}" in un)
-        check("a file that IS mutable is not reported (it was measured)",
-              "proj/doc.md" not in un)
-        check("a DERIVED artifact is not reported — its source is in the surface",
-              not any("__pycache__" in u for u in un))
+        check(
+            "a file the claim READS but the sweep CANNOT MUTATE is reported",
+            f"proj/data{GAP}" in un,
+        )
+        check("a file that IS mutable is not reported (it was measured)", "proj/doc.md" not in un)
+        check(
+            "a DERIVED artifact is not reported — its source is in the surface",
+            not any("__pycache__" in u for u in un),
+        )
         check("exactly the gap, nothing else", un == [f"proj/data{GAP}"])
 
         print("\n⟨it is an axis, not a rung⟩\n")
-        check("`unmeasured` is not a rung on the ladder (incompleteness is not a grade)",
-              "unmeasured" not in mikemol.grade.grade.RANK_C and "unmeasured" not in mikemol.grade.grade.STRENGTH)
-        check("...so no adequacy floor can fail a claim for it",
-              all("unmeasured" not in mikemol.grade.grade.below(f) for f in mikemol.grade.grade.ORDER))
+        check(
+            "`unmeasured` is not a rung on the ladder (incompleteness is not a grade)",
+            "unmeasured" not in mikemol.grade.grade.RANK_C
+            and "unmeasured" not in mikemol.grade.grade.STRENGTH,
+        )
+        check(
+            "...so no adequacy floor can fail a claim for it",
+            all(
+                "unmeasured" not in mikemol.grade.grade.below(f) for f in mikemol.grade.grade.ORDER
+            ),
+        )
 
         print("\n⟨Φ·degrade⟩\n")
-        check("no trace ⇒ no claim either way (never a false 'nothing is unmeasured')",
-              paperkit.grader.unmeasured_reads(None, root) == [] and
-              paperkit.grader.unmeasured_reads(reads, None) == [])
+        check(
+            "no trace ⇒ no claim either way (never a false 'nothing is unmeasured')",
+            paperkit.grader.unmeasured_reads(None, root) == []
+            and paperkit.grader.unmeasured_reads(reads, None) == [],
+        )
 
         print("\n⟨P, F, δ⟩ minimum-delta pair\n")
         # δ is one entry in MUTABLE_SUFFIXES: the gap exists BECAUSE a suffix is absent, and
@@ -87,11 +103,14 @@ def main() -> int:
         finally:
             paperkit.layout.MUTABLE_SUFFIXES.clear()
             paperkit.layout.MUTABLE_SUFFIXES.update(was)
-        s.delta("admitting the suffix CLOSES the gap, and the axis says so",
-                un == [f"proj/data{GAP}"], closed == [],
-                p=f"as shipped: data{GAP} is read, not mutable → reported as unmeasured",
-                f="suffix added: the same file becomes measurable → the gap is empty",
-                d="one entry in MUTABLE_SUFFIXES")
+        s.delta(
+            "admitting the suffix CLOSES the gap, and the axis says so",
+            un == [f"proj/data{GAP}"],
+            closed == [],
+            p=f"as shipped: data{GAP} is read, not mutable → reported as unmeasured",
+            f="suffix added: the same file becomes measurable → the gap is empty",
+            d="one entry in MUTABLE_SUFFIXES",
+        )
 
     return s.finish()
 

@@ -29,6 +29,7 @@ A reader that "fixed" these would be a different tool with the same name.  What 
 DECLARES: `unaccounted()` is the totality probe, and a caller reporting `n of m` can distinguish
 a clean read from one that examined nothing.
 """
+
 from __future__ import annotations
 
 import re
@@ -68,8 +69,9 @@ def strip_comments(text: str) -> str:
     values are read AFTER this pass, so a braced `%` would be blanked.  The live corpus has none,
     and `unaccounted()` would report the field if it did.
     """
-    return "\n".join(" " * len(ln) if ln.lstrip().startswith("%") else ln
-                     for ln in text.split("\n"))
+    return "\n".join(
+        " " * len(ln) if ln.lstrip().startswith("%") else ln for ln in text.split("\n")
+    )
 
 
 def _value_end(body: str, start: int) -> int:
@@ -116,7 +118,7 @@ def fields(body: str) -> dict[str, str]:
         end = _value_end(body, m.end())
         if end < 0:
             return out
-        out[str(m.group(1))] = " ".join(body[m.end():end - 1].split())
+        out[str(m.group(1))] = " ".join(body[m.end() : end - 1].split())
         pos = end
 
 
@@ -142,7 +144,7 @@ def mask_values(body: str) -> str:
         end = _value_end(body, m.end())
         if end < 0:
             return out
-        out = out[:m.end()] + (" " * (end - 1 - m.end())) + out[end - 1:]
+        out = out[: m.end()] + (" " * (end - 1 - m.end())) + out[end - 1 :]
         pos = end
 
 
@@ -155,8 +157,11 @@ def unaccounted(body: str, parsed: dict[str, str]) -> list[str]:
     claim that the grammar's kernel is empty.
     """
     masked = mask_values(body)
-    return [str(a.group(1)).strip("'\"") for a in ASSIGN.finditer(masked)
-            if str(a.group(1)).strip("'\"") not in parsed]
+    return [
+        str(a.group(1)).strip("'\"")
+        for a in ASSIGN.finditer(masked)
+        if str(a.group(1)).strip("'\"") not in parsed
+    ]
 
 
 def entries(text: str) -> dict[str, dict[str, str]]:

@@ -51,6 +51,7 @@ Best-effort by construction: on a machine without cgroup-v2, without `cpu` deleg
 user hierarchy, or with the file unwritable, this is a no-op and the build proceeds unweighted.
 A QoL lever must never be able to fail a build.
 """
+
 from __future__ import annotations
 
 import os
@@ -66,7 +67,7 @@ def _cgroup_of(pid: str | int) -> str | None:
     try:
         for line in Path(f"/proc/{pid}/cgroup").read_text().splitlines():
             hid, ctrl, path = line.split(":", 2)
-            if hid == "0" and ctrl == "":       # the unified hierarchy
+            if hid == "0" and ctrl == "":  # the unified hierarchy
                 return path
     except OSError:
         pass
@@ -97,7 +98,7 @@ def _app_slice() -> str:
     cg = _cgroup_of("self") or ""
     marker = "/app.slice"
     i = cg.find(marker)
-    return cg[:i + len(marker)] if i >= 0 else cg
+    return cg[: i + len(marker)] if i >= 0 else cg
 
 
 def build_cgroup(name: str = "paperkit-build.scope") -> tuple[str | None, str]:
@@ -126,8 +127,10 @@ def build_cgroup(name: str = "paperkit-build.scope") -> tuple[str | None, str]:
     except OSError as e:
         return None, f"cannot create {d} ({e}) — unweighted"
     if not (d / "cpu.weight").is_file():
-        return None, (f"`cpu` not delegated to {parent} — the weight file does not exist in a "
-                      f"cgroup we own; unweighted")
+        return None, (
+            f"`cpu` not delegated to {parent} — the weight file does not exist in a "
+            f"cgroup we own; unweighted"
+        )
     return f"{parent}/{name}", f"{parent}/{name}"
 
 
@@ -137,7 +140,8 @@ def join(cg: str, pid: str | int = "self") -> tuple[bool, str]:
     """
     try:
         (CGROUP_ROOT / cg.lstrip("/") / "cgroup.procs").write_text(
-            f"{os.getpid() if pid == 'self' else pid}\n")
+            f"{os.getpid() if pid == 'self' else pid}\n"
+        )
         return True, cg
     except OSError as e:
         return False, f"cannot join {cg} ({e})"
@@ -282,8 +286,11 @@ def main(argv: list) -> int:
         # inherits the scope.
         moved = [q for q in build_servers() if join(cg, q)[0]]
         ratio, blocked = runnable_ratio()
-        print(f"cpu.weight: {why}; joined={joined}; servers_moved={len(moved)}; "
-              f"box runnable/core={ratio:.2f} blocked={blocked}", file=sys.stderr)
+        print(
+            f"cpu.weight: {why}; joined={joined}; servers_moved={len(moved)}; "
+            f"box runnable/core={ratio:.2f} blocked={blocked}",
+            file=sys.stderr,
+        )
 
     if "--verify" in argv:
         cg2, _ = build_cgroup()
@@ -292,12 +299,12 @@ def main(argv: list) -> int:
         return 0 if ok else 1
 
     if "--exec" in argv:
-        cmd = argv[argv.index("--exec") + 1:]
+        cmd = argv[argv.index("--exec") + 1 :]
         if not cmd:
             print("cpuweight: --exec needs a command", file=sys.stderr)
             return 2
-        os.execvp(cmd[0], cmd)                  # inherits the cgroup we just joined
-    return 0                                    # best-effort: never fail the build
+        os.execvp(cmd[0], cmd)  # inherits the cgroup we just joined
+    return 0  # best-effort: never fail the build
 
 
 if __name__ == "__main__":

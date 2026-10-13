@@ -12,6 +12,7 @@ a broken grounding: it fails the gate like an undefined citation.
 
     python3 paperkit/tests/boundaries_grounding.py
 """
+
 from __future__ import annotations
 
 import json
@@ -34,18 +35,24 @@ import paperkit.tests._fixture_model
 # green (they call gate(), which does not sweep) and only the one Δ arm went red — the shape
 # guard-must-not-copy names, one level over: a copy of a declaration drifts from its original
 # the moment the original gains a field.
-PLAIN = {"paper.toml": '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
-                       'out = "out.md"\nnumbered = false\nreferences = false\ntarget = "plain"\n'
-                       'root = "."\n'}
+PLAIN = {
+    "paper.toml": '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
+    'out = "out.md"\nnumbered = false\nreferences = false\ntarget = "plain"\n'
+    'root = "."\n'
+}
 
 
 def chain(leaf_check):
     """Apex (section-tagged, woven) → g (sectionless) → h (sectionless), two rests-on hops.
     Neither g nor h surfaces any marker in the rendered prose — only the closure reaches them.
     """
-    return [paperkit.tests._fixture_model.entry("a", claim="apex", rests="g"),
-            paperkit.tests._fixture_model.entry("g", claim="ground", section=None, check="file:w.bib", rests="h"),
-            paperkit.tests._fixture_model.entry("h", claim="bedrock", section=None, check=leaf_check)]
+    return [
+        paperkit.tests._fixture_model.entry("a", claim="apex", rests="g"),
+        paperkit.tests._fixture_model.entry(
+            "g", claim="ground", section=None, check="file:w.bib", rests="h"
+        ),
+        paperkit.tests._fixture_model.entry("h", claim="bedrock", section=None, check=leaf_check),
+    ]
 
 
 def main() -> int:
@@ -68,46 +75,82 @@ def main() -> int:
     rc_p, j_p = paperkit.tests._fixture_gate.gate_json(chain("file:r.tsv"), assets=PLAIN)
     rc_f, e_f = paperkit.tests._fixture_gate.gate(chain("file:nope"), assets=PLAIN)
     check("plain: a sectionless rests-on cone all passing → gate PASS", rc_p == 0)
-    check("plain: BOTH sectionless grounding nodes are in the resolved count (verified=3)",
-          j_p.get("verified") == 3)
-    check("plain: a sectionless node TWO rests-on hops away with a FAILING check fails the gate",
-          rc_f == 1 and "[@h]" in e_f)
+    check(
+        "plain: BOTH sectionless grounding nodes are in the resolved count (verified=3)",
+        j_p.get("verified") == 3,
+    )
+    check(
+        "plain: a sectionless node TWO rests-on hops away with a FAILING check fails the gate",
+        rc_f == 1 and "[@h]" in e_f,
+    )
 
-    rc_u, _e = paperkit.tests._fixture_gate.gate([paperkit.tests._fixture_model.entry("a", claim="apex"),
-                     paperkit.tests._fixture_model.entry("z", claim="stray", section=None, check="file:nope")], assets=PLAIN)
+    rc_u, _e = paperkit.tests._fixture_gate.gate(
+        [
+            paperkit.tests._fixture_model.entry("a", claim="apex"),
+            paperkit.tests._fixture_model.entry(
+                "z", claim="stray", section=None, check="file:nope"
+            ),
+        ],
+        assets=PLAIN,
+    )
     check("plain: an UNREACHABLE sectionless node's failing check stays un-gated (PASS)", rc_u == 0)
 
-    rc_c, _e = paperkit.tests._fixture_gate.gate([paperkit.tests._fixture_model.entry("a", claim="apex", rests="g"),
-                     paperkit.tests._fixture_model.entry("g", claim="ground", section=None, check="file:w.bib", rests="h"),
-                     paperkit.tests._fixture_model.entry("h", claim="bedrock", section=None, check="file:r.tsv", rests="g")],
-                    assets=PLAIN)
-    check("plain: a rests-on CYCLE terminates (each node visited once) and gates its checks", rc_c == 0)
+    rc_c, _e = paperkit.tests._fixture_gate.gate(
+        [
+            paperkit.tests._fixture_model.entry("a", claim="apex", rests="g"),
+            paperkit.tests._fixture_model.entry(
+                "g", claim="ground", section=None, check="file:w.bib", rests="h"
+            ),
+            paperkit.tests._fixture_model.entry(
+                "h", claim="bedrock", section=None, check="file:r.tsv", rests="g"
+            ),
+        ],
+        assets=PLAIN,
+    )
+    check(
+        "plain: a rests-on CYCLE terminates (each node visited once) and gates its checks",
+        rc_c == 0,
+    )
 
-    rc_d, e_d = paperkit.tests._fixture_gate.gate([paperkit.tests._fixture_model.entry("a", claim="apex", rests="ghost")], assets=PLAIN)
-    check("a rests-on edge to an UNDEFINED key is a broken grounding — gate FAILS",
-          rc_d == 1 and "dangling rests-on" in e_d and "ghost" in e_d)
+    rc_d, e_d = paperkit.tests._fixture_gate.gate(
+        [paperkit.tests._fixture_model.entry("a", claim="apex", rests="ghost")], assets=PLAIN
+    )
+    check(
+        "a rests-on edge to an UNDEFINED key is a broken grounding — gate FAILS",
+        rc_d == 1 and "dangling rests-on" in e_d and "ghost" in e_d,
+    )
 
     # the closure is target-independent: pandoc renders no marker for a cross-scope
     # (sectionless) grounding edge either, yet the cone is still gated.
     rc_pd, e_pd = paperkit.tests._fixture_gate.gate(chain("file:nope"))
-    check("pandoc: the same failing grounding cone fails the gate (closure on every target)",
-          rc_pd == 1 and "[@h]" in e_pd)
+    check(
+        "pandoc: the same failing grounding cone fails the gate (closure on every target)",
+        rc_pd == 1 and "[@h]" in e_pd,
+    )
 
-    rc_g, o_g = paperkit.tests._fixture_delta.discriminate(chain("file:r.tsv"), "--json", assets=PLAIN)
+    rc_g, o_g = paperkit.tests._fixture_delta.discriminate(
+        chain("file:r.tsv"), "--json", assets=PLAIN
+    )
     keys = {r["key"] for r in json.loads(o_g or "[]")}
-    check("Δ grades the sectionless grounding nodes too (they appear in the records)",
-          {"g", "h"} <= keys)
+    check(
+        "Δ grades the sectionless grounding nodes too (they appear in the records)",
+        {"g", "h"} <= keys,
+    )
 
     # SAID-SOMETHING (summit ask-degenerate-claim-passes) — a claim whose `claim` brace lands a
     # field late loses its text to bib.parse's brace-balanced regex; the projector then renders the
     # bare KEY as the paragraph and PROJECT/RESOLVE/COVERAGE all still hold.  The gate refuses a
     # section claim that would project as its key (no `claim`, no `title`).  δ = the closing brace.
     GOOD = paperkit.tests._fixture_model.entry("good", claim="a good claim")
-    RUNAWAY = ("@misc{mute,\n  section = {s}, from = {good}, join = {. },\n"
-               "  claim   = {this claim loses its closing brace and the next field swallows it,\n"
-               "  check   = {cmd:true}\n}\n")
-    CLOSED = ("@misc{mute,\n  section = {s}, from = {good}, join = {. },\n"
-              "  claim   = {this claim closes its brace},\n  check   = {cmd:true}\n}\n")
+    RUNAWAY = (
+        "@misc{mute,\n  section = {s}, from = {good}, join = {. },\n"
+        "  claim   = {this claim loses its closing brace and the next field swallows it,\n"
+        "  check   = {cmd:true}\n}\n"
+    )
+    CLOSED = (
+        "@misc{mute,\n  section = {s}, from = {good}, join = {. },\n"
+        "  claim   = {this claim closes its brace},\n  check   = {cmd:true}\n}\n"
+    )
     rc_mute, e_mute = paperkit.tests._fixture_gate.gate([GOOD, RUNAWAY], assets=PLAIN)
     rc_said, _ = paperkit.tests._fixture_gate.gate([GOOD, CLOSED], assets=PLAIN)
     # ⚑ Ζ·bib·wire — THE REFUSAL MOVED FROM THE PROJECTOR TO THE PARSER, and that is the point.
@@ -122,9 +165,12 @@ def main() -> int:
     # opened.  So the property this arm pins is unchanged — a runaway brace must not ship — while
     # the WHO and the WORDING both move.  Asserting the message text would re-pin the next
     # accident; asserting the refusal plus the named position is what the property actually is.
-    check("a claim whose `claim` brace runs away is REFUSED — now by the parser, at a position",
-          rc_mute != 0 and "mute" in e_mute
-          and any(w in e_mute for w in ("unterminated", "expected", "SyntaxError")))
+    check(
+        "a claim whose `claim` brace runs away is REFUSED — now by the parser, at a position",
+        rc_mute != 0
+        and "mute" in e_mute
+        and any(w in e_mute for w in ("unterminated", "expected", "SyntaxError")),
+    )
     check("the same claim with its brace closed says something — the gate PASSES", rc_said == 0)
 
     print("\n⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -137,7 +183,9 @@ def main() -> int:
 
     ok2 = rc_mute == 1 and rc_said == 0
     fails.append("said-something-delta") if not ok2 else None
-    print(f"  {'ok ' if ok2 else 'XX '}a claim that says nothing (projects as its key) flips the gate")
+    print(
+        f"  {'ok ' if ok2 else 'XX '}a claim that says nothing (projects as its key) flips the gate"
+    )
     print("      P (pass side): the `claim` brace closes → the paragraph carries prose → PASS")
     print("      F (flag side): the brace runs away → the paragraph is the bare KEY → FAIL")
     print("      δ (min delta): the claim's closing brace\n")

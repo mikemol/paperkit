@@ -25,6 +25,7 @@ kinds it is not using.  `Site` carries what the cell was told; each deliverer re
 own kind defines.  Adding a fifth artifact level adds a field and a function, not a parameter to
 everything.
 """
+
 from __future__ import annotations
 
 import pathlib

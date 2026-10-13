@@ -44,22 +44,33 @@ def main() -> int:
     if dirty:
         for name, groups in sorted(dirty.items()):
             for check, keys in sorted(groups.items()):
-                print(f"{name}: {len(keys)} claims share one witness `{check}` — "
-                      f"{', '.join(sorted(keys))}", file=sys.stderr)
-        print("--without-K is NOT clean: rpt-proof claims every cited claim carries a distinct "
-              "witness, and the collapses above refute it", file=sys.stderr)
+                print(
+                    f"{name}: {len(keys)} claims share one witness `{check}` — "
+                    f"{', '.join(sorted(keys))}",
+                    file=sys.stderr,
+                )
+        print(
+            "--without-K is NOT clean: rpt-proof claims every cited claim carries a distinct "
+            "witness, and the collapses above refute it",
+            file=sys.stderr,
+        )
         return 1
 
     if unran:
         for name, why in sorted(unran.items()):
             print(f"{name}: gate could not run — {why}", file=sys.stderr)
-        print(f"{len(unran)} document(s) were NOT evaluated, so rpt-proof's 'in every document' "
-              "cannot be witnessed here.  Not a refutation.", file=sys.stderr)
+        print(
+            f"{len(unran)} document(s) were NOT evaluated, so rpt-proof's 'in every document' "
+            "cannot be witnessed here.  Not a refutation.",
+            file=sys.stderr,
+        )
         return 3
 
     docs = [name for name, _ in gen._graded()]
-    print(f"--without-K clean across {len(docs)} document(s): {', '.join(docs)} — "
-          "every cited claim carries a distinct witness")
+    print(
+        f"--without-K clean across {len(docs)} document(s): {', '.join(docs)} — "
+        "every cited claim carries a distinct witness"
+    )
     return 0
 
 

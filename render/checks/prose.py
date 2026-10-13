@@ -27,6 +27,7 @@ Used by both agree producers, so the substitution is identical on both sides.
 
     pandoc-input | python3 checks/prose.py   # (invoked inside the agree producers)
 """
+
 from __future__ import annotations
 
 import re

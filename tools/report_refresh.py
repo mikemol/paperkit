@@ -16,6 +16,7 @@ first host refresh after the records existed read boundaries, render and talk as
 3. resolves their output files (cquery --output=files);
 4. runs report/gen.py's refresh with PAPERKIT_CONSUMED_RECORDS naming them.
 """
+
 import os
 import subprocess
 import sys
@@ -39,20 +40,29 @@ def _key(path: str) -> str:
     parts = Path(path).parts
     repo = parts[parts.index("external") + 1].split("+")[-1]
     base = Path(path).name
-    return f"{repo}/{base[:-len('.verdict.json')] if base.endswith('.verdict.json') else base}"
+    return f"{repo}/{base[: -len('.verdict.json')] if base.endswith('.verdict.json') else base}"
 
 
 def main() -> int:
-    labels = sorted(l for l in _run(BAZEL, "query", "labels(consumes, @paperkit_report//:all)",
-                                    "--output=label").split() if l.startswith("@"))
+    labels = sorted(
+        l
+        for l in _run(
+            BAZEL, "query", "labels(consumes, @paperkit_report//:all)", "--output=label"
+        ).split()
+        if l.startswith("@")
+    )
     if not labels:
         print("report_refresh: the report consumes no records — nothing to build", file=sys.stderr)
         return 2
     print(f"report_refresh: building {len(labels)} records", file=sys.stderr)
     _run(BAZEL, "build", "--config=remote", *labels)
-    files = [f for f in _run(BAZEL, "cquery", "--config=remote", "--output=files",
-                             " + ".join(labels)).split()                 # ONE query expression
-             if f.endswith((".json", ".rc"))]
+    files = [
+        f
+        for f in _run(
+            BAZEL, "cquery", "--config=remote", "--output=files", " + ".join(labels)
+        ).split()  # ONE query expression
+        if f.endswith((".json", ".rc"))
+    ]
     env = dict(os.environ)
     env["PAPERKIT_CONSUMED_RECORDS"] = " ".join(f"{_key(f)}={ROOT / f}" for f in files)
     return subprocess.run([sys.executable, "report/gen.py"], cwd=ROOT, env=env).returncode

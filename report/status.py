@@ -12,6 +12,7 @@ documents, derived from BUILD.bazel by gen._graded, never listed here).
 Exit 0 iff every such record reports pass; 1 on any fail; 3 (cannot run) when the records are not
 staged — e.g. the footprint audit tracing this on the host.
 """
+
 import sys
 
 import gen
@@ -25,9 +26,14 @@ def main() -> int:
         return 3
     bad = [name for name, g in rows if "error" in g or not g.get("pass")]
     for name, g in rows:
-        print(f"  {name}: {'PASS' if name not in bad else 'FAIL — ' + str(g.get('error', 'gate failed'))}")
+        print(
+            f"  {name}: {'PASS' if name not in bad else 'FAIL — ' + str(g.get('error', 'gate failed'))}"
+        )
     if bad:
-        print(f"rpt-status: {len(bad)} CI-gated document(s) do not pass: {', '.join(bad)}", file=sys.stderr)
+        print(
+            f"rpt-status: {len(bad)} CI-gated document(s) do not pass: {', '.join(bad)}",
+            file=sys.stderr,
+        )
         return 1
     print(f"rpt-status: all {len(rows)} CI-gated documents pass their gate (--safe)")
     return 0

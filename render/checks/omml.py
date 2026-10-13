@@ -22,6 +22,7 @@ heading-count are dropped — they are not general):
     python3 checks/omml.py            # build the paper's docx, gate R1/R2/R3/R6/R7
     python3 checks/omml.py --selftest # ⟨P,F,δ⟩ against math / no-math fixtures
 """
+
 from __future__ import annotations
 
 import re
@@ -45,10 +46,12 @@ _TEXT_RUN = re.compile(r"<w:t[^>]*>([^<]*)</w:t>")
 # check must surface.  The set is the witness's parameter; extend it (with a measured pair) when a
 # new macro is used, rather than widening a comparison to ignore the difference.
 MATH_VARIANTS = {
-    "∅": "⌀",   # ∅ (U+2205 EMPTY SET, markdown path) ~ ⌀ (U+2300 DIAMETER, docx path)
-    "\\": "∖",       # \  (U+005C, markdown path)          ~ ∖ (U+2216 SET MINUS, docx path)
+    "∅": "⌀",  # ∅ (U+2205 EMPTY SET, markdown path) ~ ⌀ (U+2300 DIAMETER, docx path)
+    "\\": "∖",  # \  (U+005C, markdown path)          ~ ∖ (U+2216 SET MINUS, docx path)
 }
-_SOURCECODE_P = re.compile(r'<w:p\b(?:(?!</w:p>).)*?w:val="SourceCode"(?:(?!</w:p>).)*?</w:p>', re.DOTALL)
+_SOURCECODE_P = re.compile(
+    r'<w:p\b(?:(?!</w:p>).)*?w:val="SourceCode"(?:(?!</w:p>).)*?</w:p>', re.DOTALL
+)
 _OMATH_BLOCK = re.compile(r"<m:oMath\b[^>]*>.*?</m:oMath>", re.DOTALL)
 _BRK = re.compile(r"<m:brk\b[^>]*/?>")
 _OMATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -67,16 +70,26 @@ def _rungs(docx: Path) -> list[tuple[str, bool, str]]:
     # R2 — no rasterized equation (vector figures allowed)
     media = [e for e in z.namelist() if e.startswith("word/media/")]
     raster = [e for e in media if e.lower().endswith(_RASTER)]
-    rows.append(("R2 no raster equation", not raster,
-                 f"{len(media)} media, {len(raster)} raster" + (f": {raster}" if raster else "")))
+    rows.append(
+        (
+            "R2 no raster equation",
+            not raster,
+            f"{len(media)} media, {len(raster)} raster" + (f": {raster}" if raster else ""),
+        )
+    )
 
     # R3 — no math `$` surviving in text (appendix SourceCode listings legitimately carry `$`)
     prose = _SOURCECODE_P.sub("", doc)
     runs = _TEXT_RUN.findall(prose)
     joined = "".join(runs)
     sample = next((r for r in runs if "$" in r), "")
-    rows.append(("R3 no bare $", "$" not in joined,
-                 f"{len(runs)} runs" + (f"; leaked: {sample!r}" if sample else "")))
+    rows.append(
+        (
+            "R3 no bare $",
+            "$" not in joined,
+            f"{len(runs)} runs" + (f"; leaked: {sample!r}" if sample else ""),
+        )
+    )
 
     # R6 — every oMath block well-formed
     blocks = _OMATH_BLOCK.findall(doc)
@@ -87,8 +100,13 @@ def _rungs(docx: Path) -> list[tuple[str, bool, str]]:
         except ET.ParseError as e:
             bad = f"block {i + 1}/{len(blocks)}: {e}"
             break
-    rows.append(("R6 oMath well-formed", bad is None,
-                 f"{len(blocks)} block(s)" + (f"; {bad}" if bad else " all parse")))
+    rows.append(
+        (
+            "R6 oMath well-formed",
+            bad is None,
+            f"{len(blocks)} block(s)" + (f"; {bad}" if bad else " all parse"),
+        )
+    )
 
     # R7 — every line-break inside an oMath block, WITH A POPULATION WITNESS.  The verdict
     # `outside == 0` is True at ZERO breaks (0 - 0), which is indistinguishable in the exit code
@@ -102,8 +120,11 @@ def _rungs(docx: Path) -> list[tuple[str, bool, str]]:
     in_omath = sum(len(_BRK.findall(b)) for b in blocks)
     outside = len(all_brks) - in_omath
     n = len(all_brks)
-    detail = ("0 of 0 — no <m:brk/> to conform (vacuous on this route; pandoc emits none)"
-              if n == 0 else f"{n - outside} of {n} <m:brk/> inside oMath")
+    detail = (
+        "0 of 0 — no <m:brk/> to conform (vacuous on this route; pandoc emits none)"
+        if n == 0
+        else f"{n - outside} of {n} <m:brk/> inside oMath"
+    )
     rows.append(("R7 breaks inside oMath", outside == 0, detail))
     return rows
 
@@ -134,16 +155,24 @@ def math_agree(paper_md: Path) -> tuple[bool, str]:
         outside = []
         for i, eq in enumerate(eqs):
             (d / "m.md").write_text(f"$${eq}$$\n")
-            md_plain = subprocess.run(["pandoc", str(d / "m.md"), "-t", "plain"],
-                                      capture_output=True, text=True).stdout.strip()
+            md_plain = subprocess.run(
+                ["pandoc", str(d / "m.md"), "-t", "plain"], capture_output=True, text=True
+            ).stdout.strip()
             subprocess.run(["pandoc", str(d / "m.md"), "-o", str(d / "m.docx")], check=True)
-            dx_plain = subprocess.run(["pandoc", str(d / "m.docx"), "-t", "plain"],
-                                      capture_output=True, text=True).stdout.strip()
+            dx_plain = subprocess.run(
+                ["pandoc", str(d / "m.docx"), "-t", "plain"], capture_output=True, text=True
+            ).stdout.strip()
             if _canonical(md_plain) != _canonical(dx_plain):
                 outside.append(f"eq {i + 1}: {md_plain!r} vs {dx_plain!r}")
     if outside:
-        return False, f"{len(outside)} equation(s) diverge across paths OUTSIDE the registered variants: {outside[:3]}"
-    return True, f"{len(eqs)} equation(s) concur across both render paths (within the registered variants)"
+        return (
+            False,
+            f"{len(outside)} equation(s) diverge across paths OUTSIDE the registered variants: {outside[:3]}",
+        )
+    return (
+        True,
+        f"{len(eqs)} equation(s) concur across both render paths (within the registered variants)",
+    )
 
 
 _MATH_SPANS = re.compile(r"\$\$(.+?)\$\$|(?<!\\)\$(?!\$)(.+?)(?<!\\)\$", re.S)
@@ -160,12 +189,25 @@ def _paper_docx(d: Path) -> Path:
         c = re.search(r"\bcheck\s*=\s*\{(\w+):", m.group(2))
         if c:
             mk[m.group(1)] = mark.get(c.group(1), "(machine-checked)")
-    split = re.sub(r"\[@([A-Za-z][\w:.+-]*)\]", lambda x: mk.get(x.group(1), x.group(0)),
-                   Path("../paper/paper.md").read_text())
+    split = re.sub(
+        r"\[@([A-Za-z][\w:.+-]*)\]",
+        lambda x: mk.get(x.group(1), x.group(0)),
+        Path("../paper/paper.md").read_text(),
+    )
     md, docx = d / "p.md", d / "p.docx"
     md.write_text(split)
-    subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography", "../paper/references.bib",
-                    "-o", str(docx)], check=True)
+    subprocess.run(
+        [
+            "pandoc",
+            str(md),
+            "--citeproc",
+            "--bibliography",
+            "../paper/references.bib",
+            "-o",
+            str(docx),
+        ],
+        check=True,
+    )
     return docx
 
 
@@ -188,15 +230,19 @@ def _selftest() -> int:
         p_docx = d / "math.docx"
         subprocess.run(["pandoc", str(d / "math.md"), "-o", str(p_docx)], check=True)
         p = {name: ok for name, ok, _ in _rungs(p_docx)}
-        check("P: math renders as native OMML (R1) with no leaked $ (R3), well-formed (R6)",
-              p["R1 native OMML"] and p["R3 no bare $"] and p["R6 oMath well-formed"])
+        check(
+            "P: math renders as native OMML (R1) with no leaked $ (R3), well-formed (R6)",
+            p["R1 native OMML"] and p["R3 no bare $"] and p["R6 oMath well-formed"],
+        )
         check("P: no rasterized equation (R2)", p["R2 no raster equation"])
 
         # R7 population witness (summit's catch): a break-free doc reports "0 of 0" (vacuous/frozen),
         # DISTINCT from "N of N conformed" — so N→0 is visible in the verdict, not a silent 0==0 pass.
         r7_none = dict((n, det) for n, _ok, det in _rungs(p_docx))["R7 breaks inside oMath"]
-        check("R7 reports 0 of 0 when there are no breaks (population witness, not a silent pass)",
-              "0 of 0" in r7_none)
+        check(
+            "R7 reports 0 of 0 when there are no breaks (population witness, not a silent pass)",
+            "0 of 0" in r7_none,
+        )
         # a doc WITH an m:brk inside an oMath: R7 conforms AND reports the population (N of N)
         with zipfile.ZipFile(p_docx) as zin:
             doc_xml = zin.read("word/document.xml").decode()
@@ -204,21 +250,27 @@ def _selftest() -> int:
         b_docx = d / "brk.docx"
         with zipfile.ZipFile(p_docx) as zin, zipfile.ZipFile(b_docx, "w") as zout:
             for item in zin.namelist():
-                zout.writestr(item, doc_xml.encode() if item == "word/document.xml" else zin.read(item))
+                zout.writestr(
+                    item, doc_xml.encode() if item == "word/document.xml" else zin.read(item)
+                )
         r7_brk = dict((n, det) for n, _ok, det in _rungs(b_docx))["R7 breaks inside oMath"]
-        check("R7 reports N of N when breaks are present (conformed, distinct from the vacuous case)",
-              " of 1" in r7_brk and "0 of 0" not in r7_brk)
+        check(
+            "R7 reports N of N when breaks are present (conformed, distinct from the vacuous case)",
+            " of 1" in r7_brk and "0 of 0" not in r7_brk,
+        )
 
         # F: force the same equation to a raster image (the leak R1/R2 catch).  Synthesize a docx
         # with a PNG in word/media and NO oMath, by post-editing the package.
         f_docx = d / "raster.docx"
         import shutil
+
         shutil.copy(p_docx, f_docx)
         with zipfile.ZipFile(p_docx) as zin:
             doc = zin.read("word/document.xml").decode()
         doc_noomath = _OMATH_BLOCK.sub("<w:r><w:t>[equation image]</w:t></w:r>", doc)
         # rewrite the docx with the oMath stripped + a fake raster in media
         import os
+
         tmp = d / "rebuilt.docx"
         with zipfile.ZipFile(p_docx) as zin, zipfile.ZipFile(tmp, "w") as zout:
             for item in zin.namelist():
@@ -229,10 +281,14 @@ def _selftest() -> int:
             zout.writestr("word/media/image1.png", b"\x89PNG\r\n\x00\x00fake")
         os.replace(tmp, f_docx)
         f = {name: ok for name, ok, _ in _rungs(f_docx)}
-        check("F: a rasterized equation fails R1 (no OMML) or R2 (raster present)",
-              not (f["R1 native OMML"] and f["R2 no raster equation"]))
-        check("δ: the same equation passes as OMML, fails as a raster",
-              p["R1 native OMML"] and not (f["R1 native OMML"] and f["R2 no raster equation"]))
+        check(
+            "F: a rasterized equation fails R1 (no OMML) or R2 (raster present)",
+            not (f["R1 native OMML"] and f["R2 no raster equation"]),
+        )
+        check(
+            "δ: the same equation passes as OMML, fails as a raster",
+            p["R1 native OMML"] and not (f["R1 native OMML"] and f["R2 no raster equation"]),
+        )
 
         print("\n⟨math-agree: the cross-path difference is REGISTERED, not erased (--without-K)⟩\n")
         # P: a variant-only difference (∅ vs ⌀) is within the registered set → concurs.
@@ -242,10 +298,14 @@ def _selftest() -> int:
         # F: an UNregistered cross-path difference must NOT be waved through.  We prove the
         # discriminator directly: _canonical folds only the registered variants, so two strings
         # differing OUTSIDE the set stay unequal (a real divergence would surface).
-        check("F: a difference OUTSIDE the registered variants is NOT folded (real divergence surfaces)",
-              _canonical("min") != _canonical("max"))
-        check("δ: _canonical folds a registered variant but not an arbitrary glyph",
-              _canonical("⌀") == _canonical("∅") and _canonical("α") != _canonical("β"))
+        check(
+            "F: a difference OUTSIDE the registered variants is NOT folded (real divergence surfaces)",
+            _canonical("min") != _canonical("max"),
+        )
+        check(
+            "δ: _canonical folds a registered variant but not an arbitrary glyph",
+            _canonical("⌀") == _canonical("∅") and _canonical("α") != _canonical("β"),
+        )
 
     if fails:
         print(f"OMML SELFTEST: FAIL ({len(fails)})")
@@ -270,11 +330,15 @@ def main(argv: list[str]) -> int:
             print(f"  {'✓' if ok else '✗'} {name:<24} {detail}")
         print("  " + "-" * 60)
         if all(ok for _, ok, _ in rows):
-            print("  omml: PASS — the paper's equations transport as native OMML and concur across "
-                  "render paths within the registered variants")
+            print(
+                "  omml: PASS — the paper's equations transport as native OMML and concur across "
+                "render paths within the registered variants"
+            )
             return 0
-        print("  omml: FAIL — an equation did not transport faithfully or diverged across paths",
-              file=sys.stderr)
+        print(
+            "  omml: FAIL — an equation did not transport faithfully or diverged across paths",
+            file=sys.stderr,
+        )
         return 1
 
 

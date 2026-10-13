@@ -25,6 +25,7 @@ mine.  Same discipline as tools/project_endpoints.py.
 `absent` is a STABLE value, not an error: on a host without the pools nothing runs remotely, so no
 verdict is ever produced under it to be mis-cached.  Read by tools/toolchain_status.sh.
 """
+
 from __future__ import annotations
 
 import json
@@ -43,8 +44,12 @@ def digest(image: str) -> str:
         raise SystemExit(f"image_digest: unknown image {image!r}; known: {', '.join(IMAGES)}")
     if not QUERY.is_file() or not PYTHON.is_file():
         return "absent"
-    r = subprocess.run([str(PYTHON), str(QUERY), image],  # noqa: S603
-                       capture_output=True, text=True, check=False)
+    r = subprocess.run(
+        [str(PYTHON), str(QUERY), image],  # noqa: S603
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if r.returncode != 0 or not r.stdout.strip():
         return "absent"
     rec = json.loads(r.stdout)

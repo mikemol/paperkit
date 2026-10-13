@@ -24,6 +24,7 @@ height before intersecting.  The F-arm of the ⟨P,F,δ⟩ fixture guards exactl
 
 `describe_links(pdf) -> int` returns the count restored, for pdf.py to call in the render pipeline.
 """
+
 from __future__ import annotations
 
 import re
@@ -33,8 +34,8 @@ from pathlib import Path
 
 try:
     import pikepdf
-except ImportError:                          # Ζ·tier·exit — pikepdf absent is CANNOT-RUN (exit 3, guarded
-    pikepdf = None                           # in main), not an uncaught ImportError read as a failure
+except ImportError:  # Ζ·tier·exit — pikepdf absent is CANNOT-RUN (exit 3, guarded
+    pikepdf = None  # in main), not an uncaught ImportError read as a failure
 
 
 def _words_by_page(pdf: Path) -> dict[int, list[tuple[float, float, float, float, str]]]:
@@ -42,8 +43,9 @@ def _words_by_page(pdf: Path) -> dict[int, list[tuple[float, float, float, float
     The page height comes from each `<page height=...>` element — pdftotext measures from the top,
     PDF annotations from the bottom, so each word is flipped through its own page's height.
     """
-    xml = subprocess.run(["pdftotext", "-bbox", str(pdf), "-"],
-                         capture_output=True, text=True).stdout
+    xml = subprocess.run(
+        ["pdftotext", "-bbox", str(pdf), "-"], capture_output=True, text=True
+    ).stdout
     out: dict[int, list[tuple[float, float, float, float, str]]] = {}
     page = 0
     for chunk in xml.split("<page")[1:]:
@@ -54,10 +56,11 @@ def _words_by_page(pdf: Path) -> dict[int, list[tuple[float, float, float, float
         height = float(h.group(1))
         ws: list[tuple[float, float, float, float, str]] = []
         for m in re.finditer(
-                r'<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)</word>',
-                chunk):
+            r'<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)</word>',
+            chunk,
+        ):
             x0, y0, x1, y1 = (float(g) for g in m.groups()[:4])
-            ws.append((x0, height - y1, x1, height - y0, m.group(5)))   # top-down → bottom-up
+            ws.append((x0, height - y1, x1, height - y0, m.group(5)))  # top-down → bottom-up
         out[page] = ws
     return out
 
@@ -79,7 +82,7 @@ def uninformative(pdf: Path) -> list:
     out = []
     with pikepdf.open(str(pdf)) as doc:
         for i, page in enumerate(doc.pages, 1):
-            for a in (page.get("/Annots") or []):
+            for a in page.get("/Annots") or []:
                 if a.get("/Subtype") == "/Link":
                     c = str(a.get("/Contents") or "").strip()
                     # ONE owner for "is this description thin": _is_marker.  This branch used to
@@ -164,7 +167,7 @@ def describe_links(pdf: Path) -> int:
             for wx0, wy0, wx1, wy1, w in words.get(pno, []):
                 ox = min(x1, wx1) - max(x0, wx0)
                 oy = min(y1, wy1) - max(y0, wy0)
-                if ox > 0 and oy > 0 and ox >= 0.5 * min(x1 - x0, wx1 - wx0):   # ≥ half a word wide
+                if ox > 0 and oy > 0 and ox >= 0.5 * min(x1 - x0, wx1 - wx0):  # ≥ half a word wide
                     hit.append(w)
             text = " ".join(hit).strip()
             # Ρ·render·alt·measure — a link whose own text is a bare MARKER describes nothing.
@@ -180,15 +183,19 @@ def describe_links(pdf: Path) -> int:
                 a["/Contents"] = pikepdf.String(text)
                 filled += 1
             else:
-                a["/Contents"] = pikepdf.String("link")        # never leave a link undescribed
+                a["/Contents"] = pikepdf.String("link")  # never leave a link undescribed
     doc.save(str(pdf))
     return filled
 
 
 def _undescribed(pdf: Path) -> int:
     doc = pikepdf.open(str(pdf))
-    return sum(1 for pg in doc.pages for a in pg.get("/Annots", [])
-               if a.get("/Subtype") == "/Link" and a.get("/Contents") is None)
+    return sum(
+        1
+        for pg in doc.pages
+        for a in pg.get("/Annots", [])
+        if a.get("/Subtype") == "/Link" and a.get("/Contents") is None
+    )
 
 
 def _selftest() -> int:
@@ -198,6 +205,7 @@ def _selftest() -> int:
     δ: overlap-vs-centre selection — one link that is bare under centre carries /Contents here.
     """
     import tempfile
+
     fails = []
 
     def check(desc, cond) -> None:
@@ -214,12 +222,14 @@ def _selftest() -> int:
         before = _undescribed(pdf)
         # centre-rule reference (the bug): a word whose centre is outside both rects → 0 described
         centre_desc = _describe_by_centre(pdf)
-        n = describe_links(pdf)                              # the overlap rule (the fix)
+        n = describe_links(pdf)  # the overlap rule (the fix)
         after = _undescribed(pdf)
         check("fixture starts with undescribed links", before >= 1)
         check("P: overlap rule describes every undescribed link (0 remain)", after == 0 and n >= 1)
-        check("F: the centre rule leaves at least one bare (sre's half-description bug)",
-              centre_desc < n)
+        check(
+            "F: the centre rule leaves at least one bare (sre's half-description bug)",
+            centre_desc < n,
+        )
         check("δ: overlap describes strictly more than centre", n > centre_desc)
 
         # ── the MARKER-DESCRIBED arm (Ρ·render·alt·fixture) ──────────────────────────────────
@@ -233,13 +243,15 @@ def _selftest() -> int:
         _make_fixture(mk)
         with pikepdf.open(str(mk), allow_overwriting_input=True) as doc:
             for a in doc.pages[0].get("/Annots", []):
-                a["/Contents"] = pikepdf.String("1")          # what the office export writes
+                a["/Contents"] = pikepdf.String("1")  # what the office export writes
             doc.save(str(mk))
         pre_thin = len(uninformative(mk))
         describe_links(mk)
         post_thin = len(uninformative(mk))
-        check("P(marker): a link already described by its own GLYPH is expanded, not skipped",
-              pre_thin >= 1 and post_thin == 0)
+        check(
+            "P(marker): a link already described by its own GLYPH is expanded, not skipped",
+            pre_thin >= 1 and post_thin == 0,
+        )
         # and the guard that keeps it honest: REAL prose is never overwritten.
         pr = dd / "prose.pdf"
         _make_fixture(pr)
@@ -249,8 +261,9 @@ def _selftest() -> int:
             doc.save(str(pr))
         describe_links(pr)
         with pikepdf.open(str(pr)) as doc:
-            kept = all("adequacy" in str(a.get("/Contents") or "")
-                       for a in doc.pages[0].get("/Annots", []))
+            kept = all(
+                "adequacy" in str(a.get("/Contents") or "") for a in doc.pages[0].get("/Annots", [])
+            )
         check("F(marker): an existing PROSE description is left alone, never overwritten", kept)
 
     if fails:
@@ -273,14 +286,26 @@ def _make_fixture(pdf: Path) -> None:
     stream = b"BT /F1 12 Tf 20 50 Td ([1][2]) Tj ET"
     page.Contents = doc.make_stream(stream)
     page.Resources = pikepdf.Dictionary(
-        Font=pikepdf.Dictionary(F1=pikepdf.Dictionary(
-            Type=pikepdf.Name.Font, Subtype=pikepdf.Name.Type1, BaseFont=pikepdf.Name.Helvetica)))
+        Font=pikepdf.Dictionary(
+            F1=pikepdf.Dictionary(
+                Type=pikepdf.Name.Font, Subtype=pikepdf.Name.Type1, BaseFont=pikepdf.Name.Helvetica
+            )
+        )
+    )
     # the token '[1][2]' renders ~from x=20 to x=54 at 12pt; two links split it at the seam (~x=37),
     # so the extracted word's centre (~x=37) lies at the boundary — inside at most one rect.
-    a1 = pikepdf.Dictionary(Type=pikepdf.Name.Annot, Subtype=pikepdf.Name.Link,
-                            Rect=pikepdf.Array([20, 48, 37, 64]), Border=pikepdf.Array([0, 0, 0]))
-    a2 = pikepdf.Dictionary(Type=pikepdf.Name.Annot, Subtype=pikepdf.Name.Link,
-                            Rect=pikepdf.Array([37, 48, 54, 64]), Border=pikepdf.Array([0, 0, 0]))
+    a1 = pikepdf.Dictionary(
+        Type=pikepdf.Name.Annot,
+        Subtype=pikepdf.Name.Link,
+        Rect=pikepdf.Array([20, 48, 37, 64]),
+        Border=pikepdf.Array([0, 0, 0]),
+    )
+    a2 = pikepdf.Dictionary(
+        Type=pikepdf.Name.Annot,
+        Subtype=pikepdf.Name.Link,
+        Rect=pikepdf.Array([37, 48, 54, 64]),
+        Border=pikepdf.Array([0, 0, 0]),
+    )
     page.Annots = pikepdf.Array([doc.make_indirect(a1), doc.make_indirect(a2)])
     doc.save(str(pdf))
 
@@ -299,16 +324,22 @@ def _describe_by_centre(pdf: Path) -> int:
                 continue
             r = [float(v) for v in a["/Rect"]]
             x0, y0, x1, y1 = min(r[0], r[2]), min(r[1], r[3]), max(r[0], r[2]), max(r[1], r[3])
-            hit = [w for w in words.get(pno, [])
-                   if x0 <= (w[0] + w[2]) / 2 <= x1 and y0 <= (w[1] + w[3]) / 2 <= y1]
+            hit = [
+                w
+                for w in words.get(pno, [])
+                if x0 <= (w[0] + w[2]) / 2 <= x1 and y0 <= (w[1] + w[3]) / 2 <= y1
+            ]
             if hit:
                 n += 1
     return n
 
 
 def main(argv: list[str]) -> int:
-    if pikepdf is None:                      # Ζ·tier·exit — the toolchain (pikepdf) is absent here
-        print("linkalt: pikepdf absent — CANNOT VERIFY link descriptions (not a pass)", file=sys.stderr)
+    if pikepdf is None:  # Ζ·tier·exit — the toolchain (pikepdf) is absent here
+        print(
+            "linkalt: pikepdf absent — CANNOT VERIFY link descriptions (not a pass)",
+            file=sys.stderr,
+        )
         return 3
     if argv and argv[0] == "--selftest":
         return _selftest()
@@ -322,9 +353,11 @@ def main(argv: list[str]) -> int:
     n = describe_links(pdf)
     left = _undescribed(pdf)
     thin = uninformative(pdf)
-    print(f"linkalt: described {n} link(s); {left} undescribed remain; "
-          f"{len(thin)} carry an UNINFORMATIVE description (the \"link\" floor or a single "
-          f"token) — present, but announcing little to a screen reader")
+    print(
+        f"linkalt: described {n} link(s); {left} undescribed remain; "
+        f'{len(thin)} carry an UNINFORMATIVE description (the "link" floor or a single '
+        f"token) — present, but announcing little to a screen reader"
+    )
     if left:
         print("linkalt: FAIL — a link covering visible text is still undescribed", file=sys.stderr)
         return 1

@@ -11,6 +11,7 @@ any mutation — and every site would then read as sensitive (the degenerate all
 non-idempotent eval).  So a flipped baseline makes this action FAIL LOUD rather than emit a
 plausible-but-wrong sens set.  The baseline is excluded from `sens` (∅ is not a site).
 """
+
 import argparse
 import json
 import sys
@@ -18,7 +19,9 @@ import sys
 
 def main(argv) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--baseline", required=True, help="the ∅-mutation eval record — MUST be flipped=false")
+    ap.add_argument(
+        "--baseline", required=True, help="the ∅-mutation eval record — MUST be flipped=false"
+    )
     ap.add_argument("evals", nargs="*", help="the per-site pk_eval records")
     a = ap.parse_args(argv)
 
@@ -36,11 +39,16 @@ def main(argv) -> int:
     # this FAILS LOUD if one reached pk_sens anyway (a partition regression), since Starlark cannot make
     # a type error the way the in-process FlipSite/DflipSite do.  A positive control, like the ∅-baseline
     # guard above.  Matches "::flip:" and "::dflip:" (the dflip: spec is `<file>::dflip:<QN>#<n>`).
-    flips = [r["site"] for r in records
-             if "::flip:" in r.get("site", "") or "::dflip:" in r.get("site", "")]
+    flips = [
+        r["site"]
+        for r in records
+        if "::flip:" in r.get("site", "") or "::dflip:" in r.get("site", "")
+    ]
     if flips:
-        sys.stderr.write("Μ·sweep·atom: NON-monotone cell(s) reached pk_sens — the partition "
-                         "leaked: %s\n" % flips)
+        sys.stderr.write(
+            "Μ·sweep·atom: NON-monotone cell(s) reached pk_sens — the partition "
+            "leaked: %s\n" % flips
+        )
         return 1
     sens = [r["site"] for r in records if r["flipped"]]
     # Ζ·sens·attempted — record the ATTEMPTED sites, not only the killed ones.  `sens` alone cannot
@@ -51,8 +59,16 @@ def main(argv) -> int:
     # ALL-flip; this catches its dual, a silently SHORT sweep.  Additive: readers keying on
     # {claim, baseline, sens} are untouched.
     attempted = [r["site"] for r in records]
-    print(json.dumps({"claim": base["claim"], "baseline": baseline, "sens": sorted(sens),
-                      "attempted": sorted(attempted)}))
+    print(
+        json.dumps(
+            {
+                "claim": base["claim"],
+                "baseline": baseline,
+                "sens": sorted(sens),
+                "attempted": sorted(attempted),
+            }
+        )
+    )
     return 0
 
 

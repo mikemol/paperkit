@@ -10,6 +10,7 @@ is reached by declaration rather than by mutating sys.path.
 
 (pdffonts columns end: ... emb sub uni objnum gen → emb is [-5].)
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -27,14 +28,14 @@ def check() -> int:
 
     with tempfile.TemporaryDirectory() as d:
         docx = Path(d) / "p.docx"
-        subprocess.run(["pandoc", "../paper/paper.md", "-o", str(docx)],
-                       check=True)
+        subprocess.run(["pandoc", "../paper/paper.md", "-o", str(docx)], check=True)
         pdf = lo.convert(docx, "pdf", d)
         if pdf is None:
             sys.stderr.write("docx did not convert to a PDF (soffice produced no output)\n")
             return 1
-        listed = subprocess.run(["pdffonts", str(pdf)],
-                                capture_output=True, text=True, check=True).stdout.splitlines()
+        listed = subprocess.run(
+            ["pdffonts", str(pdf)], capture_output=True, text=True, check=True
+        ).stdout.splitlines()
         rows = [r for r in listed[HEADER_ROWS:] if r.strip()]
         if not rows:
             sys.stderr.write("no fonts found in the rendered PDF\n")
@@ -43,8 +44,9 @@ def check() -> int:
         if missing:
             sys.stderr.write(f"fonts NOT embedded (would substitute/tofu elsewhere): {missing}\n")
             return 1
-    sys.stdout.write(f"fonts ok: all {len(rows)} fonts embedded — "
-                     f"the PDF draws identically on any machine\n")
+    sys.stdout.write(
+        f"fonts ok: all {len(rows)} fonts embedded — the PDF draws identically on any machine\n"
+    )
     return 0
 
 

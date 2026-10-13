@@ -22,6 +22,7 @@ feel would be the thing that comment exists to refuse.
 TOTALITY.  Every key lands in exactly one band, and a key with no record lands in `full` — the
 conservative choice: an unmeasured claim is not advertised as terse.
 """
+
 import genrekit
 
 TERSE, BRIEF = 20, 45

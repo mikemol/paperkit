@@ -16,6 +16,7 @@ breached:
 
     python3 paperkit/tests/boundaries_data_grade.py     # exit 0 = structured data is graded, soundly
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -45,7 +46,9 @@ def _decisions_of(check_src):
         (p / "check.py").write_text(check_src)
         chk = "cmd:python3 check.py"
         _b, sens = paperkit.grader.sensitivity(chk, p, {}, engine_dir=p)
-        return [u for u in paperkit.grader.decisions_unasserted(chk, p, {}, p, sens) if "dflip:" in u]
+        return [
+            u for u in paperkit.grader.decisions_unasserted(chk, p, {}, p, sens) if "dflip:" in u
+        ]
 
 
 def main() -> int:
@@ -59,58 +62,74 @@ def main() -> int:
 
     # ── data-: is a monotone site the sweep consumes (the wall breached) ─────────────────────────
     sens = _sens_of(
-        "import sys; sys.path.insert(0, '.')\n"
-        "from m import s\n"
-        "assert s('x') == 'full'\n")                      # reads only key "x" (#0)
+        "import sys; sys.path.insert(0, '.')\nfrom m import s\nassert s('x') == 'full'\n"
+    )  # reads only key "x" (#0)
     data_sens = [x for x in sens if "data-:" in x]
-    check("a data-: DROP of a READ key appears in sens (structured data is now swept)",
-          any("::data-:SCOPE#0" in x for x in data_sens))
-    check("a data-: DROP of an UNREAD key does NOT appear in sens (precise, per-key)",
-          not any("::data-:SCOPE#1" in x for x in data_sens))
+    check(
+        "a data-: DROP of a READ key appears in sens (structured data is now swept)",
+        any("::data-:SCOPE#0" in x for x in data_sens),
+    )
+    check(
+        "a data-: DROP of an UNREAD key does NOT appear in sens (precise, per-key)",
+        not any("::data-:SCOPE#1" in x for x in data_sens),
+    )
 
     # ── the DflipSite structural bar ─────────────────────────────────────────────────────────────
-    ds = paperkit.grader.DflipSite(file=Path("x.py"), qualname="D", n=0, kind="dict", label="x.py::dflip:D#0")
+    ds = paperkit.grader.DflipSite(
+        file=Path("x.py"), qualname="D", n=0, kind="dict", label="x.py::dflip:D#0"
+    )
     try:
         paperkit.grader._apply("cmd:x", Path(), {}, [ds])
         barred = False
     except (ValueError, TypeError):
-        barred = True                                    # 5 fields vs the sweep's `f, node, _ =`
+        barred = True  # 5 fields vs the sweep's `f, node, _ =`
     check("a DflipSite handed to _apply FAILS structurally (the value-perturb bar)", barred)
-    check("a DflipSite is a distinct 5-field type, not a (file, node, label) triple",
-          len(paperkit.grader.DflipSite._fields) == 5 and "node" not in paperkit.grader.DflipSite._fields)
+    check(
+        "a DflipSite is a distinct 5-field type, not a (file, node, label) triple",
+        len(paperkit.grader.DflipSite._fields) == 5
+        and "node" not in paperkit.grader.DflipSite._fields,
+    )
     # a dflip: label is never in _sites (the sweep surface); only _dflip_sites_of yields it.
     with tempfile.TemporaryDirectory() as d:
         p = Path(d)
         (p / "m.py").write_text(_MOD)
         site_labels = [x[2] for x in paperkit.grader._sites(p, p)]
         dflip_labels = [x.label for x in paperkit.grader._dflip_sites_of(p, p)]
-    check("no dflip: label appears in _sites (the sweep never sees a value-perturb)",
-          not any("::dflip:" in lbl for lbl in site_labels))
-    check("data-: labels DO appear in _sites (the monotone drop is a swept site)",
-          any("::data-:SCOPE#" in lbl for lbl in site_labels))
-    check("_dflip_sites_of yields dflip: sites separately",
-          bool(dflip_labels) and all("::dflip:" in lbl for lbl in dflip_labels))
+    check(
+        "no dflip: label appears in _sites (the sweep never sees a value-perturb)",
+        not any("::dflip:" in lbl for lbl in site_labels),
+    )
+    check(
+        "data-: labels DO appear in _sites (the monotone drop is a swept site)",
+        any("::data-:SCOPE#" in lbl for lbl in site_labels),
+    )
+    check(
+        "_dflip_sites_of yields dflip: sites separately",
+        bool(dflip_labels) and all("::dflip:" in lbl for lbl in dflip_labels),
+    )
 
     # ── decisions_unasserted, the DATA path ──────────────────────────────────────────────────────
     asserts = _decisions_of(
-        "import sys; sys.path.insert(0, '.')\n"
-        "from m import s\n"
-        "assert s('x') == 'full'\n")                      # ASSERTS the value
+        "import sys; sys.path.insert(0, '.')\nfrom m import s\nassert s('x') == 'full'\n"
+    )  # ASSERTS the value
     check("(P) a check that ASSERTS a dict value is NOT flagged unasserted", asserts == [])
 
     reads = _decisions_of(
-        "import sys; sys.path.insert(0, '.')\n"
-        "from m import s\n"
-        "s('x')\n")                                       # READS but never asserts the value
-    check("(F) a check that READS a dict value but never asserts it IS flagged unasserted",
-          reads == ["m.py::dflip:SCOPE#0"])
+        "import sys; sys.path.insert(0, '.')\nfrom m import s\ns('x')\n"
+    )  # READS but never asserts the value
+    check(
+        "(F) a check that READS a dict value but never asserts it IS flagged unasserted",
+        reads == ["m.py::dflip:SCOPE#0"],
+    )
 
     print()
     if fails:
         print(f"FAIL — {len(fails)} broken: {fails}")
         return 1
-    print("ok — the grader sweeps structured data: data-: monotone-in-sens, DflipSite barred, "
-          "decisions_unasserted names an unasserted dict value")
+    print(
+        "ok — the grader sweeps structured data: data-: monotone-in-sens, DflipSite barred, "
+        "decisions_unasserted names an unasserted dict value"
+    )
     return 0
 
 

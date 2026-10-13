@@ -86,6 +86,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The three-valued answer.  Modelled on scripts/ratchet.BaselineState.
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class Presence:
     """PRESENT / ABSENT / BROKEN — the distinction three call sites lost.
 
@@ -130,21 +131,28 @@ class Presence:
         for s in cls.all():
             if s.name == name:
                 return s
-        raise KeyError("unknown presence %r; known: %s"
-                       % (name, ", ".join(s.name for s in cls.all())))
+        raise KeyError(
+            "unknown presence %r; known: %s" % (name, ", ".join(s.name for s in cls.all()))
+        )
 
 
 Presence.PRESENT = Presence(
-    "PRESENT", is_defect=False,
-    gloss="a blob exists at this path in this source; .data is bytes, possibly b''")
+    "PRESENT",
+    is_defect=False,
+    gloss="a blob exists at this path in this source; .data is bytes, possibly b''",
+)
 Presence.ABSENT = Presence(
-    "ABSENT", is_defect=False,
+    "ABSENT",
+    is_defect=False,
     gloss="not there at that source — the ONE legitimate miss, and NOT the same as "
-          "a zero-byte file")
+    "a zero-byte file",
+)
 Presence.BROKEN = Presence(
-    "BROKEN", is_defect=True,
+    "BROKEN",
+    is_defect=True,
     gloss="bad rev, not a repo, decode failure, permission — the read did not "
-          "happen. NEVER silently a miss; .error carries the cause")
+    "happen. NEVER silently a miss; .error carries the cause",
+)
 
 
 class Result:
@@ -192,6 +200,7 @@ class Result:
 # scmrepo.  This is what fixes `agda_defs --at HEAD` being a MODE: a tool takes a
 # source object and every read in it is uniformly addressed.
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class WorkingTree:
     """The filesystem as it is right now. The only WRITABLE source."""
@@ -249,11 +258,12 @@ class Rev:
         except ImportError as e:
             self._err = RuntimeError(
                 "pygit2 is required to read from a revision (%s). "
-                "Install with: uv pip install pygit2" % e)
+                "Install with: uv pip install pygit2" % e
+            )
             return None, self._err
         try:
             repo = pygit2.Repository(self.root)
-        except Exception as e:               # GitError: not a repository
+        except Exception as e:  # GitError: not a repository
             self._err = RuntimeError("not a git repository at %s: %s" % (self.root, e))
             return None, self._err
         try:
@@ -267,7 +277,7 @@ class Rev:
             self._err = RuntimeError("cannot resolve %r: %s" % (self.rev, e))
             return None, self._err
         try:
-            self._tree = obj.peel(2)          # GIT_OBJECT_TREE — commit/tag → tree
+            self._tree = obj.peel(2)  # GIT_OBJECT_TREE — commit/tag → tree
         except Exception as e:
             self._err = ValueError("revision %r does not name a tree: %s" % (self.rev, e))
         return self._tree, self._err
@@ -276,6 +286,7 @@ class Rev:
 # ─────────────────────────────────────────────────────────────────────────────
 # read
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _relpath(path, root):
     """Repo-relative, forward-slashed — the spelling a git tree is keyed by."""
@@ -303,7 +314,7 @@ def read(path, source=None):
 def _read_worktree(path, source):
     p = path if os.path.isabs(path) else os.path.join(source.root, path)
     try:
-        with open(p, "rb") as fh:            # ⚑ "rb": no locale, no codec, no guess
+        with open(p, "rb") as fh:  # ⚑ "rb": no locale, no codec, no guess
             return Result(Presence.PRESENT, fh.read(), path=path, source=source)
     except FileNotFoundError as e:
         return Result(Presence.ABSENT, error=e, path=path, source=source)
@@ -312,7 +323,7 @@ def _read_worktree(path, source):
         # wrong question for it. Reporting ABSENT would tell a caller the tree is
         # missing something that is right there.
         return Result(Presence.BROKEN, error=e, path=path, source=source)
-    except OSError as e:                     # permission, ELOOP, ENAMETOOLONG
+    except OSError as e:  # permission, ELOOP, ENAMETOOLONG
         return Result(Presence.BROKEN, error=e, path=path, source=source)
 
 
@@ -328,9 +339,12 @@ def _read_rev(path, source):
         # ⚑ SAFE *ONLY* BECAUSE THE REV IS ALREADY RESOLVED. See Rev.resolve.
         return Result(Presence.ABSENT, error=e, path=path, source=source)
     if entry.type_str != "blob":
-        return Result(Presence.BROKEN, path=path, source=source,
-                      error=IsADirectoryError("%s is a %s at %s"
-                                              % (rel, entry.type_str, source.rev)))
+        return Result(
+            Presence.BROKEN,
+            path=path,
+            source=source,
+            error=IsADirectoryError("%s is a %s at %s" % (rel, entry.type_str, source.rev)),
+        )
     return Result(Presence.PRESENT, entry.data, path=path, source=source)
 
 
@@ -342,8 +356,11 @@ def read_text(path, source=None, errors="strict"):
     Those are DIFFERENT return values, which is the whole point. A caller that wants
     them merged must write `or ""` itself, in the open, where a reader can see it.
     """
-    return read(path, source).text(errors) if read(path, source) else _none_or_raise(
-        read(path, source))
+    return (
+        read(path, source).text(errors)
+        if read(path, source)
+        else _none_or_raise(read(path, source))
+    )
 
 
 def _none_or_raise(r):
@@ -382,7 +399,9 @@ def _declare(intent):
     if DRY_RUN:
         raise RuntimeError(
             "vfs.write refused: vfs.DRY_RUN is set. The caller asked for a preview, "
-            "so this seam will not write. Clear vfs.DRY_RUN to apply.")
+            "so this seam will not write. Clear vfs.DRY_RUN to apply."
+        )
+
 
 def write(path, data, source=None, mkdirs=False):
     r"""Write bytes-or-str to the WORKING TREE, atomically, always UTF-8.
@@ -449,7 +468,8 @@ def write(path, data, source=None, mkdirs=False):
             "cannot write to %r — git history is not writable. `write` is "
             "WORKING-TREE ONLY by construction; there is no write(path, Rev(...)). "
             "To change history, commit to the working tree and let the normal "
-            "commit gate promote it." % (source,))
+            "commit gate promote it." % (source,)
+        )
     if isinstance(data, str):
         data = data.encode("utf-8")
     elif not isinstance(data, (bytes, bytearray)):
@@ -466,7 +486,7 @@ def write(path, data, source=None, mkdirs=False):
             fh.write(data)
             fh.flush()
             os.fsync(fh.fileno())
-        os.replace(tmp, p)                   # atomic within a filesystem
+        os.replace(tmp, p)  # atomic within a filesystem
     except BaseException:
         try:
             os.unlink(tmp)
@@ -526,25 +546,33 @@ def ambiguous_across_sources(pattern):
     segs = pattern.split("/")
     for i, s in enumerate(segs):
         if "**" in s and s != "**":
-            return ("`%s` — `**` is only a segment wildcard when it is a WHOLE segment; "
-                    "glob reads it as a plain `*` here, fnmatch has no `**` at all"
-                    % s)
+            return (
+                "`%s` — `**` is only a segment wildcard when it is a WHOLE segment; "
+                "glob reads it as a plain `*` here, fnmatch has no `**` at all" % s
+            )
     if "**" in segs and segs[-1] != "**":
-        return ("`**/` cannot match ZERO segments in either matcher, so every depth-0 "
-                "path is dropped — silently, because the drop looks like a smaller "
-                "corpus. Use the depth-agnostic `%s` (+ `--suffix`), which both "
-                "matchers read identically."
-                % "/".join(segs[:segs.index("**") + 1]))
-    if "**" not in segs and any("*" in s or "?" in s or "[" in s for s in segs[:-1] + segs[-1:]) \
-            and len(segs) > 0 and any("*" in s or "?" in s for s in segs):
+        return (
+            "`**/` cannot match ZERO segments in either matcher, so every depth-0 "
+            "path is dropped — silently, because the drop looks like a smaller "
+            "corpus. Use the depth-agnostic `%s` (+ `--suffix`), which both "
+            "matchers read identically." % "/".join(segs[: segs.index("**") + 1])
+        )
+    if (
+        "**" not in segs
+        and any("*" in s or "?" in s or "[" in s for s in segs[:-1] + segs[-1:])
+        and len(segs) > 0
+        and any("*" in s or "?" in s for s in segs)
+    ):
         # ⚑ A bare `*`/`?` is separator-RESPECTING under glob and separator-CROSSING
         # under fnmatch. Harmless only when the pattern cannot span a `/` anyway —
         # i.e. when it is a single segment with no directory context to cross into.
         if len(segs) > 1:
-            return ("`*`/`?` crosses `/` under the Rev matcher (fnmatch) but not under "
-                    "the working-tree matcher (glob), so `%s` selects one depth on disk "
-                    "and every depth at a revision. Use `%s/**` (+ `--suffix`)."
-                    % (pattern, "/".join(segs[:-1])))
+            return (
+                "`*`/`?` crosses `/` under the Rev matcher (fnmatch) but not under "
+                "the working-tree matcher (glob), so `%s` selects one depth on disk "
+                "and every depth at a revision. Use `%s/**` (+ `--suffix`)."
+                % (pattern, "/".join(segs[:-1]))
+            )
     return None
 
 
@@ -578,13 +606,15 @@ def listdir(pattern, source=None, strict=True):
     (`LISTDIR_ORDER`) rather than left as an incident of two separate `sorted()` calls.
     """
     import fnmatch
+
     source = source or WorkingTree()
     if strict:
         why = ambiguous_across_sources(pattern)
         if why is not None:
             raise AmbiguousPattern(
                 "pattern %r means different things at a WorkingTree and at a Rev: %s"
-                % (pattern, why))
+                % (pattern, why)
+            )
     if isinstance(source, Rev):
         tree, err = source.resolve()
         if err is not None:
@@ -606,9 +636,9 @@ def listdir(pattern, source=None, strict=True):
         out.sort()
         return out
     import glob as _glob
+
     base = source.root
-    out = [_relpath(p, base)
-           for p in _glob.glob(os.path.join(base, pattern), recursive=True)]
+    out = [_relpath(p, base) for p in _glob.glob(os.path.join(base, pattern), recursive=True)]
     out.sort()
     return out
 
@@ -616,6 +646,7 @@ def listdir(pattern, source=None, strict=True):
 # ─────────────────────────────────────────────────────────────────────────────
 # selftest — ⚑⚑ EVERY ARM STARVED INDIVIDUALLY
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _selftest():
     """Counted — a hardcoded total once hid an added case (prune_imports.py:332).
@@ -628,6 +659,7 @@ def _selftest():
     """
     import tempfile
     import traceback
+
     cases = []
 
     def check(name, got, want):
@@ -643,14 +675,12 @@ def _selftest():
         fh.write(b"")
 
     r_has = read("has.txt", wt)
-    check("PRESENT: nonempty reads", (r_has.presence, r_has.data),
-          (Presence.PRESENT, b"hello"))
+    check("PRESENT: nonempty reads", (r_has.presence, r_has.data), (Presence.PRESENT, b"hello"))
 
     # ⚑⚑ THE LOAD-BEARING PAIR. `_head_text`'s `else ""` makes these two INDISTINGUISHABLE.
     r_empty = read("empty.txt", wt)
     r_gone = read("gone.txt", wt)
-    check("EMPTY is PRESENT with b''", (r_empty.presence, r_empty.data),
-          (Presence.PRESENT, b""))
+    check("EMPTY is PRESENT with b''", (r_empty.presence, r_empty.data), (Presence.PRESENT, b""))
     check("ABSENT is ABSENT", r_gone.presence, Presence.ABSENT)
     check("⚑ EMPTY and ABSENT are DISTINCT", r_empty.presence == r_gone.presence, False)
     check("⚑ EMPTY is truthy-as-a-read", bool(r_empty), True)
@@ -692,6 +722,7 @@ def _selftest():
     # UNMEASURED, which is a refusal, and the refusal names its successor.
     try:
         import pygit2
+
         have_pygit2 = True
     except ImportError as _e:
         have_pygit2 = False
@@ -699,19 +730,22 @@ def _selftest():
 
     if not have_pygit2:
         import shutil as _sh
+
         _sh.rmtree(tmp, ignore_errors=True)
         bad = [c for c in cases if not c[1]]
         for name, ok, got, want in cases:
             if not ok:
                 print("  FAIL  %s\n        got  %r\n        want %r" % (name, got, want))
         print("vfs selftest: %d/%d working-tree arms" % (len(cases) - len(bad), len(cases)))
-        print("  REFUSED: the Rev arms are UNMEASURED — pygit2 is not importable "
-              "(%s)." % _pygit2_err)
-        print("  This is a fact about THIS INTERPRETER (%s), not about vfs."
-              % sys.executable)
-        print("  pygit2 is declared in pyproject.toml; remedy: `uv sync`, and invoke "
-              "via .venv/bin/python.")
-        return 2                       # ⚑ distinct from 1 (a real arm failed)
+        print(
+            "  REFUSED: the Rev arms are UNMEASURED — pygit2 is not importable (%s)." % _pygit2_err
+        )
+        print("  This is a fact about THIS INTERPRETER (%s), not about vfs." % sys.executable)
+        print(
+            "  pygit2 is declared in pyproject.toml; remedy: `uv sync`, and invoke "
+            "via .venv/bin/python."
+        )
+        return 2  # ⚑ distinct from 1 (a real arm failed)
 
     if have_pygit2:
         head = Rev("HEAD")
@@ -730,14 +764,12 @@ def _selftest():
         r_badrev = read("CLAUDE.md", Rev("nosuchrev-zzz-9999"))
         check("⚑⚑ BROKEN: bad rev is NOT ABSENT", r_badrev.presence, Presence.BROKEN)
         check("bad rev names itself", "bad revision" in str(r_badrev.error), True)
-        check("⚑ bad-rev and missing-path DIFFER",
-              r_badrev.presence == r_norev.presence, False)
+        check("⚑ bad-rev and missing-path DIFFER", r_badrev.presence == r_norev.presence, False)
 
         # ⚑ BROKEN: not a repository (starved with a non-repo dir)
         r_norepo = read("x.txt", Rev("HEAD", root=tmp))
         check("BROKEN: not a git repo", r_norepo.presence, Presence.BROKEN)
-        check("not-a-repo names itself", "not a git repository" in str(r_norepo.error),
-              True)
+        check("not-a-repo names itself", "not a git repository" in str(r_norepo.error), True)
 
         # ⚑ A tree is not a blob
         r_tree = read("scratch", head)
@@ -745,8 +777,9 @@ def _selftest():
 
         # ⚑ PATH TRAVERSAL is structurally absent — no filesystem path to escape.
         for bad in ("../etc/passwd", "/etc/passwd", "scratch/../../etc/passwd"):
-            check("traversal %r is ABSENT not a read" % bad,
-                  read(bad, head).presence, Presence.ABSENT)
+            check(
+                "traversal %r is ABSENT not a read" % bad, read(bad, head).presence, Presence.ABSENT
+            )
 
         # ⚑ require() keeps the distinction across the conversion to exceptions
         try:
@@ -755,15 +788,15 @@ def _selftest():
         except FileNotFoundError:
             check("require ABSENT raises FileNotFoundError", True, True)
         except Exception as e:
-            check("require ABSENT raises FileNotFoundError", type(e).__name__,
-                  "FileNotFoundError")
+            check("require ABSENT raises FileNotFoundError", type(e).__name__, "FileNotFoundError")
         try:
             r_badrev.require()
             check("require BROKEN does NOT raise FileNotFoundError", "no raise", "raise")
         except FileNotFoundError:
             # ⚑ This would mean a caller's `except FileNotFoundError` swallows a bad rev.
-            check("require BROKEN does NOT raise FileNotFoundError", "FileNotFoundError",
-                  "ValueError")
+            check(
+                "require BROKEN does NOT raise FileNotFoundError", "FileNotFoundError", "ValueError"
+            )
         except ValueError:
             check("require BROKEN does NOT raise FileNotFoundError", True, True)
 
@@ -775,8 +808,11 @@ def _selftest():
     agda_ish = "rc = F2.𝟙 ∷ F2.𝟘 ∷ F2.𝟘 ∷ F2.𝟙 ∷ []\n"
     write("uni.agda", agda_ish, wt)
     check("write→read round-trips non-ASCII", read("uni.agda", wt).text(), agda_ish)
-    check("write is UTF-8 ON THE WIRE, not locale",
-          read("uni.agda", wt).data, agda_ish.encode("utf-8"))
+    check(
+        "write is UTF-8 ON THE WIRE, not locale",
+        read("uni.agda", wt).data,
+        agda_ish.encode("utf-8"),
+    )
 
     # ⚑ A decode failure is BROKEN, not empty — and `.text()` must not silently mangle.
     with open(os.path.join(tmp, "latin.bin"), "wb") as fh:
@@ -786,8 +822,7 @@ def _selftest():
         check("undecodable text() raises", "no raise", "raise")
     except UnicodeDecodeError:
         check("undecodable text() raises", True, True)
-    check("undecodable is still PRESENT as BYTES",
-          read("latin.bin", wt).presence, Presence.PRESENT)
+    check("undecodable is still PRESENT as BYTES", read("latin.bin", wt).presence, Presence.PRESENT)
 
     # ── DRY_RUN: the seam honours the caller's preview, and STARVED both ways ──
     # ⚑ A refusal that has never been shown to differ from an allow is not a control.
@@ -817,13 +852,11 @@ def _selftest():
         check("refusal names its successor", "not writable" in str(e), True)
 
     # ── atomicity: the temp file never survives ──
-    check("no .vfs-tmp leftovers",
-          [f for f in os.listdir(tmp) if ".vfs-tmp" in f], [])
+    check("no .vfs-tmp leftovers", [f for f in os.listdir(tmp) if ".vfs-tmp" in f], [])
 
     # ── Presence roster: walked from all(), not hand-typed ──
     check("Presence.all() is the roster", len(Presence.all()), 3)
-    check("Presence.of refuses unknown",
-          _raises(lambda: Presence.of("MAYBE"), KeyError), True)
+    check("Presence.of refuses unknown", _raises(lambda: Presence.of("MAYBE"), KeyError), True)
     for s in Presence.all():
         check("Presence.of round-trips %s" % s, Presence.of(s.name), s)
         check("%s has a gloss" % s, bool(s.gloss), True)
@@ -843,16 +876,23 @@ def _selftest():
     # The `empty` cell is what the claim rests on and it is 0 either way, so the
     # CONCLUSION never moved; only its scope was understated. See `--suffix`/`_suffixed`.
     cen = _census("*.txt", wt)
-    check("⚑ census separates EMPTY from PRESENT-nonempty",
-          (cen["empty"] > 0, cen["nonempty"] > 0), (True, True))
+    check(
+        "⚑ census separates EMPTY from PRESENT-nonempty",
+        (cen["empty"] > 0, cen["nonempty"] > 0),
+        (True, True),
+    )
     check("census counts the empty file exactly once", cen["empty"], 1)
-    check("census total is the sum of its cells",
-          cen["total"], cen["nonempty"] + cen["empty"] + cen["absent"] + cen["broken"])
+    check(
+        "census total is the sum of its cells",
+        cen["total"],
+        cen["nonempty"] + cen["empty"] + cen["absent"] + cen["broken"],
+    )
     # ⚑ and a corpus with NO empty member must report 0 — the all-clear, shown to
     # DIFFER from the found-something above.
     cen2 = _census("uni.agda", wt)
-    check("⚑ census all-clear differs from found-something",
-          (cen2["empty"], cen2["nonempty"]), (0, 1))
+    check(
+        "⚑ census all-clear differs from found-something", (cen2["empty"], cen2["nonempty"]), (0, 1)
+    )
 
     # ── --suffix: the mode that exists because NO GLOB EXPRESSES IT (⟡census-suffix) ──
     # ⚑⚑ THE ARM IS THE DEPTH-0 MISS ITSELF, not just "does the filter filter". The
@@ -866,10 +906,16 @@ def _selftest():
     # it is guarding something.
     os.mkdir(os.path.join(tmp, "sub"))
     write("sub/Deep.agda", "-- deep\n", wt)
-    check("⚑⚑ `**` + suffix finds BOTH depths",
-          sorted(_suffixed(listdir("**", wt), ".agda")), ["sub/Deep.agda", "uni.agda"])
-    check("⚑⚑ `**/*.agda` is REFUSED, not silently short",
-          _raises(lambda: listdir("**/*.agda", wt), AmbiguousPattern), True)
+    check(
+        "⚑⚑ `**` + suffix finds BOTH depths",
+        sorted(_suffixed(listdir("**", wt), ".agda")),
+        ["sub/Deep.agda", "uni.agda"],
+    )
+    check(
+        "⚑⚑ `**/*.agda` is REFUSED, not silently short",
+        _raises(lambda: listdir("**/*.agda", wt), AmbiguousPattern),
+        True,
+    )
     # ⚑⚑⚑ AND THE DROP IS **NOT** ON THE WORKING TREE — MEASURED HERE, 2026-08-25, BY
     # THIS ARM FAILING WHEN IT ASSERTED OTHERWISE. Python's `glob(recursive=True)` DOES
     # let `**/` match zero segments, so `**/*.agda` finds `uni.agda` on disk; `fnmatch`
@@ -880,13 +926,19 @@ def _selftest():
     # ZERO segments in either matcher"; on glob it can. The REFUSAL is right and the
     # clause explaining it is not — recorded, not silently rewritten, because it is
     # another item's live text.
-    check("⚑ working tree is EXACT for `**/*.agda` (the branch you can easily check)",
-          sorted(listdir("**/*.agda", wt, strict=False)), ["sub/Deep.agda", "uni.agda"])
+    check(
+        "⚑ working tree is EXACT for `**/*.agda` (the branch you can easily check)",
+        sorted(listdir("**/*.agda", wt, strict=False)),
+        ["sub/Deep.agda", "uni.agda"],
+    )
     if have_pygit2:
         # the SAME pattern at a Rev, over a real corpus with depth-0 members
-        check("⚑⚑ at a Rev the SAME pattern DROPS depth-0 — the real defect",
-              sorted(listdir("scratch/**/*.py", head, strict=False))
-              == sorted(_suffixed(listdir("scratch/**", head), ".py")), False)
+        check(
+            "⚑⚑ at a Rev the SAME pattern DROPS depth-0 — the real defect",
+            sorted(listdir("scratch/**/*.py", head, strict=False))
+            == sorted(_suffixed(listdir("scratch/**", head), ".py")),
+            False,
+        )
         # ⚑ NAMED BY DEPTH, NOT BY FILENAME. An arm spelling one path asserts that file
         # is at HEAD — an unrelated fact that fails when the tree moves (it did: the
         # first spelling named `scratch/vfs.py`, which is untracked). The claim is about
@@ -894,17 +946,25 @@ def _selftest():
         _deep = set(listdir("scratch/**/*.py", head, strict=False))
         _all = set(_suffixed(listdir("scratch/**", head), ".py"))
         _top = {p for p in _all if p.count("/") == 1}
-        check("⚑ the fixture is inhabited (a zero here would prove nothing)",
-              (len(_top) > 0, len(_all) > len(_top)), (True, True))
+        check(
+            "⚑ the fixture is inhabited (a zero here would prove nothing)",
+            (len(_top) > 0, len(_all) > len(_top)),
+            (True, True),
+        )
         check("⚑ `**` + suffix keeps EVERY depth-0 member", _top - _all, set())
-        check("⚑⚑ starved: `**/*.py` at a Rev drops EVERY depth-0 member",
-              _top & _deep, set())
+        check("⚑⚑ starved: `**/*.py` at a Rev drops EVERY depth-0 member", _top & _deep, set())
     # starved the other way: an empty suffix must not filter, and a suffix nothing
     # matches must report 0 rather than falling back to "everything".
-    check("⚑ empty suffix is a NO-OP, not a wildcard",
-          len(_suffixed(listdir("**", wt), "")), len(listdir("**", wt)))
-    check("⚑ an unmatched suffix reports 0, not everything",
-          _suffixed(listdir("**", wt), ".nosuchext"), [])
+    check(
+        "⚑ empty suffix is a NO-OP, not a wildcard",
+        len(_suffixed(listdir("**", wt), "")),
+        len(listdir("**", wt)),
+    )
+    check(
+        "⚑ an unmatched suffix reports 0, not everything",
+        _suffixed(listdir("**", wt), ".nosuchext"),
+        [],
+    )
     check("census honours --suffix", _census("**", wt, ".agda")["nonempty"], 2)
 
     # ── ⟡glob-branch-asymmetry ────────────────────────────────────────────────
@@ -915,13 +975,15 @@ def _selftest():
     # matchers select the SAME SUBSET of the same tree. So the case builds one tree,
     # commits it, and compares branch to branch — no literal listing anywhere in it.
     import subprocess
+
     gtmp = tempfile.mkdtemp(prefix="vfs-selftest-git-")
 
     def _git(*args):
         return subprocess.run(("git",) + args, cwd=gtmp, capture_output=True)
 
     _git("init", "-q")
-    _git("config", "user.email", "t@t"); _git("config", "user.name", "t")
+    _git("config", "user.email", "t@t")
+    _git("config", "user.name", "t")
     os.makedirs(os.path.join(gtmp, "d", "sub", "deep"))
     # ⚑ THE DEPTH-0 MEMBER IS THE WHOLE POINT. Without `d/top.agda` every pattern
     # agrees and the suite is green on a corpus that cannot express the defect —
@@ -929,11 +991,15 @@ def _selftest():
     for rel in ("d/top.agda", "d/sub/mid.agda", "d/sub/deep/low.agda", "d/sub/other.txt"):
         with open(os.path.join(gtmp, rel), "w") as fh:
             fh.write("x")
-    _git("add", "-A"); _git("commit", "-qm", "t")
+    _git("add", "-A")
+    _git("commit", "-qm", "t")
     gwt, ghead = WorkingTree(gtmp), Rev("HEAD", gtmp)
 
-    check("⚑ the corpus can EXPRESS the defect (a depth-0 member exists)",
-          "d/top.agda" in listdir("d/**", gwt), True)
+    check(
+        "⚑ the corpus can EXPRESS the defect (a depth-0 member exists)",
+        "d/top.agda" in listdir("d/**", gwt),
+        True,
+    )
 
     # THE INVARIANT. Quantified over every accepted pattern, not one example.
     diverged = []
@@ -941,14 +1007,13 @@ def _selftest():
         try:
             a = _suffixed(listdir(pat, gwt), "")
         except AmbiguousPattern:
-            continue                       # refused patterns are excused BY the refusal
+            continue  # refused patterns are excused BY the refusal
         b = _suffixed(listdir(pat, ghead), "")
         # git tracks blobs only; compare on files the working tree also has as files.
         a = [p for p in a if os.path.isfile(os.path.join(gtmp, p))]
         if a != b:
             diverged.append((pat, sorted(set(a) ^ set(b))))
-    check("⚑⚑ every ACCEPTED pattern selects the same set at both sources",
-          diverged, [])
+    check("⚑⚑ every ACCEPTED pattern selects the same set at both sources", diverged, [])
 
     # ⚑⚑ THE POSITIVE CONTROL FOR THE INVARIANT ABOVE. A green agreement-check is
     # worthless until it has been SHOWN TO GO RED — `census-green-is-a-fact-about-the-
@@ -957,49 +1022,76 @@ def _selftest():
     # future edit makes the comparison structurally incapable of failing (an exception
     # swallowed, a set emptied, `strict` silently forced on), THIS case goes red first.
     def _cmp(pat):
-        a = [p for p in listdir(pat, gwt, strict=False)
-             if os.path.isfile(os.path.join(gtmp, p))]
+        a = [p for p in listdir(pat, gwt, strict=False) if os.path.isfile(os.path.join(gtmp, p))]
         return sorted(set(a) ^ set(listdir(pat, ghead, strict=False)))
 
-    check("⚑⚑ POSITIVE CONTROL: the comparison DOES report a real divergence",
-          _cmp("d/*.agda"), ["d/sub/deep/low.agda", "d/sub/mid.agda"])
-    check("⚑ ...and reports NO divergence for the agreeing form (both arms shown)",
-          _cmp("d/**"), [])
+    check(
+        "⚑⚑ POSITIVE CONTROL: the comparison DOES report a real divergence",
+        _cmp("d/*.agda"),
+        ["d/sub/deep/low.agda", "d/sub/mid.agda"],
+    )
+    check(
+        "⚑ ...and reports NO divergence for the agreeing form (both arms shown)", _cmp("d/**"), []
+    )
 
     # ⚑ AND THE REFUSAL IS STARVED BOTH WAYS — a check whose all-clear has never been
     # shown to differ from its found-something is not a measurement.
-    check("⟡ the lossy `**/*.ext` form is REFUSED",
-          _raises(lambda: listdir("d/**/*.agda", gwt), AmbiguousPattern), True)
-    check("⟡ the separator-crossing `d/*.ext` form is REFUSED",
-          _raises(lambda: listdir("d/*.agda", gwt), AmbiguousPattern), True)
-    check("⟡ a `**` glued into a segment is REFUSED",
-          _raises(lambda: listdir("d/x**/y", gwt), AmbiguousPattern), True)
-    check("⚑ the refusal fires on the WORKING TREE too, where the pattern is exact",
-          _raises(lambda: listdir("d/**/*.agda", gwt), AmbiguousPattern), True)
-    check("⚑ ...and the agreeing form is NOT refused (all-clear differs)",
-          _raises(lambda: listdir("d/**", gwt), AmbiguousPattern), False)
+    check(
+        "⟡ the lossy `**/*.ext` form is REFUSED",
+        _raises(lambda: listdir("d/**/*.agda", gwt), AmbiguousPattern),
+        True,
+    )
+    check(
+        "⟡ the separator-crossing `d/*.ext` form is REFUSED",
+        _raises(lambda: listdir("d/*.agda", gwt), AmbiguousPattern),
+        True,
+    )
+    check(
+        "⟡ a `**` glued into a segment is REFUSED",
+        _raises(lambda: listdir("d/x**/y", gwt), AmbiguousPattern),
+        True,
+    )
+    check(
+        "⚑ the refusal fires on the WORKING TREE too, where the pattern is exact",
+        _raises(lambda: listdir("d/**/*.agda", gwt), AmbiguousPattern),
+        True,
+    )
+    check(
+        "⚑ ...and the agreeing form is NOT refused (all-clear differs)",
+        _raises(lambda: listdir("d/**", gwt), AmbiguousPattern),
+        False,
+    )
     check("⚑ an exact path is NOT refused", ambiguous_across_sources("d/top.agda"), None)
-    check("⚑ the refusal NAMES its successor",
-          "/**" in (ambiguous_across_sources("d/**/*.agda") or ""), True)
-    check("strict=False opts out rather than lying about portability",
-          len(listdir("d/**/*.agda", gwt, strict=False)) > 0, True)
+    check(
+        "⚑ the refusal NAMES its successor",
+        "/**" in (ambiguous_across_sources("d/**/*.agda") or ""),
+        True,
+    )
+    check(
+        "strict=False opts out rather than lying about portability",
+        len(listdir("d/**/*.agda", gwt, strict=False)) > 0,
+        True,
+    )
 
     # ⚑ THE DROP IS REAL AND THE OPT-OUT SHOWS IT — the defect reproduced in miniature,
     # so a future reader can see the six-module drop without a 3598-module corpus.
     lossy = set(listdir("d/**/*.agda", ghead, strict=False))
     full = {p for p in listdir("d/**", ghead) if p.endswith(".agda")}
-    check("⚑ `**/*.agda` at a Rev drops exactly the depth-0 members",
-          sorted(full - lossy), ["d/top.agda"])
+    check(
+        "⚑ `**/*.agda` at a Rev drops exactly the depth-0 members",
+        sorted(full - lossy),
+        ["d/top.agda"],
+    )
 
     shutil_g = __import__("shutil")
     shutil_g.rmtree(gtmp, ignore_errors=True)
 
     # ⚑ EVERY arm produced at least once — the starvation check itself.
     produced = {r_has.presence, r_gone.presence, r_dir.presence}
-    check("⚑ every Presence arm was PRODUCED by a case",
-          sorted(produced), sorted(Presence.all()))
+    check("⚑ every Presence arm was PRODUCED by a case", sorted(produced), sorted(Presence.all()))
 
     import shutil
+
     shutil.rmtree(tmp, ignore_errors=True)
 
     bad = [c for c in cases if not c[1]]
@@ -1059,9 +1151,15 @@ def _census(glob, src, suffix=""):
             absent += 1
         else:
             broken.append((p, r.error))
-    return {"nonempty": nonempty, "empty": len(empty), "absent": absent,
-            "broken": len(broken), "total": nonempty + len(empty) + absent + len(broken),
-            "empty_paths": empty, "broken_paths": broken}
+    return {
+        "nonempty": nonempty,
+        "empty": len(empty),
+        "absent": absent,
+        "broken": len(broken),
+        "total": nonempty + len(empty) + absent + len(broken),
+        "empty_paths": empty,
+        "broken_paths": broken,
+    }
 
 
 def _compare(pattern, rev, suffix=""):
@@ -1095,8 +1193,12 @@ def _compare(pattern, rev, suffix=""):
     for tag, src in (("wt", wt), ("head", rv)):
         got = set(_suffixed(listdir(pattern, src, strict=False), suffix))
         con = set(_suffixed(listdir(ctrl, src, strict=False), suffix))
-        res[tag] = {"n": len(got), "control_n": len(con),
-                    "missed": sorted(con - got), "extra": sorted(got - con)}
+        res[tag] = {
+            "n": len(got),
+            "control_n": len(con),
+            "missed": sorted(con - got),
+            "extra": sorted(got - con),
+        }
     return res
 
 
@@ -1112,27 +1214,41 @@ def _raises(fn, exc):
 
 def _main():
     import argparse
+
     ap = argparse.ArgumentParser(
-        description="⟡vfs — one read/write seam over working tree and git history")
+        description="⟡vfs — one read/write seam over working tree and git history"
+    )
     ap.add_argument("--selftest", action="store_true", help="run the selftest")
     ap.add_argument("--read", metavar="PATH", help="read a path and report its Presence")
-    ap.add_argument("--at", metavar="REV", default=None,
-                    help="read from a git revision instead of the working tree")
+    ap.add_argument(
+        "--at",
+        metavar="REV",
+        default=None,
+        help="read from a git revision instead of the working tree",
+    )
     ap.add_argument("--list", metavar="GLOB", help="list paths matching a glob")
-    ap.add_argument("--states", action="store_true",
-                    help="the Presence roster and what each means")
-    ap.add_argument("--census", metavar="GLOB",
-                    help="Presence census over a glob, splitting PRESENT into "
-                         "empty (0 bytes) vs nonempty")
-    ap.add_argument("--suffix", metavar="EXT", default="",
-                    help="restrict --list/--census to paths ending in EXT (e.g. .agda). "
-                         "NOT expressible as a glob: the WorkingTree and Rev matchers "
-                         "disagree on `**/*.ext` — see _suffixed")
-    ap.add_argument("--compare", metavar="GLOB",
-                    help="⟡glob-branch-asymmetry: what this pattern selects at each "
-                         "source vs the depth-agnostic `<dir>/**` control, and which "
-                         "paths each branch DROPS. Bypasses the AmbiguousPattern "
-                         "refusal — ambiguous patterns are its subject.")
+    ap.add_argument("--states", action="store_true", help="the Presence roster and what each means")
+    ap.add_argument(
+        "--census",
+        metavar="GLOB",
+        help="Presence census over a glob, splitting PRESENT into empty (0 bytes) vs nonempty",
+    )
+    ap.add_argument(
+        "--suffix",
+        metavar="EXT",
+        default="",
+        help="restrict --list/--census to paths ending in EXT (e.g. .agda). "
+        "NOT expressible as a glob: the WorkingTree and Rev matchers "
+        "disagree on `**/*.ext` — see _suffixed",
+    )
+    ap.add_argument(
+        "--compare",
+        metavar="GLOB",
+        help="⟡glob-branch-asymmetry: what this pattern selects at each "
+        "source vs the depth-agnostic `<dir>/**` control, and which "
+        "paths each branch DROPS. Bypasses the AmbiguousPattern "
+        "refusal — ambiguous patterns are its subject.",
+    )
     a = ap.parse_args()
 
     if a.compare:
@@ -1140,8 +1256,10 @@ def _main():
         print("compare %s   control %s   rev %s" % (c["pattern"], c["control"], c["rev"]))
         for tag in ("wt", "head"):
             d = c[tag]
-            print("  %-5s %5d   control %5d   missed %d   extra %d"
-                  % (tag, d["n"], d["control_n"], len(d["missed"]), len(d["extra"])))
+            print(
+                "  %-5s %5d   control %5d   missed %d   extra %d"
+                % (tag, d["n"], d["control_n"], len(d["missed"]), len(d["extra"]))
+            )
             for p in d["missed"][:12]:
                 print("        MISSED  %s" % p)
             for p in d["extra"][:12]:

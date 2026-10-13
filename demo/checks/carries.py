@@ -14,6 +14,7 @@ tree whose every project declares none (a vacuous pass, green under exhaustive s
 supplies the missing EXERCISE, so a regression in the declared-field carry/suppress path fails a gate here.
 
 cwd = demo/ (checks run from the project dir)."""
+
 import io
 import sys
 from contextlib import redirect_stderr
@@ -23,10 +24,10 @@ import paperkit.bib  # noqa: E402
 
 
 def main() -> int:
-    demo_dir = Path(__file__).resolve().parents[1]       # the demo/ project dir (has paper.toml)
+    demo_dir = Path(__file__).resolve().parents[1]  # the demo/ project dir (has paper.toml)
     declared = paperkit.bib.load_config(demo_dir)["consumer_fields"]
     if "provenance" not in declared:
-        print("demo: paper.toml must declare consumer_fields = [\"provenance\"]", file=sys.stderr)
+        print('demo: paper.toml must declare consumer_fields = ["provenance"]', file=sys.stderr)
         return 1
 
     # Parse the project's own bib through the OWNER (binds the declared consumer_fields), capturing stderr
@@ -38,16 +39,23 @@ def main() -> int:
 
     carriers = [k for k, r in recs.items() if r.get("provenance")]
     if not carriers:
-        print("demo: no claim carries the declared `provenance` field — the demonstration is empty",
-              file=sys.stderr)
+        print(
+            "demo: no claim carries the declared `provenance` field — the demonstration is empty",
+            file=sys.stderr,
+        )
         return 1
     # the declared field must be QUIET: a loud-drop of a DECLARED field is the exact bug this demonstrates
     if "provenance" in stderr and "DROPPED" in stderr:
-        print("demo: the DECLARED field `provenance` was loud-dropped — the consumer_fields carry/suppress "
-              "path is broken:\n" + stderr, file=sys.stderr)
+        print(
+            "demo: the DECLARED field `provenance` was loud-dropped — the consumer_fields carry/suppress "
+            "path is broken:\n" + stderr,
+            file=sys.stderr,
+        )
         return 1
-    print(f"demo: paperkit carried its own declared consumer field `provenance` on {len(carriers)} "
-          f"claim(s), quietly — the feature is demonstrated end-to-end")
+    print(
+        f"demo: paperkit carried its own declared consumer field `provenance` on {len(carriers)} "
+        f"claim(s), quietly — the feature is demonstrated end-to-end"
+    )
     return 0
 
 

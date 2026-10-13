@@ -33,6 +33,7 @@ work here — LibreOffice clips an over-wide run AT the text margin, so a clippe
 and a fitting cell end at the same x; the only reliable signal is per-cell fit.  Run
 inside mkdocx.sh (build refuses to emit a clipping docx) and in the JI gate.
 """
+
 import re
 import shutil
 import subprocess
@@ -43,10 +44,10 @@ from pathlib import Path
 
 import lo  # sibling helper: isolated-profile libreoffice conversion (race/provenance-safe)
 
-EMU_MARGIN = 216          # 2 * 108-twip default cell margin (Table style)
-SLACK = 120               # ~0.08in breathing room past measured ink
-FLOOR = 700               # never below ~0.5in
-TOL = 80                  # twips: re-measurement jitter tolerance for --check
+EMU_MARGIN = 216  # 2 * 108-twip default cell margin (Table style)
+SLACK = 120  # ~0.08in breathing room past measured ink
+FLOOR = 700  # never below ~0.5in
+TOL = 80  # twips: re-measurement jitter tolerance for --check
 DPI = 300
 
 
@@ -92,16 +93,20 @@ def build_probe(doc, cells):
     # widen the probe page to 40in so nothing wraps.  pandoc's sectPr usually carries NO
     # pgSz/pgMar (it inherits them from the reference doc), so drop any that exist and
     # INSERT ours right after the <w:sectPr> opening tag.
-    pg = ('<w:pgSz w:w="57600" w:h="15840" />'
-          '<w:pgMar w:top="720" w:right="360" w:bottom="720" w:left="360" '
-          'w:header="0" w:footer="0" w:gutter="0" />')
+    pg = (
+        '<w:pgSz w:w="57600" w:h="15840" />'
+        '<w:pgMar w:top="720" w:right="360" w:bottom="720" w:left="360" '
+        'w:header="0" w:footer="0" w:gutter="0" />'
+    )
     sect_xml = re.sub(r"<w:pg(Sz|Mar)\b[^>]*/?>", "", sect_xml)
     sect_xml = re.sub(r"(<w:sectPr\b[^>]*>)", r"\1" + pg, sect_xml, count=1)
     # RULE = an empty paragraph with a bottom border → a solid line at the text width
     # (~39.5in on the 40in page).  One after every cell; the count of rules == the count
     # of cells, so measurement can never miscount.
-    rule = ('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" '
-            'w:color="000000"/></w:pBdr></w:pPr></w:p>')
+    rule = (
+        '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" '
+        'w:color="000000"/></w:pBdr></w:pPr></w:p>'
+    )
     probe_body = "<w:body>" + "".join(p + rule for _, _, p in cells) + sect_xml + "</w:body>"
     return re.sub(r"<w:body>.*</w:body>", lambda _m: probe_body, doc, flags=re.S)
 
@@ -128,14 +133,15 @@ def measure_cells(pngs):
     page whose rule is not full-width still segments).
     """
     from PIL import Image
-    Image.MAX_IMAGE_PIXELS = None            # the probe page is intentionally huge
+
+    Image.MAX_IMAGE_PIXELS = None  # the probe page is intentionally huge
     widths = []
-    left, right, have, in_rule = 10 ** 9, 0, False, False
+    left, right, have, in_rule = 10**9, 0, False, False
     for png in pngs:
         # Pre-binarize at mat260's exact <150 threshold, so getbbox measures ONLY the ink darker
         # than 150 (not the antialias halo a getbbox on the raw image would sweep in) and matches
         # numpy's `arr < 150` set exactly.
-        bw = Image.open(png).convert("L").point(lambda p: 255 if p < 150 else 0)   # ink → 255
+        bw = Image.open(png).convert("L").point(lambda p: 255 if p < 150 else 0)  # ink → 255
         w, h = bw.size
         # Ink extent per row by getbbox on the 1px-tall strip — a TRUE EXISTENTIAL (None iff the
         # strip has no ink), the PIL equal of numpy's `arr.any(axis=1)` + argmax leftmost/rightmost.
@@ -143,21 +149,21 @@ def measure_cells(pngs):
         # would silently DROP a thin stroke (a fraction bar, a minus) — biasing columns too narrow
         # (mat260's flag; measured: resize((1,h)) returns 255 for one ink pixel in 12000).  getbbox
         # sees the single pixel.
-        extent = {}                                            # y -> (leftmost, rightmost) ink column
+        extent = {}  # y -> (leftmost, rightmost) ink column
         for y in range(h):
-            b = bw.crop((0, y, w, y + 1)).getbbox()            # (l, 0, r_exclusive, 1) or None
+            b = bw.crop((0, y, w, y + 1)).getbbox()  # (l, 0, r_exclusive, 1) or None
             if b:
                 extent[y] = (b[0], b[2] - 1)
         if not extent:
             continue
-        margin = max(r for _l, r in extent.values())           # widest ink on the page = the rule/border
+        margin = max(r for _l, r in extent.values())  # widest ink on the page = the rule/border
         for y in range(h):
             is_rule = y in extent and extent[y][1] >= 0.9 * margin
             if is_rule:
-                if not in_rule:                                 # close the cell once, on rule entry
+                if not in_rule:  # close the cell once, on rule entry
                     widths.append((max(0, right - left) / DPI) if have else 0.0)
-                    left, right, have, in_rule = 10 ** 9, 0, False, True
-            elif y in extent:                                   # a content (non-rule) ink row
+                    left, right, have, in_rule = 10**9, 0, False, True
+            elif y in extent:  # a content (non-rule) ink row
                 in_rule = False
                 lm, rm = extent[y]
                 left = min(left, lm)
@@ -172,13 +178,17 @@ def render_widths(src_docx, doc, cells, work):
     probe_doc = build_probe(doc, cells)
     probe = Path(work, "probe.docx")
     write_document(src_docx, probe, probe_doc)
-    pdf = lo.convert(probe, "pdf", work)   # isolated profile: a concurrent soffice can't corrupt the probe
+    pdf = lo.convert(
+        probe, "pdf", work
+    )  # isolated profile: a concurrent soffice can't corrupt the probe
     if pdf is None:
         return None
-    subprocess.run(["pdftoppm", "-png", "-r", str(DPI), str(pdf), str(Path(work, "pg"))],
-                   capture_output=True)
-    pngs = sorted(Path(work).glob("pg-*.png"),
-                  key=lambda p: int(re.search(r"(\d+)", p.stem).group(1)))   # numeric page order
+    subprocess.run(
+        ["pdftoppm", "-png", "-r", str(DPI), str(pdf), str(Path(work, "pg"))], capture_output=True
+    )
+    pngs = sorted(
+        Path(work).glob("pg-*.png"), key=lambda p: int(re.search(r"(\d+)", p.stem).group(1))
+    )  # numeric page order
     return measure_cells(pngs)
 
 
@@ -191,11 +201,11 @@ def _unwrappable(xml):
     math, NOT the 30-inch single-line render — so it is NOT rigid, and its full width is
     only a preferred hint.
     """
-    prose = re.sub(r"<m:oMath\b.*?</m:oMath>", "", xml, flags=re.S)        # strip math objects
+    prose = re.sub(r"<m:oMath\b.*?</m:oMath>", "", xml, flags=re.S)  # strip math objects
     prose_txt = "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", prose)).strip()
     if "<m:oMath" in xml:
-        return prose_txt == ""                                            # lone math, no prose → rigid
-    return bool(prose_txt) and " " not in prose_txt                       # single bare token → rigid
+        return prose_txt == ""  # lone math, no prose → rigid
+    return bool(prose_txt) and " " not in prose_txt  # single bare token → rigid
 
 
 def col_widths(cells, ink_widths, key):
@@ -209,25 +219,30 @@ def col_widths(cells, ink_widths, key):
 
 def read_grids(doc):
     """table_index -> [gridCol twips] as actually present in the docx."""
-    return {ti: [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"', tm.group(0))]
-            for ti, tm in enumerate(re.finditer(r"<w:tbl>.*?</w:tbl>", doc, re.S))}
+    return {
+        ti: [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"', tm.group(0))]
+        for ti, tm in enumerate(re.finditer(r"<w:tbl>.*?</w:tbl>", doc, re.S))
+    }
 
 
 def lay_out(doc, cells, ink_widths, text_w):
     """Map measured widths back to (table,col)->max, compute target grids, rewrite."""
     if len(ink_widths) != len(cells):
-        print(f"widen_tables: band/cell count mismatch ({len(ink_widths)} vs {len(cells)}); "
-              f"skipping (no change)", file=sys.stderr)
+        print(
+            f"widen_tables: band/cell count mismatch ({len(ink_widths)} vs {len(cells)}); "
+            f"skipping (no change)",
+            file=sys.stderr,
+        )
         return doc, False
-    pref = col_widths(cells, ink_widths, lambda _x: True)        # full content width, any cell
-    hard = col_widths(cells, ink_widths, _unwrappable)           # un-wrappable cells: hard minimum
-    ncol = {}        # ti -> column count
+    pref = col_widths(cells, ink_widths, lambda _x: True)  # full content width, any cell
+    hard = col_widths(cells, ink_widths, _unwrappable)  # un-wrappable cells: hard minimum
+    ncol = {}  # ti -> column count
     for (ti, ci, _), _iw in zip(cells, ink_widths):
         ncol[ti] = max(ncol.get(ti, 0), ci + 1)
 
-    targets = {}     # ti -> [widths]
+    targets = {}  # ti -> [widths]
     for ti, n in ncol.items():
-        base = [max(FLOOR, hard.get((ti, c), 0)) for c in range(n)]          # must-fit floor per column
+        base = [max(FLOOR, hard.get((ti, c), 0)) for c in range(n)]  # must-fit floor per column
         want = [max(FLOOR, pref.get((ti, c), 0) + SLACK) for c in range(n)]  # preferred width
         if sum(base) >= text_w:
             # un-wrappable content alone exceeds the page — shrink to fit (will clip; --check flags it)
@@ -237,12 +252,12 @@ def lay_out(doc, cells, ink_widths, text_w):
             # prose columns absorb the compression and math columns are never starved below their need.
             slack, wsum = text_w - sum(base), sum(want)
             cols = [base[c] + slack * want[c] // wsum for c in range(n)]
-        cols[cols.index(max(cols))] += text_w - sum(cols)        # absorb rounding to exactly text_w
+        cols[cols.index(max(cols))] += text_w - sum(cols)  # absorb rounding to exactly text_w
         targets[ti] = cols
 
     out, last, changed = [], 0, False
     for ti, tm in enumerate(re.finditer(r"<w:tbl>.*?</w:tbl>", doc, re.S)):
-        out.append(doc[last:tm.start()])
+        out.append(doc[last : tm.start()])
         tbl = tm.group(0)
         cols = targets[ti]
         grid = "<w:tblGrid>" + "".join(f'<w:gridCol w:w="{w}" />' for w in cols) + "</w:tblGrid>"
@@ -295,15 +310,20 @@ def check(src) -> int:
     # typed-exit alphabet: 0 pass, 1 ran-and-failed, 2 could-not-run), distinct from the fit verdict.
     absent = _deps_absent()
     if absent:
-        print(f"widen_tables --check: {absent} absent — CANNOT VERIFY (not a pass)", file=sys.stderr)
+        print(
+            f"widen_tables --check: {absent} absent — CANNOT VERIFY (not a pass)", file=sys.stderr
+        )
         return 3
     doc, cells, ink = _measure(src)
     if not cells:
-        print("widen_tables --check: no tables to check")   # nothing to clip is a genuine pass
+        print("widen_tables --check: no tables to check")  # nothing to clip is a genuine pass
         return 0
     if ink is None or len(ink) != len(cells):
-        print(f"widen_tables --check: could not measure ({'render failed' if ink is None else 'band mismatch'})"
-              " — CANNOT VERIFY (not a pass)", file=sys.stderr)
+        print(
+            f"widen_tables --check: could not measure ({'render failed' if ink is None else 'band mismatch'})"
+            " — CANNOT VERIFY (not a pass)",
+            file=sys.stderr,
+        )
         return 3
     grids = read_grids(doc)
     # only UN-WRAPPABLE cells can clip (math runs + single whitespace-free tokens); prose reflows.
@@ -316,8 +336,11 @@ def check(src) -> int:
             bad.append((ti, ci, nd, alloc))
     if bad:
         for ti, ci, nd, al in bad:
-            print(f"widen_tables --check: table {ti} col {ci}: content needs {nd}tw > column {al}tw "
-                  f"(overflows by {nd - al}tw → CLIPS)", file=sys.stderr)
+            print(
+                f"widen_tables --check: table {ti} col {ci}: content needs {nd}tw > column {al}tw "
+                f"(overflows by {nd - al}tw → CLIPS)",
+                file=sys.stderr,
+            )
         # A FIRST-PASS verdict, not an exhaustion proof: the cell does not fit under the ONE lever
         # this tool pulls — column width sizing.  Other levers are UN-TRIED here (a wider/landscape
         # page, narrower margins, breaking the equation into a multi-line form — which on the pandoc
@@ -325,11 +348,16 @@ def check(src) -> int:
         # oMath run).  One lever is PROVEN unavailable: shrinking the math font — LibreOffice renders
         # OMML at a fixed base size and ignores both rPr and per-run w:sz, so column width is the only
         # sizing lever (mat260, measured).  So this says "over-wide under column sizing", not "too wide".
-        print(f"widen_tables --check: {len(bad)} cell(s) do not fit under column-width sizing — run "
-              "widen_tables to size to measured ink, or widen the page (landscape / margins) or shorten "
-              "the equation; the math font cannot be shrunk (LibreOffice ignores it)", file=sys.stderr)
+        print(
+            f"widen_tables --check: {len(bad)} cell(s) do not fit under column-width sizing — run "
+            "widen_tables to size to measured ink, or widen the page (landscape / margins) or shorten "
+            "the equation; the math font cannot be shrunk (LibreOffice ignores it)",
+            file=sys.stderr,
+        )
         return 1
-    print(f"widen_tables --check: all {len(need)} cells fit their columns across {len(grids)} table(s)")
+    print(
+        f"widen_tables --check: all {len(need)} cells fit their columns across {len(grids)} table(s)"
+    )
     return 0
 
 
@@ -343,8 +371,10 @@ def _selftest() -> int:
     """
     absent = _deps_absent()
     if absent:
-        print(f"  -- {absent} absent; the measurement cannot run here.\n"
-              "     WIDEN SELFTEST: SKIP (loud) — the method is present but unrunnable on this box")
+        print(
+            f"  -- {absent} absent; the measurement cannot run here.\n"
+            "     WIDEN SELFTEST: SKIP (loud) — the method is present but unrunnable on this box"
+        )
         return 0
     fails = []
 
@@ -358,26 +388,31 @@ def _selftest() -> int:
     # under-measures; a raw getbbox sweeps the antialias halo and over-measures) — both pass a
     # thick-math ⟨P,F,δ⟩ while shifting every width.  (mat260's proposed one-run check, made permanent.)
     from PIL import Image, ImageDraw
+
     with tempfile.TemporaryDirectory() as t:
         pg = Path(t) / "pg-1.png"
         img = Image.new("L", (2000, 30), 255)
         dr = ImageDraw.Draw(img)
-        dr.rectangle([100, 5, 500, 10], fill=0)          # cell ink: exactly 400 px wide
-        dr.rectangle([0, 20, 1900, 25], fill=0)          # rule: 95% of the page width
+        dr.rectangle([100, 5, 500, 10], fill=0)  # cell ink: exactly 400 px wide
+        dr.rectangle([0, 20, 1900, 25], fill=0)  # rule: 95% of the page width
         img.save(pg)
         measured = measure_cells([pg])
         want = 400 / DPI
-        check_(f"measures a known 400px band as {want:.3f}in (±1px) — not resize-biased narrow "
-               "nor halo-biased wide",
-               len(measured) == 1 and abs(measured[0] - want) < 2 / DPI)
+        check_(
+            f"measures a known 400px band as {want:.3f}in (±1px) — not resize-biased narrow "
+            "nor halo-biased wide",
+            len(measured) == 1 and abs(measured[0] - want) < 2 / DPI,
+        )
         # a single ink pixel in a wide row is SEEN (the thin-stroke existential) — a resize-averaged
         # any-ink test returns white for one dark pixel in 2000 and would miss it.  Assert the binarized
         # row's getbbox finds it, the exact property the fix restores.
         thin = Image.new("L", (2000, 1), 255)
         thin.putpixel((1000, 0), 0)
         bw = thin.point(lambda p: 255 if p < 150 else 0)
-        check_("a lone ink pixel in a wide row is seen (getbbox existential, not a resize average)",
-               bw.getbbox() is not None)
+        check_(
+            "a lone ink pixel in a wide row is seen (getbbox existential, not a resize average)",
+            bw.getbbox() is not None,
+        )
 
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
@@ -389,25 +424,32 @@ def _selftest() -> int:
             "| f |\n|---|\n| "
             r"$\mathrm{eff}(c) = \min\{\, \mathrm{grade}(c)\,\} \cup \{\, \mathrm{eff}(d) : d \in "
             r"\mathrm{rests\text{-}on}(c)\,\}$"
-            " |\n")
+            " |\n"
+        )
         src = d / "f.docx"
         subprocess.run(["pandoc", str(d / "f.md"), "-o", str(src)], check=True)
         # force a narrow column so the wide math overflows (the R-1 condition)
         doc = read_document(src)
-        doc = re.sub(r"<w:gridCol w:w=\"\d+\"", '<w:gridCol w:w="1440"', doc)   # 1in column
+        doc = re.sub(r"<w:gridCol w:w=\"\d+\"", '<w:gridCol w:w="1440"', doc)  # 1in column
         write_document(src, d / "narrow.docx", doc)
         src = d / "narrow.docx"
 
         rc_f = check(str(src))
-        check_("F: the wide math cell overflows its narrow column unwidened (--check → CLIPS, rc 1)",
-               rc_f == 1)
+        check_(
+            "F: the wide math cell overflows its narrow column unwidened (--check → CLIPS, rc 1)",
+            rc_f == 1,
+        )
 
         widened = widen(src, d / "wide.docx", text_w=9360)
         rc_p = check(str(widened))
-        check_("P: after widen() sizes the column to measured ink, every cell fits (--check rc 0)",
-               rc_p == 0)
-        check_("δ: widen() changed the column sizing (the tblGrid twips differ)",
-               read_grids(read_document(widened)) != read_grids(read_document(src)))
+        check_(
+            "P: after widen() sizes the column to measured ink, every cell fits (--check rc 0)",
+            rc_p == 0,
+        )
+        check_(
+            "δ: widen() changed the column sizing (the tblGrid twips differ)",
+            read_grids(read_document(widened)) != read_grids(read_document(src)),
+        )
 
     if fails:
         print(f"WIDEN SELFTEST: FAIL ({len(fails)})")
@@ -449,8 +491,11 @@ def fits(docx_path, text_w=9360):
             over.append((ti, ci, need, have))
     if over:
         worst = max(over, key=lambda x: x[2] - x[3])
-        return ("clipped", f"{len(over)} un-wrappable cell(s) exceed their column; worst "
-                           f"table {worst[0]} col {worst[1]} needs {worst[2]} twips, has {worst[3]}")
+        return (
+            "clipped",
+            f"{len(over)} un-wrappable cell(s) exceed their column; worst "
+            f"table {worst[0]} col {worst[1]} needs {worst[2]} twips, has {worst[3]}",
+        )
     return ("fits", f"{len(hard)} un-wrappable column(s) measured, none clipped")
 
 
@@ -485,8 +530,10 @@ def _deliverable(paper_md="../paper/paper.md") -> int:
     silent-degradation this module's own loud-absence doctrine forbids.
     """
     import tempfile
+
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import docx as _d
+
     with tempfile.TemporaryDirectory() as t:
         w = Path(t)
         src = _d.docx(Path(paper_md), w / "p.docx")
@@ -519,9 +566,11 @@ def main():
     if "--selftest" in sys.argv or "--deliverable" in sys.argv:
         absent = _deps_absent()
         if absent:
-            print(f"widen_tables: {absent} absent — CANNOT MEASURE column widths (not a pass)",
-                  file=sys.stderr)
-            return 3                                        # Ζ·tier·exit — cannot-run, not a fail
+            print(
+                f"widen_tables: {absent} absent — CANNOT MEASURE column widths (not a pass)",
+                file=sys.stderr,
+            )
+            return 3  # Ζ·tier·exit — cannot-run, not a fail
     if "--selftest" in sys.argv:
         return _selftest()
     if "--deliverable" in sys.argv:

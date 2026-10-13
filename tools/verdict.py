@@ -28,6 +28,7 @@ Subcommands — each writes one compact {verb, verdict} record to <out>:
                                                      out to the real unmutated tree) → fail LOUD
                                                      with a NAMED error, never a silent green.
 """
+
 import argparse
 import json
 import pathlib
@@ -55,8 +56,9 @@ def _write_atomic(path, data) -> None:
     """
     import os
     import tempfile
+
     path = pathlib.Path(path)
-    try:                               # preserve the target's mode — mkstemp creates at 0600
+    try:  # preserve the target's mode — mkstemp creates at 0600
         keep = os.stat(path).st_mode & 0o7777
     except FileNotFoundError:
         u = os.umask(0)
@@ -115,8 +117,11 @@ def _write(out, verb, verdict, why="", account=None) -> None:
     # byte-identical — the same non-breaking widening `why` took above.
     if account and verdict != "pass":
         try:
-            tail = [ln for ln in pathlib.Path(account).read_text(
-                errors="replace").splitlines() if ln.strip()][-40:]
+            tail = [
+                ln
+                for ln in pathlib.Path(account).read_text(errors="replace").splitlines()
+                if ln.strip()
+            ][-40:]
         except OSError:
             tail = []
         if tail:
@@ -135,8 +140,11 @@ def main(argv) -> int:
         p.add_argument("out")
         # Ζ·cell·account — only `emit` runs a check and therefore has stderr to fold in.
         if name == "emit":
-            p.add_argument("--account", default=None,
-                           help="file holding the check's stderr; its tail rides the record on a non-pass")
+            p.add_argument(
+                "--account",
+                default=None,
+                help="file holding the check's stderr; its tail rides the record on a non-pass",
+            )
     pg = sub.add_parser("agg")
     pg.add_argument("verb")
     pg.add_argument("out")
@@ -174,6 +182,7 @@ def main(argv) -> int:
         # not a rung raises rather than quietly grading everything green.
         if a.bad.startswith("below:"):
             import mikemol.grade.grade
+
             bad = set(mikemol.grade.grade.below(a.bad.split(":", 1)[1]))
         else:
             bad = {b.lower() for b in a.bad.split(",")}
@@ -197,15 +206,23 @@ def main(argv) -> int:
         # seven-term arm had, one layer out, in the aggregator rather than the suite.
         vals = [(r, field_val(r)) for r in a.records]
         offenders = [(r, v) for r, v in vals if v in bad]
-        _write(a.out, a.verb, not offenders,
-               why="; ".join(f"{pathlib.Path(r).name}={v}" for r, v in offenders)[:400])
+        _write(
+            a.out,
+            a.verb,
+            not offenders,
+            why="; ".join(f"{pathlib.Path(r).name}={v}" for r, v in offenders)[:400],
+        )
     elif a.cmd == "agree":
         # CONCURS — the producers' full outputs are all byte-equal (one distinct TEXT), none failed.
         # (Not one distinct LINE: a producer output is a whole document; collapsing to lines would
         # demand every producer be a single line — which reds two byte-identical multi-line documents.)
         texts = [pathlib.Path(p).read_text() for p in a.produced]
         distinct = set(texts)
-        _write(a.out, a.verb, len(texts) >= 2 and len(distinct) == 1 and "__FAIL__" not in next(iter(distinct)))
+        _write(
+            a.out,
+            a.verb,
+            len(texts) >= 2 and len(distinct) == 1 and "__FAIL__" not in next(iter(distinct)),
+        )
     elif a.cmd == "calc":
         _write(a.out, a.verb, bool(json.loads(pathlib.Path(a.calc).read_text()).get("baseline")))
     elif a.cmd == "cohere":
@@ -220,8 +237,12 @@ def main(argv) -> int:
         # edge to anything that reads records rather than watches a build.  stderr is TEE'd — it
         # still reaches the terminal (a caller watching the build must not lose it) AND lands in
         # the verdict's `why`, capped, so the failure travels with the artifact.
-        p = subprocess.run([sys.executable, "-m", "paperkit.coherence", "--from-calcs", a.project, *a.calcs],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        p = subprocess.run(
+            [sys.executable, "-m", "paperkit.coherence", "--from-calcs", a.project, *a.calcs],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
         if p.stderr:
             print(p.stderr, end="", file=sys.stderr)
         # The LAST lines carry the diagnosis (the faces print progress before the residual), and a
@@ -246,11 +267,13 @@ def main(argv) -> int:
         nul = json.loads(pathlib.Path(a.nul).read_text())
         ok = pos.get("flipped") is True and nul.get("flipped") is False
         if not ok:
-            print("verdict canary: HARNESS DEGRADED — guaranteed-flip mutation flipped=%s, "
-                  "∅ identity flipped=%s.  A non-hermetic sandbox (processwrapper fallback) lets "
-                  "checks resolve() out to the real unmutated tree; run under --config=mutant "
-                  "(hermetic linux-sandbox)." % (pos.get("flipped"), nul.get("flipped")),
-                  file=sys.stderr)
+            print(
+                "verdict canary: HARNESS DEGRADED — guaranteed-flip mutation flipped=%s, "
+                "∅ identity flipped=%s.  A non-hermetic sandbox (processwrapper fallback) lets "
+                "checks resolve() out to the real unmutated tree; run under --config=mutant "
+                "(hermetic linux-sandbox)." % (pos.get("flipped"), nul.get("flipped")),
+                file=sys.stderr,
+            )
         _write(a.out, "canary", ok)
     return 0
 

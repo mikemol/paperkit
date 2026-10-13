@@ -20,6 +20,7 @@ of the clamp: an unknown rung would otherwise rank lowest and drag its dependent
 
 The clamp is the engine's own fold (paperkit/grade.py `clamp`), never re-implemented here.
 """
+
 import json
 import sys
 from pathlib import Path
@@ -41,13 +42,22 @@ for m in meta:
     base = {"key": k, "check": m["check"], "section": m["section"], "rests-on": m["rests-on"]}
     if k in recs:
         r = recs[k]
-        base.update(grade=r["grade"], tests=r.get("tests", []), baseline=r.get("baseline", ""),
-                    why=r.get("why", ""), not_higher=r.get("not_higher", ""),
-                    not_lower=r.get("not_lower", ""))
+        base.update(
+            grade=r["grade"],
+            tests=r.get("tests", []),
+            baseline=r.get("baseline", ""),
+            why=r.get("why", ""),
+            not_higher=r.get("not_higher", ""),
+            not_lower=r.get("not_lower", ""),
+        )
         graded.append(base)
     else:
-        base.update(grade="not graded", why=f"gated, not Δ-graded (no grade record; {m['tier']} tier)",
-                    not_higher="", not_lower="")
+        base.update(
+            grade="not graded",
+            why=f"gated, not Δ-graded (no grade record; {m['tier']} tier)",
+            not_higher="",
+            not_lower="",
+        )
     out.append(base)
 
 by_check = {}
@@ -56,5 +66,5 @@ for r in out:
 for r in out:
     r["shared_with"] = [o for o in by_check[r["check"]] if o != r["key"]]
 
-ladder.clamp(graded, keys={m["key"] for m in meta})   # mutates the graded records in place
+ladder.clamp(graded, keys={m["key"] for m in meta})  # mutates the graded records in place
 print(json.dumps(out))

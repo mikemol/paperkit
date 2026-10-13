@@ -109,6 +109,7 @@ present file and by construction cannot notice.
 Every mode reports `n of m`: "there are no sweeps, only censuses" — a bare list
 cannot distinguish "no matches" from "no file read".
 """
+
 import os
 import re
 import sys
@@ -127,7 +128,7 @@ import sys
 # as well as unreachable.
 try:
     from paperkit.tools import vfs
-except ImportError:               # run as a script: no parent package, sibling on sys.path
+except ImportError:  # run as a script: no parent package, sibling on sys.path
     import vfs
 
 # Ζ·bibstruct·root — RELOCATED FROM substrate/scratch/ TO paperkit/tools/ (2026-08-28), and BOTH
@@ -169,10 +170,13 @@ def _mutation_contract_error():
     """
     try:
         import tools.edit_snapshot
+
         return tools.edit_snapshot.MutationContractError
-    except Exception:                       # not importable here — the clause becomes inert
+    except Exception:  # not importable here — the clause becomes inert
+
         class _Never(Exception):
             pass
+
         return _Never
 
 
@@ -188,11 +192,12 @@ def operands_after(flag, argv):
     if flag not in argv:
         return []
     out = []
-    for a in argv[argv.index(flag) + 1:]:
+    for a in argv[argv.index(flag) + 1 :]:
         if a.startswith("-"):
             break
         out.append(a)
     return out
+
 
 # ⚑ ONE ENTRY GRAMMAR, SPELLED ONCE.  This is the file-level read the engine's
 # whitelist cannot give; it is not a competing parser of the same question.
@@ -316,11 +321,15 @@ def _report_collisions(n_distinct):
     for (first, later), keys in sorted(pairs.items()):
         shown = ", ".join(sorted(keys)[:4])
         more = "" if len(keys) <= 4 else ", … (%d more)" % (len(keys) - 4)
-        print("  ⚑ %d key(s) declared in BOTH %s and %s (later wins): %s%s"
-              % (len(keys), first, later, shown, more))
-    print("  ⚑ %d distinct key(s) over %d declaration(s): %d key(s) declared in more than one "
-          "bib.\n     A record-counting parser will report the LARGER number; neither is wrong."
-          % (n_distinct, n_distinct + len(collisions), len(collisions)))
+        print(
+            "  ⚑ %d key(s) declared in BOTH %s and %s (later wins): %s%s"
+            % (len(keys), first, later, shown, more)
+        )
+    print(
+        "  ⚑ %d distinct key(s) over %d declaration(s): %d key(s) declared in more than one "
+        "bib.\n     A record-counting parser will report the LARGER number; neither is wrong."
+        % (n_distinct, n_distinct + len(collisions), len(collisions))
+    )
 
 
 def _read_bib(path):
@@ -359,18 +368,21 @@ def _read_bib(path):
     if r.presence is vfs.Presence.ABSENT:
         raise SystemExit(
             f"bibstruct: no such bib {path} — ABSENT.  The file is not there; this is NOT "
-            "the same as an empty bib, and not the same as a read that failed.")
+            "the same as an empty bib, and not the same as a read that failed."
+        )
     if r.presence is vfs.Presence.BROKEN:
         raise SystemExit(
             f"bibstruct: cannot read {path} — BROKEN, the read did NOT happen ({r.error}).  This "
-            "is not an absence: do not read it as 'the bib has no entries'.")
+            "is not an absence: do not read it as 'the bib has no entries'."
+        )
     try:
         return r.text()
     except UnicodeDecodeError as e:
         raise SystemExit(
             f"bibstruct: {path} is not valid UTF-8 ({e}).  A bib that cannot be decoded is "
             "BROKEN, not empty — refusing to parse a mangled corpus into entries that "
-            "would look plausible and corroborate themselves.")
+            "would look plausible and corroborate themselves."
+        )
 
 
 def entries(path=None):
@@ -415,7 +427,7 @@ def entries(path=None):
         # miscount by adding a fake member is the cleaver, not the differential.
         out, seen = {}, {}
         collisions.clear()
-        for one in (path or [DEFAULT]):
+        for one in path or [DEFAULT]:
             for key, fields in entries(one).items():
                 if key in seen and seen[key] != one:
                     collisions.append((key, seen[key], one))
@@ -457,8 +469,7 @@ def entries(path=None):
     out = {}
     for m in _ENTRY.finditer(text):
         body = m.group(3)
-        fields = {f.group(1): " ".join(f.group(2).split())
-                  for f in _FIELD.finditer(body)}
+        fields = {f.group(1): " ".join(f.group(2).split()) for f in _FIELD.finditer(body)}
         fields["_type"] = m.group(1)
         out[m.group(2)] = fields
     return out
@@ -470,12 +481,12 @@ def engine_view(path=None):
     ⚑ ROUTED THROUGH THE AUTHORITY.  Re-implementing the whitelist here would
     recreate the disagreement `bib.py` exists to have ended.
     """
-    for root in (os.environ.get("PAPERKIT"),
-                 os.path.expanduser("~/github/paperkit")):
+    for root in (os.environ.get("PAPERKIT"), os.path.expanduser("~/github/paperkit")):
         if root and os.path.isfile(os.path.join(root, "paperkit", "bib.py")):
             if root not in sys.path:
                 sys.path.insert(0, root)
             import paperkit.bib as B
+
             # ⚑⚑⚑ MANY PATHS OR ONE, BECAUSE EVERY READ MODE TAKES THE LIST. `main` hands
             # `path` in as a LIST and `B.parse` wants a single path, so `--dropped`
             # crashed with `not 'list'` on EVERY input — a floor bib, a peer ledger, and
@@ -535,21 +546,22 @@ def engine_view(path=None):
             # ⚑ FALLS BACK to `parse` for a bib with no project dir (a peer's floor, a bare
             # `.bib` on argv). That case has no `paper.toml` to widen anything, so the
             # defaults ARE the right whitelist — and a drop reported there is honest.
-            _ps = [path] if isinstance(path, (str, bytes, os.PathLike)) else list(
-                path or [DEFAULT])
+            _ps = [path] if isinstance(path, (str, bytes, os.PathLike)) else list(path or [DEFAULT])
             merged = {}
             for _p in _ps:
                 _dir = os.path.dirname(os.path.abspath(_p))
                 _cfg = os.path.join(_dir, "paper.toml")
                 if hasattr(B, "load_bib") and os.path.isfile(_cfg):
                     import pathlib as _pl
+
                     merged.update(B.load_bib(_pl.Path(_p), _pl.Path(_dir)))
                 else:
                     merged.update(B.parse(_p))
             return merged
     raise SystemExit(
         "bibstruct: no paperkit engine found (set PAPERKIT=<checkout>); "
-        "refusing rather than re-deriving the warrant grammar locally")
+        "refusing rather than re-deriving the warrant grammar locally"
+    )
 
 
 def dropped(path=None):
@@ -628,7 +640,7 @@ def mentions(key, path=None):
             continue
         for name, raw in sorted(fields.items()):
             if name.startswith("_") or name in EDGE_FIELDS:
-                continue          # a declared edge is not a MENTION
+                continue  # a declared edge is not a MENTION
             i = raw.find(key)
             if i < 0:
                 continue
@@ -636,14 +648,14 @@ def mentions(key, path=None):
             if any(k != key and key in k and k in raw for k in have):
                 continue
             lo, hi = max(0, i - 40), min(len(raw), i + len(key) + 40)
-            out.append((other, name, ("…" if lo else "") + raw[lo:hi] +
-                        ("…" if hi < len(raw) else "")))
+            out.append(
+                (other, name, ("…" if lo else "") + raw[lo:hi] + ("…" if hi < len(raw) else ""))
+            )
     return out
 
 
 def _n_of_m(label, rows, total):
-    print("%s: %d of %d entr%s" % (label, len(rows), total,
-                                   "y" if total == 1 else "ies"))
+    print("%s: %d of %d entr%s" % (label, len(rows), total, "y" if total == 1 else "ies"))
 
 
 def main(argv, intent=None):
@@ -665,8 +677,7 @@ def main(argv, intent=None):
         # unknown value HERE rather than letting it ride to the write means a typo cannot
         # look like a preview.
         if intent not in ("apply", "dry-run"):
-            print(f"bibstruct: intent={intent!r} is not 'apply' or 'dry-run'.",
-                  file=sys.stderr)
+            print(f"bibstruct: intent={intent!r} is not 'apply' or 'dry-run'.", file=sys.stderr)
             return 2
     # ⚑ THERE IS NO `--entry <key>` HERE, AND ITS ABSENCE IS THE FINDING.  I
     # built one (hunting G1's fields had taken five reads) and was asked *"isn't
@@ -682,8 +693,16 @@ def main(argv, intent=None):
     # "None reads every bib positionally" — a message about a mode that does not exist,
     # for a mode that does. Two rosters of one fact, disagreeing, exactly as this file's
     # banner records for the tool's own documented-vs-dispatched modes.
-    known = {"--entries", "--dropped", "--edges", "--orphans", "--field",
-             "--mentions", "--roundtrip", "--selftest"} | set(WRITE_MODES)
+    known = {
+        "--entries",
+        "--dropped",
+        "--edges",
+        "--orphans",
+        "--field",
+        "--mentions",
+        "--roundtrip",
+        "--selftest",
+    } | set(WRITE_MODES)
     if "--selftest" in argv:
         return _selftest()
     mode = next((a for a in argv if a in known), None)
@@ -732,12 +751,16 @@ def main(argv, intent=None):
         # frozen-roster shape this module's own banner records (a mode shipped without
         # reaching the dispatch). One list, read by the guard and named in the message.
         if mode not in WRITE_MODES:
-            print("bibstruct.py: --bib is the WRITE target ({}) and takes ONE path;\n"
-                  "  {} reads every bib given POSITIONALLY. Passing --bib to a read mode would\n"
-                  "  DROP {} from the read set and report false dangling edges for anything it\n"
-                  "  defines. Re-run without --bib:\n"
-                  "    bibstruct.py {} <bib> [<bib> …]".format("/".join(WRITE_MODES), mode, os.path.basename(write_bib), mode),
-                  file=sys.stderr)
+            print(
+                "bibstruct.py: --bib is the WRITE target ({}) and takes ONE path;\n"
+                "  {} reads every bib given POSITIONALLY. Passing --bib to a read mode would\n"
+                "  DROP {} from the read set and report false dangling edges for anything it\n"
+                "  defines. Re-run without --bib:\n"
+                "    bibstruct.py {} <bib> [<bib> …]".format(
+                    "/".join(WRITE_MODES), mode, os.path.basename(write_bib), mode
+                ),
+                file=sys.stderr,
+            )
             return 2
         paths = [a for a in paths if a != write_bib]
         target = write_bib
@@ -758,9 +781,12 @@ def main(argv, intent=None):
     corpus = []
     if "--corpus" in argv:
         if mode not in WRITE_MODES:
-            print("bibstruct.py: --corpus names sibling bibs for a WRITE's edge check "
-                  "({});\n  {} reads its corpus POSITIONALLY — pass the bibs directly:\n"
-                  "    bibstruct.py {} <bib> [<bib> …]".format("/".join(WRITE_MODES), mode, mode), file=sys.stderr)
+            print(
+                "bibstruct.py: --corpus names sibling bibs for a WRITE's edge check "
+                "({});\n  {} reads its corpus POSITIONALLY — pass the bibs directly:\n"
+                "    bibstruct.py {} <bib> [<bib> …]".format("/".join(WRITE_MODES), mode, mode),
+                file=sys.stderr,
+            )
             return 2
         # ⚑⚑⚑ IT STOPS AT THE NEXT FLAG, AND GREEDY CONSUMPTION MADE IT ORDER-DEPENDENT.
         # `[a for a in argv[i+1:] if not a.startswith("-")]` filtered flags out but kept
@@ -781,8 +807,7 @@ def main(argv, intent=None):
         # would give and what every other multi-operand flag here already assumes.
         corpus = operands_after("--corpus", argv)
         if not corpus:
-            print(f"usage: bibstruct.py {mode} … --corpus <bib> [<bib> …]",
-                  file=sys.stderr)
+            print(f"usage: bibstruct.py {mode} … --corpus <bib> [<bib> …]", file=sys.stderr)
             return 2
         paths = [a for a in paths if a not in corpus]
     # ⚑ AND A STRAY POSITIONAL IS NOW A REFUSAL, NOT A SILENT SUFFIX.  Without this the
@@ -792,9 +817,12 @@ def main(argv, intent=None):
     if mode in ("--add", "--set") and write_bib is None:
         _stray = [a for a in paths if a.endswith(".bib")]
         if _stray:
-            print(f"bibstruct.py {mode}: {_stray[0]!r} looks like a target bib, but {mode} takes it as "
-                  "`--bib <path>` — a trailing positional here would be swallowed into "
-                  "the preceding field's VALUE.", file=sys.stderr)
+            print(
+                f"bibstruct.py {mode}: {_stray[0]!r} looks like a target bib, but {mode} takes it as "
+                "`--bib <path>` — a trailing positional here would be swallowed into "
+                "the preceding field's VALUE.",
+                file=sys.stderr,
+            )
             return 2
     # `--field <name>` consumes the next positional as its argument
     fname = None
@@ -825,11 +853,13 @@ def main(argv, intent=None):
         if cur is not None:
             pairs.append(cur)
         if not akey or not pairs:
-            print("usage: bibstruct.py --add <key> <field>=<value> ... --apply\n"
-                  "  creates a NEW entry. Editing an existing field is --set.\n"
-                  "  `claim` and `check` are required; every edge target and the\n"
-                  "  item: witness must already exist, or this refuses.",
-                  file=sys.stderr)
+            print(
+                "usage: bibstruct.py --add <key> <field>=<value> ... --apply\n"
+                "  creates a NEW entry. Editing an existing field is --set.\n"
+                "  `claim` and `check` are required; every edge target and the\n"
+                "  item: witness must already exist, or this refuses.",
+                file=sys.stderr,
+            )
             return 2
         newfields = {}
         for p in pairs:
@@ -837,13 +867,15 @@ def main(argv, intent=None):
             newfields[n.strip()] = v.strip()
         new = add_entry(akey, newfields, target, corpus)
         old = open(target, encoding="utf-8").read()
-        for line in difflib.unified_diff(old.split("\n"), new.split("\n"),
-                                         "before", "after", lineterm="", n=1):
+        for line in difflib.unified_diff(
+            old.split("\n"), new.split("\n"), "before", "after", lineterm="", n=1
+        ):
             print("  " + line)
         if "--apply" not in argv:
             print("--add: DRY RUN — pass --apply to write.")
             return 0
         import tools.edit_snapshot
+
         tools.edit_snapshot.guard(f"bibstruct --add {akey}", [target], intent=intent)
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(new)
@@ -851,19 +883,25 @@ def main(argv, intent=None):
         if bad:
             for kind, what, detail in bad:
                 print("  ⚠ %-16s %-24s %s" % (kind, what, detail))
-            print("--add: WROTE, but the result does NOT round-trip. Recover with "
-                  "edit_snapshot --from-snapshot.")
+            print(
+                "--add: WROTE, but the result does NOT round-trip. Recover with "
+                "edit_snapshot --from-snapshot."
+            )
             return 1
         # ⚑ AND THE ENTRY MUST READ BACK.  Writing text that round-trips is not
         # the same as writing the entry asked for -- the mis-sliced `--set`
         # produced a file that parsed fine and had the wrong content.
         back = entries(target)
         if akey not in back:
-            print(f"--add: WROTE, but {akey!r} does not read back. Recover with "
-                  "edit_snapshot --from-snapshot.")
+            print(
+                f"--add: WROTE, but {akey!r} does not read back. Recover with "
+                "edit_snapshot --from-snapshot."
+            )
             return 1
-        print("--add: ✓ wrote %s; the file round-trips (%d entries, was %d)."
-              % (akey, len(back), len(back) - 1))
+        print(
+            "--add: ✓ wrote %s; the file round-trips (%d entries, was %d)."
+            % (akey, len(back), len(back) - 1)
+        )
         return 0
     if mode == "--addfield":
         # ⚑⚑ SAME OPERAND SHAPE AS `--set`, DELIBERATELY — three positionals with a
@@ -871,22 +909,26 @@ def main(argv, intent=None):
         # convention is how a toolkit becomes unlearnable; the difference between the
         # verbs is what they REFUSE, not how they are typed.
         if len(paths) < 3:
-            print("usage: bibstruct.py --addfield <key> <field> <value...> --apply\n"
-                  "  adds a field an EXISTING entry does not carry. Creating an entry\n"
-                  "  is `--add`; editing an existing value is `--set`; both are refused\n"
-                  "  here. Without --apply this prints the diff and writes nothing.",
-                  file=sys.stderr)
+            print(
+                "usage: bibstruct.py --addfield <key> <field> <value...> --apply\n"
+                "  adds a field an EXISTING entry does not carry. Creating an entry\n"
+                "  is `--add`; editing an existing value is `--set`; both are refused\n"
+                "  here. Without --apply this prints the diff and writes nothing.",
+                file=sys.stderr,
+            )
             return 2
         akey2, afield, avalue = paths[0], paths[1], " ".join(paths[2:])
         new = add_field(akey2, afield, avalue, target)
         old = open(target, encoding="utf-8").read()
-        for line in difflib.unified_diff(old.split("\n"), new.split("\n"),
-                                         "before", "after", lineterm="", n=1):
+        for line in difflib.unified_diff(
+            old.split("\n"), new.split("\n"), "before", "after", lineterm="", n=1
+        ):
             print("  " + line)
         if "--apply" not in argv:
             print("--addfield: DRY RUN — pass --apply to write.")
             return 0
         import tools.edit_snapshot
+
         tools.edit_snapshot.guard(f"bibstruct --addfield {akey2}.{afield}", [target], intent=intent)
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(new)
@@ -894,12 +936,16 @@ def main(argv, intent=None):
         if bad:
             for kind, what, detail in bad:
                 print("  ⚠ %-16s %s %s" % (kind, what, detail))
-            print("--addfield: WROTE, but the result does NOT round-trip. Recover with "
-                  "edit_snapshot --from-snapshot.")
+            print(
+                "--addfield: WROTE, but the result does NOT round-trip. Recover with "
+                "edit_snapshot --from-snapshot."
+            )
             return 1
         back = entries(target)
-        print("--addfield: ✓ wrote %s.%s; the file still round-trips (%d entries)."
-              % (akey2, afield, len(back)))
+        print(
+            "--addfield: ✓ wrote %s.%s; the file still round-trips (%d entries)."
+            % (akey2, afield, len(back))
+        )
         return 0
     if mode == "--set":
         # ⚑ THREE OPERANDS, AND THE VALUE MAY CONTAIN SPACES.  Taking only the
@@ -909,11 +955,13 @@ def main(argv, intent=None):
         # a FLAG here rather than a trailing positional, because a positional
         # path is indistinguishable from a value word.
         if len(paths) < 3:
-            print("usage: bibstruct.py --set <key> <field> <value...> --apply\n"
-                  "  edits ONE field of ONE existing entry. Adding an entry or a\n"
-                  "  field is a different operation and is refused.\n"
-                  "  without --apply this prints the diff and writes nothing.",
-                  file=sys.stderr)
+            print(
+                "usage: bibstruct.py --set <key> <field> <value...> --apply\n"
+                "  edits ONE field of ONE existing entry. Adding an entry or a\n"
+                "  field is a different operation and is refused.\n"
+                "  without --apply this prints the diff and writes nothing.",
+                file=sys.stderr,
+            )
             return 2
         skey, sfield, svalue = paths[0], paths[1], " ".join(paths[2:])
         new = set_field(skey, sfield, svalue, target)
@@ -921,13 +969,15 @@ def main(argv, intent=None):
         if new == old:
             print(f"  {skey}.{sfield} is already {svalue!r} — nothing to write.")
             return 0
-        for line in difflib.unified_diff(old.split("\n"), new.split("\n"),
-                                         "before", "after", lineterm="", n=1):
+        for line in difflib.unified_diff(
+            old.split("\n"), new.split("\n"), "before", "after", lineterm="", n=1
+        ):
             print("  " + line)
         if "--apply" not in argv:
             print("--set: DRY RUN — pass --apply to write.")
             return 0
         import tools.edit_snapshot
+
         tools.edit_snapshot.guard(f"bibstruct --set {skey}.{sfield}", [target], intent=intent)
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(new)
@@ -939,11 +989,15 @@ def main(argv, intent=None):
         if bad:
             for kind, what, detail in bad:
                 print("  ⚠ %-16s %-24s %s" % (kind, what, detail))
-            print("--set: WROTE, but the result does NOT round-trip. Recover with "
-                  "edit_snapshot --from-snapshot.")
+            print(
+                "--set: WROTE, but the result does NOT round-trip. Recover with "
+                "edit_snapshot --from-snapshot."
+            )
             return 1
-        print("--set: ✓ wrote %s.%s; the file still round-trips (%d entries)."
-              % (skey, sfield, len(entries(target))))
+        print(
+            "--set: ✓ wrote %s.%s; the file still round-trips (%d entries)."
+            % (skey, sfield, len(entries(target)))
+        )
         return 0
     if mode in ("--field", "--mentions"):
         if not paths:
@@ -976,22 +1030,23 @@ def main(argv, intent=None):
         # ⚑ EVIDENCE, NOT A VERDICT.  An edge is warranted when the prose
         # already asserts the relation; which DIRECTION it runs is read from
         # that prose, not chosen here.
-        print("%s: named by %d of %d other entr%s (prose only; declared edges "
-              "excluded)"
-              % (fname, len(rows), len(have) - 1,
-                 "y" if len(have) == 2 else "ies"))
+        print(
+            "%s: named by %d of %d other entr%s (prose only; declared edges "
+            "excluded)" % (fname, len(rows), len(have) - 1, "y" if len(have) == 2 else "ies")
+        )
     elif mode == "--dropped":
         rows = dropped(path)
         for k, n, v in rows:
             print("  %-16s %-12s %s" % (k, n, v[:80]))
-        print("dropped: %d field(s) the engine ignores, across %d entr%s"
-              % (len(rows), len(have), "y" if len(have) == 1 else "ies"))
+        print(
+            "dropped: %d field(s) the engine ignores, across %d entr%s"
+            % (len(rows), len(have), "y" if len(have) == 1 else "ies")
+        )
     elif mode == "--edges":
         rows = edges(path)
         for kind, s, d in rows:
             print("  %-9s %-16s -> %s" % (kind, s, d))
-        print("edges: %d over %d entr%s" % (len(rows), len(have),
-                                            "y" if len(have) == 1 else "ies"))
+        print("edges: %d over %d entr%s" % (len(rows), len(have), "y" if len(have) == 1 else "ies"))
     elif mode == "--roundtrip":
         # ⚑ ONE PATH OR MANY. `roundtrip()` takes a single path while every other read
         # mode takes the list, so `--roundtrip a.bib` crashed with `expected str, bytes
@@ -1004,20 +1059,25 @@ def main(argv, intent=None):
         # ⚑ REPORT THE DENOMINATOR THE PROBE COVERED, NOT JUST THE FAILURES.  A
         # bare "0 losses" cannot distinguish a total read from a probe that
         # examined nothing — the same reason every other mode prints `n of m`.
-        print("roundtrip: %d unaccounted-for construct(s) over %d parsed entr%s"
-              % (len(rows), len(have), "y" if len(have) == 1 else "ies"))
+        print(
+            "roundtrip: %d unaccounted-for construct(s) over %d parsed entr%s"
+            % (len(rows), len(have), "y" if len(have) == 1 else "ies")
+        )
         if not rows:
-            print("   this read is TOTAL over this input — an ALGEBRA result. It "
-                  "does NOT say the\n   parser's kernel is empty; it says nothing "
-                  "in THIS file fell into it.")
+            print(
+                "   this read is TOTAL over this input — an ALGEBRA result. It "
+                "does NOT say the\n   parser's kernel is empty; it says nothing "
+                "in THIS file fell into it."
+            )
         return 1 if rows else 0
     elif mode == "--orphans":
         rows = orphans(path)
         for kind, s, d in rows:
             print("  ⚠ %-9s %-16s -> %s   (no such entry)" % (kind, s, d))
-        print("orphans: %d dangling edge(s) of %d over %d entr%s"
-              % (len(rows), len(edges(path)), len(have),
-                 "y" if len(have) == 1 else "ies"))
+        print(
+            "orphans: %d dangling edge(s) of %d over %d entr%s"
+            % (len(rows), len(edges(path)), len(have), "y" if len(have) == 1 else "ies")
+        )
         _report_collisions(len(have))
     return 0
 
@@ -1089,11 +1149,10 @@ def roundtrip(path=None):
     # (1) ENTRY-LEVEL: every @-header must have become a key.
     seen_hdr = []
     for m in re.finditer(r"(?m)^\s*@(\w+)\s*\{\s*([^,\s]+)\s*,", text):
-        seen_hdr.append((m.group(2), text[:m.start()].count("\n") + 1))
+        seen_hdr.append((m.group(2), text[: m.start()].count("\n") + 1))
     for key, line in seen_hdr:
         if key not in parsed:
-            out.append(("entry-vanished", key, "line %d: header present, not parsed"
-                        % line))
+            out.append(("entry-vanished", key, "line %d: header present, not parsed" % line))
     # duplicates: the parse keeps the last, so a repeated key is a silent loss
     counts = {}
     for key, _l in seen_hdr:
@@ -1146,10 +1205,14 @@ def roundtrip(path=None):
             raw = f.group(1)
             name = raw.strip("'\"")
             if name not in got:
-                line = text[:m.start(3) + f.start()].count("\n") + 1
-                out.append(("field-unparsed", f"{key}.{raw}",
-                            "line %d: `%s = {` in the bytes, no field in the parse"
-                            % (line, raw)))
+                line = text[: m.start(3) + f.start()].count("\n") + 1
+                out.append(
+                    (
+                        "field-unparsed",
+                        f"{key}.{raw}",
+                        "line %d: `%s = {` in the bytes, no field in the parse" % (line, raw),
+                    )
+                )
     return out
 
 
@@ -1179,15 +1242,22 @@ def set_field(key, field, value, path=None):
     path = path or DEFAULT
     have = entries(path)
     if key not in have:
-        raise SystemExit("bibstruct --set: no entry %r (have %d). Adding an entry "
-                         "is a different operation." % (key, len(have)))
+        raise SystemExit(
+            "bibstruct --set: no entry %r (have %d). Adding an entry "
+            "is a different operation." % (key, len(have))
+        )
     if field not in have[key]:
-        raise SystemExit("bibstruct --set: {} carries no {!r} (has: {}). Adding a "
-                         "field is a different operation.".format(key, field, ", ".join(sorted(
-                             n for n in have[key] if not n.startswith("_")))))
+        raise SystemExit(
+            "bibstruct --set: {} carries no {!r} (has: {}). Adding a "
+            "field is a different operation.".format(
+                key, field, ", ".join(sorted(n for n in have[key] if not n.startswith("_")))
+            )
+        )
     if value.count("{") != value.count("}"):
-        raise SystemExit("bibstruct --set: unbalanced braces in the value; "
-                         "`_FIELD` nests one level and would truncate it.")
+        raise SystemExit(
+            "bibstruct --set: unbalanced braces in the value; "
+            "`_FIELD` nests one level and would truncate it."
+        )
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
     # ⚑ MATCH ON MASKED, SLICE THE RAW — and this is only sound because
@@ -1203,15 +1273,17 @@ def set_field(key, field, value, path=None):
         if m.group(2) != key:
             continue
         body_start = m.start(3)
-        for f in _FIELD.finditer(masked[body_start:m.end(3)]):
+        for f in _FIELD.finditer(masked[body_start : m.end(3)]):
             if f.group(1) != field:
                 continue
             lo = body_start + f.start(2)
             hi = body_start + f.end(2)
             return text[:lo] + value + text[hi:]
-    raise SystemExit(f"bibstruct --set: {key}.{field} parsed but its span was not "
-                     "located -- the read and the locate disagree, which is a "
-                     "defect, not a missing field.")
+    raise SystemExit(
+        f"bibstruct --set: {key}.{field} parsed but its span was not "
+        "located -- the read and the locate disagree, which is a "
+        "defect, not a missing field."
+    )
 
 
 def add_field(key, field, value, path=None):
@@ -1240,14 +1312,20 @@ def add_field(key, field, value, path=None):
     path = path or DEFAULT
     have = entries(path)
     if key not in have:
-        raise SystemExit("bibstruct --addfield: no entry %r (have %d). Creating an "
-                         "entry is `--add`." % (key, len(have)))
+        raise SystemExit(
+            "bibstruct --addfield: no entry %r (have %d). Creating an "
+            "entry is `--add`." % (key, len(have))
+        )
     if field in have[key]:
-        raise SystemExit(f"bibstruct --addfield: {key} already carries {field!r} (= {have[key][field]!r}). Editing "
-                         "a value is `--set`.")
+        raise SystemExit(
+            f"bibstruct --addfield: {key} already carries {field!r} (= {have[key][field]!r}). Editing "
+            "a value is `--set`."
+        )
     if value.count("{") != value.count("}"):
-        raise SystemExit("bibstruct --addfield: unbalanced braces in the value; "
-                         "`_FIELD` nests one level and would truncate it.")
+        raise SystemExit(
+            "bibstruct --addfield: unbalanced braces in the value; "
+            "`_FIELD` nests one level and would truncate it."
+        )
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
     masked = _strip_comments(text)
@@ -1258,18 +1336,22 @@ def add_field(key, field, value, path=None):
         # is conventionally `section` here, and prepending would put a new `note` above
         # it — a diff that touches the entry's shape rather than extending it.
         last = None
-        for f in _FIELD.finditer(masked[m.start(3):m.end(3)]):
+        for f in _FIELD.finditer(masked[m.start(3) : m.end(3)]):
             last = f
         if last is None:
-            raise SystemExit(f"bibstruct --addfield: {key} parsed with no fields to "
-                             "follow — the read and the locate disagree.")
+            raise SystemExit(
+                f"bibstruct --addfield: {key} parsed with no fields to "
+                "follow — the read and the locate disagree."
+            )
         at = m.start(3) + last.end(2)
         # the closing brace of the value, then the comma-and-newline this file uses
         while at < len(text) and text[at] in "}":
             at += 1
         return text[:at] + ",\n  %-8s = {%s}" % (field, value) + text[at:]
-    raise SystemExit(f"bibstruct --addfield: {key} parsed but its span was not located — "
-                     "the read and the locate disagree, which is a defect.")
+    raise SystemExit(
+        f"bibstruct --addfield: {key} parsed but its span was not located — "
+        "the read and the locate disagree, which is a defect."
+    )
 
 
 def add_entry(key, fields, path=None, corpus=()):
@@ -1306,11 +1388,17 @@ def add_entry(key, fields, path=None, corpus=()):
     # the corpus. Widening both would refuse a key that legitimately appears in another
     # genre's bib; widening neither is the bug summit measured.
     if key in have:
-        raise SystemExit(f"bibstruct --add: {key!r} already exists. Editing a field is "
-                         "`--set`; this only creates.")
+        raise SystemExit(
+            f"bibstruct --add: {key!r} already exists. Editing a field is "
+            "`--set`; this only creates."
+        )
     if "claim" not in fields or "check" not in fields:
-        raise SystemExit("bibstruct --add: an entry needs at least `claim` and "
-                         "`check` (got: {})".format(", ".join(sorted(fields))) or "none")
+        raise SystemExit(
+            "bibstruct --add: an entry needs at least `claim` and `check` (got: {})".format(
+                ", ".join(sorted(fields))
+            )
+            or "none"
+        )
     for name, value in sorted(fields.items()):
         if value.count("{") != value.count("}"):
             raise SystemExit(f"bibstruct --add: unbalanced braces in {name!r}")
@@ -1348,7 +1436,8 @@ def add_entry(key, fields, path=None, corpus=()):
                     "`--corpus <bib> [<bib> …]`. A split corpus makes an edge "
                     "cross files, and this check reads only what it is given — "
                     "'not in the population' is NOT 'does not exist'."
-                    % (efield, dest, 1 + len(corpus or ())))
+                    % (efield, dest, 1 + len(corpus or ()))
+                )
     # the witness must resolve, or the item can never be closed
     m = re.match(r"item:(\S+)", fields["check"].strip())
     if m:
@@ -1365,15 +1454,24 @@ def add_entry(key, fields, path=None, corpus=()):
         # keeps every existing caller working, since that is where the original project's
         # witnesses live.
         _bibdir = os.path.dirname(os.path.abspath(path or DEFAULT))
-        ipath = next((p for p in (os.path.join(_bibdir, "findings.py"),
-                                  os.path.join(_bibdir, "items.py"),
-                                  os.path.join(ROOT, "catalog", "library", "items.py"))
-                      if os.path.exists(p)), None)
+        ipath = next(
+            (
+                p
+                for p in (
+                    os.path.join(_bibdir, "findings.py"),
+                    os.path.join(_bibdir, "items.py"),
+                    os.path.join(ROOT, "catalog", "library", "items.py"),
+                )
+                if os.path.exists(p)
+            ),
+            None,
+        )
         if ipath is None:
             raise SystemExit(
                 f"bibstruct --add: no witness module to resolve check=item:{wkey} against — "
                 f"looked for findings.py or items.py beside {_bibdir}, then "
-                "catalog/library/items.py")
+                "catalog/library/items.py"
+            )
         # ⚑ THE DEFINITION, NOT A MENTION.  A key named in a docstring or a
         # comment is not a witness; this is the `--calls` lesson (a name in prose
         # is not a call) applied to the witness roster.
@@ -1388,8 +1486,7 @@ def add_entry(key, fields, path=None, corpus=()):
         # `--items` resolves through the ITEMS dict, so a defined-but-
         # unregistered function is still unreachable (measured: `def D0_KERNEL(`
         # existed and `--items D0-kernel` said `unknown item key(s)`).
-        cands = {wkey, wkey.replace("-", "_"),
-                 wkey.replace("-", "_").upper()}
+        cands = {wkey, wkey.replace("-", "_"), wkey.replace("-", "_").upper()}
         # ⚑⚑ TWO WITNESS SHAPES, AND REQUIRING ONE WOULD BE A ROSTER REFUSING ITS OWN
         # POPULATION. `catalog/library/items.py` registers `def KEY(...)` and maps the name in
         # `ITEMS`; `.claude/agents/findings.py` registers a lambda directly in `WITNESSES`, one
@@ -1398,19 +1495,23 @@ def add_entry(key, fields, path=None, corpus=()):
         # `--items <key>` resolve it*, which is the dict membership tested below, and the
         # definition check is the weaker one. A key registered as a dict value satisfies the
         # real requirement without a matching `def`.
-        _defined = any(re.search(rf"(?m)^def\s+{re.escape(c)}\s*\(", isrc)
-                       for c in cands)
+        _defined = any(re.search(rf"(?m)^def\s+{re.escape(c)}\s*\(", isrc) for c in cands)
         _lambda = re.search(rf'(?m)^\s*"{re.escape(wkey)}"\s*:\s*(lambda|_)', isrc)
         if not (_defined or _lambda):
             raise SystemExit(
                 "bibstruct --add: check=item:{} but {} defines none of {}. The witness must "
-                "exist FIRST, or the item files as ordered-but-never-closable.".format(wkey, os.path.relpath(ipath, ROOT),
-                   ", ".join(f"`def {c}(`" for c in sorted(cands))))
+                "exist FIRST, or the item files as ordered-but-never-closable.".format(
+                    wkey,
+                    os.path.relpath(ipath, ROOT),
+                    ", ".join(f"`def {c}(`" for c in sorted(cands)),
+                )
+            )
         if not re.search(rf'(?m)^\s*"{re.escape(wkey)}"\s*:', isrc):
             raise SystemExit(
                 f"bibstruct --add: check=item:{wkey} has a witness function but is "
                 f"NOT REGISTERED in the ITEMS dict, so `--items {wkey}` cannot "
-                "resolve it. Defining the function is not registering the item.")
+                "resolve it. Defining the function is not registering the item."
+            )
 
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
@@ -1418,8 +1519,7 @@ def add_entry(key, fields, path=None, corpus=()):
     # join before claim/check; matching it keeps the projection's render order
     # stable and the diff readable.
     order = ["section", "from", "rests-on", "enables", "join", "claim", "check"]
-    keys = [k for k in order if k in fields] + \
-           [k for k in sorted(fields) if k not in order]
+    keys = [k for k in order if k in fields] + [k for k in sorted(fields) if k not in order]
     body = "".join("  %-8s = {%s},\n" % (k, fields[k]) for k in keys)
     body = body.rstrip(",\n") + "\n"
     entry = f"\n@misc{{{key},\n{body}}}\n"
@@ -1441,6 +1541,7 @@ def _refuses(fn):
 
 def _selftest():
     import tempfile
+
     cases = []
 
     def check(label, got, want):
@@ -1460,37 +1561,41 @@ def _selftest():
         # `T27`/`T28-edges` are REGISTERED, `_open` is defined-but-UNREGISTERED (the
         # roster-vs-definition case), and `NoSuchWitness` is absent from both.
         with open(os.path.join(d, "items.py"), "w", encoding="utf-8") as fh:
-            fh.write("def T27():\n    pass\n\n\n"
-                     "def T28_EDGES():\n    pass\n\n\n"
-                     "def A():\n    pass\n\n\n"
-                     "def B():\n    pass\n\n\n"
-                     "def C():\n    pass\n\n\n"
-                     "def _open():\n    pass\n\n\n"
-                     # ⚑ DOUBLE-QUOTED, ONE PER LINE: the registration probe is
-                     # `^\\s*"<key>"\\s*:` (line-anchored), so a single-quoted key or two
-                     # on one line reads as UNREGISTERED and the refusal names the
-                     # roster rather than the spelling.
-                     "ITEMS = {\n"
-                     '    "T27": T27,\n'
-                     '    "T28-edges": T28_EDGES,\n'
-                     '    "A": A,\n'
-                     '    "B": B,\n'
-                     '    "C": C,\n'
-                     "}\n")
+            fh.write(
+                "def T27():\n    pass\n\n\n"
+                "def T28_EDGES():\n    pass\n\n\n"
+                "def A():\n    pass\n\n\n"
+                "def B():\n    pass\n\n\n"
+                "def C():\n    pass\n\n\n"
+                "def _open():\n    pass\n\n\n"
+                # ⚑ DOUBLE-QUOTED, ONE PER LINE: the registration probe is
+                # `^\\s*"<key>"\\s*:` (line-anchored), so a single-quoted key or two
+                # on one line reads as UNREGISTERED and the refusal names the
+                # roster rather than the spelling.
+                "ITEMS = {\n"
+                '    "T27": T27,\n'
+                '    "T28-edges": T28_EDGES,\n'
+                '    "A": A,\n'
+                '    "B": B,\n'
+                '    "C": C,\n'
+                "}\n"
+            )
         p = os.path.join(d, "w.bib")
         with open(p, "w", encoding="utf-8") as fh:
-            fh.write("% a comment line\n"
-                     "@misc{A,\n"
-                     "  section = {s},\n"
-                     "  claim   = {alpha},\n"
-                     "  check   = {item:A}\n"
-                     "}\n\n"
-                     "@misc{B,\n"
-                     "  section = {s}, from = {A}, rests-on = {A},\n"
-                     "  enables = {A, NOSUCH},\n"
-                     "  claim   = {beta},\n"
-                     "  check   = {item:B}\n"
-                     "}\n")
+            fh.write(
+                "% a comment line\n"
+                "@misc{A,\n"
+                "  section = {s},\n"
+                "  claim   = {alpha},\n"
+                "  check   = {item:A}\n"
+                "}\n\n"
+                "@misc{B,\n"
+                "  section = {s}, from = {A}, rests-on = {A},\n"
+                "  enables = {A, NOSUCH},\n"
+                "  claim   = {beta},\n"
+                "  check   = {item:B}\n"
+                "}\n"
+            )
         e = entries(p)
         check("both entries parse", sorted(e), ["A", "B"])
         check("fields are read verbatim", e["A"]["claim"], "alpha")
@@ -1501,11 +1606,13 @@ def _selftest():
         # would pass against the broken code — it never touches the layer that dropped the files.
         p2 = os.path.join(d, "w2.bib")
         with open(p2, "w", encoding="utf-8") as fh:
-            fh.write("@misc{C,\n"
-                     "  section = {s}, rests-on = {A},\n"
-                     "  claim   = {gamma},\n"
-                     "  check   = {item:C}\n"
-                     "}\n")
+            fh.write(
+                "@misc{C,\n"
+                "  section = {s}, rests-on = {A},\n"
+                "  claim   = {gamma},\n"
+                "  check   = {item:C}\n"
+                "}\n"
+            )
         import contextlib
         import io
 
@@ -1543,16 +1650,25 @@ def _selftest():
         # C rests-on A, which lives in the OTHER bib. Read alone, that premise is unresolvable
         # and C reports as dangling; read TOGETHER, it resolves. Same edge, opposite verdict —
         # which is the whole reason a composed corpus is the unit.
-        check("a premise in another bib is DANGLING when that bib is not passed",
-              "no such entry" in _run("--orphans", p2), True)
+        check(
+            "a premise in another bib is DANGLING when that bib is not passed",
+            "no such entry" in _run("--orphans", p2),
+            True,
+        )
         # ⚑ NAMED, not just "no such entry": `w.bib` carries a DELIBERATE dangling
         # `enables = {A, NOSUCH}`, so the file is never orphan-free and a bare
         # "no orphans" assertion would fail for a reason that has nothing to do with
         # composition. The claim is about C's premise specifically.
-        check("...and C's premise RESOLVES when both bibs are passed",
-              "C -> A" in _run("--orphans", p2, p), False)
-        check("...while the fixture's OWN deliberate dangler is still reported",
-              "NOSUCH" in _run("--orphans", p2, p), True)
+        check(
+            "...and C's premise RESOLVES when both bibs are passed",
+            "C -> A" in _run("--orphans", p2, p),
+            False,
+        )
+        check(
+            "...while the fixture's OWN deliberate dangler is still reported",
+            "NOSUCH" in _run("--orphans", p2, p),
+            True,
+        )
         # ⚑ THE COUNT CASE — the one that catches the exact silent-drop signature. Reading both
         # must report 3 entries; the broken code reported the first file's 2 and ignored the rest,
         # so a byte-identical count across a widened input read as "the finding survives."
@@ -1564,20 +1680,31 @@ def _selftest():
         # hand).  `p3` re-declares A, which `p` already has.
         p3 = os.path.join(d, "w3.bib")
         with open(p3, "w", encoding="utf-8") as fh:
-            fh.write("@misc{A,\n"
-                     "  section = {s},\n"
-                     "  claim   = {alpha-redeclared},\n"
-                     "  check   = {item:A}\n"
-                     "}\n")
+            fh.write(
+                "@misc{A,\n"
+                "  section = {s},\n"
+                "  claim   = {alpha-redeclared},\n"
+                "  check   = {item:A}\n"
+                "}\n"
+            )
         out = _run("--orphans", p, p3)
-        check("a key declared in two bibs is REPORTED, not merged silently",
-              "1 key(s) declared in BOTH" in out and "(later wins): A" in out, True)
-        check("...and the distinct-vs-declared gap is named",
-              "1 key(s) declared in more than one bib" in out, True)
+        check(
+            "a key declared in two bibs is REPORTED, not merged silently",
+            "1 key(s) declared in BOTH" in out and "(later wins): A" in out,
+            True,
+        )
+        check(
+            "...and the distinct-vs-declared gap is named",
+            "1 key(s) declared in more than one bib" in out,
+            True,
+        )
         # ⚑ THE CONTROL: without it, a mode that warned unconditionally would pass both cases
         # above while being useless. Two bibs with disjoint keys must report NO collision.
-        check("...while disjoint bibs report no collision",
-              "declared in BOTH" in _run("--orphans", p, p2), False)
+        check(
+            "...while disjoint bibs report no collision",
+            "declared in BOTH" in _run("--orphans", p, p2),
+            False,
+        )
         # ⚑⚑ AND THE STATE CASE, WHICH ONLY WORKS IN THIS ORDER.  `collisions` is module-level,
         # so a stale list from the COLLIDING read above must not leak into a clean one after it.
         # Running the clean read first would pass against a version that never clears — the
@@ -1585,8 +1712,11 @@ def _selftest():
         # identical-looking `_run(p, p2)` calls are not redundant: one is a control, this is a
         # sequence.
         _run("--orphans", p, p3)
-        check("a stale collision does NOT leak into the next clean read",
-              "declared in BOTH" in _run("--orphans", p, p2), False)
+        check(
+            "a stale collision does NOT leak into the next clean read",
+            "declared in BOTH" in _run("--orphans", p, p2),
+            False,
+        )
 
         # ⚑⚑ `--bib` ON A READ MODE IS A REFUSAL, NOT A SILENT DROP.  It is the WRITE target and
         # is removed from the read set, so `--orphans --bib a b` read only `b` — which on a
@@ -1642,29 +1772,36 @@ def _selftest():
         # exchange that produced it was worth more than the case.
         _n_expected = len(set(entries(p)) | set(entries(p2)) | set(entries(p3)))
         _out = _run("--orphans", p, p2, p3)
-        check("the REPORTED denominator equals the independently-parsed key count",
-              "over %d entries" % _n_expected in _out, True)
+        check(
+            "the REPORTED denominator equals the independently-parsed key count",
+            "over %d entries" % _n_expected in _out,
+            True,
+        )
         # ⚑ THE CONTROL: the invariant must be able to FAIL. A wrong expectation must not pass,
         # or the case is asserting the tool's output against itself.
-        check("...and a wrong denominator would NOT match",
-              "over %d entries" % (_n_expected + 1) in _out, False)
+        check(
+            "...and a wrong denominator would NOT match",
+            "over %d entries" % (_n_expected + 1) in _out,
+            False,
+        )
 
         rc, err = _rc("--orphans", "--bib", p, p2)
         check("a read mode REFUSES --bib", rc, 2)
         check("...and the refusal names the read form", "POSITIONALLY" in err, True)
         # ⚑ THE CONTROL: --bib must still WORK on the write modes it belongs to, or the refusal
         # has broken the flag's actual purpose — cross-repo filing, which is why it exists.
-        check("...while a write mode still accepts it",
-              _rc("--set", "A", "claim", "x", "--bib", p)[0] != 2, True)
+        check(
+            "...while a write mode still accepts it",
+            _rc("--set", "A", "claim", "x", "--bib", p)[0] != 2,
+            True,
+        )
 
         # ⚑ THE CASE THAT PINS THE DEFECT.  `enables` is NOT in the engine's
         # whitelist, so a consumer using `bib.parse` reads it as absent — which
         # is how `worklist_gate.order()` came to hand-roll a regex for it.
         drops = {(k, n) for k, n, _v in dropped(p)}
-        check("`enables` is reported as ENGINE-DROPPED", ("B", "enables") in drops,
-              True)
-        check("a whitelisted field is NOT reported dropped",
-              ("B", "rests-on") in drops, False)
+        check("`enables` is reported as ENGINE-DROPPED", ("B", "enables") in drops, True)
+        check("a whitelisted field is NOT reported dropped", ("B", "rests-on") in drops, False)
 
         # ⚑⚑⚑ THE COMPLEMENT, AND ITS ABSENCE IS WHY THE DEFECT SHIPPED.  The case above
         # pins the UNDECLARED half and passed throughout; nothing pinned the DECLARED half,
@@ -1684,13 +1821,18 @@ def _selftest():
         os.makedirs(_proj, exist_ok=True)
         open(os.path.join(_proj, "paper.toml"), "w").write(
             '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nout = "O.md"\n'
-            'consumer_fields = ["enables"]\n')
+            'consumer_fields = ["enables"]\n'
+        )
         _dp = os.path.join(_proj, "w.bib")
         open(_dp, "w").write(
             "@misc{B,\n  section = {s},\n  claim = {c},\n  check = {item:T27},\n"
-            "  enables = {A},\n}\n")
-        check("⚑ a DECLARED consumer field is NOT reported dropped",
-              ("B", "enables") in {(k, n) for k, n, _v in dropped(_dp)}, False)
+            "  enables = {A},\n}\n"
+        )
+        check(
+            "⚑ a DECLARED consumer field is NOT reported dropped",
+            ("B", "enables") in {(k, n) for k, n, _v in dropped(_dp)},
+            False,
+        )
 
         # ⚑ THE TOTALITY PROBE — and every case below drives a REAL DROP rather
         # than asserting the probe's own arithmetic.  A case that only checks
@@ -1739,15 +1881,24 @@ def _selftest():
         except SystemExit as _e:
             _absent_msg = str(_e)
         try:
-            entries(d)                             # a DIRECTORY, not a bib
+            entries(d)  # a DIRECTORY, not a bib
         except SystemExit as _e:
             _broken_msg = str(_e)
-        check("⚑ an ABSENT bib names itself ABSENT",
-              bool(_absent_msg) and "ABSENT" in _absent_msg, True)
-        check("⚑ a BROKEN read names itself BROKEN, and says the read did not happen",
-              bool(_broken_msg) and "BROKEN" in _broken_msg, True)
-        check("⚑⚑ ABSENT and BROKEN are DIFFERENT messages, not one 'cannot read'",
-              _absent_msg == _broken_msg, False)
+        check(
+            "⚑ an ABSENT bib names itself ABSENT",
+            bool(_absent_msg) and "ABSENT" in _absent_msg,
+            True,
+        )
+        check(
+            "⚑ a BROKEN read names itself BROKEN, and says the read did not happen",
+            bool(_broken_msg) and "BROKEN" in _broken_msg,
+            True,
+        )
+        check(
+            "⚑⚑ ABSENT and BROKEN are DIFFERENT messages, not one 'cannot read'",
+            _absent_msg == _broken_msg,
+            False,
+        )
         # ⚑ AND `roundtrip` — the SECOND former reader — must agree with `entries`
         # about absence.  Two readers of one artifact disagreeing about what ABSENT
         # means is precisely the defect this module's banner records against itself.
@@ -1756,8 +1907,9 @@ def _selftest():
             roundtrip(os.path.join(d, "nosuch.bib"))
         except SystemExit as _e:
             _rt_msg = str(_e)
-        check("⚑⚑ roundtrip and entries give the SAME verdict on an absent bib",
-              _rt_msg, _absent_msg)
+        check(
+            "⚑⚑ roundtrip and entries give the SAME verdict on an absent bib", _rt_msg, _absent_msg
+        )
         # ⚑ A NON-UTF-8 BIB IS BROKEN, NOT EMPTY AND NOT PARTIAL.  The strict decode
         # refuses rather than handing the grammar a replacement-char corpus that would
         # parse into plausible entries — the one failure class here that FABRICATES.
@@ -1768,58 +1920,70 @@ def _selftest():
             entries(_mangled)
         except SystemExit as _e:
             _utf8_msg = str(_e)
-        check("⚑ a non-UTF-8 bib is refused, not parsed into plausible entries",
-              bool(_utf8_msg) and "not valid UTF-8" in _utf8_msg, True)
+        check(
+            "⚑ a non-UTF-8 bib is refused, not parsed into plausible entries",
+            bool(_utf8_msg) and "not valid UTF-8" in _utf8_msg,
+            True,
+        )
 
         # (1) ENTRY-VANISHED: the closing brace INDENTED.  `_ENTRY` requires
         # `\n}` at column 0, so the whole entry disappears and `--entries`
         # reports success over a file it did not fully read.
         q = os.path.join(d, "indent.bib")
         with open(q, "w", encoding="utf-8") as fh:
-            fh.write("@misc{A,\n  claim = {a}\n}\n\n"
-                     "@misc{B,\n  claim = {b}\n  }\n")
-        check("an INDENTED closing brace makes the entry vanish from the parse",
-              "B" in entries(q), False)
-        check("and roundtrip REPORTS that vanished entry",
-              [k for k, w, _d in roundtrip(q) if w == "B"], ["entry-vanished"])
+            fh.write("@misc{A,\n  claim = {a}\n}\n\n@misc{B,\n  claim = {b}\n  }\n")
+        check(
+            "an INDENTED closing brace makes the entry vanish from the parse",
+            "B" in entries(q),
+            False,
+        )
+        check(
+            "and roundtrip REPORTS that vanished entry",
+            [k for k, w, _d in roundtrip(q) if w == "B"],
+            ["entry-vanished"],
+        )
 
         # (2) ENTRY-VANISHED: the whole entry on ONE line.
         r = os.path.join(d, "oneline.bib")
         with open(r, "w", encoding="utf-8") as fh:
             fh.write("@misc{A,\n  claim = {a}\n}\n\n@misc{B, claim = {b}}\n")
         check("a ONE-LINE entry vanishes from the parse", "B" in entries(r), False)
-        check("and roundtrip reports it",
-              any(w == "B" for _k, w, _d in roundtrip(r)), True)
+        check("and roundtrip reports it", any(w == "B" for _k, w, _d in roundtrip(r)), True)
 
         # (3) FIELD-DROPPED: a QUOTED value.  The entry survives WITH A HOLE,
         # which is the worse case — a partial answer reads as a complete one.
         s = os.path.join(d, "quoted.bib")
         with open(s, "w", encoding="utf-8") as fh:
             fh.write('@misc{A,\n  claim = {a},\n  from = "B"\n}\n')
-        check("a QUOTED field is silently absent from the parse",
-              "from" in entries(s).get("A", {}), False)
-        check("and roundtrip reports the hole, naming entry.field",
-              [w for _k, w, _d in roundtrip(s)], ["A.from"])
+        check(
+            "a QUOTED field is silently absent from the parse",
+            "from" in entries(s).get("A", {}),
+            False,
+        )
+        check(
+            "and roundtrip reports the hole, naming entry.field",
+            [w for _k, w, _d in roundtrip(s)],
+            ["A.from"],
+        )
 
         # (4) FIELD-DROPPED: a BARE INTEGER value.
         t = os.path.join(d, "bare.bib")
         with open(t, "w", encoding="utf-8") as fh:
             fh.write("@misc{A,\n  claim = {a},\n  year = 2026\n}\n")
-        check("a BARE-INTEGER field is silently absent",
-              "year" in entries(t).get("A", {}), False)
-        check("and roundtrip reports it",
-              [w for _k, w, _d in roundtrip(t)], ["A.year"])
+        check("a BARE-INTEGER field is silently absent", "year" in entries(t).get("A", {}), False)
+        check("and roundtrip reports it", [w for _k, w, _d in roundtrip(t)], ["A.year"])
 
         # (5) DUPLICATE KEY: the parse keeps the LAST silently, so an entry is
         # lost with no count change that `--entries` could show.
         u = os.path.join(d, "dup.bib")
         with open(u, "w", encoding="utf-8") as fh:
-            fh.write("@misc{A,\n  claim = {first}\n}\n\n"
-                     "@misc{A,\n  claim = {second}\n}\n")
-        check("a DUPLICATE key silently keeps the last", entries(u)["A"]["claim"],
-              "second")
-        check("and roundtrip reports the duplicate",
-              [k for k, _w, _d in roundtrip(u)], ["duplicate-key"])
+            fh.write("@misc{A,\n  claim = {first}\n}\n\n@misc{A,\n  claim = {second}\n}\n")
+        check("a DUPLICATE key silently keeps the last", entries(u)["A"]["claim"], "second")
+        check(
+            "and roundtrip reports the duplicate",
+            [k for k, _w, _d in roundtrip(u)],
+            ["duplicate-key"],
+        )
 
         # ⚑ A `%` COMMENT MENTIONING AN @-KEY IS NOT AN ENTRY.  The live bib is
         # 66% comment lines; counting prose as a header would make the probe
@@ -1827,30 +1991,46 @@ def _selftest():
         # than none, because it trains the reader to ignore it.
         v = os.path.join(d, "cmt.bib")
         with open(v, "w", encoding="utf-8") as fh:
-            fh.write("% see @misc{GHOST, ...} for the shape\n"
-                     "@misc{A,\n  claim = {a}\n}\n")
-        check("an @-key inside a % comment is not read as an entry",
-              roundtrip(v), [])
+            fh.write("% see @misc{GHOST, ...} for the shape\n@misc{A,\n  claim = {a}\n}\n")
+        check("an @-key inside a % comment is not read as an entry", roundtrip(v), [])
 
         # ⚑ `--set` IS PURE AND REFUSES THREE CLASSES.  Each refusal is asserted
         # as a VERDICT (`_refuses`), not as an empty return -- a predicate that
         # returns nothing where it should refuse is the inert-guard shape.
-        check("--set edits the named field in place",
-              "beta2" in set_field("B", "claim", "beta2", p), True)
-        check("--set leaves the OTHER entry untouched",
-              "alpha" in set_field("B", "claim", "beta2", p), True)
-        check("--set REFUSES an unknown key",
-              _refuses(lambda: set_field("NOPE", "claim", "x", p)), True)
-        check("--set REFUSES a field the entry does not carry",
-              _refuses(lambda: set_field("A", "enables", "x", p)), True)
-        check("--set REFUSES an unbalanced value",
-              _refuses(lambda: set_field("B", "claim", "a {b", p)), True)
+        check(
+            "--set edits the named field in place",
+            "beta2" in set_field("B", "claim", "beta2", p),
+            True,
+        )
+        check(
+            "--set leaves the OTHER entry untouched",
+            "alpha" in set_field("B", "claim", "beta2", p),
+            True,
+        )
+        check(
+            "--set REFUSES an unknown key",
+            _refuses(lambda: set_field("NOPE", "claim", "x", p)),
+            True,
+        )
+        check(
+            "--set REFUSES a field the entry does not carry",
+            _refuses(lambda: set_field("A", "enables", "x", p)),
+            True,
+        )
+        check(
+            "--set REFUSES an unbalanced value",
+            _refuses(lambda: set_field("B", "claim", "a {b", p)),
+            True,
+        )
         # ⚑ THE PURITY CASE.  `set_field` returning text is what lets the dry run
         # and the real run share one path; if it ever wrote, this would fail.
         _before = open(p, encoding="utf-8").read()
         set_field("B", "claim", "beta3", p)
-        check("--set is PURE — computing a change writes nothing",
-              open(p, encoding="utf-8").read(), _before)
+        check(
+            "--set is PURE — computing a change writes nothing",
+            open(p, encoding="utf-8").read(),
+            _before,
+        )
         # ⚑ AND THE RESULT MUST STILL ROUND-TRIP.  A write is only correct if the
         # file remains readable to the parser that produced it.
         w = os.path.join(d, "written.bib")
@@ -1876,32 +2056,46 @@ def _selftest():
         # caught it, because every case fed one file.
         _sib = os.path.join(d, "sib.bib")
         with open(_sib, "w", encoding="utf-8") as fh:
-            fh.write("@misc{FAR,\n  section = {s},\n  claim = {far},\n"
-                     "  check = {item:T27}\n}\n")
+            fh.write("@misc{FAR,\n  section = {s},\n  claim = {far},\n  check = {item:T27}\n}\n")
         _here = os.path.join(d, "here.bib")
         with open(_here, "w", encoding="utf-8") as fh:
-            fh.write("@misc{NEAR,\n  section = {s},\n  claim = {near},\n"
-                     "  check = {item:T27}\n}\n")
-        check("--add REFUSES an edge into a key it cannot see",
-              _refuses(lambda: add_entry(
-                  "X", {"claim": "c", "check": "item:T27", "rests-on": "FAR"}, _here)),
-              True)
-        check("...and ACCEPTS it once --corpus names the sibling that defines it",
-              "FAR" in add_entry(
-                  "X", {"claim": "c", "check": "item:T27", "rests-on": "FAR"},
-                  _here, [_sib]), True)
+            fh.write("@misc{NEAR,\n  section = {s},\n  claim = {near},\n  check = {item:T27}\n}\n")
+        check(
+            "--add REFUSES an edge into a key it cannot see",
+            _refuses(
+                lambda: add_entry(
+                    "X", {"claim": "c", "check": "item:T27", "rests-on": "FAR"}, _here
+                )
+            ),
+            True,
+        )
+        check(
+            "...and ACCEPTS it once --corpus names the sibling that defines it",
+            "FAR"
+            in add_entry(
+                "X", {"claim": "c", "check": "item:T27", "rests-on": "FAR"}, _here, [_sib]
+            ),
+            True,
+        )
         # ⚑⚑ AND A KEY IN NO FILE IS STILL REFUSED WITH THE CORPUS WIDE OPEN. Widening
         # the population must not weaken the invariant — otherwise `--corpus` becomes a
         # way to silence the check rather than to state its scope.
-        check("...while a key in NEITHER file is still refused",
-              _refuses(lambda: add_entry(
-                  "X", {"claim": "c", "check": "item:T27", "rests-on": "NOWHERE"},
-                  _here, [_sib])), True)
+        check(
+            "...while a key in NEITHER file is still refused",
+            _refuses(
+                lambda: add_entry(
+                    "X", {"claim": "c", "check": "item:T27", "rests-on": "NOWHERE"}, _here, [_sib]
+                )
+            ),
+            True,
+        )
         # ⚑ THE DUPLICATE CHECK STAYS TARGET-LOCAL. A key existing in a SIBLING is not a
         # duplicate here — genres are separate files and `--add` must still create.
-        check("...and a key defined only in the sibling is NOT a duplicate here",
-              "FAR" in add_entry("FAR", {"claim": "c", "check": "item:T27"},
-                                 _here, [_sib]), True)
+        check(
+            "...and a key defined only in the sibling is NOT a duplicate here",
+            "FAR" in add_entry("FAR", {"claim": "c", "check": "item:T27"}, _here, [_sib]),
+            True,
+        )
         # ⚑⚑⚑ `--corpus` STOPS AT THE NEXT FLAG. It scanned to the END of argv filtering
         # out `-`-prefixed tokens, so `--corpus a.bib --bib target.bib` ate `target.bib`
         # as a corpus member — summit measured two failed invocations and found only
@@ -1909,8 +2103,7 @@ def _selftest():
         # `--bib`'s operand consumed, the write falls through to DEFAULT, so an `--add`
         # aimed at a peer's floor can diff cleanly against THIS repo's warrants.bib.
         # Asserted on the PARSE, since the failure is an operand crossing a flag boundary.
-        _argv_probe = ["--add", "K", "claim=c", "check=true",
-                       "--corpus", _sib, "--bib", _here]
+        _argv_probe = ["--add", "K", "claim=c", "check=true", "--corpus", _sib, "--bib", _here]
         # ⚑⚑⚑ THE LEXER CENSUS — fields present in the BYTES and absent from the PARSE.
         # The field-level probe used `([\w-]+)`, the parser's OWN character class, so it
         # measured its own reimplementation and reported TOTAL on a file whose fields it
@@ -1921,23 +2114,33 @@ def _selftest():
         # answered for the LEXER.
         _unp = os.path.join(d, "unparsed.bib")
         with open(_unp, "w", encoding="utf-8") as fh:
-            fh.write("@misc{U,\n  section = {s},\n  claim = {c},\n"
-                     "  check = {item:T27},\n  meta:origin = {A}\n}\n")
+            fh.write(
+                "@misc{U,\n  section = {s},\n  claim = {c},\n"
+                "  check = {item:T27},\n  meta:origin = {A}\n}\n"
+            )
         _rows = roundtrip(_unp)
-        check("roundtrip reports a field the LEXER cannot see",
-              [k for k, _w, _d in _rows], ["field-unparsed"])
+        check(
+            "roundtrip reports a field the LEXER cannot see",
+            [k for k, _w, _d in _rows],
+            ["field-unparsed"],
+        )
         # ⚑⚑ IT NAMES THE RAW SPELLING, not a normalised guess. A name form nobody
         # anticipated is exactly the case here, so echoing what is in the bytes is the
         # only honest report — `meta:origin`, not `origin` or a shrug.
-        check("...naming the raw spelling from the bytes",
-              [w for _k, w, _d in _rows], ["U.meta:origin"])
+        check(
+            "...naming the raw spelling from the bytes",
+            [w for _k, w, _d in _rows],
+            ["U.meta:origin"],
+        )
         # ⚑ AND A FILE WHOSE FIELDS ALL PARSE STILL READS CLEAN. A probe that fires on
         # everything is as useless as one that fires on nothing; both halves are asserted
         # because only the pair distinguishes a detector from a constant.
         _ok2 = os.path.join(d, "allparsed.bib")
         with open(_ok2, "w", encoding="utf-8") as fh:
-            fh.write("@misc{V,\n  section = {s},\n  claim = {c},\n"
-                     "  check = {item:T27},\n  'rests-on' = {U}\n}\n")
+            fh.write(
+                "@misc{V,\n  section = {s},\n  claim = {c},\n"
+                "  check = {item:T27},\n  'rests-on' = {U}\n}\n"
+            )
         check("...while a quoted-but-parseable field is NOT reported", roundtrip(_ok2), [])
         # ⚑⚑ AND PROSE INSIDE A VALUE IS NOT AN ASSIGNMENT. Live false positive on the
         # first run against summit's floor: a claim discussing a Fano line says
@@ -1947,11 +2150,12 @@ def _selftest():
         # field boundary, and then the instrument built to catch both did it too.
         _prose = os.path.join(d, "prose.bib")
         with open(_prose, "w", encoding="utf-8") as fh:
-            fh.write("@misc{W,\n  section = {s},\n"
-                     "  claim = {three points, p+q+r = 0 over F2, symmetric},\n"
-                     "  check = {item:T27}\n}\n")
-        check("...and an `=` inside a VALUE is prose, not an unparsed field",
-              roundtrip(_prose), [])
+            fh.write(
+                "@misc{W,\n  section = {s},\n"
+                "  claim = {three points, p+q+r = 0 over F2, symmetric},\n"
+                "  check = {item:T27}\n}\n"
+            )
+        check("...and an `=` inside a VALUE is prose, not an unparsed field", roundtrip(_prose), [])
 
         # ⚑⚑⚑ EVERY READ MODE MUST SURVIVE THE PATH LIST, and two did not. `main` hands
         # `path` in as a LIST; `roundtrip()` and `engine_view()` each took a single path,
@@ -1970,45 +2174,82 @@ def _selftest():
         # ⚑ SO THE CASE IS OVER THE MODE SET, not over two names. A read mode added
         # tomorrow that forgets the list is caught by this arm without an edit.
         _twofile = [_here, _sib]
-        for _mode, _fn in (("entries", lambda p: entries(p)),
-                           ("dropped", lambda p: dropped(p)),
-                           ("edges", lambda p: edges(p)),
-                           ("roundtrip", lambda p: [r for q in p for r in roundtrip(q)])):
-            check(f"--{_mode} accepts the path LIST every read mode is handed",
-                  _refuses(lambda: _fn(_twofile)), False)
+        for _mode, _fn in (
+            ("entries", lambda p: entries(p)),
+            ("dropped", lambda p: dropped(p)),
+            ("edges", lambda p: edges(p)),
+            ("roundtrip", lambda p: [r for q in p for r in roundtrip(q)]),
+        ):
+            check(
+                f"--{_mode} accepts the path LIST every read mode is handed",
+                _refuses(lambda: _fn(_twofile)),
+                False,
+            )
 
-        check("--corpus takes only operands BEFORE the next flag",
-              operands_after("--corpus", _argv_probe), [_sib])
-        check("...so --bib's own operand survives the scan",
-              _argv_probe[_argv_probe.index("--bib") + 1], _here)
-        check("...and a flag given LAST still takes its operands",
-              operands_after("--corpus", ["--add", "K", "--bib", _here,
-                                          "--corpus", _sib, _here]), [_sib, _here])
-        check("...while an absent flag takes nothing (not everything)",
-              operands_after("--corpus", ["--add", "K", _sib]), [])
-        check("--addfield adds a field the entry lacks",
-              "kind=x" in add_field("B", "note", "kind=x", p), True)
-        check("--addfield REFUSES a field the entry already carries (that is --set)",
-              _refuses(lambda: add_field("B", "claim", "x", p)), True)
-        check("--addfield REFUSES an unknown key (that is --add)",
-              _refuses(lambda: add_field("NOPE", "note", "x", p)), True)
-        check("--addfield REFUSES an unbalanced value",
-              _refuses(lambda: add_field("B", "note", "a {b", p)), True)
+        check(
+            "--corpus takes only operands BEFORE the next flag",
+            operands_after("--corpus", _argv_probe),
+            [_sib],
+        )
+        check(
+            "...so --bib's own operand survives the scan",
+            _argv_probe[_argv_probe.index("--bib") + 1],
+            _here,
+        )
+        check(
+            "...and a flag given LAST still takes its operands",
+            operands_after("--corpus", ["--add", "K", "--bib", _here, "--corpus", _sib, _here]),
+            [_sib, _here],
+        )
+        check(
+            "...while an absent flag takes nothing (not everything)",
+            operands_after("--corpus", ["--add", "K", _sib]),
+            [],
+        )
+        check(
+            "--addfield adds a field the entry lacks",
+            "kind=x" in add_field("B", "note", "kind=x", p),
+            True,
+        )
+        check(
+            "--addfield REFUSES a field the entry already carries (that is --set)",
+            _refuses(lambda: add_field("B", "claim", "x", p)),
+            True,
+        )
+        check(
+            "--addfield REFUSES an unknown key (that is --add)",
+            _refuses(lambda: add_field("NOPE", "note", "x", p)),
+            True,
+        )
+        check(
+            "--addfield REFUSES an unbalanced value",
+            _refuses(lambda: add_field("B", "note", "a {b", p)),
+            True,
+        )
         # ⚑ PURE, like its two siblings — the dry run and the real run share one path.
         _b2 = open(p, encoding="utf-8").read()
         add_field("B", "note", "kind=x", p)
-        check("--addfield is PURE — computing a change writes nothing",
-              open(p, encoding="utf-8").read(), _b2)
+        check(
+            "--addfield is PURE — computing a change writes nothing",
+            open(p, encoding="utf-8").read(),
+            _b2,
+        )
         # ⚑ AND THE RESULT MUST ROUND-TRIP AND READ BACK. A widened entry that the
         # parser can no longer read is the fabrication class through the write path.
         w2 = os.path.join(d, "widened.bib")
         with open(w2, "w", encoding="utf-8") as fh:
             fh.write(add_field("B", "note", "kind=corroboration by=substrate", p))
         check("an --addfield result still round-trips", roundtrip(w2), [])
-        check("and the added field reads back",
-              entries(w2)["B"]["note"], "kind=corroboration by=substrate")
-        check("...while the entry's existing fields survive",
-              entries(w2)["B"]["claim"], entries(p)["B"]["claim"])
+        check(
+            "and the added field reads back",
+            entries(w2)["B"]["note"],
+            "kind=corroboration by=substrate",
+        )
+        check(
+            "...while the entry's existing fields survive",
+            entries(w2)["B"]["claim"],
+            entries(p)["B"]["claim"],
+        )
 
         # ⚑ THE CASE THE ORIGINAL FIXTURE COULD NOT EXPRESS, AND IT IS THE ONE
         # THAT MATTERS.  The suite read 30/30 with a single comment line while
@@ -2018,18 +2259,24 @@ def _selftest():
         # the real input tests nothing about comment handling.
         c = os.path.join(d, "commented.bib")
         with open(c, "w", encoding="utf-8") as fh:
-            fh.write("% a long banner line that is much wider than the entry\n"
-                     "% ⚑ a second comment, also long, carrying an adjudication\n"
-                     "%\n"
-                     "@misc{A,\n  claim = {alpha},\n  section = {s}\n}\n")
+            fh.write(
+                "% a long banner line that is much wider than the entry\n"
+                "% ⚑ a second comment, also long, carrying an adjudication\n"
+                "%\n"
+                "@misc{A,\n  claim = {alpha},\n  section = {s}\n}\n"
+            )
         _new = set_field("A", "claim", "rewritten", c)
-        check("--set PRESERVES comment lines verbatim",
-              _new.count("% a long banner line that is much wider than the entry"),
-              1)
-        check("--set preserves EVERY comment, not just the first",
-              _new.count("%"), 3)
-        check("--set writes the value at the right offset past comments",
-              "claim = {rewritten}" in _new, True)
+        check(
+            "--set PRESERVES comment lines verbatim",
+            _new.count("% a long banner line that is much wider than the entry"),
+            1,
+        )
+        check("--set preserves EVERY comment, not just the first", _new.count("%"), 3)
+        check(
+            "--set writes the value at the right offset past comments",
+            "claim = {rewritten}" in _new,
+            True,
+        )
 
         # ⚑ `--add` IS THE SIBLING THAT CREATES, AND ITS REFUSALS ARE THE POINT.
         # Every case below drives a real refusal or a real read-back; a case
@@ -2055,47 +2302,70 @@ def _selftest():
         # (the witness module for these cases is written at the top of the fixture)
         _ok = {"claim": "gamma", "check": "item:T27", "section": "s"}
         _addp = _via_disk(add_entry("C", _ok, p), "added.bib")
-        check("--add appends a NEW entry that reads back",
-              "C" in entries(_addp), True)
-        check("--add preserves the entries already there",
-              sorted(entries(_addp)), ["A", "B", "C"])
+        check("--add appends a NEW entry that reads back", "C" in entries(_addp), True)
+        check("--add preserves the entries already there", sorted(entries(_addp)), ["A", "B", "C"])
         check("--add result round-trips", roundtrip(_addp), [])
-        check("--add REFUSES a key that already exists",
-              _refuses(lambda: add_entry("A", _ok, p)), True)
-        check("--add REFUSES an entry with no claim",
-              _refuses(lambda: add_entry("D", {"check": "item:D"}, p)), True)
-        check("--add REFUSES an edge into a non-existent key",
-              _refuses(lambda: add_entry(
-                  "D", dict(_ok, **{"rests-on": "NOSUCH"}), p)), True)
-        check("--add ACCEPTS an edge into an existing key",
-              "rests-on" in entries(_via_disk(
-                  add_entry("D", dict(_ok, **{"rests-on": "A"}), p),
-                  "edged.bib"))["D"], True)
+        check(
+            "--add REFUSES a key that already exists",
+            _refuses(lambda: add_entry("A", _ok, p)),
+            True,
+        )
+        check(
+            "--add REFUSES an entry with no claim",
+            _refuses(lambda: add_entry("D", {"check": "item:D"}, p)),
+            True,
+        )
+        check(
+            "--add REFUSES an edge into a non-existent key",
+            _refuses(lambda: add_entry("D", dict(_ok, **{"rests-on": "NOSUCH"}), p)),
+            True,
+        )
+        check(
+            "--add ACCEPTS an edge into an existing key",
+            "rests-on"
+            in entries(_via_disk(add_entry("D", dict(_ok, **{"rests-on": "A"}), p), "edged.bib"))[
+                "D"
+            ],
+            True,
+        )
         # ⚑ THE WITNESS GATE.  `item:` naming no `def` in items.py must refuse:
         # such an entry is ordered-but-never-closable, which is worse than absent
         # because the ordering will surface it as work forever.
-        check("--add REFUSES an item: witness with no def in items.py",
-              _refuses(lambda: add_entry(
-                  "D", {"claim": "d", "check": "item:NoSuchWitness"}, p)), True)
+        check(
+            "--add REFUSES an item: witness with no def in items.py",
+            _refuses(lambda: add_entry("D", {"claim": "d", "check": "item:NoSuchWitness"}, p)),
+            True,
+        )
         # ⚑ THE KEY IS NOT THE FUNCTION NAME.  `T28-edges` resolves to
         # `def T28_EDGES(`, so checking the LITERAL key rejects every hyphenated
         # key -- most of them.  Measured: this refused `D0-kernel` on its own
         # correct, registered, mutation-tested witness.  A guard that refuses the
         # population it governs reads as strictness and is a defect.
-        check("--add ACCEPTS a hyphenated key whose witness is UPPER_SNAKE",
-              "T28-edges" in entries(_via_disk(
-                  add_entry("T28-edges",
-                            {"claim": "x", "check": "item:T28-edges"}, p),
-                  "hyphen.bib")), True)
+        check(
+            "--add ACCEPTS a hyphenated key whose witness is UPPER_SNAKE",
+            "T28-edges"
+            in entries(
+                _via_disk(
+                    add_entry("T28-edges", {"claim": "x", "check": "item:T28-edges"}, p),
+                    "hyphen.bib",
+                )
+            ),
+            True,
+        )
         # ⚑ AND DEFINING IS NOT REGISTERING.  `def D0_KERNEL(` existed while
         # `--items D0-kernel` still said `unknown item key(s)`, because the
         # roster is the ITEMS dict.  An entry whose witness is defined but
         # unregistered is exactly as unclosable as one with no witness at all.
-        check("--add REFUSES a witness that is defined but NOT in ITEMS",
-              _refuses(lambda: add_entry(
-                  "E", {"claim": "e", "check": "item:_open"}, p)), True)
-        check("--add is PURE — computing an entry writes nothing",
-              open(p, encoding="utf-8").read(), _before)
+        check(
+            "--add REFUSES a witness that is defined but NOT in ITEMS",
+            _refuses(lambda: add_entry("E", {"claim": "e", "check": "item:_open"}, p)),
+            True,
+        )
+        check(
+            "--add is PURE — computing an entry writes nothing",
+            open(p, encoding="utf-8").read(),
+            _before,
+        )
         # ⚑ THE PAIR-SPLITTER, DRIVEN THROUGH THE CLI'S OWN PARSE.  The unit
         # under test is `main`'s argv handling, not `add_entry` -- the defect was
         # entirely in the splitter, and a case calling `add_entry` with a ready
@@ -2108,9 +2378,14 @@ def _selftest():
         # case failed while the parse it tests was provably right (the printed
         # diff showed the claim whole).  A case must request the effect it
         # asserts.
-        _argv = ["--add", "F", "section=s",
-                 "claim=a claim with spaces [some-tag=0]", "check=item:T27",
-                 "--apply"]
+        _argv = [
+            "--add",
+            "F",
+            "section=s",
+            "claim=a claim with spaces [some-tag=0]",
+            "check=item:T27",
+            "--apply",
+        ]
         _ap = os.path.join(d, "pairs.bib")
         with open(_ap, "w", encoding="utf-8") as fh:
             fh.write(open(p, encoding="utf-8").read())
@@ -2163,55 +2438,74 @@ def _selftest():
         finally:
             globals()["DEFAULT"] = _saved
         if _armed:
-            check("⚑ ARMED: an UNSTATED mutation intent is REFUSED, not guessed "
-                  "(this run did NOT measure the =0 advisory path)",
-                  _rc_unstated, 2)
+            check(
+                "⚑ ARMED: an UNSTATED mutation intent is REFUSED, not guessed "
+                "(this run did NOT measure the =0 advisory path)",
+                _rc_unstated,
+                2,
+            )
         else:
             # ⚑ NOT A SKIP AND NOT A TAUTOLOGY. The hatch's documented job is to be LOUD;
             # a silent downgrade is the failure mode its own author named. Asserting the
             # announcement is a real assertion about the unarmed world.
-            check("⚑ UNARMED (=0): the downgrade ANNOUNCES itself — a silent bypass is the "
-                  "defect (this run did NOT measure the armed refusal)",
-                  "RUNNING UNARMED" in _err_unstated, True)
+            check(
+                "⚑ UNARMED (=0): the downgrade ANNOUNCES itself — a silent bypass is the "
+                "defect (this run did NOT measure the armed refusal)",
+                "RUNNING UNARMED" in _err_unstated,
+                True,
+            )
         # ⚑ AND THE WRITE-SIDE CONSEQUENCE, WHICH ALREADY MEASURED SOMETHING IN BOTH WORLDS
         # and still does: armed, nothing lands; unarmed, the advisory lets the write through.
         # The expectation FLIPS with the world, so neither branch is satisfied by the other's
         # answer — which is what makes this one a genuine two-world assertion rather than a
         # constant wearing a condition.
-        check("...and the write follows the world: armed writes NOTHING, unarmed proceeds",
-              "F" in entries(_ap2), not _armed)
-        check("--add keeps a multi-word claim whole",
-              _got.get("claim"), "a claim with spaces [some-tag=0]")
-        check("--add does not read `[tag=N]` as a field name",
-              sorted(n for n in _got if not n.startswith("_")),
-              ["check", "claim", "section"])
+        check(
+            "...and the write follows the world: armed writes NOTHING, unarmed proceeds",
+            "F" in entries(_ap2),
+            not _armed,
+        )
+        check(
+            "--add keeps a multi-word claim whole",
+            _got.get("claim"),
+            "a claim with spaces [some-tag=0]",
+        )
+        check(
+            "--add does not read `[tag=N]` as a field name",
+            sorted(n for n in _got if not n.startswith("_")),
+            ["check", "claim", "section"],
+        )
 
         kinds = sorted({k for k, _s, _d in edges(p)})
-        check("all three edge kinds are read", kinds,
-              ["enables", "from", "rests-on"])
+        check("all three edge kinds are read", kinds, ["enables", "from", "rests-on"])
 
         # ⚑ A DANGLING EDGE IS A FINDING, and the engine hides it: its `if d in
         # bib` filter makes a mistyped dependency read as NO dependency, so the
         # item sorts as if unblocked.
-        check("a dangling edge target is reported",
-              orphans(p), [("enables", "B", "NOSUCH")])
+        check("a dangling edge target is reported", orphans(p), [("enables", "B", "NOSUCH")])
 
         # ⚑ MENTIONS IS EVIDENCE FOR AN EDGE, and a DECLARED edge is excluded:
         # `B` already declares `from = {A}`, so reporting that as a "mention"
         # would recommend an edge that exists.
         with open(p, "a", encoding="utf-8") as fh:
-            fh.write("\n@misc{C,\n"
-                     "  section = {s},\n"
-                     "  claim   = {gamma, which rests on B's result},\n"
-                     "  check   = {item:C}\n"
-                     "}\n")
+            fh.write(
+                "\n@misc{C,\n"
+                "  section = {s},\n"
+                "  claim   = {gamma, which rests on B's result},\n"
+                "  check   = {item:C}\n"
+                "}\n"
+            )
         m = mentions("B", p)
-        check("a prose mention is reported", [(o, f) for o, f, _c in m],
-              [("C", "claim")])
-        check("a DECLARED edge is not reported as a mention",
-              [o for o, _f, _c in mentions("A", p)], [])
-        check("an unknown key refuses, never returns empty",
-              _refuses(lambda: mentions("NOPE", p)), True)
+        check("a prose mention is reported", [(o, f) for o, f, _c in m], [("C", "claim")])
+        check(
+            "a DECLARED edge is not reported as a mention",
+            [o for o, _f, _c in mentions("A", p)],
+            [],
+        )
+        check(
+            "an unknown key refuses, never returns empty",
+            _refuses(lambda: mentions("NOPE", p)),
+            True,
+        )
 
         # a missing file REFUSES rather than reporting an empty bib as clean
         try:
@@ -2239,40 +2533,39 @@ def _selftest():
         # first version of both assertions said ["A", "B"] from memory of the fixture's
         # OPENING state and went red, which is the case working: a literal population is
         # only a real assertion if you check what the fixture has become.
-        check("...and the refusal writes nothing", sorted(entries(p)),
-              ["A", "B", "C"])
+        check("...and the refusal writes nothing", sorted(entries(p)), ["A", "B", "C"])
         # ⚑ THE POSITIVE HALF, because a refusal alone would be satisfied by a mode that
         # refuses EVERYTHING.  `--bib` must actually retarget: this writes to a second
         # file and the FIRST must be untouched, which is the property the whole flag
         # exists for and the one a cross-repo filing depends on.
         p2 = os.path.join(d, "other.bib")
         with open(p2, "w", encoding="utf-8") as fh:
-            fh.write("@misc{Z,\n  section = {s},\n  claim = {zeta},\n"
-                     "  check = {item:Z}\n}\n")
+            fh.write("@misc{Z,\n  section = {s},\n  claim = {zeta},\n  check = {item:Z}\n}\n")
         # ⚑ `item:T27` AND NOT `item:NEW`: `--add` verifies the witness EXISTS before it
         # writes, so an invented key makes this case die inside the tool — SystemExit,
         # which aborts the whole selftest and reports a smaller population instead of one
         # red row.  Measured while writing this case; the same shape the mdstruct
         # frontmatter case is wrapped against.
         try:
-            main(["--add", "NEW", "section=s", "claim=n", "check=item:T27",
-                  "--bib", p2, "--apply"], intent="apply")
+            main(
+                ["--add", "NEW", "section=s", "claim=n", "check=item:T27", "--bib", p2, "--apply"],
+                intent="apply",
+            )
         except SystemExit as exc:
             check("--bib write completes", f"SystemExit: {exc}", "no exit")
         check("--bib retargets the write", sorted(entries(p2)), ["NEW", "Z"])
-        check("...and the default-side file is untouched", sorted(entries(p)),
-              ["A", "B", "C"])
+        check("...and the default-side file is untouched", sorted(entries(p)), ["A", "B", "C"])
         # ⚑⚑ AND THE SAME FOR `--set` — the half the first version of this case MISSED,
         # and the miss SHIPPED.  `--bib` was threaded through `--add` only; `--set` went
         # on writing to DEFAULT while accepting the flag without complaint, which is
         # precisely the half-wired-flag defect `--bib` was added to fix, reproduced inside
         # the fix for it.  **One mode tested is not one capability tested** — the case
         # passed green over a broken sibling because it only ever exercised one verb.
-        main(["--set", "Z", "claim", "zeta-edited", "--bib", p2, "--apply"],
-             intent="apply")
+        main(["--set", "Z", "claim", "zeta-edited", "--bib", p2, "--apply"], intent="apply")
         check("--bib retargets a --set too", entries(p2)["Z"]["claim"], "zeta-edited")
-        check("...and --set leaves the default-side file alone",
-              sorted(entries(p)), ["A", "B", "C"])
+        check(
+            "...and --set leaves the default-side file alone", sorted(entries(p)), ["A", "B", "C"]
+        )
 
     bad = [c for c in cases if not c[1]]
     for label, _, got, want in bad:
@@ -2300,8 +2593,8 @@ def _selftest():
     # cases, and an inflated reach baseline is permanent (no honest run can reach it).
     try:
         import rungs as _rungs
-        _rungs.emit_record(len(cases) - len(bad), len(cases),
-                           key="scratch/bibstruct.py")
+
+        _rungs.emit_record(len(cases) - len(bad), len(cases), key="scratch/bibstruct.py")
     except ImportError:
         # ⚑ ABSENT `rungs` IS REPORTED, NOT SWALLOWED INTO A GREEN. The prose line below
         # still prints, so the suite degrades to the legacy reading rather than to a

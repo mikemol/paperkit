@@ -25,6 +25,7 @@ precedent: derive what the generator WOULD emit from `MODULE.bazel`, compare aga
 that decides it.  A witness keyed on an output-base hash reports one machine's cache layout as a
 fact about the engine.
 """
+
 import re
 import sys
 from pathlib import Path
@@ -46,8 +47,9 @@ def declarations() -> dict:
         m = re.search(r'name\s*=\s*"([^"]+)"', line)
         if not m:
             continue
-        out[m.group(1)] = {f: f"{f} = True" in line
-                           for f in ("adequacy", "emerge", "calc", "compose")}
+        out[m.group(1)] = {
+            f: f"{f} = True" in line for f in ("adequacy", "emerge", "calc", "compose")
+        }
     return out
 
 
@@ -77,12 +79,12 @@ def _guard_of(bzl: str, target: str):
             continue
         indent = len(line) - len(line.lstrip())
         if indent >= emit_indent:
-            continue                                   # a sibling statement, not an encloser
+            continue  # a sibling statement, not an encloser
         # ⚑ THE FLAG MAY BE READ THROUGH A LOCAL, NOT ONLY OFF THE ATTRIBUTE.  `cohere_rec`'s
         # guard is `if emerge and (calc_claims or imported_cert):` — the attribute was bound to a
         # local far above.  Matching only `repository_ctx.attr.X` reported it UNGUARDED, which is
         # Β-F1's shape again: one SPELLING taken for the concept.  Both forms are the same rule.
-        m = re.search(r'if (?:repository_ctx\.attr\.)?([\w.]+)\b', line)
+        m = re.search(r"if (?:repository_ctx\.attr\.)?([\w.]+)\b", line)
         if m:
             # ⚑ THE NEAREST ENCLOSING `if` IS THE ANSWER, WHATEVER IT TESTS.  Returning only
             # recognised FLAGS and walking PAST anything else made the witness report a guard from
@@ -92,7 +94,7 @@ def _guard_of(bzl: str, target: str):
             flag = m.group(1)
             return (flag, None) if flag in FLAGS else (None, f"guarded by `{flag}`")
         if line.strip().endswith(":"):
-            emit_indent = indent                       # an enclosing block that is not our guard
+            emit_indent = indent  # an enclosing block that is not our guard
     return None, "unguarded"
 
 
@@ -106,35 +108,48 @@ def main() -> int:
     flag, why = _guard_of(bzl, "adequacy_rec")
     if flag == "adequacy":
         n = sum(1 for d in decl.values() if d["adequacy"])
-        print(f"  ok the :adequacy record is guarded by `adequacy` — {n} of {len(decl)} "
-              f"project(s) declare it")
+        print(
+            f"  ok the :adequacy record is guarded by `adequacy` — {n} of {len(decl)} "
+            f"project(s) declare it"
+        )
     else:
-        print(f"  XX the :adequacy record is {why or f'guarded by {flag!r}'}, not by `adequacy` — "
-              f"a project could be graded without declaring it, or declare it and not be",
-              file=sys.stderr)
+        print(
+            f"  XX the :adequacy record is {why or f'guarded by {flag!r}'}, not by `adequacy` — "
+            f"a project could be graded without declaring it, or declare it and not be",
+            file=sys.stderr,
+        )
         bad += 1
 
     print("\n⟨emerge = True ⇒ :cohere and :decisions⟩\n")
     flag, why = _guard_of(bzl, "cohere_rec")
     if flag == "emerge":
         n = sum(1 for d in decl.values() if d["emerge"])
-        print(f"  ok the :cohere record is guarded by `emerge` — {n} of {len(decl)} project(s) "
-              f"declare it")
+        print(
+            f"  ok the :cohere record is guarded by `emerge` — {n} of {len(decl)} project(s) "
+            f"declare it"
+        )
     else:
-        print(f"  XX the :cohere record is {why or f'guarded by {flag!r}'}, not by `emerge`",
-              file=sys.stderr)
+        print(
+            f"  XX the :cohere record is {why or f'guarded by {flag!r}'}, not by `emerge`",
+            file=sys.stderr,
+        )
         bad += 1
 
     print("\n⟨:invariants is emitted for EVERY project, at ANY tier⟩\n")
     flag, why = _guard_of(bzl, "invariants")
     if why == "absent":
-        print("  XX no :invariants emission in the generator — every project loses --without-K",
-              file=sys.stderr)
+        print(
+            "  XX no :invariants emission in the generator — every project loses --without-K",
+            file=sys.stderr,
+        )
         bad += 1
     elif why != "unguarded" or flag is not None:
-        print(f"  XX :invariants is {why or f'GUARDED by `{flag}`'} — Α wired report/image on the "
-              f"argument that it is emitted REGARDLESS of tier; a guard silently removes "
-              f"--without-K from whichever projects fail the condition", file=sys.stderr)
+        print(
+            f"  XX :invariants is {why or f'GUARDED by `{flag}`'} — Α wired report/image on the "
+            f"argument that it is emitted REGARDLESS of tier; a guard silently removes "
+            f"--without-K from whichever projects fail the condition",
+            file=sys.stderr,
+        )
         bad += 1
     else:
         print("  ok :invariants is emitted unconditionally (unguarded)")
@@ -143,27 +158,37 @@ def main() -> int:
     # ANYWHERE — and it appears twice, so a mutation removing it from the invariants command left
     # the check green (measured: the discrimination probe scored 5/6 on exactly this).  Read the
     # `inv = ` assignment that BUILDS the command.
-    m = re.search(r'^\s*inv = (.+)$', bzl, re.M)
+    m = re.search(r"^\s*inv = (.+)$", bzl, re.M)
     if m is None:
-        print("  XX cannot find the `inv = ` command assignment — the invariants command is not "
-              "where this witness looks, so it can assert nothing about it", file=sys.stderr)
+        print(
+            "  XX cannot find the `inv = ` command assignment — the invariants command is not "
+            "where this witness looks, so it can assert nothing about it",
+            file=sys.stderr,
+        )
         bad += 1
     elif "--without-K" in m.group(1):
         print("  ok the :invariants COMMAND carries `--without-K`")
     else:
-        print(f"  XX the :invariants command no longer carries `--without-K` — the cross-claim "
-              f"distinctness invariant is gone from every project: {m.group(1).strip()[:70]}",
-              file=sys.stderr)
+        print(
+            f"  XX the :invariants command no longer carries `--without-K` — the cross-claim "
+            f"distinctness invariant is gone from every project: {m.group(1).strip()[:70]}",
+            file=sys.stderr,
+        )
         bad += 1
 
     print("\n⟨P, F, δ⟩ what would refute each rule\n")
-    print("      P: adequacy_rec guarded by `adequacy`; cohere_rec by `emerge`; invariants unguarded")
+    print(
+        "      P: adequacy_rec guarded by `adequacy`; cohere_rec by `emerge`; invariants unguarded"
+    )
     print("      F: a guard added to :invariants, or removed from a record, or --without-K dropped")
     print("      δ (min delta): one `if repository_ctx.attr.<flag>:` line in tools/bibtex.bzl")
 
     if bad:
-        print(f"\nbnd-generator: {bad} rule(s) REFUTED — the build graph no longer follows its "
-              f"own declarations", file=sys.stderr)
+        print(
+            f"\nbnd-generator: {bad} rule(s) REFUTED — the build graph no longer follows its "
+            f"own declarations",
+            file=sys.stderr,
+        )
         return 1
     print(f"\nBOUNDARIES: PASS (3 declaration→target rules over {len(decl)} projects, 1 delta)")
     return 0

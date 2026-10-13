@@ -17,6 +17,7 @@ the seam is unreachable from here until `Ζ·runner·venv` lands, and each regex
 pays for its own narrowing meanwhile.  Recorded rather than silently re-derived: this is the
 same capability in a second body, which is the thing the seam was built to prevent.
 """
+
 from __future__ import annotations
 
 import re
@@ -48,13 +49,11 @@ def _to_pdf_text(svg: Path, d: Path) -> tuple[str, str]:
     if emf is None:
         return "", "SVG did not convert to an EMF vector (soffice produced no output)"
     (d / "m.md").write_text("# Figure\n\n![the claim-DAG](dag.emf)\n")
-    subprocess.run(["pandoc", str(d / "m.md"), "-o", str(d / "out.docx")],
-                   check=True, cwd=str(d))
+    subprocess.run(["pandoc", str(d / "m.md"), "-o", str(d / "out.docx")], check=True, cwd=str(d))
     out_pdf = lo.convert(d / "out.docx", "pdf", d, timeout=120)
     if out_pdf is None:
         return "", "docx did not convert to a PDF (soffice produced no output)"
-    subprocess.run(["pdftotext", str(out_pdf), str(d / "t.txt")],
-                   check=True)
+    subprocess.run(["pdftotext", str(out_pdf), str(d / "t.txt")], check=True)
     return (d / "t.txt").read_text().lower(), ""
 
 
@@ -72,11 +71,14 @@ def check() -> int:
         return 1
     missing = [w for w in words if w not in txt]
     if missing:
-        sys.stderr.write(f"figure legend words lost from the PDF text layer "
-                         f"(locked in pixels?): {missing}\n")
+        sys.stderr.write(
+            f"figure legend words lost from the PDF text layer (locked in pixels?): {missing}\n"
+        )
         return 1
-    sys.stdout.write(f"fig legible ok: all {len(words)} legend words survive into the PDF "
-                     f"text layer (screen-readable)\n")
+    sys.stdout.write(
+        f"fig legible ok: all {len(words)} legend words survive into the PDF "
+        f"text layer (screen-readable)\n"
+    )
     return 0
 
 

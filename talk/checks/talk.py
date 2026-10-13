@@ -9,6 +9,7 @@ already graded — zero new witness code, which is the concept-library story the
 The few here are mechanism claims with no matching library concept yet.  Each asserts its specific
 proposition against the ENGINE, so it fails if the claim is false, rather than standing on cmd:true.
 """
+
 import sys
 from pathlib import Path
 import paperkit.bib
@@ -22,37 +23,49 @@ def t_chain():
     # LOAD-BEARING — break the innermost and the outermost goes red.
     import shutil, tempfile
     import paperkit.gate, paperkit.project
+
     d = Path(tempfile.mkdtemp())
     try:
+
         def mk(name, check):
-            p = d / name; p.mkdir(exist_ok=True)
-            (p / "paper.toml").write_text('[paper]\ntitle = "t"\nwarrants = ["w.bib"]\n'
-                                          'rubric = "r.tsv"\nout = "out.md"\n')
+            p = d / name
+            p.mkdir(exist_ok=True)
+            (p / "paper.toml").write_text(
+                '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "out.md"\n'
+            )
             (p / "r.tsv").write_text("s\tSec\n")
-            (p / "w.bib").write_text("@misc{c,\n  section = {s},\n  claim = {x},\n"
-                                     "  check = {%s}\n}\n" % check)
+            (p / "w.bib").write_text(
+                "@misc{c,\n  section = {s},\n  claim = {x},\n  check = {%s}\n}\n" % check
+            )
             (p / "out.md").write_text(paperkit.project.project(paperkit.bib.load_config(p)))
-        mk("inner", "cmd:true"); mk("middle", "result:../inner")
-        assert paperkit.resolver.resolves("result:middle", d, {}).passed, "a two-link chain did not resolve"
+
+        mk("inner", "cmd:true")
+        mk("middle", "result:../inner")
+        assert paperkit.resolver.resolves("result:middle", d, {}).passed, (
+            "a two-link chain did not resolve"
+        )
         mk("inner", "cmd:false")
-        assert not paperkit.resolver.resolves("result:middle", d, {}).passed, \
+        assert not paperkit.resolver.resolves("result:middle", d, {}).passed, (
             "breaking the innermost left the outermost green — the chain is decorative"
+        )
     finally:
         shutil.rmtree(d, ignore_errors=True)
-
-
 
 
 def t_fmt_deck():
     # a deck is a SEGMENTATION, not a linearization: project() returns one string, observe()
     # returns units — a different observation of the same carrier.
     import paperkit.project
-    assert callable(paperkit.project.observe) and callable(paperkit.project.project), "the two observation shapes are not both present"
+
+    assert callable(paperkit.project.observe) and callable(paperkit.project.project), (
+        "the two observation shapes are not both present"
+    )
     cfg = paperkit.bib.load_config(ROOT / "talk")
     assert isinstance(paperkit.project.project(cfg), str), "project() must return one flat stream"
     u = paperkit.project.observe(cfg, "staged", ROOT / "talk")
-    assert isinstance(u, list) and u and isinstance(u[0], dict), \
+    assert isinstance(u, list) and u and isinstance(u[0], dict), (
         "observe() must return UNITS — a segmentation, not a rendered string"
+    )
 
 
 def t_fmt_genre():
@@ -60,6 +73,7 @@ def t_fmt_genre():
     # like a check type — a consumer adds its own without touching the engine.
     import paperkit.genre
     import paperkit.project
+
     cfg = paperkit.bib.load_config(ROOT / "talk")
     a = paperkit.project.observe(cfg, "staged", ROOT / "talk")
     b = paperkit.project.observe(cfg, "atomic", ROOT / "talk")
@@ -71,12 +85,12 @@ def t_fmt_genre():
         pass
 
 
-
 def t_graphs_fig():
     # a FIGURE is alt-texted BY CONSTRUCTION: the projector renders an `as = image` placement as
     # ![claim](path), so the claim's own sentence IS the alternative text — a figure cannot ship
     # without a description unless the claim itself is empty.
     import paperkit.project
+
     cfg = paperkit.bib.load_config(ROOT / "talk")
     F = {}
     for b in cfg["bibs"]:
@@ -85,7 +99,7 @@ def t_graphs_fig():
     assert f.get("emit") and (f.get("as") == "image"), "the figure claim no longer places an image"
     line = paperkit.project.emit_block(cfg, f)[0]
     assert line.startswith("!["), f"an image placement did not render as markdown image: {line!r}"
-    alt = line[2:line.index("](")]
+    alt = line[2 : line.index("](")]
     assert len(alt.split()) > 5, f"the figure's alt text is too thin to describe it: {alt!r}"
     assert (ROOT / "talk" / f["emit"]).is_file(), "the figure asset is missing from the project"
 
@@ -95,6 +109,7 @@ def _figure(key):
     `as = image` as ![claim](path), so the claim IS the description), its asset exists, and its
     description reads as prose rather than a filename."""
     import paperkit.project
+
     cfg = paperkit.bib.load_config(ROOT / "talk")
     F = {}
     for b in cfg["bibs"]:
@@ -103,7 +118,7 @@ def _figure(key):
     assert f.get("emit") and f.get("as") == "image", f"{key} no longer places an image"
     line = paperkit.project.emit_block(cfg, f)[0]
     assert line.startswith("!["), f"{key} did not render as a markdown image: {line!r}"
-    alt = line[2:line.index("](")]
+    alt = line[2 : line.index("](")]
     assert len(alt.split()) > 5, f"{key} alt text too thin: {alt!r}"
     assert not alt.endswith(".svg"), f"{key} alt text is a filename, not a description"
     assert (ROOT / "talk" / f["emit"]).is_file(), f"{key} asset missing"
@@ -117,13 +132,28 @@ def _colour_safe(svg, key):
     words.  Enforced negatively — the figure must not introduce meaning HUES at all — which is the
     strongest form of the rule and the one a reproduction in greyscale also satisfies."""
     import re as _re
+
     hues = {h.lower() for h in _re.findall(r'(?:fill|stroke)="(#[0-9a-fA-F]{3,6}|[a-z]+)"', svg)}
-    allowed = {"#fff", "#ffffff", "#111", "#111111", "#333", "#333333", "none", "white", "black",
-               "currentcolor"}
+    allowed = {
+        "#fff",
+        "#ffffff",
+        "#111",
+        "#111111",
+        "#333",
+        "#333333",
+        "none",
+        "white",
+        "black",
+        "currentcolor",
+    }
     meaning = hues - allowed
-    assert not meaning, f"{key} uses meaning colour(s) {sorted(meaning)} — colour must not be the sole cue"
-    redundant = ("stroke-dasharray" in svg or "font-weight" in svg or "stroke-width" in svg)
-    assert redundant, f"{key} carries no non-colour cue (dash, weight or shape) to distinguish anything"
+    assert not meaning, (
+        f"{key} uses meaning colour(s) {sorted(meaning)} — colour must not be the sole cue"
+    )
+    redundant = "stroke-dasharray" in svg or "font-weight" in svg or "stroke-width" in svg
+    assert redundant, (
+        f"{key} carries no non-colour cue (dash, weight or shape) to distinguish anything"
+    )
     assert 'role="img"' in svg and "aria-label" in svg, f"{key} SVG lacks role/aria-label"
 
 
@@ -139,8 +169,10 @@ def _figure_domain():
     so the domain had already silently shrunk before anyone looked.
     """
     import importlib.util
+
     spec = importlib.util.spec_from_file_location("_eb", ROOT / "paperkit" / "bib.py")
-    eb = importlib.util.module_from_spec(spec); spec.loader.exec_module(eb)
+    eb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(eb)
     F = eb.parse_project(ROOT / "talk")
     return sorted(k for k, v in F.items() if v.get("emit") and v.get("as") == "image")
 
@@ -164,7 +196,8 @@ def _every_figure():
     assert len(dom) >= len(shipped), (
         f"the figure domain SHRANK: {len(dom)} claim(s) place an image but the project ships "
         f"{len(shipped)} figure asset(s) {shipped} — an asset with no image-placing claim is "
-        f"outside the family and unchecked")
+        f"outside the family and unchecked"
+    )
     for key in dom:
         _colour_safe(_figure(key), key)
     return dom
@@ -182,14 +215,16 @@ def t_routes_fig():
     _every_figure()
 
 
-
 WITNESSES = {
     "t-graphs-fig": t_graphs_fig,
     "t-verbs-fig": t_verbs_fig,
     "t-library-fig": t_library_fig,
     "t-routes-fig": t_routes_fig,
-    "t-chain": t_chain, "t-fmt-deck": t_fmt_deck, "t-fmt-genre": t_fmt_genre,
+    "t-chain": t_chain,
+    "t-fmt-deck": t_fmt_deck,
+    "t-fmt-genre": t_fmt_genre,
 }
+
 
 def _dispatch_total():
     """The dispatch table is itself a hand-kept domain, and the LAST unfloored one here.
@@ -203,17 +238,21 @@ def _dispatch_total():
     (the growth arm is the one that catches the derivation standing still while its owner grows).
     """
     import importlib.util, re
+
     spec = importlib.util.spec_from_file_location("_eb", ROOT / "paperkit" / "bib.py")
-    eb = importlib.util.module_from_spec(spec); spec.loader.exec_module(eb)
+    eb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(eb)
     F = eb.parse_project(ROOT / "talk")
     want = {k for k, v in F.items() if (v.get("check") or "").startswith("claim:")}
     have = set(WITNESSES)
     assert not (want - have), (
         f"claims with no witness: {sorted(want - have)} -- the bib routes these to claim: but the "
-        f"dispatch table has no entry, so the runner reports a missing key, not a missing witness")
+        f"dispatch table has no entry, so the runner reports a missing key, not a missing witness"
+    )
     assert not (have - want), (
         f"witnesses with no claim: {sorted(have - want)} -- these never fire; either the claim was "
-        f"dropped from the bib or the key drifted, and a dead witness proves nothing")
+        f"dropped from the bib or the key drifted, and a dead witness proves nothing"
+    )
 
 
 if __name__ == "__main__":
@@ -222,14 +261,17 @@ if __name__ == "__main__":
         try:
             _dispatch_total()
         except AssertionError as e:
-            print(f"talk --total: FAIL -- {e}", file=sys.stderr); raise SystemExit(1)
+            print(f"talk --total: FAIL -- {e}", file=sys.stderr)
+            raise SystemExit(1)
         print(f"talk --total: OK ({len(WITNESSES)} claims, each witnessed, none orphaned)")
         raise SystemExit(0)
     fn = WITNESSES.get(key)
     if fn is None:
-        print(f"talk: no witness for {key!r}", file=sys.stderr); raise SystemExit(2)
+        print(f"talk: no witness for {key!r}", file=sys.stderr)
+        raise SystemExit(2)
     try:
         fn()
     except AssertionError as e:
-        print(f"claim {key}: FAIL — {e}", file=sys.stderr); raise SystemExit(1)
+        print(f"claim {key}: FAIL — {e}", file=sys.stderr)
+        raise SystemExit(1)
     print(f"claim {key}: OK")

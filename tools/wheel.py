@@ -76,7 +76,7 @@ def build(out: str, pyproject: str) -> None:
     shutil.rmtree(root / "build", ignore_errors=True)
     cwd = os.getcwd()
     try:
-        os.chdir(root)                      # PEP 517 builds the project rooted at the CWD
+        os.chdir(root)  # PEP 517 builds the project rooted at the CWD
         with tempfile.TemporaryDirectory() as td:
             name = build_meta.build_wheel(td)
             shutil.copyfile(pathlib.Path(td) / name, out)
@@ -110,7 +110,7 @@ def install(venv_dir: str, wheel: str, *extra: str) -> str:
         _populate(tmp, wheel, extra)
         (tmp / ".pk-complete").write_text("")
         try:
-            os.rename(tmp, vd)                    # atomic when the name is free
+            os.rename(tmp, vd)  # atomic when the name is free
         except OSError:
             # A peer won the race and the shared name now exists, complete.  Its content equals
             # ours by construction, so DISCARD OURS rather than clobbering a venv in use.
@@ -149,7 +149,8 @@ def _populate(vd: pathlib.Path, wheel: str, extra: tuple) -> None:
                 roots.append(r)
     if roots:
         (sp / "_pydeps.pth").write_text(
-            "\n".join(str(pathlib.Path(r).resolve()) for r in roots) + "\n")
+            "\n".join(str(pathlib.Path(r).resolve()) for r in roots) + "\n"
+        )
 
 
 if __name__ == "__main__":

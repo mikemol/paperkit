@@ -23,6 +23,7 @@ manifest by rnd-slides, so the chain closes: claims → units (here) → slides 
     python3 checks/units.py            # print the current segmentation
     python3 checks/units.py --check    # assert the committed manifest IS the segmentation
 """
+
 from __future__ import annotations
 
 import sys
@@ -35,20 +36,20 @@ _ROOT = Path(__file__).resolve().parents[2]
 # manifest; the genre is part of the declaration because a different genre is a different cut, and
 # a manifest that did not say which would be ungateable.
 OBSERVED = {
-    "paper": "talk",       # the densest cut available.  (A count once sat here — "87 claims,
-                           #   68 grounding edges" — against slides.bib's 84/57 for the same
-                           #   project: two uncoordinated snapshots, neither marked stale.
-                           #   Dropped rather than re-measured; the manifest itself carries
-                           #   the live numbers and cannot drift from them.)
-    "setup": "talk",       # 26 edges: a SECOND grounded project, so the gate is not one instance
-    "talk": "talk",        # the delivered talk: a FOURTH project, and the only one whose claims
-                           #   are a mix of imported certificates, own witnesses and honest
-                           #   premises — so its manifest is the one that would move if a
-                           #   post-talk edit quietly re-sectioned or re-grounded a claim.
-    "root": "talk",        # 9 units, 9 placed assets — the asset-heaviest, and DEGENERATE
-                           #   (no rests-on), so it exercises the σ-fallback path the dense
-                           #   projects never reach.  One observed project could not tell whether
-                           #   the manifest held for a document the partition falls back on.
+    "paper": "talk",  # the densest cut available.  (A count once sat here — "87 claims,
+    #   68 grounding edges" — against slides.bib's 84/57 for the same
+    #   project: two uncoordinated snapshots, neither marked stale.
+    #   Dropped rather than re-measured; the manifest itself carries
+    #   the live numbers and cannot drift from them.)
+    "setup": "talk",  # 26 edges: a SECOND grounded project, so the gate is not one instance
+    "talk": "talk",  # the delivered talk: a FOURTH project, and the only one whose claims
+    #   are a mix of imported certificates, own witnesses and honest
+    #   premises — so its manifest is the one that would move if a
+    #   post-talk edit quietly re-sectioned or re-grounded a claim.
+    "root": "talk",  # 9 units, 9 placed assets — the asset-heaviest, and DEGENERATE
+    #   (no rests-on), so it exercises the σ-fallback path the dense
+    #   projects never reach.  One observed project could not tell whether
+    #   the manifest held for a document the partition falls back on.
 }
 
 
@@ -65,6 +66,7 @@ _OBSERVED_FLOOR = 4
 def manifest(project_dir: Path, genre_name: str) -> str:
     """The segmentation as text: one unit per line, section then keys, tab-separated."""
     import paperkit.project
+
     cfg = paperkit.bib.load_config(project_dir)
     units = paperkit.project.observe(cfg, genre_name, project_dir)
     return "".join(f"{u['section']}\t" + "\t".join(u["keys"]) + "\n" for u in units)
@@ -74,10 +76,12 @@ def main(argv: list) -> int:
     check = "--check" in argv
     rc = 0
     if len(OBSERVED) < _OBSERVED_FLOOR:
-        print(f"units --check: OBSERVED holds {len(OBSERVED)} project(s), below the declared "
-              f"floor of {_OBSERVED_FLOOR} — a manifest was dropped, which reads identically to "
-              f"never having been added.  Lower the floor deliberately or restore the entry.",
-              file=sys.stderr)
+        print(
+            f"units --check: OBSERVED holds {len(OBSERVED)} project(s), below the declared "
+            f"floor of {_OBSERVED_FLOOR} — a manifest was dropped, which reads identically to "
+            f"never having been added.  Lower the floor deliberately or restore the entry.",
+            file=sys.stderr,
+        )
         return 1
     for name, genre_name in sorted(OBSERVED.items()):
         want = manifest(_ROOT if name == "root" else _ROOT / name, genre_name)
@@ -86,25 +90,34 @@ def main(argv: list) -> int:
             print(want, end="")
             continue
         if not path.exists():
-            print(f"units --check: {path.name} is MISSING — the segmentation has no committed "
-                  f"artifact, so nothing holds it to the claim-DAG", file=sys.stderr)
+            print(
+                f"units --check: {path.name} is MISSING — the segmentation has no committed "
+                f"artifact, so nothing holds it to the claim-DAG",
+                file=sys.stderr,
+            )
             rc = 1
             continue
         got = path.read_text()
         if got != want:
             gl, wl = got.splitlines(), want.splitlines()
-            drift = next((i for i, (a, b) in enumerate(zip(gl, wl)) if a != b), min(len(gl), len(wl)))
-            print(f"units --check: {path.name} ≠ segmentation — {len(gl)} committed units vs "
-                  f"{len(wl)} projected; first divergence at unit {drift + 1}:\n"
-                  f"  committed: {gl[drift] if drift < len(gl) else '(past end)'}\n"
-                  f"  projected: {wl[drift] if drift < len(wl) else '(past end)'}\n"
-                  f"Regenerate: python3 paperkit/project.py --observe --genre {genre_name} "
-                  f"{'.' if name == 'root' else name} > render/assets/{name}-units.tsv",
-                  file=sys.stderr)
+            drift = next(
+                (i for i, (a, b) in enumerate(zip(gl, wl)) if a != b), min(len(gl), len(wl))
+            )
+            print(
+                f"units --check: {path.name} ≠ segmentation — {len(gl)} committed units vs "
+                f"{len(wl)} projected; first divergence at unit {drift + 1}:\n"
+                f"  committed: {gl[drift] if drift < len(gl) else '(past end)'}\n"
+                f"  projected: {wl[drift] if drift < len(wl) else '(past end)'}\n"
+                f"Regenerate: python3 paperkit/project.py --observe --genre {genre_name} "
+                f"{'.' if name == 'root' else name} > render/assets/{name}-units.tsv",
+                file=sys.stderr,
+            )
             rc = 1
         else:
-            print(f"units --check: {path.name} ≡ segmentation ({len(want.splitlines())} units, "
-                  f"genre {genre_name})")
+            print(
+                f"units --check: {path.name} ≡ segmentation ({len(want.splitlines())} units, "
+                f"genre {genre_name})"
+            )
     return rc
 
 

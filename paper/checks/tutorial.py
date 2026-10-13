@@ -33,6 +33,7 @@ places on its cross-group edges (`owner.get(y) is not None`).
 TOTALITY.  Every key has exactly one depth, so grouping by it is a partition by construction.  A
 key with no record lands at depth 0 — the honest default: nothing is known to precede it.
 """
+
 import genrekit
 
 
@@ -44,7 +45,7 @@ def depths(rests):
         if k in memo:
             return memo[k]
         if k in path:
-            return 0                       # a cycle contributes nothing (the clamp() guard shape)
+            return 0  # a cycle contributes nothing (the clamp() guard shape)
         ps = [p for p in rests.get(k, ()) if p in rests]
         v = 0 if not ps else 1 + max(d(p, path | {k}) for p in ps)
         memo[k] = v
@@ -61,7 +62,7 @@ def tutorial(groups):
     for g in groups:
         for k in g:
             rests.setdefault(k, [])
-    depth = depths(rests)          # computed ONCE — it is a property of the graph, not of a key
+    depth = depths(rests)  # computed ONCE — it is a property of the graph, not of a key
     by_depth = {}
     for g in groups:
         for k in g:

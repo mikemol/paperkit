@@ -23,6 +23,7 @@ distinction; this producer must never make it red.
     odp(pptx_path, outdir) -> Path        # the pptx→odp morphism
     python3 checks/slides.py              # produce + gate both nodes
 """
+
 from __future__ import annotations
 
 import re
@@ -48,9 +49,11 @@ def _slide_level(paper_md: Path) -> int:
     assumed: the shallowest level that occurs more than once.  A projector that changed its
     heading scheme would move this with it instead of silently collapsing the deck.
     """
-    levels = [len(m) for m in
-              (line.split(" ")[0] for line in paper_md.read_text().splitlines())
-              if m and set(m) == {"#"}]
+    levels = [
+        len(m)
+        for m in (line.split(" ")[0] for line in paper_md.read_text().splitlines())
+        if m and set(m) == {"#"}
+    ]
     for lvl in sorted(set(levels)):
         if levels.count(lvl) > 1:
             return lvl
@@ -62,15 +65,27 @@ def pptx(paper_md: Path, out_pptx: Path) -> Path:
     pandoc it to a .pptx, cut at the DERIVED slide level (see _slide_level) — the PROSE's own
     section boundary, which is the finest cut this transform has available (see THE BOUND).
     """
-    assert graph.tool_for("md", "pptx") == "pandoc", \
+    assert graph.tool_for("md", "pptx") == "pandoc", (
         "the graph no longer declares md→pptx as a pandoc morphism — derive the tool, never hardcode"
+    )
     with tempfile.TemporaryDirectory() as t:
         md = Path(t) / "p.md"
         md.write_text(source.cite_split(paper_md))
-        subprocess.run(["pandoc", str(md), f"--slide-level={_slide_level(paper_md)}", "--citeproc",
-                        "--bibliography", str(paper_md.parent / "references.bib"),
-                        "--metadata", f"title={source.title(paper_md)}", "-o", str(out_pptx)],
-                       check=True)
+        subprocess.run(
+            [
+                "pandoc",
+                str(md),
+                f"--slide-level={_slide_level(paper_md)}",
+                "--citeproc",
+                "--bibliography",
+                str(paper_md.parent / "references.bib"),
+                "--metadata",
+                f"title={source.title(paper_md)}",
+                "-o",
+                str(out_pptx),
+            ],
+            check=True,
+        )
     return out_pptx
 
 
@@ -91,9 +106,11 @@ def pptx_observed(project_dir: Path, out_pptx: Path, genre_name: str = "talk") -
     The unit's heading is its section plus its ordinal within that section, so a section split
     across several units reads as a sequence rather than as the same title repeated.
     """
-    assert graph.tool_for("units", "pptx") == "pandoc", \
+    assert graph.tool_for("units", "pptx") == "pandoc", (
         "the graph no longer declares units→pptx as a pandoc morphism — derive the tool, never hardcode"
+    )
     import paperkit.project
+
     cfg = paperkit.bib.load_config(project_dir)
     units = paperkit.project.observe(cfg, genre_name, project_dir)
     # the verification marker per claim, by check TYPE — the same table the prose route uses, read
@@ -113,8 +130,9 @@ def pptx_observed(project_dir: Path, out_pptx: Path, genre_name: str = "talk") -
         seen[u["section"]] = seen.get(u["section"], 0) + 1
         n = seen[u["section"]]
         lines.append(f"# {u['section']}" + (f" ({n})" if n > 1 else ""))
-        for it in u.get("items") or [{"key": k, "claim": c}
-                                     for k, c in zip(u["keys"], u["claims"])]:
+        for it in u.get("items") or [
+            {"key": k, "claim": c} for k, c in zip(u["keys"], u["claims"])
+        ]:
             c = it.get("claim")
             if c:
                 # depth nests the bullet as a proof step, exactly as the prose route indents it
@@ -143,9 +161,20 @@ def pptx_observed(project_dir: Path, out_pptx: Path, genre_name: str = "talk") -
         # the project's assets, this one is assembled in a temp dir, so a relative `emit` path has
         # nothing to resolve against.  A placed FIGURE exposed it — the deck built fine for as long
         # as every placement happened to be text.
-        subprocess.run(["pandoc", str(md), "--slide-level=1",
-                        "--resource-path", f"{Path(project_dir).resolve()}:{t}",
-                        "--metadata", f"title={cfg['title']}", "-o", str(out_pptx)], check=True)
+        subprocess.run(
+            [
+                "pandoc",
+                str(md),
+                "--slide-level=1",
+                "--resource-path",
+                f"{Path(project_dir).resolve()}:{t}",
+                "--metadata",
+                f"title={cfg['title']}",
+                "-o",
+                str(out_pptx),
+            ],
+            check=True,
+        )
     _repair_alt_text(out_pptx, units)
     return out_pptx, units
 
@@ -166,15 +195,18 @@ def _repair_alt_text(pptx_path: Path, units: list) -> None:
     """
     alt = {}
     for u in units:
-        for it in (u.get("items") or []):
+        for it in u.get("items") or []:
             em = it.get("emit")
-            if em and (em.get("as") == "image" or str(em.get("path", "")).endswith(
-                    (".svg", ".png", ".jpg", ".jpeg", ".gif"))):
+            if em and (
+                em.get("as") == "image"
+                or str(em.get("path", "")).endswith((".svg", ".png", ".jpg", ".jpeg", ".gif"))
+            ):
                 if it.get("claim"):
                     alt[str(em["path"])] = it["claim"]
     if not alt:
         return
     import shutil
+
     tmp = pptx_path.with_suffix(".tmp.pptx")
     with zipfile.ZipFile(pptx_path) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
         for item in zin.infolist():
@@ -182,8 +214,12 @@ def _repair_alt_text(pptx_path: Path, units: list) -> None:
             if re.match(r"ppt/slides/slide\d+\.xml$", item.filename):
                 x = data.decode("utf-8")
                 for path, claim in alt.items():
-                    esc = (claim.replace("&", "&amp;").replace("<", "&lt;")
-                                .replace(">", "&gt;").replace('"', "&quot;"))
+                    esc = (
+                        claim.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                        .replace('"', "&quot;")
+                    )
                     x = x.replace(f'descr="{path}"', f'descr="{esc}"')
                 data = x.encode("utf-8")
             zout.writestr(item, data)
@@ -195,14 +231,20 @@ def odp(src_pptx: Path, outdir: Path) -> Path | None:
     gets the isolated ephemeral profile and the unlink-first provenance guarantee: a file at the
     path is BY CONSTRUCTION the conversion of the current input, never a stale survivor.
     """
-    assert graph.tool_for("pptx", "odp") == "soffice", \
+    assert graph.tool_for("pptx", "odp") == "soffice", (
         "the graph no longer declares pptx→odp as a soffice morphism — derive the tool, never hardcode"
+    )
     return lo.convert(src_pptx, "odp", outdir)
 
 
 def _slide_count(odp_path: Path) -> int:
     """Drawing pages in the ODP — the deliverable's own count of what it carries."""
-    return zipfile.ZipFile(odp_path).read("content.xml").decode("utf-8", "replace").count("<draw:page ")
+    return (
+        zipfile.ZipFile(odp_path)
+        .read("content.xml")
+        .decode("utf-8", "replace")
+        .count("<draw:page ")
+    )
 
 
 def main() -> int:
@@ -221,13 +263,19 @@ def main() -> int:
         # ── node 2: odp, a well-formed ODF PRESENTATION (not the text mimetype odf.py gates) ──
         o = odp(p, work)
         if o is None or not o.exists():
-            print("slides: FAIL — the pptx→odp morphism produced no file (soffice did not convert)",
-                  file=sys.stderr)
+            print(
+                "slides: FAIL — the pptx→odp morphism produced no file (soffice did not convert)",
+                file=sys.stderr,
+            )
             return 1
         oz = zipfile.ZipFile(o)
         names = oz.namelist()
-        odp_ok = ("content.xml" in names and "mimetype" in names
-                  and oz.read("mimetype") == _ODP_MIME and o.stat().st_size > 0)
+        odp_ok = (
+            "content.xml" in names
+            and "mimetype" in names
+            and oz.read("mimetype") == _ODP_MIME
+            and o.stat().st_size > 0
+        )
 
         # ── the CONTENT survived the chain: the deliverable carries the paper's own title, and
         # carries slides at all.  A structurally-valid but EMPTY container would otherwise pass
@@ -242,8 +290,9 @@ def main() -> int:
         # slides and this check went green.  So the floor is the section count the projection
         # actually carries — one slide per heading at the derived level, allowing overflow above.
         lvl = _slide_level(paper_md)
-        headings = sum(1 for line in paper_md.read_text().splitlines()
-                       if line.startswith("#" * lvl + " "))
+        headings = sum(
+            1 for line in paper_md.read_text().splitlines() if line.startswith("#" * lvl + " ")
+        )
         tracks = pages >= headings
 
         # ── node 3 (Ρ·deck·route): the OBSERVED route — slides sourced from the segmentation ──
@@ -253,8 +302,10 @@ def main() -> int:
         op, units = pptx_observed(Path("../paper"), work / "obs.pptx", "talk")
         oo = odp(op, work)
         if oo is None or not oo.exists():
-            print("slides: FAIL — the observed route's pptx→odp morphism produced no file",
-                  file=sys.stderr)
+            print(
+                "slides: FAIL — the observed route's pptx→odp morphism produced no file",
+                file=sys.stderr,
+            )
             return 1
         obs_pages = _slide_count(oo)
         # pandoc emits a title slide from the metadata, so the deck carries units + 1.
@@ -271,7 +322,7 @@ def main() -> int:
         # projector discarded.  Checked against the asset's own text, not a count.
         placed, missing_asset = 0, []
         for u in units:
-            for it in (u.get("items") or []):
+            for it in u.get("items") or []:
                 if it.get("emit"):
                     placed += 1
                     body = "\n".join(it["emit"]["lines"])
@@ -301,8 +352,7 @@ def main() -> int:
         # least as many descriptions as images" — two images sharing one description would pass a
         # counting test while one of them ships undescribed.
         frames = re.findall(r"<draw:frame\b.*?</draw:frame>", otext, re.S)
-        content_frames = [f for f in frames
-                          if "<draw:image" in f and "TablePreview" not in f]
+        content_frames = [f for f in frames if "<draw:image" in f and "TablePreview" not in f]
 
         def _quality(desc: str) -> bool:
             """Ρ·render·alt·odp·live — the deck's descriptions measured on the ARTIFACT, held to
@@ -313,6 +363,7 @@ def main() -> int:
             """
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import linkalt
+
             return not linkalt._is_marker(desc)
 
         def _described(fr):
@@ -330,7 +381,7 @@ def main() -> int:
             desc = m.group(1).strip()
             href = re.search(r'xlink:href="([^"]*)"', fr)
             if href and (desc == href.group(1) or desc.endswith(Path(href.group(1)).name)):
-                return False                      # the filename is not a description
+                return False  # the filename is not a description
             return _quality(desc) and len(desc.split()) >= 4
 
         undescribed = [f for f in content_frames if not _described(f)]
@@ -347,8 +398,7 @@ def main() -> int:
         # scaffolding says nothing about whether the author's words survived.
         want_notes = sum(1 for u in units if any(i.get("note") for i in (u.get("items") or [])))
         note_pages = re.findall(r'presentation:class="notes".*?</draw:frame>', otext, re.S)
-        got_notes = sum(1 for pg in note_pages
-                        if len(re.sub(r"<[^>]+>", "", pg).split()) > 3)
+        got_notes = sum(1 for pg in note_pages if len(re.sub(r"<[^>]+>", "", pg).split()) > 3)
         notes_ok = got_notes >= want_notes
 
         # Ρ·talk·colour·render — WCAG 1.4.1 at the DELIVERABLE, not just at the source.  The
@@ -371,23 +421,38 @@ def main() -> int:
         # the distinction the graph draws would be a name without a referent.
         differs = obs_pages != pages
 
-        ok = pptx_ok and odp_ok and carried and tracks and corresponds and differs and marked and assets_ok and structured and alt_ok and notes_ok and colour_ok
-        print(f"slides: {'ok' if ok else 'FAIL'} — paper.md → .pptx "
-              f"({'valid OOXML, pandoc reads it back' if pptx_ok else 'INVALID pptx'}) → .odp "
-              f"({'valid ODF presentation' if odp_ok else 'INVALID odp'}, {pages} slides for "
-              f"{headings} level-{lvl} sections{'' if tracks else ' — CUT COLLAPSED'}, "
-              f"title {'carried' if carried else 'LOST'}); observed route: {obs_pages} slides "
-              f"for {len(units)} units"
-              f"{'' if corresponds else ' — DOES NOT CORRESPOND'}"
-              f"{'' if differs else ' — SAME AS THE PROSE CUT, the route is decorative'}"
-              f"{'' if marked else ' — NO VERIFICATION MARKERS, less honest than the prose route'}"
-              f", {placed} placed asset(s), {titles} slide titles / {lists} lists"
-              f", {got_notes} speaker-note page(s) for {want_notes} noted unit(s)"
-              f"{'' if notes_ok else ' — NOTES DROPPED'}"
-              f"{'' if colour_ok else ' — MEANING COLOUR APPLIED TO CONTENT: ' + str(meaning_hues)}"
-              f"{'' if structured else ' — NO SLIDE STRUCTURE for a screen reader'}"
-              f"{'' if alt_ok else f' — {imgs} image(s), only {descs} description(s)'}"
-              f"{'' if assets_ok else ' — DROPPED: ' + str(missing_asset)}")
+        ok = (
+            pptx_ok
+            and odp_ok
+            and carried
+            and tracks
+            and corresponds
+            and differs
+            and marked
+            and assets_ok
+            and structured
+            and alt_ok
+            and notes_ok
+            and colour_ok
+        )
+        print(
+            f"slides: {'ok' if ok else 'FAIL'} — paper.md → .pptx "
+            f"({'valid OOXML, pandoc reads it back' if pptx_ok else 'INVALID pptx'}) → .odp "
+            f"({'valid ODF presentation' if odp_ok else 'INVALID odp'}, {pages} slides for "
+            f"{headings} level-{lvl} sections{'' if tracks else ' — CUT COLLAPSED'}, "
+            f"title {'carried' if carried else 'LOST'}); observed route: {obs_pages} slides "
+            f"for {len(units)} units"
+            f"{'' if corresponds else ' — DOES NOT CORRESPOND'}"
+            f"{'' if differs else ' — SAME AS THE PROSE CUT, the route is decorative'}"
+            f"{'' if marked else ' — NO VERIFICATION MARKERS, less honest than the prose route'}"
+            f", {placed} placed asset(s), {titles} slide titles / {lists} lists"
+            f", {got_notes} speaker-note page(s) for {want_notes} noted unit(s)"
+            f"{'' if notes_ok else ' — NOTES DROPPED'}"
+            f"{'' if colour_ok else ' — MEANING COLOUR APPLIED TO CONTENT: ' + str(meaning_hues)}"
+            f"{'' if structured else ' — NO SLIDE STRUCTURE for a screen reader'}"
+            f"{'' if alt_ok else f' — {imgs} image(s), only {descs} description(s)'}"
+            f"{'' if assets_ok else ' — DROPPED: ' + str(missing_asset)}"
+        )
         return 0 if ok else 1
 
 

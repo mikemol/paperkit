@@ -27,6 +27,7 @@ Its SIBLING in spirit is cotype/check.py (which holds the ledger's entries monot
 REASONING rather than claims, and neither is a paperkit check verb — they are the layer that
 keeps the record honest before anything reaches the bib.
 """
+
 from __future__ import annotations
 
 import ast
@@ -42,8 +43,16 @@ from pathlib import Path
 # strings — which is why the list is a parameter.  A false positive here costs an argument;
 # dropping the marker would cost the plainest phrasing there is ("conclusion: X"), so it stays in
 # the default and callers whose subject matter IS conclusions pass PROSE_MARKERS instead.
-MARKERS = ("=>", "therefore", "so the ", "which means", "so it is",
-           "the answer", "conclusion", "it follows")
+MARKERS = (
+    "=>",
+    "therefore",
+    "so the ",
+    "which means",
+    "so it is",
+    "the answer",
+    "conclusion",
+    "it follows",
+)
 
 # The default minus the bare noun — for scripts that write ABOUT conclusions rather than staking any.
 PROSE_MARKERS = tuple(m for m in MARKERS if m != "conclusion")
@@ -55,21 +64,29 @@ def conclusion_lines(src: str, markers=MARKERS) -> list[tuple[int, str]]:
     """Printed lines that stake a conclusion."""
     out = []
     for node in ast.walk(ast.parse(src)):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-                and node.func.id == "print"):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "print"
+        ):
             continue
         text = " ".join(
-            a.value if isinstance(a, ast.Constant) and isinstance(a.value, str)
+            a.value
+            if isinstance(a, ast.Constant) and isinstance(a.value, str)
             else (ast.get_source_segment(src, a) or "")
-            for a in node.args)
+            for a in node.args
+        )
         if any(m in text.lower() for m in markers):
             out.append((node.lineno, text.strip()[:78]))
     return out
 
 
 def assertions(src: str) -> list[tuple[int, str]]:
-    return [(n.lineno, ast.get_source_segment(src, n.test) or "")
-            for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Assert)]
+    return [
+        (n.lineno, ast.get_source_segment(src, n.test) or "")
+        for n in ast.walk(ast.parse(src))
+        if isinstance(n, ast.Assert)
+    ]
 
 
 def bound_names(src: str) -> set[str]:
@@ -94,12 +111,12 @@ def findings(src: str, markers=MARKERS) -> dict:
     if not concl:
         return out
     if not asserts:
-        out["ungated"] = True                       # conclusions staked, no assertion anywhere
+        out["ungated"] = True  # conclusions staked, no assertion anywhere
         return out
     for ln, text in concl:
         subj = {w for w in _WORD.findall(text) if w in names}
         if not subj:
-            continue                                # pure prose — the weak direction, by design
+            continue  # pure prose — the weak direction, by design
         if not any(subj & set(_WORD.findall(a)) for _l, a in asserts):
             out["unbacked"].append((ln, text, sorted(subj)[:4]))
     return out
@@ -109,22 +126,28 @@ def gate(path: Path, markers=MARKERS, report=True) -> int:
     """0 = every conclusion naming a computed value is backed; 1 = at least one is not."""
     f = findings(path.read_text(), markers)
     if report:
-        print(f"   {path.name}: {len(f['conclusions'])} conclusion(s), "
-              f"{len(f['assertions'])} assertion(s)")
+        print(
+            f"   {path.name}: {len(f['conclusions'])} conclusion(s), "
+            f"{len(f['assertions'])} assertion(s)"
+        )
     if not f["conclusions"]:
         if report:
             print("   no conclusions staked — nothing to gate")
         return 0
     if f["ungated"]:
         if report:
-            print(f"   UNGATED: {len(f['conclusions'])} conclusion(s) with NO assertion in the script")
+            print(
+                f"   UNGATED: {len(f['conclusions'])} conclusion(s) with NO assertion in the script"
+            )
             for ln, t in f["conclusions"][:6]:
                 print(f"      line {ln}: {t}")
         return 1
     if f["unbacked"]:
         if report:
-            print(f"   UNBACKED: {len(f['unbacked'])} conclusion(s) name a computed value "
-                  f"that no assertion touches")
+            print(
+                f"   UNBACKED: {len(f['unbacked'])} conclusion(s) name a computed value "
+                f"that no assertion touches"
+            )
             for ln, t, s in f["unbacked"][:6]:
                 print(f"      line {ln}: {t}")
                 print(f"         names {s} — absent from every assert")
@@ -134,26 +157,29 @@ def gate(path: Path, markers=MARKERS, report=True) -> int:
     return 0
 
 
-DEMO_BAD = '''
+DEMO_BAD = """
 rows = [(1, 2), (1, 2)]
 ties = sum(1 for a, b in rows if a == b)
 print(f"ties found: {ties}")
 print("=> the two are history-dependent")
-'''
+"""
 
-DEMO_GOOD = '''
+DEMO_GOOD = """
 rows = [(1, 2), (1, 3)]
 ties = sum(1 for a, b in rows if a == b)
 print(f"ties found: {ties}")
 assert ties == 0, "a tie appeared"
 print("=> the ties count is zero, so no dependence is shown")
-'''
+"""
 
 
 def demo() -> int:
     import tempfile
-    for label, code in (("a conclusion with no backing", DEMO_BAD),
-                        ("the same conclusion, backed", DEMO_GOOD)):
+
+    for label, code in (
+        ("a conclusion with no backing", DEMO_BAD),
+        ("the same conclusion, backed", DEMO_GOOD),
+    ):
         p = Path(tempfile.mkdtemp()) / "s.py"
         p.write_text(code)
         print(f"\n   {label}:")

@@ -23,6 +23,7 @@ no `bazel` and reading no `_bazel_<user>` path.  A witness keyed on an output-ba
 on one machine's cache layout, and would report a fact about this laptop as a fact about the
 generator.
 """
+
 import re
 import sys
 from pathlib import Path
@@ -68,12 +69,13 @@ def declares_genre(project_dir: str) -> bool:
     if not p.exists():
         raise SystemExit(
             f"bnd-genre-emit: CANNOT RUN — {p} is not staged, so whether {project_dir!r} declares "
-            f"a genre is unmeasurable here (declare it in the warrant's `builds`)")
+            f"a genre is unmeasurable here (declare it in the warrant's `builds`)"
+        )
     return any(ln.strip().startswith("[genres.") for ln in p.read_text().splitlines())
 
 
 def emission_state(bzl: str) -> str:
-    """"guarded" | "unconditional" | "absent" — the generator's `:genres` emission rule.
+    """ "guarded" | "unconditional" | "absent" — the generator's `:genres` emission rule.
 
     ⚑ THREE STATES, NOT TWO, AND THE THIRD IS WHY.  A first version returned a bool and reported
     a DELETED emission as "unconditional" — red for the right reason, naming the wrong cause.
@@ -101,16 +103,23 @@ def main() -> int:
     print("⟨the guard exists⟩\n")
 
     state = emission_state(bzl)
-    print(f"  {'ok' if state == 'guarded' else 'FAIL'} the `:genres` emission is "
-          f"{'guarded by `repository_ctx.attr.genres`' if state == 'guarded' else state.upper()}")
+    print(
+        f"  {'ok' if state == 'guarded' else 'FAIL'} the `:genres` emission is "
+        f"{'guarded by `repository_ctx.attr.genres`' if state == 'guarded' else state.upper()}"
+    )
     if state == "absent":
-        print("bnd-genre-emit: there is NO `:genres` emission in the generator — a declared genre "
-              "is invoked by nothing, which is Ν-F7 restored (`genre.py --check` wired to nothing)",
-              file=sys.stderr)
+        print(
+            "bnd-genre-emit: there is NO `:genres` emission in the generator — a declared genre "
+            "is invoked by nothing, which is Ν-F7 restored (`genre.py --check` wired to nothing)",
+            file=sys.stderr,
+        )
         return 1
     if state == "unconditional":
-        print("bnd-genre-emit: the emission is UNCONDITIONAL — every project would carry a check "
-              "over an empty registry, green by vacuity", file=sys.stderr)
+        print(
+            "bnd-genre-emit: the emission is UNCONDITIONAL — every project would carry a check "
+            "over an empty registry, green by vacuity",
+            file=sys.stderr,
+        )
         return 1
 
     print("\n⟨the attribute has ONE owner⟩\n")
@@ -119,32 +128,40 @@ def main() -> int:
     filled = "genres = _declared_genres(module_ctx, tag.project)" in bzl
     print(f"  {'ok' if filled else 'FAIL'} the extension fills it from `_declared_genres`")
     if not filled:
-        print("bnd-genre-emit: nothing fills the `genres` attribute — the target would never be "
-              "emitted, and the guard would be vacuously false", file=sys.stderr)
+        print(
+            "bnd-genre-emit: nothing fills the `genres` attribute — the target would never be "
+            "emitted, and the guard would be vacuously false",
+            file=sys.stderr,
+        )
         return 1
 
     print("\n⟨P, F, δ⟩ the population, per project\n")
     declaring = sorted(p for p, d in projects.items() if declares_genre(d))
     silent = sorted(p for p, d in projects.items() if not declares_genre(d))
-    print(f"  ok DECLARES a genre → gets :genres  ({len(declaring)}): "
-          f"{', '.join(declaring) or 'none'}")
-    print(f"  ok declares NONE   → no :genres     ({len(silent)}): "
-          f"{', '.join(silent)}")
+    print(
+        f"  ok DECLARES a genre → gets :genres  ({len(declaring)}): "
+        f"{', '.join(declaring) or 'none'}"
+    )
+    print(f"  ok declares NONE   → no :genres     ({len(silent)}): {', '.join(silent)}")
 
     if not declaring:
         # Not a pass: with no declaring project the biconditional is vacuously satisfiable by a
         # generator that never emits.  Absence here is a reading about the CORPUS, and it makes
         # this witness unable to discriminate — which is a refusal, not a green.
-        print("\nbnd-genre-emit: NO project declares a genre, so the positive half of the "
-              "biconditional has no witness.  This check cannot discriminate on this corpus.",
-              file=sys.stderr)
+        print(
+            "\nbnd-genre-emit: NO project declares a genre, so the positive half of the "
+            "biconditional has no witness.  This check cannot discriminate on this corpus.",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"\n      P (pass side): a [genres.*] table → the guard is true → :genres emitted")
     print(f"      F (flag side): no [genres.*] table → the guard is false → no target")
     print(f"      δ (min delta): one `[genres.<name>]` header in a project's paper.toml")
-    print(f"\nBOUNDARIES: PASS (2 structural behaviors, {len(projects)} projects partitioned, "
-          f"1 delta)")
+    print(
+        f"\nBOUNDARIES: PASS (2 structural behaviors, {len(projects)} projects partitioned, "
+        f"1 delta)"
+    )
     return 0
 
 

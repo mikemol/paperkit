@@ -31,6 +31,7 @@ because it LOOKS LIKE DATA.  The rule (project-dont-author): CITE THE AUTHORITY,
     python3 tools/dagbzl.py --check     # byte-compare against a fresh render (gated)
     python3 tools/dagbzl.py --write     # regenerate
 """
+
 from __future__ import annotations
 
 import ast
@@ -58,7 +59,7 @@ def literal(path: Path, name: str) -> dict[str, list[str]]:
     """
     src = path.read_text()
     i = src.index(name + " = ")
-    val: object = ast.literal_eval(src[src.index("{", i):src.index("\n}", i) + 2])
+    val: object = ast.literal_eval(src[src.index("{", i) : src.index("\n}", i) + 2])
     if not isinstance(val, dict):
         return {}
     out: dict[str, list[str]] = {}
@@ -92,8 +93,10 @@ def render(rows: list[tuple[str, str]]) -> str:
     by_mod: dict[str, set[str]] = {}
     for m, i in rows:
         by_mod.setdefault(m, set()).add(i)
-    body = "".join('    "{}": [{}],\n'.format(m, ", ".join(f'"{x}"' for x in sorted(v)))
-                   for m, v in sorted(by_mod.items()))
+    body = "".join(
+        '    "{}": [{}],\n'.format(m, ", ".join(f'"{x}"' for x in sorted(v)))
+        for m, v in sorted(by_mod.items())
+    )
     return HEADER + "IMPORTS = {\n" + body + "}\n"
 
 
@@ -106,8 +109,10 @@ def main(argv: list[str]) -> int:
 
     if mode == "--check":
         if dag.read_text() != want:
-            sys.stderr.write("dagbzl.py --check: paperkit/dag.bzl is STALE — regenerate with "
-                             "`python3 tools/dagbzl.py --write`\n")
+            sys.stderr.write(
+                "dagbzl.py --check: paperkit/dag.bzl is STALE — regenerate with "
+                "`python3 tools/dagbzl.py --write`\n"
+            )
             return 1
         sys.stdout.write("dagbzl.py --check: dag.bzl is fresh\n")
         return 0

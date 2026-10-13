@@ -33,6 +33,7 @@ by composing this with graph.ROUTES.
                                         #   demonstrating warrant, and the pdf-ua row agrees
                                         #   with graph.MORPHISMS
 """
+
 from __future__ import annotations
 
 import sys
@@ -84,13 +85,13 @@ FORMATS = ("docx", "odt", "latex", "pdf-office", "pdf-latex", "pptx", "odp")
 # compared itself to itself.  An object must now be in FORMATS or in this map, so a new node
 # cannot be quietly uncovered.
 NOT_STATED = {
-    "md":    "the SOURCE, not a deliverable — capabilities are properties of what a consumer "
-             "receives",
+    "md": "the SOURCE, not a deliverable — capabilities are properties of what a consumer receives",
     "units": "the OBSERVATION (project.observe's segmentation), a carrier of claims rather than a "
-             "rendered format; its capabilities are those of whatever format it is rendered into",
-    "pdf":   "split into pdf-office and pdf-latex, since a capability can differ between the two "
-             "producers (UA-1 vs UA-2)",
+    "rendered format; its capabilities are those of whatever format it is rendered into",
+    "pdf": "split into pdf-office and pdf-latex, since a capability can differ between the two "
+    "producers (UA-1 vs UA-2)",
 }
+
 
 class Capability(TypedDict):
     """One a11y-or-fidelity property: what it is, its WCAG clause, and its per-format cells.
@@ -126,10 +127,11 @@ CAPABILITIES: dict[str, Capability] = {
     },
     "coalgebra": {
         "what": "the render pipeline is an explicit owned coalgebra (formats × conversions as "
-                "data)",
+        "data)",
         "wcag": "",
-        "cells": dict.fromkeys(("docx", "odt", "latex", "pdf-office", "pdf-latex"),
-                               ("native", "rnd-graph")),
+        "cells": dict.fromkeys(
+            ("docx", "odt", "latex", "pdf-office", "pdf-latex"), ("native", "rnd-graph")
+        ),
     },
     "presentation-agreement": {
         "what": "the rendered document presents byte-for-byte the verified paper's prose",
@@ -140,7 +142,7 @@ CAPABILITIES: dict[str, Capability] = {
     },
     "slide-structure": {
         "what": "each slide carries a real title placeholder and its content as list structure, "
-                "so a screen reader announces the slide and walks its points",
+        "so a screen reader announces the slide and walks its points",
         "wcag": "1.3.1",
         # MEASURED on the observed deck: 59 title placeholders, 50 outline placeholders, 286
         # lists.  `post` rather than `native`: pandoc's pptx writer places them and the office
@@ -157,8 +159,10 @@ CAPABILITIES: dict[str, Capability] = {
     "glyph-fidelity": {
         "what": "every non-ASCII glyph survives to the PDF text layer, no missing-glyph tofu",
         "wcag": "",
-        "cells": {"pdf-office": ("post", "rnd-fidelity"),
-                  "pdf-latex": ("native", "rnd-a11y-latex")},
+        "cells": {
+            "pdf-office": ("post", "rnd-fidelity"),
+            "pdf-latex": ("native", "rnd-a11y-latex"),
+        },
     },
     "native-math": {
         "what": "equations transport as native editable math, never rasterized",
@@ -167,15 +171,13 @@ CAPABILITIES: dict[str, Capability] = {
         # TWISTS native-math into math-alt (a tagged /Formula with /Alt).  So there is no
         # pdf-office cell here; the twist is recorded in TRANSFORMS below.  The latex PDF
         # carries math natively (MathML /AF).
-        "cells": {"docx": ("native", "rnd-omml"),
-                  "pdf-latex": ("native", "rnd-a11y-latex")},
+        "cells": {"docx": ("native", "rnd-omml"), "pdf-latex": ("native", "rnd-a11y-latex")},
     },
     "measured-column-width": {
         "what": "a wide equation in a table cell is sized to measured ink, clip named not silent",
         "wcag": "",
         # the latex route wraps natively — no measured widen needed
-        "cells": {"docx": ("post", "rnd-widen"),
-                  "pdf-latex": ("n/a", "")},
+        "cells": {"docx": ("post", "rnd-widen"), "pdf-latex": ("n/a", "")},
     },
     "ocr-recoverable": {
         "what": "OCR recovers the paper's text from the rasterized PDF pixels (visual layer)",
@@ -186,21 +188,22 @@ CAPABILITIES: dict[str, Capability] = {
         "what": "every font is embedded, drawing identically where the font is absent",
         "wcag": "",
         # a UA-2 zero-fail forbids .notdef, subsuming this
-        "cells": {"pdf-office": ("post", "rnd-fonts"),
-                  "pdf-latex": ("native", "rnd-a11y-latex")},
+        "cells": {"pdf-office": ("post", "rnd-fonts"), "pdf-latex": ("native", "rnd-a11y-latex")},
     },
     "citations-resolve": {
         "what": "internal warrants inline as markers, external sources render author-date, no "
-                "bare marker",
+        "bare marker",
         "wcag": "",
         # citations resolve at the source formats AND survive into the delivered PDF (rnd-pdf
         # gates no bare marker in the PDF); the latex PDF carries them too.
-        "cells": {**dict.fromkeys(("docx", "odt", "latex"), ("native", "rnd-bib")),
-                  "pdf-office": ("post", "rnd-pdf"), "pdf-latex": ("native", "rnd-a11y-latex")},
+        "cells": {
+            **dict.fromkeys(("docx", "odt", "latex"), ("native", "rnd-bib")),
+            "pdf-office": ("post", "rnd-pdf"),
+            "pdf-latex": ("native", "rnd-a11y-latex"),
+        },
     },
     "vector-figures": {
-        "what": "a generated figure embeds as a native vector, never rasterized, crisp at any "
-                "zoom",
+        "what": "a generated figure embeds as a native vector, never rasterized, crisp at any zoom",
         "wcag": "1.4.10",
         # the vector is carried through to the PDF without rasterizing (rnd-fig-vector gates
         # this end-to-end).
@@ -208,7 +211,7 @@ CAPABILITIES: dict[str, Capability] = {
     },
     "legible-figure-text": {
         "what": "a figure's legend survives into the PDF text layer, selectable and "
-                "screen-readable",
+        "screen-readable",
         "wcag": "1.4.5",
         "cells": {"pdf-office": ("post", "rnd-fig-legible")},
     },
@@ -221,8 +224,10 @@ CAPABILITIES: dict[str, Capability] = {
         "what": "every equation carries a text alternative a screen reader announces",
         "wcag": "7.7",
         # /AF associated MathML — recoverable structure
-        "cells": {"pdf-office": ("post", "rnd-math-alt"),
-                  "pdf-latex": ("native", "rnd-a11y-latex")},
+        "cells": {
+            "pdf-office": ("post", "rnd-math-alt"),
+            "pdf-latex": ("native", "rnd-a11y-latex"),
+        },
     },
     "pdf-ua": {
         "what": "the deliverable is PDF/UA conformant by construction (veraPDF zero fails)",
@@ -233,24 +238,26 @@ CAPABILITIES: dict[str, Capability] = {
     },
     "tagged-uno-export": {
         "what": "exported as tagged PDF/UA over the UNO bridge, refreshing indexes, bounded and "
-                "loud",
+        "loud",
         "wcag": "",
         "cells": {"pdf-office": ("post", "rnd-index")},
     },
     "ruler-sequence-rules": {
         "what": "a table's binary row-structure is carried in the rule PATTERN, a non-colour cue "
-                "(producing side)",
+        "(producing side)",
         "wcag": "1.4.1",
         # The 1.4.1 PRODUCING side: LaTeX affords per-row rules (nicematrix), the office route's
         # toolchain CANNOT (a docx/markdown table has no per-row rule mechanism) — a TYPED
         # exception, not a silent gap.
-        "cells": {"pdf-latex": ("native", "rnd-ruler"),
-                  "docx": ("excepted", "rnd-ruler"),
-                  "odt": ("excepted", "rnd-ruler")},
+        "cells": {
+            "pdf-latex": ("native", "rnd-ruler"),
+            "docx": ("excepted", "rnd-ruler"),
+            "odt": ("excepted", "rnd-ruler"),
+        },
     },
     "use-of-colour": {
         "what": "no table row relies on colour as its sole cue — a meaning colour carries a "
-                "weight cue too (verifying side)",
+        "weight cue too (verifying side)",
         "wcag": "1.4.1",
         # The 1.4.1 VERIFYING side (pairs with ruler-sequence): a LaTeX-source auditor.
         "cells": {"pdf-latex": ("native", "rnd-colour")},
@@ -286,8 +293,9 @@ def _grid() -> str:
     head = " " * kw + "".join(f"{f:<{cw}}" for f in FORMATS)
     rows = [head]
     for cap, spec in CAPABILITIES.items():
-        cells = "".join(((spec["cells"].get(f, (None,))[0] or "·")[:cw - 1]).ljust(cw)
-                        for f in FORMATS)
+        cells = "".join(
+            ((spec["cells"].get(f, (None,))[0] or "·")[: cw - 1]).ljust(cw) for f in FORMATS
+        )
         rows.append(f"{cap:<{kw}}{cells}")
     return "\n".join(rows)
 
@@ -306,11 +314,13 @@ def check(warrants_bib: Path) -> tuple[bool, list[str]]:
             if state in (None, "n/a"):
                 continue
             if not warrant:
-                problems.append(f"{cap} × {fmt}: state {state!r} but no demonstrating warrant "
-                                f"named")
+                problems.append(
+                    f"{cap} × {fmt}: state {state!r} but no demonstrating warrant named"
+                )
             elif warrant not in keys:
-                problems.append(f"{cap} × {fmt}: names warrant {warrant!r} absent from "
-                                f"warrants.bib")
+                problems.append(
+                    f"{cap} × {fmt}: names warrant {warrant!r} absent from warrants.bib"
+                )
     # the pdf-ua row is graph.MORPHISMS[edge].a11y — office pdf edges "post", the latex "native"
     ua = CAPABILITIES["pdf-ua"]["cells"]
     # COVERAGE — every graph object is either stated over here or declared not-stated, with a
@@ -319,13 +329,16 @@ def check(warrants_bib: Path) -> tuple[bool, list[str]]:
     # each checks itself against its own list.
     uncovered = [o for o in graph.OBJECTS if o not in FORMATS and o not in NOT_STATED]
     if uncovered:
-        problems.append(f"graph object(s) {uncovered} are neither stated over nor declared "
-                        f"NOT_STATED — the capability grid and the conversion graph have "
-                        f"diverged, and each face would keep passing against its own object list")
+        problems.append(
+            f"graph object(s) {uncovered} are neither stated over nor declared "
+            f"NOT_STATED — the capability grid and the conversion graph have "
+            f"diverged, and each face would keep passing against its own object list"
+        )
     stale = [o for o in NOT_STATED if o not in graph.OBJECTS]
     if stale:
-        problems.append(f"NOT_STATED names {stale}, absent from the graph — the exemption "
-                        f"outlived its object")
+        problems.append(
+            f"NOT_STATED names {stale}, absent from the graph — the exemption outlived its object"
+        )
 
     if ua["pdf-office"][0] != graph.MORPHISMS[("docx", "pdf")]["a11y"]:
         problems.append("pdf-ua × pdf-office disagrees with graph.MORPHISMS[(docx,pdf)].a11y")
@@ -343,16 +356,24 @@ def main(argv: list[str]) -> int:
             for p in problems:
                 sys.stderr.write(f"matrix --check: {p}\n")
             return 1
-        n_cells = sum(1 for s in CAPABILITIES.values()
-                      for st, _ in s["cells"].values() if st not in (None, "n/a"))
-        sys.stdout.write(f"matrix --check: {len(CAPABILITIES)} capabilities × {len(FORMATS)} "
-                         f"formats, {n_cells} demonstrated cells — every cell has its warrant "
-                         f"and the pdf-ua row agrees with the render graph\n")
+        n_cells = sum(
+            1
+            for s in CAPABILITIES.values()
+            for st, _ in s["cells"].values()
+            if st not in (None, "n/a")
+        )
+        sys.stdout.write(
+            f"matrix --check: {len(CAPABILITIES)} capabilities × {len(FORMATS)} "
+            f"formats, {n_cells} demonstrated cells — every cell has its warrant "
+            f"and the pdf-ua row agrees with the render graph\n"
+        )
         return 0
     sys.stdout.write("render capability × format matrix (row = capability, col = format):\n\n")
     sys.stdout.write(_grid() + "\n")
-    sys.stdout.write("\ncell states: native (by construction) · post (after post-processing) · "
-                     "excepted (toolchain cannot) · · (no cell)\n")
+    sys.stdout.write(
+        "\ncell states: native (by construction) · post (after post-processing) · "
+        "excepted (toolchain cannot) · · (no cell)\n"
+    )
     return 0
 
 

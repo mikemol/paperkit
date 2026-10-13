@@ -9,6 +9,7 @@ The top-level field scan tracks brace depth, so an `=` inside a value is not mis
 
     python3 paperkit/tests/boundaries_bib.py
 """
+
 from __future__ import annotations
 
 import io
@@ -25,7 +26,7 @@ def _warns(body: str, consumer_fields: tuple = ()) -> str:
     """Parse a one-entry bib with this body (and optional declared consumer fields); return the
     parser's stderr and the parsed record.
     """
-    paperkit.bib._WARNED.clear()                          # the dedup is per build, not per probe
+    paperkit.bib._WARNED.clear()  # the dedup is per build, not per probe
     p = Path(tempfile.mkdtemp()) / "t.bib"
     p.write_text("@misc{k,\n" + body + "\n}\n")
     err = io.StringIO()
@@ -50,51 +51,83 @@ def main() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     print("bib parser behaviors\n")
-    check("_top_fields finds the top-level fields",
-          paperkit.bib._top_fields("claim = {a}, check = {cmd:true}") == ["claim", "check"])
-    check("_top_fields ignores an `=` INSIDE a value (set notation is not a field)",
-          paperkit.bib._top_fields("claim = {x = {1,2}}, check = {cmd:true}") == ["claim", "check"])
+    check(
+        "_top_fields finds the top-level fields",
+        paperkit.bib._top_fields("claim = {a}, check = {cmd:true}") == ["claim", "check"],
+    )
+    check(
+        "_top_fields ignores an `=` INSIDE a value (set notation is not a field)",
+        paperkit.bib._top_fields("claim = {x = {1,2}}, check = {cmd:true}") == ["claim", "check"],
+    )
     known_err, known = _warns("  claim = {a claim},\n  check = {cmd:true}")
-    check("a known field is carried (claim + check parsed)",
-          known.get("claim") == "a claim" and known.get("check") == "cmd:true")
+    check(
+        "a known field is carried (claim + check parsed)",
+        known.get("claim") == "a claim" and known.get("check") == "cmd:true",
+    )
     check("a known-field entry warns about nothing", known_err == "")
     pts_err, pts = _warns("  claim = {c},\n  points = {q, r},\n  check = {cmd:true}")
-    check("an unknown field is NAMED loud on stderr (not silently dropped)",
-          "points" in pts_err and "DROPPED" in pts_err)
-    check("the unknown field is still absent from the parsed record (dropped, as said)",
-          "points" not in pts)
+    check(
+        "an unknown field is NAMED loud on stderr (not silently dropped)",
+        "points" in pts_err and "DROPPED" in pts_err,
+    )
+    check(
+        "the unknown field is still absent from the parsed record (dropped, as said)",
+        "points" not in pts,
+    )
     # Ζ·bib·declare — STANDARD BIBTEX METADATA TAKES THE SAME ROUTE AS EVERY OTHER NON-ENGINE
     # FIELD.  A 24-name `_BIBTEX` roster used to exempt `journal`/`doi`/`publisher` from the
     # warning while the extraction loop still never read them, so they were SILENT AND DROPPED —
     # the engine claiming to know a field and discarding it.  Both halves are asserted here,
     # because the old design passed the first and failed the second.
-    bibtex_err, bibtex_rec = _warns("  title = {T},\n  author = {A},\n  journal = {J},\n  year = {2020}")
-    check("UNDECLARED BibTeX metadata is NAMED, not silently swallowed by an engine roster",
-          "journal" in bibtex_err and "DROPPED" in bibtex_err)
-    check("...and the warning names consumer_fields as the remedy (not just 'remove it')",
-          "consumer_fields" in bibtex_err)
-    check("an undeclared BibTeX field is absent from the record — silence never implied carriage",
-          "journal" not in bibtex_rec)
+    bibtex_err, bibtex_rec = _warns(
+        "  title = {T},\n  author = {A},\n  journal = {J},\n  year = {2020}"
+    )
+    check(
+        "UNDECLARED BibTeX metadata is NAMED, not silently swallowed by an engine roster",
+        "journal" in bibtex_err and "DROPPED" in bibtex_err,
+    )
+    check(
+        "...and the warning names consumer_fields as the remedy (not just 'remove it')",
+        "consumer_fields" in bibtex_err,
+    )
+    check(
+        "an undeclared BibTeX field is absent from the record — silence never implied carriage",
+        "journal" not in bibtex_rec,
+    )
     # And DECLARING it is what carries it: the access the old roster never granted.
-    dec_err, dec_rec = _warns("  title = {T},\n  author = {A},\n  journal = {J},\n  doi = {10.1/x}",
-                              ("journal", "doi"))
-    check("a DECLARED BibTeX field is carried on the record (engine-inert, like `note`)",
-          dec_rec.get("journal") == "J" and dec_rec.get("doi") == "10.1/x")
+    dec_err, dec_rec = _warns(
+        "  title = {T},\n  author = {A},\n  journal = {J},\n  doi = {10.1/x}", ("journal", "doi")
+    )
+    check(
+        "a DECLARED BibTeX field is carried on the record (engine-inert, like `note`)",
+        dec_rec.get("journal") == "J" and dec_rec.get("doi") == "10.1/x",
+    )
     check("...and declaring it is quiet", dec_err == "")
     # A claim carrying inline math extracts INTACT: the value is brace-counted to arbitrary depth
     # (a set-builder \min\{ … \mathrm{eff}(d) : … \} nests deeper than one level) and LaTeX-escaped
     # braces \{ \} are literal CONTENT, not structure — the one-level regex this replaced stopped
     # at the first inner `}` and returned a truncated/empty claim (the projector then fell back to
     # the bare key — the degenerate-claim class one layer down).
-    _, math = _warns(r"  claim = {clamp: $\mathrm{eff}(c) = \min\{\, \mathrm{grade}(c)\,\} \cup \{\, \mathrm{eff}(d) : d \in S\,\}$ holds},"
-                     "\n  check = {cmd:true}")
-    check("a claim with DEEP-nested inline math extracts intact (not truncated to empty)",
-          math.get("claim", "").startswith("clamp:") and math["claim"].endswith("holds")
-          and "$" in math["claim"])
-    check("_scalar_value counts to arbitrary depth (nested \\mathrm{} inside \\{ \\})",
-          paperkit.bib._scalar_value(r"claim = {a \min\{\mathrm{x}\} b}", "claim") == r"a \min\{\mathrm{x}\} b")
-    check("_top_fields ignores escaped braces in math (they are not structural depth)",
-          paperkit.bib._top_fields(r"claim = {$\{x\}$ text}, check = {cmd:true}") == ["claim", "check"])
+    _, math = _warns(
+        r"  claim = {clamp: $\mathrm{eff}(c) = \min\{\, \mathrm{grade}(c)\,\} \cup \{\, \mathrm{eff}(d) : d \in S\,\}$ holds},"
+        "\n  check = {cmd:true}"
+    )
+    check(
+        "a claim with DEEP-nested inline math extracts intact (not truncated to empty)",
+        math.get("claim", "").startswith("clamp:")
+        and math["claim"].endswith("holds")
+        and "$" in math["claim"],
+    )
+    check(
+        "_scalar_value counts to arbitrary depth (nested \\mathrm{} inside \\{ \\})",
+        paperkit.bib._scalar_value(r"claim = {a \min\{\mathrm{x}\} b}", "claim")
+        == r"a \min\{\mathrm{x}\} b",
+    )
+    check(
+        "_top_fields ignores escaped braces in math (they are not structural depth)",
+        paperkit.bib._top_fields(r"claim = {$\{x\}$ text}, check = {cmd:true}")
+        == ["claim", "check"],
+    )
     # A project DECLARES the extra scalar fields it tolerates (its downstream consumer's vocabulary);
     # paperkit carries them but consumes them in no invariant.  A DECLARED field is carried AND quiet;
     # an UNdeclared unknown is still named loud — the declaration is what tells a consumer's field
@@ -102,16 +135,24 @@ def main() -> int:
     # a domain-and-location-free engine).
     cf = ("kind", "by", "of")
     decl_err, decl = _warns("  claim = {c},\n  kind = {friction},\n  by = {paperkit}", cf)
-    check("a DECLARED consumer field is carried verbatim (kind, by parsed)",
-          decl.get("kind") == "friction" and decl.get("by") == "paperkit")
+    check(
+        "a DECLARED consumer field is carried verbatim (kind, by parsed)",
+        decl.get("kind") == "friction" and decl.get("by") == "paperkit",
+    )
     check("a declared consumer field warns about nothing (quiet)", decl_err == "")
     mixed_err, mixed = _warns("  claim = {c},\n  kind = {friction},\n  bogus = {x}", cf)
-    check("an UNdeclared unknown field is still NAMED loud even when others are declared",
-          "'bogus'" in mixed_err and "DROPPED" in mixed_err        # bogus reported dropped
-          and "'kind'" not in mixed_err and mixed.get("kind") == "friction")  # kind carried, not dropped
+    check(
+        "an UNdeclared unknown field is still NAMED loud even when others are declared",
+        "'bogus'" in mixed_err
+        and "DROPPED" in mixed_err  # bogus reported dropped
+        and "'kind'" not in mixed_err
+        and mixed.get("kind") == "friction",
+    )  # kind carried, not dropped
     undecl_err, undecl = _warns("  claim = {c},\n  kind = {friction}")
-    check("WITHOUT the declaration the same field is a loud-drop, not carried",
-          "kind" in undecl_err and "kind" not in undecl)
+    check(
+        "WITHOUT the declaration the same field is a loud-drop, not carried",
+        "kind" in undecl_err and "kind" not in undecl,
+    )
     print()
 
     # Ζ·consumer-fields — the CONFIG-RESOLVED path (bib.load_bib), the one the two bare parse sites broke.
@@ -122,16 +163,22 @@ def main() -> int:
     def _load_bib_from_toml(cf_line: str) -> tuple:
         d = Path(tempfile.mkdtemp())
         (d / "paper.toml").write_text(
-            '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["w.bib"]\nout="o.md"\n' + cf_line)
-        (d / "w.bib").write_text("@misc{k,\n  claim = {c},\n  provenance = {p},\n  check = {cmd:true}\n}\n")
+            '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["w.bib"]\nout="o.md"\n' + cf_line
+        )
+        (d / "w.bib").write_text(
+            "@misc{k,\n  claim = {c},\n  provenance = {p},\n  check = {cmd:true}\n}\n"
+        )
         paperkit.bib._WARNED.clear()
         err = io.StringIO()
         with redirect_stderr(err):
             recs = paperkit.bib.load_bib(d / "w.bib", d)
         return err.getvalue(), recs["k"]
+
     lb_err, lb = _load_bib_from_toml('consumer_fields=["provenance"]\n')
-    check("load_bib resolves consumer_fields from paper.toml on disk — a DECLARED field carried + quiet",
-          lb.get("provenance") == "p" and lb_err == "")
+    check(
+        "load_bib resolves consumer_fields from paper.toml on disk — a DECLARED field carried + quiet",
+        lb.get("provenance") == "p" and lb_err == "",
+    )
 
     # Ζ·bib·parser — AN ENTRY IS BRACE-COUNTED, NOT MATCHED TO THE FIRST LINE-INITIAL `}`.
     # The scanner this replaces was `re.finditer(r"@\w+\{...(.*?)\n\}")`: non-greedy to the first
@@ -143,10 +190,14 @@ def main() -> int:
     # what a code block, a JSON fragment or a set-builder broken across lines looks like.  The old
     # non-greedy `(.*?)\n\}` ended the entry THERE; brace-counting carries through it.
     _brace = _warns("  claim = {a block: {\nnested\n} and the tail},\n  check = {cmd:true}")[1]
-    check("an entry survives a line-initial `}` inside a value (was: silently emptied)",
-          _brace.get("check") == "cmd:true")
-    check("...and the value itself is intact, not truncated at the bare brace",
-          "the tail" in (_brace.get("claim") or ""))
+    check(
+        "an entry survives a line-initial `}` inside a value (was: silently emptied)",
+        _brace.get("check") == "cmd:true",
+    )
+    check(
+        "...and the value itself is intact, not truncated at the bare brace",
+        "the tail" in (_brace.get("claim") or ""),
+    )
     # The entry TYPE is carried.  `@\w+` matched and discarded it, so @book and @misc were
     # indistinguishable to the engine and no reader could answer what types a file uses.
     check("the entry type is captured, not discarded", _brace.get("_type") == "misc")
@@ -159,7 +210,8 @@ def main() -> int:
     def _two_bibs(second_body: str) -> tuple:
         d = Path(tempfile.mkdtemp())
         (d / "paper.toml").write_text(
-            '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["a.bib","b.bib"]\nout="o.md"\n')
+            '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["a.bib","b.bib"]\nout="o.md"\n'
+        )
         (d / "a.bib").write_text("@misc{dup,\n  claim = {first},\n  check = {cmd:true}\n}\n")
         (d / "b.bib").write_text(second_body)
         paperkit.bib._WARNED.clear()
@@ -167,14 +219,21 @@ def main() -> int:
             return True, paperkit.bib.parse_project(d)
         except SystemExit as e:
             return False, str(e)
+
     ok_dup, dup_msg = _two_bibs("@misc{dup,\n  claim = {second}\n}\n")
-    check("a key defined in TWO composed bibs REFUSES (the silent last-wins is unrepresentable)",
-          not ok_dup)
-    check("...and the refusal names BOTH files, which is the whole diagnosis",
-          "a.bib" in dup_msg and "b.bib" in dup_msg)
+    check(
+        "a key defined in TWO composed bibs REFUSES (the silent last-wins is unrepresentable)",
+        not ok_dup,
+    )
+    check(
+        "...and the refusal names BOTH files, which is the whole diagnosis",
+        "a.bib" in dup_msg and "b.bib" in dup_msg,
+    )
     ok_uniq, uniq_recs = _two_bibs("@misc{other,\n  claim = {second},\n  check = {cmd:true}\n}\n")
-    check("δ: the same two bibs with DISTINCT keys compose normally",
-          ok_uniq and sorted(uniq_recs) == ["dup", "other"])
+    check(
+        "δ: the same two bibs with DISTINCT keys compose normally",
+        ok_uniq and sorted(uniq_recs) == ["dup", "other"],
+    )
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
@@ -185,34 +244,50 @@ def main() -> int:
         # BibTeX (`type = {RFC}` was absent from it) and that bought silence without carriage.
         # One field, two projects: the SAME `journal` is quiet-and-carried where declared and
         # named where not, so nothing about the name itself decides.
-        ("a BibTeX field is carried-and-quiet iff the PROJECT declared it — the engine holds no roster",
-         "whether this project declared the field, NOT whether the engine considers the name bibliographic",
-         "declared → carried + quiet",
-         _warns("  journal = {J}", ("journal",))[1].get("journal") == "J"
-         and _warns("  journal = {J}", ("journal",))[0] == "",
-         "undeclared → dropped + named", "journal" in _warns("  journal = {J}")[0]),
-        ("a top-level field is named, an `=` inside a value is not (brace depth)",
-         "whether the `= {` sits at brace depth 0 or inside a value",
-         "top level → a field", paperkit.bib._top_fields("points = {q}") == ["points"],
-         "inside a value → not", paperkit.bib._top_fields("claim = {a points = {q} b}") == ["claim"]),
-        ("a claim's value is brace-counted, and an escaped brace is content not structure",
-         "whether a `}` is a real closing brace or a LaTeX-escaped literal `\\}`",
-         "unescaped } closes the value",
-         paperkit.bib._scalar_value(r"claim = {a {b} c}", "claim") == "a {b} c",
-         "escaped \\} does NOT close it early",
-         paperkit.bib._scalar_value(r"claim = {a \} b}", "claim") == r"a \} b"),
-        ("a consumer field is carried-and-quiet iff the project DECLARED it",
-         "whether the field name is in this project's declared consumer_fields",
-         "declared → carried + quiet",
-         _warns("  kind = {x}", ("kind",))[1].get("kind") == "x" and _warns("  kind = {x}", ("kind",))[0] == "",
-         "undeclared → dropped + named", "kind" in _warns("  kind = {x}")[0]),
-        ("load_bib carries-and-quiets a field iff the project's paper.toml DECLARES it (config-resolved)",
-         "whether the paper.toml on disk lists the field in consumer_fields — the path the bare parse sites bypassed",
-         "declared in paper.toml → carried + quiet",
-         _load_bib_from_toml('consumer_fields=["provenance"]\n')[1].get("provenance") == "p"
-         and _load_bib_from_toml('consumer_fields=["provenance"]\n')[0] == "",
-         "not declared in paper.toml → dropped + named",
-         "provenance" in _load_bib_from_toml("")[0] and "provenance" not in _load_bib_from_toml("")[1]),
+        (
+            "a BibTeX field is carried-and-quiet iff the PROJECT declared it — the engine holds no roster",
+            "whether this project declared the field, NOT whether the engine considers the name bibliographic",
+            "declared → carried + quiet",
+            _warns("  journal = {J}", ("journal",))[1].get("journal") == "J"
+            and _warns("  journal = {J}", ("journal",))[0] == "",
+            "undeclared → dropped + named",
+            "journal" in _warns("  journal = {J}")[0],
+        ),
+        (
+            "a top-level field is named, an `=` inside a value is not (brace depth)",
+            "whether the `= {` sits at brace depth 0 or inside a value",
+            "top level → a field",
+            paperkit.bib._top_fields("points = {q}") == ["points"],
+            "inside a value → not",
+            paperkit.bib._top_fields("claim = {a points = {q} b}") == ["claim"],
+        ),
+        (
+            "a claim's value is brace-counted, and an escaped brace is content not structure",
+            "whether a `}` is a real closing brace or a LaTeX-escaped literal `\\}`",
+            "unescaped } closes the value",
+            paperkit.bib._scalar_value(r"claim = {a {b} c}", "claim") == "a {b} c",
+            "escaped \\} does NOT close it early",
+            paperkit.bib._scalar_value(r"claim = {a \} b}", "claim") == r"a \} b",
+        ),
+        (
+            "a consumer field is carried-and-quiet iff the project DECLARED it",
+            "whether the field name is in this project's declared consumer_fields",
+            "declared → carried + quiet",
+            _warns("  kind = {x}", ("kind",))[1].get("kind") == "x"
+            and _warns("  kind = {x}", ("kind",))[0] == "",
+            "undeclared → dropped + named",
+            "kind" in _warns("  kind = {x}")[0],
+        ),
+        (
+            "load_bib carries-and-quiets a field iff the project's paper.toml DECLARES it (config-resolved)",
+            "whether the paper.toml on disk lists the field in consumer_fields — the path the bare parse sites bypassed",
+            "declared in paper.toml → carried + quiet",
+            _load_bib_from_toml('consumer_fields=["provenance"]\n')[1].get("provenance") == "p"
+            and _load_bib_from_toml('consumer_fields=["provenance"]\n')[0] == "",
+            "not declared in paper.toml → dropped + named",
+            "provenance" in _load_bib_from_toml("")[0]
+            and "provenance" not in _load_bib_from_toml("")[1],
+        ),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok
@@ -235,19 +310,25 @@ def main() -> int:
         (d / "paper.toml").write_text(
             '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n'
             '[checks.premise]\ncmd = "true"\nmechanical = false\n'
-            '[checks.oracle]\ncmd = "python3 x.py {target}"\n')
+            '[checks.oracle]\ncmd = "python3 x.py {target}"\n'
+        )
         cfg = paperkit.bib.load_config(d)
         ok = cfg["nonmechanical"] == ("premise",)
-        print(f"  {'ok' if ok else 'XX'} a declared `mechanical = false` type is reported "
-              f"non-mechanical")
+        print(
+            f"  {'ok' if ok else 'XX'} a declared `mechanical = false` type is reported "
+            f"non-mechanical"
+        )
         ran.append(ok)
         # δ: the SAME file without the flag — one line is the whole difference
         (d / "paper.toml").write_text(
             '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "o.md"\n'
-            '[checks.premise]\ncmd = "true"\n')
+            '[checks.premise]\ncmd = "true"\n'
+        )
         ok2 = paperkit.bib.load_config(d)["nonmechanical"] == ()
-        print(f"  {'ok' if ok2 else 'XX'} δ: the same type WITHOUT the flag is mechanical — "
-              f"declared, never inferred from `cmd = \"true\"`")
+        print(
+            f"  {'ok' if ok2 else 'XX'} δ: the same type WITHOUT the flag is mechanical — "
+            f'declared, never inferred from `cmd = "true"`'
+        )
         ran.append(ok2)
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -268,21 +349,27 @@ def main() -> int:
             ok = False
         except SystemExit as e:
             ok = "belongs under [paper]" in str(e) and "root" in str(e)
-        print(f"  {'ok' if ok else 'XX'} a [paper] key declared ABOVE [paper] REFUSES — the "
-              f"top level is a table too, and the engine reads none of it")
+        print(
+            f"  {'ok' if ok else 'XX'} a [paper] key declared ABOVE [paper] REFUSES — the "
+            f"top level is a table too, and the engine reads none of it"
+        )
         ran.append(ok)
         # δ: the SAME line, one header later.  Same three characters, opposite effect.
         (d3 / "paper.toml").write_text("[paper]\n" + body + 'root="."\n')
         ok2 = paperkit.bib.load_config(d3) is not None
-        print(f"  {'ok' if ok2 else 'XX'} δ: the same line BELOW the header is accepted — "
-              f"placement is the whole difference, and it is invisible by eye")
+        print(
+            f"  {'ok' if ok2 else 'XX'} δ: the same line BELOW the header is accepted — "
+            f"placement is the whole difference, and it is invisible by eye"
+        )
         ran.append(ok2)
         # the set is DERIVED from both owners, never copied: a guard carrying its own list
         # would certify a tautology the moment a key was added to one owner and not the guard.
         keys = set(paperkit.bib.paper_keys()) | set(paperkit.bib._param_config_keys())
         ok3 = "root" in keys and "consumer_fields" in keys and "title" in keys
-        print(f"  {'ok' if ok3 else 'XX'} the guarded set is derived from BOTH owners "
-              f"(load_config's p.get calls + Param config= declarations): {len(keys)} keys")
+        print(
+            f"  {'ok' if ok3 else 'XX'} the guarded set is derived from BOTH owners "
+            f"(load_config's p.get calls + Param config= declarations): {len(keys)} keys"
+        )
         ran.append(ok3)
     finally:
         shutil.rmtree(d3, ignore_errors=True)
@@ -293,20 +380,24 @@ def main() -> int:
     # downstream consumer who lost six fields exactly that way.
     d2 = pathlib.Path(tempfile.mkdtemp())
     try:
-        base = ('[paper]\ntitle="t"\nwarrants=["w.bib"]\nrubric="r.tsv"\nout="O.md"\n')
-        (d2 / "paper.toml").write_text(base + '[checks.claim]\ncmd="x {target}"\n'
-                                              'consumer_fields=["upstream_doc"]\n')
+        base = '[paper]\ntitle="t"\nwarrants=["w.bib"]\nrubric="r.tsv"\nout="O.md"\n'
+        (d2 / "paper.toml").write_text(
+            base + '[checks.claim]\ncmd="x {target}"\nconsumer_fields=["upstream_doc"]\n'
+        )
         try:
             paperkit.bib.load_config(d2)
-            ok = False                       # reached => it accepted a misplaced declaration
+            ok = False  # reached => it accepted a misplaced declaration
         except SystemExit as e:
             ok = "belongs under [paper]" in str(e)
-        print(f"  {'ok' if ok else 'XX'} a consumer_fields under [checks.X] REFUSES, naming the "
-              f"table and the consequence")
+        print(
+            f"  {'ok' if ok else 'XX'} a consumer_fields under [checks.X] REFUSES, naming the "
+            f"table and the consequence"
+        )
         ran.append(ok)
         # δ: the SAME key, one table up, is accepted — placement is the whole difference
-        (d2 / "paper.toml").write_text(base + 'consumer_fields=["upstream_doc"]\n'
-                                              '[checks.claim]\ncmd="x {target}"\n')
+        (d2 / "paper.toml").write_text(
+            base + 'consumer_fields=["upstream_doc"]\n[checks.claim]\ncmd="x {target}"\n'
+        )
         ok2 = paperkit.bib.load_config(d2)["consumer_fields"] == ("upstream_doc",)
         print(f"  {'ok' if ok2 else 'XX'} δ: the same declaration under [paper] is accepted")
         ran.append(ok2)

@@ -22,6 +22,7 @@ grounding structure — which is exactly when nobody would be looking for it.
 
     effective.py <project-dir> <grade.json>... [--owners <project>=<effective.json> ...]
 """
+
 from __future__ import annotations
 
 import json
@@ -88,9 +89,11 @@ def owner_grades(specs: list) -> dict:
     for spec in specs:
         proj, _, path = spec.partition("=")
         for r in json.loads(Path(path).read_text())["claims"]:
-            og[(proj, r["key"])] = {"grade": r["grade"],
-                                    "effective_grade": r["effective_grade"],
-                                    "clamped_by": r.get("clamped_by")}
+            og[(proj, r["key"])] = {
+                "grade": r["grade"],
+                "effective_grade": r["effective_grade"],
+                "clamped_by": r.get("clamped_by"),
+            }
     return og
 
 
@@ -103,19 +106,32 @@ def main(argv: list) -> int:
     i = 0
     while i < len(argv):
         if argv[i] == "--owners":
-            owners = argv[i + 1:]
+            owners = argv[i + 1 :]
             break
         rest.append(argv[i])
         i += 1
     project_dir, grade_files = Path(rest[0]), rest[1:]
     rs = mikemol.grade.grade.clamp(records(project_dir, grade_files), owner_grades(owners))
-    print(json.dumps({"project": project_dir.name or str(project_dir),
-                      "claims": [{"key": r["key"], "grade": r["grade"],
-                                  "effective_grade": r["effective_grade"],
-                                  "clamp": r["clamp"], "clamped_by": r["clamped_by"],
-                                  "clamp_path": r["clamp_path"],
-                                  "unresolved": r["unresolved"]}
-                                 for r in sorted(rs, key=lambda r: r["key"])]}, indent=2))
+    print(
+        json.dumps(
+            {
+                "project": project_dir.name or str(project_dir),
+                "claims": [
+                    {
+                        "key": r["key"],
+                        "grade": r["grade"],
+                        "effective_grade": r["effective_grade"],
+                        "clamp": r["clamp"],
+                        "clamped_by": r["clamped_by"],
+                        "clamp_path": r["clamp_path"],
+                        "unresolved": r["unresolved"],
+                    }
+                    for r in sorted(rs, key=lambda r: r["key"])
+                ],
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

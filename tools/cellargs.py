@@ -22,6 +22,7 @@ checks, and reimplementing that would be the second body of a capability the std
 This module converts its result to a record ONCE, at the boundary, and everything downstream sees
 concrete types.  One walled seam, callers clean.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -53,16 +54,24 @@ def _parser() -> argparse.ArgumentParser:
     ap.add_argument("--claim", required=True, help="the claim key this cell evaluates")
     ap.add_argument("--site", required=True, help="the def-site label, recorded in the result")
     ap.add_argument("--out", required=True, help="where to write this cell's record")
-    ap.add_argument("--module", default="",
-                    help="the mutated module's .py path (empty for a file/content cell)")
-    ap.add_argument("--mutant-py", default="",
-                    help="the mutated module SOURCE (identity for the ∅ baseline)")
+    ap.add_argument(
+        "--module", default="", help="the mutated module's .py path (empty for a file/content cell)"
+    )
+    ap.add_argument(
+        "--mutant-py", default="", help="the mutated module SOURCE (identity for the ∅ baseline)"
+    )
     ap.add_argument("--mutant-pyc", default="", help="the mutated module BYTECODE")
     ap.add_argument("--content-path", default="", help="a content cell's target file")
-    ap.add_argument("--content-textfile", default="",
-                    help="the substring to drop/inject, delivered as a FILE (no shell escaping)")
-    ap.add_argument("--peak", default="",
-                    help="write this cell's in-scope memory.peak here (empty = not observing)")
+    ap.add_argument(
+        "--content-textfile",
+        default="",
+        help="the substring to drop/inject, delivered as a FILE (no shell escaping)",
+    )
+    ap.add_argument(
+        "--peak",
+        default="",
+        help="write this cell's in-scope memory.peak here (empty = not observing)",
+    )
     return ap
 
 
@@ -85,6 +94,16 @@ def parse(argv: list[str]) -> CellArgs:
     content_path: str = ns.content_path
     content_textfile: str = ns.content_textfile
     peak: str = ns.peak
-    return CellArgs(engine_dir=engine_dir, check=check, claim=claim, site=site, out=out,
-                    module=module, mutant_py=mutant_py, mutant_pyc=mutant_pyc,
-                    content_path=content_path, content_textfile=content_textfile, peak=peak)
+    return CellArgs(
+        engine_dir=engine_dir,
+        check=check,
+        claim=claim,
+        site=site,
+        out=out,
+        module=module,
+        mutant_py=mutant_py,
+        mutant_pyc=mutant_pyc,
+        content_path=content_path,
+        content_textfile=content_textfile,
+        peak=peak,
+    )

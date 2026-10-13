@@ -35,6 +35,7 @@ Usage:
                 p="CROSSING is asked", f="the literal returns", d="one token")
         return s.finish()
 """
+
 from __future__ import annotations
 
 import sys
@@ -59,8 +60,8 @@ class Suite:
 
     def __init__(self, name: str, subtitle: str = "") -> None:
         self.name = name
-        self.ran: list[tuple[str, bool]] = []       # every behavior arm
-        self.deltas: list[tuple[str, bool]] = []    # every ⟨P, F, δ⟩ pair
+        self.ran: list[tuple[str, bool]] = []  # every behavior arm
+        self.deltas: list[tuple[str, bool]] = []  # every ⟨P, F, δ⟩ pair
         if subtitle:
             sys.stdout.write(f"{subtitle}\n\n")
 
@@ -81,8 +82,9 @@ class Suite:
         """Print a section heading between groups of arms."""
         sys.stdout.write(f"\n⟨{title}⟩\n\n")
 
-    def delta(self, desc: str, p_ok: object, f_ok: object, says: Says = ("", "", ""),
-              **prose: str) -> bool:
+    def delta(
+        self, desc: str, p_ok: object, f_ok: object, says: Says = ("", "", ""), **prose: str
+    ) -> bool:
         """Record a ⟨P, F, δ⟩ pair: BOTH arms must hold, or the pair proves nothing.
 
         ⚑ A pair whose P passes and whose F also passes is a witness that cannot fail — the
@@ -127,6 +129,8 @@ class Suite:
                 sys.stdout.write(f"  - {d}\n")
             return 1
         n, m = len(self.ran), len(self.deltas)
-        sys.stdout.write(f"\n{self.name}: PASS ({n} behavior{'' if n == 1 else 's'}, "
-                         f"{m} delta{'' if m == 1 else 's'})\n")
+        sys.stdout.write(
+            f"\n{self.name}: PASS ({n} behavior{'' if n == 1 else 's'}, "
+            f"{m} delta{'' if m == 1 else 's'})\n"
+        )
         return 0

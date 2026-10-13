@@ -20,6 +20,7 @@ functions rather than re-implementing them (one owner for the measurement).
 
     python3 checks/a11y_own.py            # build the conformant deliverable, gate it UA-1==0
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -59,18 +60,33 @@ def _build_deliverable(d: Path) -> Path:
         c = re.search(r"\bcheck\s*=\s*\{(\w+):", m.group(2))
         if c:
             mk[m.group(1)] = mark.get(c.group(1), "(machine-checked)")
-    split = re.sub(r"\[@([A-Za-z][\w:.+-]*)\]", lambda x: mk.get(x.group(1), x.group(0)),
-                   Path("../paper/paper.md").read_text())
+    split = re.sub(
+        r"\[@([A-Za-z][\w:.+-]*)\]",
+        lambda x: mk.get(x.group(1), x.group(0)),
+        Path("../paper/paper.md").read_text(),
+    )
     title = tomllib.loads(Path("../paper/paper.toml").read_text())["paper"]["title"]
     md, docx = d / "p.md", d / "p.docx"
     md.write_text(split)
-    subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography", "../paper/references.bib",
-                    "--metadata", f"title={title}", "-o", str(docx)], check=True)
-    widen_tables.widen(docx, d / "sized.docx")               # size columns before export (pandoc→widen→export)
+    subprocess.run(
+        [
+            "pandoc",
+            str(md),
+            "--citeproc",
+            "--bibliography",
+            "../paper/references.bib",
+            "--metadata",
+            f"title={title}",
+            "-o",
+            str(docx),
+        ],
+        check=True,
+    )
+    widen_tables.widen(docx, d / "sized.docx")  # size columns before export (pandoc→widen→export)
     docx = d / "sized.docx"
     pdf = lo_export.export_pdfua(docx, d / "p.pdf") or lo.convert(docx, "pdf", d)
     assert pdf is not None and pdf.stat().st_size > 0, "no PDF deliverable produced"
-    linkalt.describe_links(pdf)                                       # links: PDF/UA 7.18.1/7.18.5
+    linkalt.describe_links(pdf)  # links: PDF/UA 7.18.1/7.18.5
     mathalt.describe_formulas(pdf, mathalt.paper_equations(Path("../paper/paper.md")))  # 7.7
     return pdf
 
@@ -91,25 +107,33 @@ def main() -> int:
     # false" MUST NOT render identically.  `verdict.py` maps rc 3 → cannot-run, and `pk_gate`
     # aggregates on `fail` only, so a cannot-run does not red the gate — which is the point.
     if linkalt.pikepdf is None:
-        print("a11y-own: pikepdf absent — CANNOT VERIFY the deliverable's link descriptions "
-              "(not a pass, not a failure)", file=sys.stderr)
+        print(
+            "a11y-own: pikepdf absent — CANNOT VERIFY the deliverable's link descriptions "
+            "(not a pass, not a failure)",
+            file=sys.stderr,
+        )
         return 3
     with tempfile.TemporaryDirectory() as t:
         pdf = _build_deliverable(Path(t))
         r = a11y.Result()
-        a11y.check_ua2(r, pdf, None, flavour="ua1")                  # the conformance gate, UA-1
-        a11y.check_tagged(r, pdf, None)                              # Tagged: yes
+        a11y.check_ua2(r, pdf, None, flavour="ua1")  # the conformance gate, UA-1
+        a11y.check_tagged(r, pdf, None)  # Tagged: yes
         print(f"\n  a11y (own paper) — {pdf.name}")
         print("  " + "-" * 60)
         for name, ok, detail in r.rows:
             print(f"  {'✓' if ok else '✗'} {name:<30} {detail}")
         print("  " + "-" * 60)
         if r.ok():
-            print("  a11y-own: PASS — paperkit's paper is PDF/UA-1 conformant by construction "
-                  "(veraPDF failedChecks==0, Tagged)")
+            print(
+                "  a11y-own: PASS — paperkit's paper is PDF/UA-1 conformant by construction "
+                "(veraPDF failedChecks==0, Tagged)"
+            )
             return 0
-        print("  a11y-own: FAIL — the paper is not PDF/UA-1 conformant "
-              "(the adopted repair did not close every failure)", file=sys.stderr)
+        print(
+            "  a11y-own: FAIL — the paper is not PDF/UA-1 conformant "
+            "(the adopted repair did not close every failure)",
+            file=sys.stderr,
+        )
         return 1
 
 

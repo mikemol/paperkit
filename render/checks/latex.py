@@ -35,6 +35,7 @@ standalone LaTeX (whose preamble it cannot control); it renders the BODY with pa
     python3 checks/latex.py            # build the paper.md → tagged PDF/UA-2 deliverable, gate it
     python3 checks/latex.py --selftest # ⟨P,F,δ⟩ against a math fixture
 """
+
 from __future__ import annotations
 
 import re
@@ -53,13 +54,16 @@ _METADATA = r"\DocumentMetadata{lang=en-US,pdfstandard=ua-2,testphase={phase-III
 
 def _deps_absent() -> str | None:
     import shutil
+
     for tool in ("lualatex", "pandoc"):
         if not shutil.which(tool):
             return tool
     for sty in ("unicode-math", "luaotfload"):
         if subprocess.run(["kpsewhich", sty + ".sty"], capture_output=True).returncode != 0:
             return sty + ".sty"
-    if a11y._find_verapdf(None) is None:    # the UA-2 gate needs veraPDF; absent → cannot-run, not a crash
+    if (
+        a11y._find_verapdf(None) is None
+    ):  # the UA-2 gate needs veraPDF; absent → cannot-run, not a crash
         return "verapdf"
     # ⚑ Σ-F4 — pikepdf BELONGS IN THIS ROSTER: `_selftest` imports it directly, so its absence was
     # a `ModuleNotFoundError` the gate read as a FAILED verification while four sibling checks
@@ -84,22 +88,24 @@ def _assemble_tex(body: str, title: str, ruler_preamble: str = "") -> str:
     per-codepoint font fallback, and the ruler-sequence nicematrix definitions (empty if the
     document has no rulable table).
     """
-    return "\n".join([
-        _METADATA,                                           # first line — before \documentclass
-        r"\documentclass{article}",
-        r"\usepackage{unicode-math}",                        # math + the OpenType text stack
-        r"\usepackage{luaotfload}",
-        rf'\directlua{{luaotfload.add_fallback("pkfallback", {{"{_FALLBACK_FONT}:mode=harf;"}})}}',
-        r"\setmainfont{Latin Modern Roman}[RawFeature={fallback=pkfallback}]",
-        r"\usepackage{hyperref}",
-        ruler_preamble,                                      # nicematrix + \Rule<k> custom-lines
-        rf"\title{{{title}}}",
-        r"\begin{document}",
-        r"\maketitle",
-        body,
-        r"\end{document}",
-        "",
-    ])
+    return "\n".join(
+        [
+            _METADATA,  # first line — before \documentclass
+            r"\documentclass{article}",
+            r"\usepackage{unicode-math}",  # math + the OpenType text stack
+            r"\usepackage{luaotfload}",
+            rf'\directlua{{luaotfload.add_fallback("pkfallback", {{"{_FALLBACK_FONT}:mode=harf;"}})}}',
+            r"\setmainfont{Latin Modern Roman}[RawFeature={fallback=pkfallback}]",
+            r"\usepackage{hyperref}",
+            ruler_preamble,  # nicematrix + \Rule<k> custom-lines
+            rf"\title{{{title}}}",
+            r"\begin{document}",
+            r"\maketitle",
+            body,
+            r"\end{document}",
+            "",
+        ]
+    )
 
 
 def build(paper_md: Path, out_pdf: Path, work: Path) -> Path | None:
@@ -108,28 +114,46 @@ def build(paper_md: Path, out_pdf: Path, work: Path) -> Path | None:
     reports it cannot produce this format.
     """
     if _deps_absent():
-        print(f"latex: {_deps_absent()} absent — cannot build the LaTeX deliverable here",
-              file=sys.stderr)
+        print(
+            f"latex: {_deps_absent()} absent — cannot build the LaTeX deliverable here",
+            file=sys.stderr,
+        )
         return None
     split = source.cite_split(paper_md)
     title = source.title(paper_md)
     md = work / "p.md"
     md.write_text(split)
     body = subprocess.run(
-        ["pandoc", str(md), "-t", "latex", "--citeproc",
-         "--bibliography", str(paper_md.parent / "references.bib")],
-        capture_output=True, text=True, check=True).stdout
+        [
+            "pandoc",
+            str(md),
+            "-t",
+            "latex",
+            "--citeproc",
+            "--bibliography",
+            str(paper_md.parent / "references.bib"),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
     # by construction: rule every table with the ruler-sequence non-colour cue (WCAG 1.4.1), and
     # size the nicematrix preamble to the orders the document's tables actually reach.
     body, report = ruler_inject.inject(body)
-    ruler_preamble = (ruler_inject.preamble_defs(ruler_inject.max_order_of(report))
-                      if any(not t["excepted"] and t["rows"] >= 2 for t in report) else "")
+    ruler_preamble = (
+        ruler_inject.preamble_defs(ruler_inject.max_order_of(report))
+        if any(not t["excepted"] and t["rows"] >= 2 for t in report)
+        else ""
+    )
     tex = work / "p.tex"
     tex.write_text(_assemble_tex(body, title, ruler_preamble))
     # twice: the first pass writes the .aux (refs, the struct tree); the second resolves them.
     for _ in range(2):
-        subprocess.run(["lualatex", "-interaction=nonstopmode", "-output-directory", str(work),
-                        str(tex)], capture_output=True, text=True)
+        subprocess.run(
+            ["lualatex", "-interaction=nonstopmode", "-output-directory", str(work), str(tex)],
+            capture_output=True,
+            text=True,
+        )
     pdf = work / "p.pdf"
     if not (pdf.exists() and pdf.stat().st_size > 0):
         return None
@@ -150,7 +174,7 @@ def main(argv: list[str]) -> int:
     absent = _deps_absent()
     if absent:
         print(f"latex: {absent} absent — CANNOT BUILD (not a pass)", file=sys.stderr)
-        return 3                                            # cannot-run, not a green
+        return 3  # cannot-run, not a green
     if argv and argv[0] == "--selftest":
         return _selftest()
     with tempfile.TemporaryDirectory() as t:
@@ -168,8 +192,10 @@ def main(argv: list[str]) -> int:
         seen = set(re.findall(r"[a-z]{4,}", txt.lower()))
         rate = sum(w in seen for w in words) / len(words)
         ok = tagged and pages >= 1 and rate >= 0.85
-        print(f"latex: {'ok' if ok else 'FAIL'} — {pages}-page tagged={tagged} PDF/UA-2 deliverable, "
-              f"{rate:.0%} of body content present")
+        print(
+            f"latex: {'ok' if ok else 'FAIL'} — {pages}-page tagged={tagged} PDF/UA-2 deliverable, "
+            f"{rate:.0%} of body content present"
+        )
         return 0 if ok else 1
 
 
@@ -182,10 +208,13 @@ def _selftest() -> int:
     """
     absent = _deps_absent()
     if absent:
-        print(f"  -- {absent} absent; the LaTeX stack is unrunnable here.\n"
-              "     LATEX SELFTEST: SKIP (loud) — the method is present but unrunnable on this box")
+        print(
+            f"  -- {absent} absent; the LaTeX stack is unrunnable here.\n"
+            "     LATEX SELFTEST: SKIP (loud) — the method is present but unrunnable on this box"
+        )
         return 0
     import pikepdf
+
     fails = []
 
     def check(desc, cond) -> None:
@@ -193,24 +222,41 @@ def _selftest() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     def _ua2(pdf: Path) -> int:
-        vera = a11y._find_verapdf(None)     # portable resolution (a11y.py owns it), never a hardcoded path
+        vera = a11y._find_verapdf(
+            None
+        )  # portable resolution (a11y.py owns it), never a hardcoded path
         if vera is None:
-            return -1                       # unreachable — _deps_absent() gates veraPDF above → cannot-run
-        v = subprocess.run([str(vera), "--flavour", "ua2", str(pdf)], capture_output=True, text=True)
+            return -1  # unreachable — _deps_absent() gates veraPDF above → cannot-run
+        v = subprocess.run(
+            [str(vera), "--flavour", "ua2", str(pdf)], capture_output=True, text=True
+        )
         m = re.search(r'failedChecks="(\d+)"', v.stdout)
         return int(m.group(1)) if m else -1
 
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
         math = r"$\mathrm{eff}(c) = \min\{g(d)\}$ and $\mathrm{incr}(c) = \mathrm{fp}(c) \setminus \bigcup_d \mathrm{fp}(d)$."
-        body = subprocess.run(["pandoc", "-t", "latex"], input=f"# Formulas\n\n{math}\n",
-                              capture_output=True, text=True).stdout
+        body = subprocess.run(
+            ["pandoc", "-t", "latex"],
+            input=f"# Formulas\n\n{math}\n",
+            capture_output=True,
+            text=True,
+        ).stdout
 
         # P: with the tagging metadata → tagged, /AF MathML, ua2==0
         (d / "p.tex").write_text(_assemble_tex(body, "Fixture"))
         for _ in range(2):
-            subprocess.run(["lualatex", "-interaction=nonstopmode", "-output-directory", str(d),
-                            str(d / "p.tex")], capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "lualatex",
+                    "-interaction=nonstopmode",
+                    "-output-directory",
+                    str(d),
+                    str(d / "p.tex"),
+                ],
+                capture_output=True,
+                text=True,
+            )
         p_pdf = d / "p.pdf"
         af = 0
         if p_pdf.exists():
@@ -224,28 +270,46 @@ def _selftest() -> int:
                     af += 1
                 k = n.get("/K")
                 if k is not None:
-                    for it in (k if isinstance(k, pikepdf.Array) else [k]):
+                    for it in k if isinstance(k, pikepdf.Array) else [k]:
                         if isinstance(it, pikepdf.Dictionary):
                             walk(it, dep + 1)
+
             r = doc.Root.get("/StructTreeRoot")
             if r:
                 walk(r)
-        check("P: the deliverable is PDF/UA-2 conformant (veraPDF failedChecks==0)",
-              p_pdf.exists() and _ua2(p_pdf) == 0)
-        check("P: each formula carries ASSOCIATED MathML (/AF) — recoverable math, not just /Alt",
-              af >= 1)
+        check(
+            "P: the deliverable is PDF/UA-2 conformant (veraPDF failedChecks==0)",
+            p_pdf.exists() and _ua2(p_pdf) == 0,
+        )
+        check(
+            "P: each formula carries ASSOCIATED MathML (/AF) — recoverable math, not just /Alt",
+            af >= 1,
+        )
 
         # F: strip \DocumentMetadata → untagged, ua2 fails
         f_tex = _assemble_tex(body, "Fixture").replace(_METADATA, "")
         (d / "f.tex").write_text(f_tex)
         for _ in range(2):
-            subprocess.run(["lualatex", "-interaction=nonstopmode", "-output-directory", str(d),
-                            str(d / "f.tex")], capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "lualatex",
+                    "-interaction=nonstopmode",
+                    "-output-directory",
+                    str(d),
+                    str(d / "f.tex"),
+                ],
+                capture_output=True,
+                text=True,
+            )
         f_pdf = d / "f.pdf"
-        check("F: without \\DocumentMetadata the PDF is not UA-2 conformant (the tagging hangs off it)",
-              f_pdf.exists() and _ua2(f_pdf) != 0)
-        check("δ: the \\DocumentMetadata line is the discriminator (tagged/UA-2 vs not)",
-              p_pdf.exists() and f_pdf.exists() and _ua2(p_pdf) == 0 and _ua2(f_pdf) != 0)
+        check(
+            "F: without \\DocumentMetadata the PDF is not UA-2 conformant (the tagging hangs off it)",
+            f_pdf.exists() and _ua2(f_pdf) != 0,
+        )
+        check(
+            "δ: the \\DocumentMetadata line is the discriminator (tagged/UA-2 vs not)",
+            p_pdf.exists() and f_pdf.exists() and _ua2(p_pdf) == 0 and _ua2(f_pdf) != 0,
+        )
 
     if fails:
         print(f"LATEX SELFTEST: FAIL ({len(fails)})")

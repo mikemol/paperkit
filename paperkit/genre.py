@@ -41,6 +41,7 @@ where the escape hatch is universal so the gate holds the SEAM.  Three registry 
     python3 genre.py            # print the registry
     python3 genre.py --check    # assert the three seam invariants over every registered genre
 """
+
 from __future__ import annotations
 
 import sys
@@ -59,6 +60,7 @@ _REFUSE = 3
 # Each is a pure function (groups, records) -> units.  They are DELIBERATELY few: the registry is
 # open precisely so the interesting ones can be registered by the consumer that needs them, and
 # a built-in that guessed wrong would be a closed set's mistake made slowly.
+
 
 def _atomic(groups, records):
     """One unit per claim — the teaching cut (slides.bib: cluster → slide-per-claim).  The
@@ -100,7 +102,7 @@ def _talk(groups, records):
         unit, load = [], 0
         for k in g:
             w = weight.get(k, 0)
-            if unit and load + w > _LOAD:        # over budget: break BEFORE this claim
+            if unit and load + w > _LOAD:  # over budget: break BEFORE this claim
                 out.append(unit)
                 unit, load = [], 0
             unit.append(k)
@@ -130,7 +132,7 @@ def _collection(groups, records):
     with no rests-on (the degenerate case, measured as 7 of 11 projects) leaves this the identity.
     """
     rests = {r["key"]: [y for y in (r.get("rests-on") or [])] for r in (records or ())}
-    owner = {}                                   # key -> index of the group holding it
+    owner = {}  # key -> index of the group holding it
     for i, g in enumerate(groups):
         for k in g:
             owner[k] = i
@@ -145,7 +147,7 @@ def _collection(groups, records):
     def union(i, j) -> None:
         ri, rj = find(i), find(j)
         if ri != rj:
-            parent[max(ri, rj)] = min(ri, rj)    # lower index wins: deterministic
+            parent[max(ri, rj)] = min(ri, rj)  # lower index wins: deterministic
 
     for i, g in enumerate(groups):
         for k in g:
@@ -165,14 +167,22 @@ _LOAD = 84
 
 
 BUILTIN = {
-    "staged": {"objective": _staged, "gamma": 1.0,
-               "what": "one unit per cohering cluster, unbudgeted — the grouping as-is"},
-    "atomic": {"objective": _atomic, "gamma": 1.0,
-               "what": "one unit per claim — the teaching cut"},
-    "collection": {"objective": _collection, "gamma": 0.5,
-                   "what": "one unit per self-contained subtree — minimise cross-unit grounding"},
-    "talk":   {"objective": _talk, "gamma": 1.0,
-               "what": f"clusters split to a {_LOAD}-word load budget — the conference-talk cut"},
+    "staged": {
+        "objective": _staged,
+        "gamma": 1.0,
+        "what": "one unit per cohering cluster, unbudgeted — the grouping as-is",
+    },
+    "atomic": {"objective": _atomic, "gamma": 1.0, "what": "one unit per claim — the teaching cut"},
+    "collection": {
+        "objective": _collection,
+        "gamma": 0.5,
+        "what": "one unit per self-contained subtree — minimise cross-unit grounding",
+    },
+    "talk": {
+        "objective": _talk,
+        "gamma": 1.0,
+        "what": f"clusters split to a {_LOAD}-word load budget — the conference-talk cut",
+    },
 }
 
 
@@ -219,8 +229,12 @@ def partition(records, gamma: float = 1.0) -> dict:
         kind = "undeclared" if not any("rests-on" in r for r in records) else "ungrounded"
         return {"part": dict(sec), "edges": 0, "degenerate": True, "within": 0, "kind": kind}
 
-    within = sum(1 for r in records for y in r.get("rests-on", [])
-                 if y in idx and sec.get(y) == r.get("section"))
+    within = sum(
+        1
+        for r in records
+        for y in r.get("rests-on", [])
+        if y in idx and sec.get(y) == r.get("section")
+    )
     deg = {k: len(adj[k]) for k in keys}
     two_m = 2.0 * edges
 
@@ -264,16 +278,22 @@ def partition(records, gamma: float = 1.0) -> dict:
         # together.  Merges are tried in a deterministic order (sorted group pairs), and only an
         # adjacent pair (joined by a real rests-on edge) is a candidate — merging unconnected
         # groups would fuse a document on no evidence.
-        pairs = sorted({tuple(sorted((part[k], part[j]))) for k in keys for j in adj[k]
-                        if part[k] != part[j]})
+        pairs = sorted(
+            {tuple(sorted((part[k], part[j]))) for k in keys for j in adj[k] if part[k] != part[j]}
+        )
         for a, b in pairs:
             trial = {k: (a if part[k] == b else part[k]) for k in keys}
             score = modularity(trial) - gamma * (dist(trial) / len(keys))
             if score > base + 1e-12:
                 part, base, improved = trial, score, True
                 break
-    return {"part": part, "edges": edges, "degenerate": False, "within": within,
-            "groups": len(set(part.values()))}
+    return {
+        "part": part,
+        "edges": edges,
+        "degenerate": False,
+        "within": within,
+        "groups": len(set(part.values())),
+    }
 
 
 def run_declared(spec: dict, groups, records, cwd=None, spawn=None) -> list:
@@ -354,17 +374,23 @@ def run_declared(spec: dict, groups, records, cwd=None, spawn=None) -> list:
     # (project.py, which may import resolver) and defaults to None, so this module names no
     # resolver symbol and the partition's `project → {model, kernel}` stays true.
     if spawn is None:
-        raise Unregistered("a declared genre needs a spawn: pass resolver.spawn_declared — the "
-                           "engine's owner of running a document-declared command (project may "
-                           "not import resolver, so the caller injects it)")
+        raise Unregistered(
+            "a declared genre needs a spawn: pass resolver.spawn_declared — the "
+            "engine's owner of running a document-declared command (project may "
+            "not import resolver, so the caller injects it)"
+        )
     r = spawn(cmd, cwd, payload, records)
     if r.returncode != 0:
-        raise SystemExit(f"genre: declared objective exited {r.returncode} — {r.stderr.strip()[-300:]}")
+        raise SystemExit(
+            f"genre: declared objective exited {r.returncode} — {r.stderr.strip()[-300:]}"
+        )
     units = [ln.split("\t") for ln in r.stdout.splitlines() if ln.strip()]
     ok, why = is_total(lambda g, rec: units, groups, records)
     if not ok:
-        raise SystemExit(f"genre: the declared objective's result is {why} — a declared objective "
-                         f"is held to the same totality invariant as a built-in")
+        raise SystemExit(
+            f"genre: the declared objective's result is {why} — a declared objective "
+            f"is held to the same totality invariant as a built-in"
+        )
     return units
 
 
@@ -394,14 +420,17 @@ def registry(project_dir: Path | None = None) -> dict:
     if not cfg_path.exists():
         return reg
     import tomllib
+
     with cfg_path.open("rb") as fh:
         raw = tomllib.load(fh)
     for name, spec in (raw.get("genres") or {}).items():
-        reg[name] = {"objective": None,          # a declared genre's objective is its `cmd`
-                     "cmd": spec.get("cmd"),
-                     "gamma": float(spec.get("gamma", 1.0)),
-                     "what": spec.get("what", ""),
-                     "declared": True}
+        reg[name] = {
+            "objective": None,  # a declared genre's objective is its `cmd`
+            "cmd": spec.get("cmd"),
+            "gamma": float(spec.get("gamma", 1.0)),
+            "what": spec.get("what", ""),
+            "declared": True,
+        }
     return reg
 
 
@@ -417,7 +446,8 @@ def resolve(name: str, project_dir: Path | None = None) -> dict:
             f"genre {name!r} is not registered — available: {sorted(reg)}.  A project registers "
             f"its own with a [genres.{name}] table in paper.toml (what/cmd/gamma).  Refusing "
             f"rather than falling back to a default: a silent fallback would paginate under a "
-            f"genre nobody asked for.")
+            f"genre nobody asked for."
+        )
     return reg[name]
 
 
@@ -429,14 +459,16 @@ def is_total(objective, groups, records=()) -> tuple[bool, str]:
     src = [k for g in groups for k in g]
     try:
         units = objective(groups, records)
-    except Exception as e:                       # an objective that raises is not total
+    except Exception as e:  # an objective that raises is not total
         return False, f"objective raised {type(e).__name__}: {e}"
     out = [k for u in units for k in u]
     if sorted(out) != sorted(src):
         missing, extra = sorted(set(src) - set(out)), sorted(set(out) - set(src))
         dupes = sorted({k for k in out if out.count(k) > 1})
-        return False, (f"not a function of the grouping — "
-                       f"dropped {missing}, invented {extra}, duplicated {dupes}")
+        return False, (
+            f"not a function of the grouping — "
+            f"dropped {missing}, invented {extra}, duplicated {dupes}"
+        )
     return True, "every key lands in exactly one unit"
 
 
@@ -449,8 +481,11 @@ def main(argv: list, spawn=None) -> int:
     The engine's entry point (`_cli`) supplies it; an in-process caller that has no resolver
     passes None and `--check` then reports the declared genres as unrunnable rather than crashing.
     """
-    proj = Path([a for a in argv if not a.startswith("-")][0]) if [
-        a for a in argv if not a.startswith("-")] else None
+    proj = (
+        Path([a for a in argv if not a.startswith("-")][0])
+        if [a for a in argv if not a.startswith("-")]
+        else None
+    )
     reg = registry(proj)
     if "--check" in argv:
         # A fixture whose shape the invariant is stated over — two clusters, one singleton.
@@ -459,10 +494,13 @@ def main(argv: list, spawn=None) -> int:
         declared = 0
         for name, spec in sorted(reg.items()):
             obj = spec.get("objective")
-            if obj is None:                      # a project-declared genre: its objective is a cmd
+            if obj is None:  # a project-declared genre: its objective is a cmd
                 if not spec.get("cmd"):
-                    print(f"genre --check: {name!r} declares neither a built-in objective nor a "
-                          f"`cmd` — the registry entry names no pagination at all", file=sys.stderr)
+                    print(
+                        f"genre --check: {name!r} declares neither a built-in objective nor a "
+                        f"`cmd` — the registry entry names no pagination at all",
+                        file=sys.stderr,
+                    )
                     bad += 1
                     continue
                 # ⚑ RUN IT.  This branch used to `continue` here, checking only that a `cmd` STRING
@@ -483,9 +521,12 @@ def main(argv: list, spawn=None) -> int:
                     # result; its message already says which, so it is passed through verbatim.
                     print(f"genre --check: {name!r} (declared) {e}", file=sys.stderr)
                     bad += 1
-                except Exception as e:           # noqa: BLE001 — a check reports, never crashes
-                    print(f"genre --check: {name!r} (declared) could not run: "
-                          f"{type(e).__name__}: {e}", file=sys.stderr)
+                except Exception as e:  # noqa: BLE001 — a check reports, never crashes
+                    print(
+                        f"genre --check: {name!r} (declared) could not run: "
+                        f"{type(e).__name__}: {e}",
+                        file=sys.stderr,
+                    )
                     bad += 1
                 else:
                     declared += 1
@@ -497,9 +538,11 @@ def main(argv: list, spawn=None) -> int:
         # LOUD: an unregistered name must RAISE, never resolve to a default.
         try:
             resolve("\0no-such-genre", proj)
-            print("genre --check: an unregistered genre RESOLVED — the registry falls back "
-                  "silently, so a project would paginate under a genre it did not ask for",
-                  file=sys.stderr)
+            print(
+                "genre --check: an unregistered genre RESOLVED — the registry falls back "
+                "silently, so a project would paginate under a genre it did not ask for",
+                file=sys.stderr,
+            )
             bad += 1
         except Unregistered:
             pass
@@ -508,9 +551,11 @@ def main(argv: list, spawn=None) -> int:
         # ⚑ THE MESSAGE NAMES WHAT WAS ACTUALLY RUN.  "every objective is total" was true of the
         # built-ins and asserted of the declared ones without running them; a reader cannot tell a
         # universal that was verified from one that was assumed, so the counts are stated.
-        print(f"genre --check: {len(reg)} registered ({', '.join(sorted(reg))}) — "
-              f"{len(reg) - declared} built-in objective(s) and {declared} declared `cmd`(s) each "
-              f"INVOKED and total over the grouping, and an unregistered name refuses loudly")
+        print(
+            f"genre --check: {len(reg)} registered ({', '.join(sorted(reg))}) — "
+            f"{len(reg) - declared} built-in objective(s) and {declared} declared `cmd`(s) each "
+            f"INVOKED and total over the grouping, and an unregistered name refuses loudly"
+        )
         return 0
     print("genre registry — pagination objectives over a grouping:\n")
     for name, spec in sorted(reg.items()):
@@ -524,4 +569,5 @@ if __name__ == "__main__":
     # `genre`), so resolving the spawn here adds no component edge: dagderive attributes imports
     # to the module, and this block only runs when the file IS the program.
     import paperkit.resolver
+
     raise SystemExit(main(sys.argv[1:], spawn=paperkit.checkenv.spawn_declared))

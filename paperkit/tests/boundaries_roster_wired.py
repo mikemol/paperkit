@@ -22,6 +22,7 @@ exclusion is declared rather than silently absent.
      reverse).
   δ: membership — the arms print the difference, never a count.
 """
+
 import pathlib
 import re
 import sys
@@ -80,11 +81,12 @@ def disk_owner() -> set:
     `--config=remote` to force these to the surface, because a remote executor has no workspace to
     fall back to.
     """
-    projs = {str(q.parent.relative_to(ROOT)) if q.parent != ROOT else "."
-             for q in ROOT.rglob("paper.toml")
-             if ".git" not in q.parts and "bazel-" not in str(q) and "build" not in q.parts}
-    return {_label(p) for p in projs
-            if p not in FIXTURES and not _nested(p, projs)}
+    projs = {
+        str(q.parent.relative_to(ROOT)) if q.parent != ROOT else "."
+        for q in ROOT.rglob("paper.toml")
+        if ".git" not in q.parts and "bazel-" not in str(q) and "build" not in q.parts
+    }
+    return {_label(p) for p in projs if p not in FIXTURES and not _nested(p, projs)}
 
 
 def declared(key: str) -> set:
@@ -94,8 +96,8 @@ def declared(key: str) -> set:
     the bib against bazel's reading of the same bib, which is one source wearing two hats."""
     t = (ROOT / "arch" / "warrants.bib").read_text()
     i = t.index("@misc{" + key + ",")
-    body = t[i:t.index("\n}", i)]
-    m = re.search(r'^\s*builds\s*=\s*\{([^}]*)\}', body, re.M)
+    body = t[i : t.index("\n}", i)]
+    m = re.search(r"^\s*builds\s*=\s*\{([^}]*)\}", body, re.M)
     return {x.strip() for x in m.group(1).split(",") if "paper.toml" in x} if m else set()
 
 
@@ -110,18 +112,31 @@ def main() -> int:
     w, d = wired_owner(), disk_owner()
     pw, pr = declared("arch-projects"), declared("arch-report-scope")
 
-    check(f"P: the owners are non-empty and the readers are not vacuous -> wired={len(w)} disk={len(d)}",
-          len(w) > 1 and len(d) > 1 and len(pw) > 1 and len(pr) > 1)
-    check(f"F: no WIRED project is missing from arch-projects' labels -> {sorted(w - pw)}", not (w - pw))
-    check(f"F: arch-projects declares no label that MODULE.bazel does not wire -> {sorted(pw - w)}",
-          not (pw - w))
-    check(f"F: no paper.toml ON DISK is missing from arch-report-scope's labels -> {sorted(d - pr)}",
-          not (d - pr))
-    check(f"F: arch-report-scope declares no paper.toml absent from disk -> {sorted(pr - d)}",
-          not (pr - d))
+    check(
+        f"P: the owners are non-empty and the readers are not vacuous -> wired={len(w)} disk={len(d)}",
+        len(w) > 1 and len(d) > 1 and len(pw) > 1 and len(pr) > 1,
+    )
+    check(
+        f"F: no WIRED project is missing from arch-projects' labels -> {sorted(w - pw)}",
+        not (w - pw),
+    )
+    check(
+        f"F: arch-projects declares no label that MODULE.bazel does not wire -> {sorted(pw - w)}",
+        not (pw - w),
+    )
+    check(
+        f"F: no paper.toml ON DISK is missing from arch-report-scope's labels -> {sorted(d - pr)}",
+        not (d - pr),
+    )
+    check(
+        f"F: arch-report-scope declares no paper.toml absent from disk -> {sorted(pr - d)}",
+        not (pr - d),
+    )
 
-    print(f"BOUNDARIES: {'PASS' if not fails else f'FAIL ({len(fails)})'} "
-          f"({len(w)} wired, {len(d)} on disk, 2 rosters gated against their owners)")
+    print(
+        f"BOUNDARIES: {'PASS' if not fails else f'FAIL ({len(fails)})'} "
+        f"({len(w)} wired, {len(d)} on disk, 2 rosters gated against their owners)"
+    )
     return 1 if fails else 0
 
 

@@ -17,6 +17,7 @@ which is exactly the failure the guard makes loud.
 
     python3 paperkit/tests/boundaries_config.py
 """
+
 from __future__ import annotations
 
 import ast
@@ -30,8 +31,12 @@ from tools import dagderive as _dagderive  # noqa: E402
 from tools import dagnames as _dagnames  # noqa: E402
 
 # Synthetic Params — the mechanism's specimens (no coupling to any real knob).
-VAL = paperkit.config.Param("syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def"))
-FLAG = paperkit.config.Param("syn-flag", "PAPERKIT_SYN_FLAG", config="syn_flag", flag=True, aliases=("--syn-alias",))
+VAL = paperkit.config.Param(
+    "syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def")
+)
+FLAG = paperkit.config.Param(
+    "syn-flag", "PAPERKIT_SYN_FLAG", config="syn_flag", flag=True, aliases=("--syn-alias",)
+)
 SYN = [VAL, FLAG]
 
 
@@ -43,7 +48,9 @@ def reset(p) -> None:
 def _literal(path, name):
     """The value of assignment `name = <literal>` in a .bzl/.py file (ast, never exec)."""
     for node in ast.parse(path.read_text()).body:
-        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == name for t in node.targets):
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", None) == name for t in node.targets
+        ):
             return ast.literal_eval(node.value)
     raise SystemExit(f"bnd-config: no literal {name} in {path}")
 
@@ -87,24 +94,39 @@ def main() -> int:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
-    print("Ω·config — arg > env > config > default, one rule for every knob (synthetic specimens)\n")
+    print(
+        "Ω·config — arg > env > config > default, one rule for every knob (synthetic specimens)\n"
+    )
     p = VAL
     reset(p)
     check("default when nothing is set", paperkit.config.resolve(p) == "file")
-    check("project config (paper.toml [paper]) overrides the default", paperkit.config.resolve(p, {"syn_val": "def"}) == "def")
+    check(
+        "project config (paper.toml [paper]) overrides the default",
+        paperkit.config.resolve(p, {"syn_val": "def"}) == "def",
+    )
     os.environ[p.env] = "file"
     check("env overrides project config", paperkit.config.resolve(p, {"syn_val": "def"}) == "file")
     paperkit.config.apply_args(["--syn-val", "def"], SYN)
-    check("an explicit arg overrides the env", paperkit.config.resolve(p, {"syn_val": "def"}) == "def")
-    check("apply_args is PROCESS-LOCAL — it does NOT mutate os.environ (a spawned check won't "
-          "inherit the grader's flags)", os.environ.get(p.env) == "file")
+    check(
+        "an explicit arg overrides the env", paperkit.config.resolve(p, {"syn_val": "def"}) == "def"
+    )
+    check(
+        "apply_args is PROCESS-LOCAL — it does NOT mutate os.environ (a spawned check won't "
+        "inherit the grader's flags)",
+        os.environ.get(p.env) == "file",
+    )
     reset(p)
 
     check("a flag is False by default", paperkit.config.resolve(FLAG) is False)
-    paperkit.config.apply_args(["--syn-flag"], SYN); check("a flag set by its arg is True", paperkit.config.resolve(FLAG) is True)
+    paperkit.config.apply_args(["--syn-flag"], SYN)
+    check("a flag set by its arg is True", paperkit.config.resolve(FLAG) is True)
     paperkit.config._ARGS.clear()
-    check("a flag set by [paper] config is True", paperkit.config.resolve(FLAG, {"syn_flag": True}) is True)
-    paperkit.config.apply_args(["--syn-alias"], SYN); check("a flag honours its alias", paperkit.config.resolve(FLAG) is True)
+    check(
+        "a flag set by [paper] config is True",
+        paperkit.config.resolve(FLAG, {"syn_flag": True}) is True,
+    )
+    paperkit.config.apply_args(["--syn-alias"], SYN)
+    check("a flag honours its alias", paperkit.config.resolve(FLAG) is True)
     paperkit.config._ARGS.clear()
 
     os.environ[p.env] = "bogus"
@@ -115,8 +137,11 @@ def main() -> int:
         raised = True
     os.environ.pop(p.env, None)
     check("a value outside the param's choices is REFUSED", raised)
-    check("positionals strips flags + valued options, keeps the project dir",
-          paperkit.config.positionals(["--syn-val", "def", "--syn-flag", "myproj"], SYN) == ["myproj"])
+    check(
+        "positionals strips flags + valued options, keeps the project dir",
+        paperkit.config.positionals(["--syn-val", "def", "--syn-flag", "myproj"], SYN)
+        == ["myproj"],
+    )
 
     # ── Μ·kernel·shrink·registry — the entry-registry completeness boundary ──────────────
     # Expected set DERIVED from the owners: dag.bzl (import DAG) + vars() introspection
@@ -134,12 +159,12 @@ def main() -> int:
     # `paperkit.gate`, so one Param is one object. Imported flat beside the package, `gate` and
     # `paperkit.gate` were two loads of the same file, every Param twice, and every REGISTRY
     # comparison by identity read "missing=[X] extra=[X]".
-    mods = {
-        s: importlib.import_module(s if "." in s else f"paperkit.{s}") for s in engine_stems
-    }
+    mods = {s: importlib.import_module(s if "." in s else f"paperkit.{s}") for s in engine_stems}
 
-    check("the kernel hosts ZERO Params (config.py is the mechanism alone)",
-          not _hosted(mods["config"]))
+    check(
+        "the kernel hosts ZERO Params (config.py is the mechanism alone)",
+        not _hosted(mods["config"]),
+    )
     hosts = {s: _hosted(m) for s, m in mods.items()}
     # W64 -- a re-export (`from checkenv import PATH` inside resolver.py, so callers reaching
     # `resolver.PATH` keep working) makes the SAME Param object an attribute of two modules'
@@ -148,16 +173,22 @@ def main() -> int:
     # re-exported reference to the one true owner does not violate.
     all_params_raw = [(s, n, p_) for s, h in hosts.items() for n, p_ in h.items()]
     all_params = list({id(p_): (s, n, p_) for s, n, p_ in all_params_raw}.values())
-    check(f"every Param has exactly ONE host module ({len(all_params)} params)",
-          len({id(p_) for _, _, p_ in all_params}) == len(all_params))
+    check(
+        f"every Param has exactly ONE host module ({len(all_params)} params)",
+        len({id(p_) for _, _, p_ in all_params}) == len(all_params),
+    )
     names = [p_.name for _, _, p_ in all_params]
     envs = [p_.env for _, _, p_ in all_params]
     check("knob names are globally unique across all hosts", len(names) == len(set(names)))
     check("env vars are globally unique across all hosts", len(envs) == len(set(envs)))
 
     def expected(entry_stem):
-        return {id(p_): p_.name for s in _cone(entry_stem, imports) if s in hosts
-                for p_ in hosts[s].values()}
+        return {
+            id(p_): p_.name
+            for s in _cone(entry_stem, imports)
+            if s in hosts
+            for p_ in hosts[s].values()
+        }
 
     entries = {s: mods[s] for s in ("gate", "discriminate", "project")}
     for stem, mod in entries.items():
@@ -165,18 +196,24 @@ def main() -> int:
         got = {id(p_): p_.name for p_ in mod.REGISTRY}
         missing = sorted(n for i, n in exp.items() if i not in got)
         extra = sorted(n for i, n in got.items() if i not in exp)
-        check(f"{stem}.REGISTRY == the Params its import cone hosts ({len(exp)})"
-              + (f" — missing={missing} extra={extra}" if missing or extra else ""),
-              not missing and not extra)
+        check(
+            f"{stem}.REGISTRY == the Params its import cone hosts ({len(exp)})"
+            + (f" — missing={missing} extra={extra}" if missing or extra else ""),
+            not missing and not extra,
+        )
 
     print("\n⟨P, F, δ⟩ minimum-delta pairs\n")
-    reset(p); os.environ[p.env] = "file"
+    reset(p)
+    os.environ[p.env] = "file"
     F = paperkit.config.resolve(p)
-    paperkit.config.apply_args(["--syn-val", "def"], SYN); P_ = paperkit.config.resolve(p)
+    paperkit.config.apply_args(["--syn-val", "def"], SYN)
+    P_ = paperkit.config.resolve(p)
     ok = F == "file" and P_ == "def"
     fails.append("arg-over-env") if not ok else None
     reset(p)
-    print(f"  {'ok ' if ok else 'XX '}the same knob: an explicit arg flips the resolved value; the env alone does not")
+    print(
+        f"  {'ok ' if ok else 'XX '}the same knob: an explicit arg flips the resolved value; the env alone does not"
+    )
     print("      P (arg given):  resolve == 'def'   (--syn-val def)")
     print("      F (env only):   resolve == 'file'  (PAPERKIT_SYN_VAL=file)")
     print("      δ (min delta): the presence of the explicit arg, which overrides the env\n")
@@ -189,7 +226,9 @@ def main() -> int:
     fails.append("completeness-delta") if not caught else None
     print(f"  {'ok ' if caught else 'XX '}omitting ONE Param from a composed registry is CAUGHT")
     print("      P (intact):  gate.REGISTRY == its cone's hosted Params — every cone flag captured")
-    print("      F (dropped): one element removed → that flag would be SILENTLY ignored (green under defaults)")
+    print(
+        "      F (dropped): one element removed → that flag would be SILENTLY ignored (green under defaults)"
+    )
     print("      δ (min delta): one element of one composed registry list\n")
 
     if fails:
@@ -199,7 +238,9 @@ def main() -> int:
     if bad:
         print(f"BOUNDARIES: FAIL ({bad} of {len(ran)} behaviors drifted)")
         return 1
-    print(f"BOUNDARIES: PASS ({len(ran)} behaviors, {4 + len(entries)} registry invariants, 2 deltas)")
+    print(
+        f"BOUNDARIES: PASS ({len(ran)} behaviors, {4 + len(entries)} registry invariants, 2 deltas)"
+    )
     return 0
 
 

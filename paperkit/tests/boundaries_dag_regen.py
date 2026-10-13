@@ -31,6 +31,7 @@ an edge name the shape a Bazel target uses, and the translating map is deleted.
 
 Run:  python3 paperkit/tests/boundaries_dag_regen.py
 """
+
 from __future__ import annotations
 
 import shutil
@@ -48,6 +49,8 @@ from paperkit.tests._boundary import Suite
 
 ENG = Path(__file__).resolve().parent.parent
 ROOT = ENG.parent
+
+
 def _edges_of(dag_text: str, module: str) -> list:
     """⚑ Ζ·dag·coedge — THE RECORDED EDGES OF ONE MODULE, PARSED, NOT SUBSTRING-MATCHED.
 
@@ -63,6 +66,7 @@ def _edges_of(dag_text: str, module: str) -> list:
     is recorded among the probe module\'s edges, whatever else is.
     """
     import re as _re
+
     m = _re.search(r'"%s": \[([^\]]*)\]' % _re.escape(module), dag_text)
     return _re.findall(r'"([^"]+)"', m.group(1)) if m else []
 
@@ -111,9 +115,13 @@ def main() -> int:
             it needs the work root as the import root — which is exactly what running it as a
             module with cwd=work provides, and what a bare path invocation would not.
             """
-            r = subprocess.run([sys.executable, "-m", "tools.dagbzl", *args],  # noqa: S603
-                               cwd=work, capture_output=True, text=True,
-                               check=False)   # Λ·separate-filehandles
+            r = subprocess.run(
+                [sys.executable, "-m", "tools.dagbzl", *args],  # noqa: S603
+                cwd=work,
+                capture_output=True,
+                text=True,
+                check=False,
+            )  # Λ·separate-filehandles
             return r.returncode, (r.stdout + r.stderr)
 
         pristine_dag = dag.read_text()
@@ -127,28 +135,36 @@ def main() -> int:
 
         # δ — one real import edge, nothing else changed.
         probe.write_text(pristine_probe.replace(ANCHOR, EDGE, 1))
-        s.check("the probe edit LANDED (assert the fixture, never assume it)",
-                "boundaries_dag_regen probe" in probe.read_text())
+        s.check(
+            "the probe edit LANDED (assert the fixture, never assume it)",
+            "boundaries_dag_regen probe" in probe.read_text(),
+        )
 
         rc, out = run("--check")
         s.check("F: --check REDS on a stale dag.bzl", rc == 1)
         s.check("   ...and names the repair, not only the breach", "--write" in out)
-        s.check("   ...without writing anything (a check must not mutate)",
-                dag.read_text() == pristine_dag)
+        s.check(
+            "   ...without writing anything (a check must not mutate)",
+            dag.read_text() == pristine_dag,
+        )
 
         rc, _ = run("--write")
         s.check("--write repairs it", rc == 0)
         # ⚑ THE VALUE IS A PATH (Ξ·dag·dotted): `rematch.py`, not `rematch`.  This arm is what
         # pins the rename — a regression to bare stems reds here rather than in a sweep.
-        s.check("   ...and the new edge is actually IN the file, as a module PATH",
-                "rematch.py" in _edges_of(dag.read_text(), "genre.py"))
+        s.check(
+            "   ...and the new edge is actually IN the file, as a module PATH",
+            "rematch.py" in _edges_of(dag.read_text(), "genre.py"),
+        )
         rc, _ = run("--check")
         s.check("   ...so --check is green again", rc == 0)
 
         probe.write_text(pristine_probe)
         run("--write")
-        s.check("ROUND TRIP: dag.bzl returns BYTE-IDENTICAL once the edge is removed",
-                dag.read_text() == pristine_dag)
+        s.check(
+            "ROUND TRIP: dag.bzl returns BYTE-IDENTICAL once the edge is removed",
+            dag.read_text() == pristine_dag,
+        )
 
         # ── Ζ·dagderive·pkg — the SAME edge in the package spelling ────────────────────────
         #
@@ -165,27 +181,36 @@ def main() -> int:
         # A round-trip that only ever exercises one form cannot see a derivation that understands
         # only that form.  This arm is the second form, asserting the identical output.
         probe.write_text(pristine_probe.replace(ANCHOR, PKG_EDGE, 1))
-        s.check("the PACKAGE-spelling probe edit landed",
-                "from paperkit import rematch" in probe.read_text())
+        s.check(
+            "the PACKAGE-spelling probe edit landed",
+            "from paperkit import rematch" in probe.read_text(),
+        )
         rc, _ = run("--write")
         s.check("--write accepts the package spelling", rc == 0)
-        s.check("   ...and records the SAME edge the flat form does",
-                "rematch.py" in _edges_of(dag.read_text(), "genre.py"))
+        s.check(
+            "   ...and records the SAME edge the flat form does",
+            "rematch.py" in _edges_of(dag.read_text(), "genre.py"),
+        )
 
         probe.write_text(pristine_probe)
         run("--write")
-        s.check("   ...and it round-trips out byte-identically too",
-                dag.read_text() == pristine_dag)
+        s.check(
+            "   ...and it round-trips out byte-identically too", dag.read_text() == pristine_dag
+        )
 
         rc, out = run("--write")
-        s.check("--write is IDEMPOTENT (a no-op run says so and changes nothing)",
-                rc == 0 and "already fresh" in out and dag.read_text() == pristine_dag)
+        s.check(
+            "--write is IDEMPOTENT (a no-op run says so and changes nothing)",
+            rc == 0 and "already fresh" in out and dag.read_text() == pristine_dag,
+        )
 
     # No restore arm and no finally: the mutated tree was a temp copy, now discarded.
-    s.check("the LIVE engine module was never modified",
-            (ENG / "genre.py").read_bytes() == live_before)
-    s.check("the LIVE dag.bzl was never modified",
-            (ENG / "dag.bzl").read_bytes() == live_dag_before)
+    s.check(
+        "the LIVE engine module was never modified", (ENG / "genre.py").read_bytes() == live_before
+    )
+    s.check(
+        "the LIVE dag.bzl was never modified", (ENG / "dag.bzl").read_bytes() == live_dag_before
+    )
 
     return s.finish()
 

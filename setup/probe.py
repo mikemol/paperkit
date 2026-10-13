@@ -25,6 +25,7 @@ measurement and excluded from the match).
     probe.py --fresh reference.json        # provenance: does it match this box?
     probe.py cores10 --from reference.json # interpret one fact from the snapshot
 """
+
 from __future__ import annotations
 
 import json
@@ -36,8 +37,17 @@ COMPRESSORS = {"zstd", "lzo", "lzo-rle", "lz4", "lz4hc", "842"}
 # the interned readings that are STABLE across captures (hardware + configured
 # topology); the rest (pressure, swap fill, compression fill) are a frozen
 # measurement, so freshness/provenance compares only these.
-STRUCTURAL = ("cpu", "swap_devices", "zram_algorithm", "zram_disksize",
-              "root", "swappiness", "mem_total_kb", "zswap", "kernel")
+STRUCTURAL = (
+    "cpu",
+    "swap_devices",
+    "zram_algorithm",
+    "zram_disksize",
+    "root",
+    "swappiness",
+    "mem_total_kb",
+    "zswap",
+    "kernel",
+)
 
 
 # ── pump: retrieve + intern ───────────────────────────────────────────────────
@@ -67,8 +77,16 @@ def pump() -> dict:
         if mnt == "/" and dev.startswith("/dev/"):
             rootdev = dev.removeprefix("/dev/")
             break
-    base = rootdev.rsplit("p", 1)[0] if ("nvme" in rootdev and "p" in rootdev) else rootdev.rstrip("0123456789")
-    rota = rd(f"/sys/block/{base}/queue/rotational").strip() if has(f"/sys/block/{base}/queue/rotational") else None
+    base = (
+        rootdev.rsplit("p", 1)[0]
+        if ("nvme" in rootdev and "p" in rootdev)
+        else rootdev.rstrip("0123456789")
+    )
+    rota = (
+        rd(f"/sys/block/{base}/queue/rotational").strip()
+        if has(f"/sys/block/{base}/queue/rotational")
+        else None
+    )
 
     # zram
     algo = ""
@@ -96,18 +114,28 @@ def pump() -> dict:
                         return float(t.split("=", 1)[1])
         raise ValueError(resource)
 
-    mem_total = int(next(l.split()[1] for l in rd("/proc/meminfo").splitlines() if l.startswith("MemTotal")))
+    mem_total = int(
+        next(l.split()[1] for l in rd("/proc/meminfo").splitlines() if l.startswith("MemTotal"))
+    )
 
     # zswap: the compressed write-back CACHE in front of the disk-swap path (lz4,
     # bounded to max_pool_percent of RAM) — the second compression layer above zram.
-    zswap = {p: rd(f"/sys/module/zswap/parameters/{p}").strip()
-             for p in ("enabled", "compressor", "max_pool_percent", "shrinker_enabled")}
+    zswap = {
+        p: rd(f"/sys/module/zswap/parameters/{p}").strip()
+        for p in ("enabled", "compressor", "max_pool_percent", "shrinker_enabled")
+    }
 
     # the kernel's reclaim/overcommit policy — what makes the swap stack degrade
     # gracefully rather than stall (modern reclaim, early watermarks, conservative THP).
     kernel = {
-        "thp": next((t.strip("[]") for t in rd("/sys/kernel/mm/transparent_hugepage/enabled").split()
-                     if t.startswith("[")), ""),
+        "thp": next(
+            (
+                t.strip("[]")
+                for t in rd("/sys/kernel/mm/transparent_hugepage/enabled").split()
+                if t.startswith("[")
+            ),
+            "",
+        ),
         "mglru": rd("/sys/kernel/mm/lru_gen/enabled").strip(),
         "watermark_scale_factor": int(rd("/proc/sys/vm/watermark_scale_factor").strip()),
         "overcommit_memory": int(rd("/proc/sys/vm/overcommit_memory").strip()),
@@ -120,7 +148,9 @@ def pump() -> dict:
         "root": {"device": rootdev, "rotational": rota},
         "zram_algorithm": algo,
         "zram_disksize": int(rd("/sys/block/zram0/disksize").strip()),
-        "zram_orig_bytes": int(mm[0]), "zram_compr_bytes": int(mm[1]), "zram_same_pages": int(mm[5]),
+        "zram_orig_bytes": int(mm[0]),
+        "zram_compr_bytes": int(mm[1]),
+        "zram_same_pages": int(mm[5]),
         "zswap": zswap,
         "kernel": kernel,
         "swappiness": int(rd("/proc/sys/vm/swappiness").strip()),
@@ -141,27 +171,88 @@ def _zram(s: dict) -> dict | None:
     return z[0] if z else None
 
 
-def cores10(s):       return s["cpu"]["logical"] == 10
-def numa1(s):         return s["cpu"]["numa_nodes"] == 1
-def hybrid(s):        return "12650H" in s["cpu"]["model"] or "12th Gen" in s["cpu"]["model"]
-def zram_zstd(s):     return s["zram_algorithm"] == "zstd"
-def compressor(s):    return s["zram_algorithm"] in COMPRESSORS
-def zram_in_ram(s):   return _zram(s) is not None and s["zram_disksize"] > 0
-def zram_size(s):     return s["zram_disksize"] / (s["mem_total_kb"] * 1024) >= 0.4
-def zram_ratio(s):    return s["zram_compr_bytes"] > 0 and s["zram_orig_bytes"] / s["zram_compr_bytes"] >= 3.0
-def swappiness(s):    return s["swappiness"] >= 60
-def zswap_enabled(s): return s["zswap"]["enabled"] == "Y"
-def zswap_lz4(s):     return s["zswap"]["compressor"] == "lz4"           # speed-favouring, for the cache path
-def zswap_bounded(s): return 0 < int(s["zswap"]["max_pool_percent"]) <= 20  # the cache can't eat RAM unbounded
-def zswap_shrinker(s): return s["zswap"]["shrinker_enabled"] == "Y"     # writes back to disk under pressure
-def mglru_on(s):       return s["kernel"]["mglru"] not in ("0", "0x0000", "")  # multi-gen LRU reclaim active
-def thp_madvise(s):    return s["kernel"]["thp"] == "madvise"            # conservative, not speculative "always"
-def watermark_raised(s): return s["kernel"]["watermark_scale_factor"] >= 50   # reclaim early (default is 10)
-def overcommit_permits(s): return s["kernel"]["overcommit_memory"] in (0, 1)  # not strict (2) — oversub allowed
-def psi_io_low(s):    return s["psi"]["io_avg300"] < 5.0
-def psi_mem_low(s):   return s["psi"]["memory_avg300"] < 10.0
-def psi_readable(s):  return "io_avg300" in s["psi"]
-def env_bound(s):     return bool(s["_sources"]) and all(p.startswith(("/proc/", "/sys/")) for p in s["_sources"])
+def cores10(s):
+    return s["cpu"]["logical"] == 10
+
+
+def numa1(s):
+    return s["cpu"]["numa_nodes"] == 1
+
+
+def hybrid(s):
+    return "12650H" in s["cpu"]["model"] or "12th Gen" in s["cpu"]["model"]
+
+
+def zram_zstd(s):
+    return s["zram_algorithm"] == "zstd"
+
+
+def compressor(s):
+    return s["zram_algorithm"] in COMPRESSORS
+
+
+def zram_in_ram(s):
+    return _zram(s) is not None and s["zram_disksize"] > 0
+
+
+def zram_size(s):
+    return s["zram_disksize"] / (s["mem_total_kb"] * 1024) >= 0.4
+
+
+def zram_ratio(s):
+    return s["zram_compr_bytes"] > 0 and s["zram_orig_bytes"] / s["zram_compr_bytes"] >= 3.0
+
+
+def swappiness(s):
+    return s["swappiness"] >= 60
+
+
+def zswap_enabled(s):
+    return s["zswap"]["enabled"] == "Y"
+
+
+def zswap_lz4(s):
+    return s["zswap"]["compressor"] == "lz4"  # speed-favouring, for the cache path
+
+
+def zswap_bounded(s):
+    return 0 < int(s["zswap"]["max_pool_percent"]) <= 20  # the cache can't eat RAM unbounded
+
+
+def zswap_shrinker(s):
+    return s["zswap"]["shrinker_enabled"] == "Y"  # writes back to disk under pressure
+
+
+def mglru_on(s):
+    return s["kernel"]["mglru"] not in ("0", "0x0000", "")  # multi-gen LRU reclaim active
+
+
+def thp_madvise(s):
+    return s["kernel"]["thp"] == "madvise"  # conservative, not speculative "always"
+
+
+def watermark_raised(s):
+    return s["kernel"]["watermark_scale_factor"] >= 50  # reclaim early (default is 10)
+
+
+def overcommit_permits(s):
+    return s["kernel"]["overcommit_memory"] in (0, 1)  # not strict (2) — oversub allowed
+
+
+def psi_io_low(s):
+    return s["psi"]["io_avg300"] < 5.0
+
+
+def psi_mem_low(s):
+    return s["psi"]["memory_avg300"] < 10.0
+
+
+def psi_readable(s):
+    return "io_avg300" in s["psi"]
+
+
+def env_bound(s):
+    return bool(s["_sources"]) and all(p.startswith(("/proc/", "/sys/")) for p in s["_sources"])
 
 
 def zram_primary(s):
@@ -172,23 +263,42 @@ def zram_primary(s):
 def nvme_overflow(s):
     z = _zram(s)
     files = [d for d in s["swap_devices"] if d["type"] == "file"]
-    return bool(files) and z is not None and all(f["prio"] < z["prio"] for f in files) \
+    return (
+        bool(files)
+        and z is not None
+        and all(f["prio"] < z["prio"] for f in files)
         and s["root"]["rotational"] == "0"
+    )
 
 
-def tiered(s):        return zram_primary(s) and nvme_overflow(s)
+def tiered(s):
+    return zram_primary(s) and nvme_overflow(s)
 
 
 FACTS = {
-    "cores10": cores10, "numa1": numa1, "hybrid": hybrid,
-    "zram-primary": zram_primary, "zram-zstd": zram_zstd, "compressor": compressor,
-    "zram-in-ram": zram_in_ram, "zram-size": zram_size, "zram-ratio": zram_ratio,
-    "nvme-overflow": nvme_overflow, "tiered": tiered, "swappiness": swappiness,
-    "zswap-enabled": zswap_enabled, "zswap-lz4": zswap_lz4,
-    "zswap-bounded": zswap_bounded, "zswap-shrinker": zswap_shrinker,
-    "mglru-on": mglru_on, "thp-madvise": thp_madvise,
-    "watermark-raised": watermark_raised, "overcommit-permits": overcommit_permits,
-    "psi-readable": psi_readable, "psi-io-low": psi_io_low, "psi-mem-low": psi_mem_low,
+    "cores10": cores10,
+    "numa1": numa1,
+    "hybrid": hybrid,
+    "zram-primary": zram_primary,
+    "zram-zstd": zram_zstd,
+    "compressor": compressor,
+    "zram-in-ram": zram_in_ram,
+    "zram-size": zram_size,
+    "zram-ratio": zram_ratio,
+    "nvme-overflow": nvme_overflow,
+    "tiered": tiered,
+    "swappiness": swappiness,
+    "zswap-enabled": zswap_enabled,
+    "zswap-lz4": zswap_lz4,
+    "zswap-bounded": zswap_bounded,
+    "zswap-shrinker": zswap_shrinker,
+    "mglru-on": mglru_on,
+    "thp-madvise": thp_madvise,
+    "watermark-raised": watermark_raised,
+    "overcommit-permits": overcommit_permits,
+    "psi-readable": psi_readable,
+    "psi-io-low": psi_io_low,
+    "psi-mem-low": psi_mem_low,
     "env-bound": env_bound,
 }
 
@@ -203,19 +313,27 @@ def main(argv: list[str]) -> int:
         live = pump()
         ok = _structural(live) == _structural(ref)
         if not ok:
-            print("probe: reference dataset does NOT match this machine (structural drift)", file=sys.stderr)
+            print(
+                "probe: reference dataset does NOT match this machine (structural drift)",
+                file=sys.stderr,
+            )
         return 0 if ok else 1
 
     fact = argv[0] if argv else None
     if fact not in FACTS:
-        sys.exit(f"usage: probe.py <{' | '.join(FACTS)}> [--from ref.json] | --capture | --fresh ref.json")
+        sys.exit(
+            f"usage: probe.py <{' | '.join(FACTS)}> [--from ref.json] | --capture | --fresh ref.json"
+        )
     if "--from" in argv:
         state = json.loads(Path(argv[argv.index("--from") + 1]).read_text())
     else:
         state = pump()
     ok = bool(FACTS[fact](state))
     if not ok:
-        print(f"probe: {fact} does NOT hold for the {'snapshot' if '--from' in argv else 'live machine'}", file=sys.stderr)
+        print(
+            f"probe: {fact} does NOT hold for the {'snapshot' if '--from' in argv else 'live machine'}",
+            file=sys.stderr,
+        )
     return 0 if ok else 1
 
 

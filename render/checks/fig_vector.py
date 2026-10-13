@@ -21,6 +21,7 @@ working — but a file run BY PATH has no package context (`__package__` is empt
 import raises.  The block below re-enters through the package so the declaration resolves.  The
 verdict is `check()`'s return value; the block only turns it into an exit code.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -48,8 +49,7 @@ def _embed(d: Path, svg: Path) -> str:
     if emf is None or emf.stat().st_size <= MIN_EMF_BYTES:
         return "SVG did not convert to an EMF vector"
     (d / "m.md").write_text("# Figure\n\n![the claim-DAG](dag.emf)\n")
-    subprocess.run(["pandoc", str(d / "m.md"), "-o", str(d / "out.docx")],
-                   check=True, cwd=str(d))
+    subprocess.run(["pandoc", str(d / "m.md"), "-o", str(d / "out.docx")], check=True, cwd=str(d))
     with zipfile.ZipFile(d / "out.docx") as z:
         media = [n for n in z.namelist() if n.startswith("word/media/")]
     if not any(n.endswith(".emf") for n in media):
@@ -66,12 +66,12 @@ def _stays_vector(d: Path) -> str:
     out_pdf = lo.convert(d / "out.docx", "pdf", d, timeout=120)
     if out_pdf is None:
         return "docx did not convert to a PDF (soffice produced no output)"
-    listed = subprocess.run(["pdfimages", "-list", str(out_pdf)],
-                            capture_output=True, text=True, check=False).stdout.splitlines()
+    listed = subprocess.run(
+        ["pdfimages", "-list", str(out_pdf)], capture_output=True, text=True, check=False
+    ).stdout.splitlines()
     raster = [r for r in listed[2:] if r.strip()]
     if raster:
-        return (f"figure rasterized in the PDF (should stay vector): "
-                f"{len(raster)} raster image(s)")
+        return f"figure rasterized in the PDF (should stay vector): {len(raster)} raster image(s)"
     return ""
 
 

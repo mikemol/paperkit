@@ -8,6 +8,7 @@ dirs and the ambient, user-writable host PATH is dropped entirely (reproducibili
 
     python3 paperkit/tests/boundaries_path.py
 """
+
 from __future__ import annotations
 
 import os
@@ -40,20 +41,34 @@ def main() -> int:
     print("Τ·path — pinning tool resolution\n")
     saved = os.environ.get("PAPERKIT_PATH")
     try:
-        os.environ.pop("PAPERKIT_PATH", None); paperkit.config._ARGS.clear()
-        e = paperkit.checkenv.clean_env({"PATH": SEP.join(["/usr/bin", "/bin", "/usr/bin", "rel", "."])})
-        check("default: keeps the host's ABSOLUTE entries", e["PATH"].split(SEP) == ["/usr/bin", "/bin"])
-        check("default: DEDUPES the dup-laden host PATH (keep first)", e["PATH"].split(SEP).count("/usr/bin") == 1)
+        os.environ.pop("PAPERKIT_PATH", None)
+        paperkit.config._ARGS.clear()
+        e = paperkit.checkenv.clean_env(
+            {"PATH": SEP.join(["/usr/bin", "/bin", "/usr/bin", "rel", "."])}
+        )
+        check(
+            "default: keeps the host's ABSOLUTE entries",
+            e["PATH"].split(SEP) == ["/usr/bin", "/bin"],
+        )
+        check(
+            "default: DEDUPES the dup-laden host PATH (keep first)",
+            e["PATH"].split(SEP).count("/usr/bin") == 1,
+        )
 
         with tempfile.TemporaryDirectory() as t1, tempfile.TemporaryDirectory() as t2:
             os.environ["PAPERKIT_PATH"] = SEP.join([t1, t2, "/does-not-exist-xyz", "relative/d"])
             e = paperkit.checkenv.clean_env({"PATH": "/usr/bin"})
-            check("a declared PATH pins resolution to exactly the declared dirs", e["PATH"].split(SEP) == [t1, t2])
+            check(
+                "a declared PATH pins resolution to exactly the declared dirs",
+                e["PATH"].split(SEP) == [t1, t2],
+            )
             check("the host's ambient PATH is DROPPED when pinned", "/usr/bin" not in e["PATH"])
             check("a non-existent declared dir is dropped", "/does-not-exist-xyz" not in e["PATH"])
             check("a relative declared dir is dropped", "relative/d" not in e["PATH"])
     finally:
-        os.environ.pop("PAPERKIT_PATH", None) if saved is None else os.environ.__setitem__("PAPERKIT_PATH", saved)
+        os.environ.pop("PAPERKIT_PATH", None) if saved is None else os.environ.__setitem__(
+            "PAPERKIT_PATH", saved
+        )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     saved = os.environ.get("PAPERKIT_PATH")
@@ -61,16 +76,22 @@ def main() -> int:
         paperkit.config._ARGS.clear()
         with tempfile.TemporaryDirectory() as t:
             host = SEP.join(["/usr/bin", "/bin"])
-            os.environ.pop("PAPERKIT_PATH", None); F = paperkit.checkenv.clean_env({"PATH": host})["PATH"]
-            os.environ["PAPERKIT_PATH"] = t; P = paperkit.checkenv.clean_env({"PATH": host})["PATH"]
+            os.environ.pop("PAPERKIT_PATH", None)
+            F = paperkit.checkenv.clean_env({"PATH": host})["PATH"]
+            os.environ["PAPERKIT_PATH"] = t
+            P = paperkit.checkenv.clean_env({"PATH": host})["PATH"]
             ok = F.split(SEP) == ["/usr/bin", "/bin"] and t == P
             fails.append("pin-delta") if not ok else None
-            print(f"  {'ok ' if ok else 'XX '}declaring PAPERKIT_PATH flips resolution from the host PATH to the pinned set")
+            print(
+                f"  {'ok ' if ok else 'XX '}declaring PAPERKIT_PATH flips resolution from the host PATH to the pinned set"
+            )
             print(f"      P (pinned):  {t}  — exactly the declared dir")
             print("      F (default): /usr/bin:/bin  — the host's absolute entries")
             print("      δ (min delta): PAPERKIT_PATH being declared\n")
     finally:
-        os.environ.pop("PAPERKIT_PATH", None) if saved is None else os.environ.__setitem__("PAPERKIT_PATH", saved)
+        os.environ.pop("PAPERKIT_PATH", None) if saved is None else os.environ.__setitem__(
+            "PAPERKIT_PATH", saved
+        )
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")

@@ -17,6 +17,7 @@ warning is what a duplicated line looks like from bazel's side).  The directory 
 service NAME, resolved through the host's dns-delegate; the result carries `as_of`, which is the
 only timestamp that means anything about an address.
 """
+
 from __future__ import annotations
 
 import json
@@ -39,14 +40,18 @@ FLAGS = {
     "--bes_results_url": ("http-web", "http://", "/invocation/"),
 }
 USAGE = "usage: project_endpoints.py [--check] | --get <name> [<path suffix>]\n"
-GET_ARGS = (2, 3)            # `--get <name>` and `--get <name> <suffix>`
+GET_ARGS = (2, 3)  # `--get <name>` and `--get <name> <suffix>`
 GET_WITH_SUFFIX = 3
 
 
 def query(name: str) -> str:
     """Ask the directory for `name` on the host side; refuse anything but an answer."""
-    r = subprocess.run([sys.executable, str(DIRECTORY), name, "--side", "host"],  # noqa: S603
-                       capture_output=True, text=True, check=False)
+    r = subprocess.run(
+        [sys.executable, str(DIRECTORY), name, "--side", "host"],  # noqa: S603
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     # ⚑ NARROWED AT THE EDGE: json.loads is Any, so it lands DIRECTLY in an annotated `object` —
     # the one form mypy's disallow_any_expr permits (inside a conditional expression it is still
     # flagged) — and is checked before anything reads it.
@@ -97,8 +102,10 @@ def main(argv: list[str]) -> int:
         return 0
     unknown = [a for a in argv if a != "--check"]
     if unknown:
-        sys.stderr.write(f"project_endpoints.py: unknown argument(s) {unknown} — refusing rather "
-                         "than rewriting .bazelrc.\n" + USAGE)
+        sys.stderr.write(
+            f"project_endpoints.py: unknown argument(s) {unknown} — refusing rather "
+            "than rewriting .bazelrc.\n" + USAGE
+        )
         return 2
     text = BAZELRC.read_text()
     new, changed = project(text)
@@ -108,8 +115,9 @@ def main(argv: list[str]) -> int:
         return 3 if changed else 0
     if changed:
         BAZELRC.write_text(new)
-    sys.stdout.write(f"projected {len(changed)} of {len(FLAGS)}: "
-                     f"{', '.join(changed) or 'already current'}\n")
+    sys.stdout.write(
+        f"projected {len(changed)} of {len(FLAGS)}: {', '.join(changed) or 'already current'}\n"
+    )
     return 0
 
 

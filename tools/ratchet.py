@@ -44,6 +44,7 @@ happen once at the boundary happens nowhere.  `Census` is a frozen discriminated
 is a `Literal`, and the two payload slots are exclusive by construction — so the sum type is
 stated where it is CREATED and every reader gets a real type without narrowing it again.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -56,8 +57,8 @@ from typing import TYPE_CHECKING, Literal, cast
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-_PROBE_SUFFIX = "ZZZprobe"      # the F-arm's synthetic key: absent from any real census
-_ARGC = 2                       # baseline + current; a positional count, not a magic number
+_PROBE_SUFFIX = "ZZZprobe"  # the F-arm's synthetic key: absent from any real census
+_ARGC = 2  # baseline + current; a positional count, not a magic number
 
 
 @dataclass(frozen=True)
@@ -151,12 +152,16 @@ def apply_replacements(base: Census, repl: Sequence[tuple[str, str]]) -> Census:
     out = set(base.keys)
     for old, new in repl:
         if old not in out:
-            msg = (f"--replace {old}={new}: {old!r} is not in the baseline census "
-                   "(a stale rename — admitting its replacement would GROW the allowance)")
+            msg = (
+                f"--replace {old}={new}: {old!r} is not in the baseline census "
+                "(a stale rename — admitting its replacement would GROW the allowance)"
+            )
             raise ValueError(msg)
         if new in out:
-            msg = (f"--replace {old}={new}: {new!r} is ALREADY in the baseline census "
-                   "(the swap would shrink it by one, hiding a paydown as a rename)")
+            msg = (
+                f"--replace {old}={new}: {new!r} is ALREADY in the baseline census "
+                "(the swap would shrink it by one, hiding a paydown as a rename)"
+            )
             raise ValueError(msg)
         out.discard(old)
         out.add(new)
@@ -189,8 +194,9 @@ def _self_proof(base: Census, base_text: str, cur_text: str, policy: Policy) -> 
         m = re.compile(policy.pattern, re.MULTILINE).search(base_text)
         # drop one baseline element → must be caught
         probe = base_text.replace(str(m.group(0)), "", 1) if m else base_text
-        return bool(regressed(base, census(probe, policy.pattern, as_set=policy.as_set),
-                              grow=policy.grow))
+        return bool(
+            regressed(base, census(probe, policy.pattern, as_set=policy.as_set), grow=policy.grow)
+        )
     # inject a synthetic match the census will COUNT/CAPTURE.  Re-use a match from the baseline
     # itself so the pattern is guaranteed to match the injected line; for a keyed (--set) census
     # a bare re-inject of the same key does not grow the SET (it is already present), so a keyed
@@ -211,8 +217,9 @@ def _self_proof(base: Census, base_text: str, cur_text: str, policy: Policy) -> 
         return fresh_key in probed.keys and bool(regressed(base, probed, grow=policy.grow))
     # a count census: injecting the exact matched text adds one countable match by construction.
     probe = base_text + "\n" + whole
-    return bool(regressed(base, census(probe, policy.pattern, as_set=policy.as_set),
-                          grow=policy.grow))
+    return bool(
+        regressed(base, census(probe, policy.pattern, as_set=policy.as_set), grow=policy.grow)
+    )
 
 
 def check(base_text: str, cur_text: str, policy: Policy) -> tuple[bool, str]:
@@ -234,26 +241,37 @@ def check(base_text: str, cur_text: str, policy: Policy) -> tuple[bool, str]:
 
     reg = regressed(base, cur, grow=policy.grow)
     if reg:
-        detail = ("\n".join(f"  - {k}" for k in reg) if isinstance(reg, list)
-                  else f"  census {cur.describe()} vs a baseline {base.describe()} — "
-                       f"{reg} over the ratchet")
-        return False, (f"ratchet: FAIL — the census {forbidden} against its baseline (may-only-"
-                       f"{direction}); {cur.describe()} vs a baseline {base.describe()}:\n"
-                       f"{detail}")
+        detail = (
+            "\n".join(f"  - {k}" for k in reg)
+            if isinstance(reg, list)
+            else f"  census {cur.describe()} vs a baseline {base.describe()} — "
+            f"{reg} over the ratchet"
+        )
+        return False, (
+            f"ratchet: FAIL — the census {forbidden} against its baseline (may-only-"
+            f"{direction}); {cur.describe()} vs a baseline {base.describe()}:\n"
+            f"{detail}"
+        )
 
     caught = _self_proof(base, base_text, cur_text, policy)
     if caught is None:
-        return False, ("ratchet: SELF-PROOF VACUOUS — the pattern matches nothing in the "
-                       "baseline or current file, so the F-arm cannot be exercised; refusing to "
-                       "pass an untested ratchet (name a pattern that matches, or the census is "
-                       "empty).")
+        return False, (
+            "ratchet: SELF-PROOF VACUOUS — the pattern matches nothing in the "
+            "baseline or current file, so the F-arm cannot be exercised; refusing to "
+            "pass an untested ratchet (name a pattern that matches, or the census is "
+            "empty)."
+        )
     if not caught:
-        return False, ("ratchet: SELF-PROOF FAIL — a synthetic regression against the baseline "
-                       "went uncaught; the gate is unsound, refusing to pass.")
+        return False, (
+            "ratchet: SELF-PROOF FAIL — a synthetic regression against the baseline "
+            "went uncaught; the gate is unsound, refusing to pass."
+        )
 
-    return True, (f"ratchet: OK — census {cur.describe()} of a baseline {base.describe()}, "
-                  f"may-only-{direction} holds "
-                  f"(F-arm: a synthetic regression ({forbidden}) is caught)")
+    return True, (
+        f"ratchet: OK — census {cur.describe()} of a baseline {base.describe()}, "
+        f"may-only-{direction} holds "
+        f"(F-arm: a synthetic regression ({forbidden}) is caught)"
+    )
 
 
 def main(argv: Sequence[str]) -> int:
@@ -281,9 +299,12 @@ def main(argv: Sequence[str]) -> int:
     except ValueError as e:
         print(f"ratchet: {e}", file=sys.stderr)
         return 2
-    policy = Policy(pattern=str(cast("object", a.pattern)),
-                    as_set=bool(cast("object", a.as_set)),
-                    grow=bool(cast("object", a.grow)), repl=repl)
+    policy = Policy(
+        pattern=str(cast("object", a.pattern)),
+        as_set=bool(cast("object", a.as_set)),
+        grow=bool(cast("object", a.grow)),
+        repl=repl,
+    )
     base_text, cur_text = Path(files[0]).read_text(), Path(files[1]).read_text()
     try:
         ok, msg = check(base_text, cur_text, policy)

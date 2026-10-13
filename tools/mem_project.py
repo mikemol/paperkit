@@ -16,6 +16,7 @@ silently trusted.
     mem_project.py <db> <project> <out.json>     write the projection
     mem_project.py <db> <project> <out.json> --check   exit 1 if it would change
 """
+
 from __future__ import annotations
 
 import json
@@ -29,7 +30,7 @@ def render(db: Path, project: str) -> str:
     c = tools.mem_db.connect(db)
     m = tools.mem_db.manifest(c, project)
     if not m.get("claims") and len(m) == 1:
-        return ""                                  # no observations: emit nothing, not a false {}
+        return ""  # no observations: emit nothing, not a false {}
     return json.dumps(m, indent=2, sort_keys=True) + "\n"
 
 
@@ -40,19 +41,27 @@ def main(argv: list) -> int:
     db, project, out = Path(argv[0]), argv[1], Path(argv[2])
     text = render(db, project)
     if not text:
-        print(f"mem-project: {project}: no observations in {db} — leaving {out} alone",
-              file=sys.stderr)
+        print(
+            f"mem-project: {project}: no observations in {db} — leaving {out} alone",
+            file=sys.stderr,
+        )
         return 0
     if "--check" in argv:
         cur = out.read_text() if out.exists() else ""
         if cur != text:
-            print(f"mem-project: {out} is STALE against {db} — regenerate with:\n"
-                  f"  python3 tools/mem_project.py {db} {project} {out}", file=sys.stderr)
+            print(
+                f"mem-project: {out} is STALE against {db} — regenerate with:\n"
+                f"  python3 tools/mem_project.py {db} {project} {out}",
+                file=sys.stderr,
+            )
             return 1
         return 0
     out.write_text(text)
-    print(f"mem-project: {project} → {out} "
-          f"({ {k: v for k, v in json.loads(text).items() if k != 'claims'} })", file=sys.stderr)
+    print(
+        f"mem-project: {project} → {out} "
+        f"({ {k: v for k, v in json.loads(text).items() if k != 'claims'} })",
+        file=sys.stderr,
+    )
     return 0
 
 

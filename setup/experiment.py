@@ -17,6 +17,7 @@ the loaded cgroup; FACTS interpret the interned result), LLM-free, regex-free.
   experiment.py --ensure   run only if loadtest.json is absent
   experiment.py <fact>     --ensure, then interpret one under-load fact
 """
+
 from __future__ import annotations
 
 import json
@@ -29,12 +30,18 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "loadtest.json"
-GB = 1024 ** 3
-CAP_MB = int(os.environ.get("PAPERKIT_LOAD_CAP_MB", "4096"))   # cgroup MemoryMax (RAM cap)
-SWAP_MB = int(os.environ.get("PAPERKIT_LOAD_SWAP_MB", "10240"))  # cgroup MemorySwapMax (swap allowed)
-OVERSUB = float(os.environ.get("PAPERKIT_LOAD_OVERSUB", "3.0"))  # allocate this x the cap (12 GB at 4 GB cap)
+GB = 1024**3
+CAP_MB = int(os.environ.get("PAPERKIT_LOAD_CAP_MB", "4096"))  # cgroup MemoryMax (RAM cap)
+SWAP_MB = int(
+    os.environ.get("PAPERKIT_LOAD_SWAP_MB", "10240")
+)  # cgroup MemorySwapMax (swap allowed)
+OVERSUB = float(
+    os.environ.get("PAPERKIT_LOAD_OVERSUB", "3.0")
+)  # allocate this x the cap (12 GB at 4 GB cap)
 WORKERS = int(os.environ.get("PAPERKIT_LOAD_WORKERS", "16"))
-RAMP_S = float(os.environ.get("PAPERKIT_LOAD_RAMP", "20"))     # let the load build + spill before sampling
+RAMP_S = float(
+    os.environ.get("PAPERKIT_LOAD_RAMP", "20")
+)  # let the load build + spill before sampling
 
 
 # ── cgroup introspection (this process's own scope) ───────────────────────────
@@ -70,13 +77,13 @@ def _zram() -> dict:
 
 # ── the load ──────────────────────────────────────────────────────────────────
 def _worker(per: int, seed: int) -> None:
-    buf = bytearray(per)                                   # anonymous → swap-eligible
-    pat = (f"PAPERKIT-{seed}-".encode() * 256)             # per-worker, compressible
-    block = (pat * (1024 * 1024 // len(pat) + 1))[:1024 * 1024]   # 1 MB stride (fast fill)
+    buf = bytearray(per)  # anonymous → swap-eligible
+    pat = f"PAPERKIT-{seed}-".encode() * 256  # per-worker, compressible
+    block = (pat * (1024 * 1024 // len(pat) + 1))[: 1024 * 1024]  # 1 MB stride (fast fill)
     for off in range(0, per, len(block)):
         n = min(len(block), per - off)
-        buf[off:off + n] = block[:n]                       # write non-zero so it can't dedup to nothing
-    time.sleep(300)                                        # hold; the parent SIGKILLs after sampling
+        buf[off : off + n] = block[:n]  # write non-zero so it can't dedup to nothing
+    time.sleep(300)  # hold; the parent SIGKILLs after sampling
 
 
 def _loaded() -> dict:
@@ -90,14 +97,14 @@ def _loaded() -> dict:
     procs = [ctx.Process(target=_worker, args=(per, i)) for i in range(WORKERS)]
     for p in procs:
         p.start()
-    time.sleep(RAMP_S)                                     # fixed: let the load build + spill to swap
+    time.sleep(RAMP_S)  # fixed: let the load build + spill to swap
     peak = {
         "mem_current_bytes": _cg_int(base, "memory.current"),
         "swap_current_bytes": _cg_int(base, "memory.swap.current"),
         **_zram(),
     }
     p_mem, p_io = _psi_full_total(base, "memory"), _psi_full_total(base, "io")
-    for p in procs:                                        # SIGKILL — no graceful-join stall
+    for p in procs:  # SIGKILL — no graceful-join stall
         p.kill()
     for p in procs:
         p.join(timeout=5)
@@ -111,8 +118,10 @@ def _loaded() -> dict:
         # memory.current is capped at memory.max by the kernel; the overflow is swap
         "mem_full_stall_fraction": round((p_mem - b_mem) / elapsed_us, 5),
         "io_full_stall_fraction": round((p_io - b_io) / elapsed_us, 5),
-        "_sources": ["cgroup memory.max/current/swap.current/{memory,io}.pressure",
-                     "/sys/block/zram0/mm_stat"],
+        "_sources": [
+            "cgroup memory.max/current/swap.current/{memory,io}.pressure",
+            "/sys/block/zram0/mm_stat",
+        ],
     }
     OUT.write_text(json.dumps(data, indent=2, sort_keys=True))
     return data
@@ -125,28 +134,66 @@ def run() -> dict:
     # from the rest of the box.  Unlike membudget (MemorySwapMax=0, a stay-in-RAM hard
     # cap), this ALLOWS swap — the whole point is to watch the overflow degrade
     # gracefully through the swap tiers rather than be OOM-refused.
-    r = subprocess.run(["systemd-run", "--user", "--scope", "-q", "--slice=paperkit-load",
-                        "-p", f"MemoryMax={CAP_MB}M", "-p", f"MemorySwapMax={SWAP_MB}M",
-                        sys.executable, str(Path(__file__).resolve()), "--run"])
+    r = subprocess.run(
+        [
+            "systemd-run",
+            "--user",
+            "--scope",
+            "-q",
+            "--slice=paperkit-load",
+            "-p",
+            f"MemoryMax={CAP_MB}M",
+            "-p",
+            f"MemorySwapMax={SWAP_MB}M",
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--run",
+        ]
+    )
     if r.returncode != 0 or not OUT.exists():
-        sys.exit(f"experiment: bounded run failed (rc={r.returncode}) — is `systemd-run --user` available?")
+        sys.exit(
+            f"experiment: bounded run failed (rc={r.returncode}) — is `systemd-run --user` available?"
+        )
     return json.loads(OUT.read_text())
 
 
 # ── interpret: pure functions of the interned load result ─────────────────────
-def load_oversubscribed(s): return s["allocated_bytes"] > s["cap_bytes"]                       # asked for > the cap
-def load_bounded(s):        return s["peak"]["mem_current_bytes"] <= int(s["cap_bytes"] * 1.05)  # held AT the cap
-def load_swap_spilled(s):   return s["peak"]["swap_current_bytes"] > 64 * 1024 * 1024            # overflow swapped, not OOM
-def load_io_quiet(s):       return s["io_full_stall_fraction"] < 0.01                            # the DISK never blocked
-def load_not_io_bound(s):   return s["io_full_stall_fraction"] < 0.1 * s["mem_full_stall_fraction"]  # cost is CPU/mem, not disk
-def load_compressed(s):     return s["peak"]["zram_compr_bytes"] > 0 and \
-    s["peak"]["zram_orig_bytes"] / s["peak"]["zram_compr_bytes"] >= 1.5
+def load_oversubscribed(s):
+    return s["allocated_bytes"] > s["cap_bytes"]  # asked for > the cap
+
+
+def load_bounded(s):
+    return s["peak"]["mem_current_bytes"] <= int(s["cap_bytes"] * 1.05)  # held AT the cap
+
+
+def load_swap_spilled(s):
+    return s["peak"]["swap_current_bytes"] > 64 * 1024 * 1024  # overflow swapped, not OOM
+
+
+def load_io_quiet(s):
+    return s["io_full_stall_fraction"] < 0.01  # the DISK never blocked
+
+
+def load_not_io_bound(s):
+    return (
+        s["io_full_stall_fraction"] < 0.1 * s["mem_full_stall_fraction"]
+    )  # cost is CPU/mem, not disk
+
+
+def load_compressed(s):
+    return (
+        s["peak"]["zram_compr_bytes"] > 0
+        and s["peak"]["zram_orig_bytes"] / s["peak"]["zram_compr_bytes"] >= 1.5
+    )
 
 
 FACTS = {
-    "load-oversubscribed": load_oversubscribed, "load-bounded": load_bounded,
-    "load-swap-spilled": load_swap_spilled, "load-io-quiet": load_io_quiet,
-    "load-not-io-bound": load_not_io_bound, "load-compressed": load_compressed,
+    "load-oversubscribed": load_oversubscribed,
+    "load-bounded": load_bounded,
+    "load-swap-spilled": load_swap_spilled,
+    "load-io-quiet": load_io_quiet,
+    "load-not-io-bound": load_not_io_bound,
+    "load-compressed": load_compressed,
 }
 
 
@@ -156,6 +203,7 @@ def _ensure() -> None:
     if OUT.exists():
         return
     import fcntl
+
     with open(HERE / ".loadtest.lock", "w") as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
         if not OUT.exists():

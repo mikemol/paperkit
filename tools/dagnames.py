@@ -28,6 +28,7 @@ needs no writer, so it does not inherit that dependency.
     python3 tools/dagnames.py --skip tests
     python3 tools/dagnames.py --skip tests --verify # and prove every one of them imports
 """
+
 from __future__ import annotations
 
 import ast
@@ -49,7 +50,7 @@ def literal(path: Path, name: str) -> dict[str, list[str]]:
     """
     src = path.read_text()
     i = src.index(name + " = ")
-    val: object = ast.literal_eval(src[src.index("{", i):src.index("\n}", i) + 2])
+    val: object = ast.literal_eval(src[src.index("{", i) : src.index("\n}", i) + 2])
     if not isinstance(val, dict):
         return {}
     out: dict[str, list[str]] = {}
@@ -106,14 +107,22 @@ def unresolvable(names: list[str], eng: Path = ENGINE) -> list[tuple[str, str]]:
     # `tools.bibstruct`.  Reproducing the consumer's binding order is what makes the probe answer
     # the consumer's question — and it is why the engine's subpackage names must be QUALIFIED
     # (`paperkit.tools.x`), since with either path order one of the two bare `tools` is shadowed.
-    prelude = (f"import sys; sys.path.insert(0, {str(eng)!r}); "
-               f"sys.path.insert(0, {str(eng.parent)!r}); "
-               "import tools.dagnames; import importlib; ")
+    prelude = (
+        f"import sys; sys.path.insert(0, {str(eng)!r}); "
+        f"sys.path.insert(0, {str(eng.parent)!r}); "
+        "import tools.dagnames; import importlib; "
+    )
     out: list[tuple[str, str]] = []
     for n in names:
         code = prelude + f"importlib.import_module({n!r})"
-        r = subprocess.run([exe, "-c", code], cwd=ROOT,  # noqa: S603
-                           capture_output=True, text=True, timeout=120, check=False)
+        r = subprocess.run(
+            [exe, "-c", code],
+            cwd=ROOT,  # noqa: S603
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
         if r.returncode:
             tail = [ln for ln in (r.stdout + r.stderr).splitlines() if ln.strip()]
             out.append((n, tail[-1][:96] if tail else ""))
@@ -148,8 +157,9 @@ def main(argv: list[str]) -> int:
         OUT.write(f"  XX {n:<28} {why}\n")
     OUT.write(f"\n{len(names) - len(bad)} of {len(names)} engine modules import by name\n")
     if bad:
-        OUT.write("  ⚑ a name here is a ModuleNotFoundError in every consumer that walks the "
-                  "partition.\n")
+        OUT.write(
+            "  ⚑ a name here is a ModuleNotFoundError in every consumer that walks the partition.\n"
+        )
     return 1 if bad else 0
 
 

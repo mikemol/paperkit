@@ -22,6 +22,7 @@ exactly what a build stages too few of.
     python3 tools/closure_census.py                      # every project with a checks/ dir
     python3 tools/closure_census.py paper                # one project
 """
+
 from __future__ import annotations
 
 import ast
@@ -63,15 +64,17 @@ def declared(check: str, mods: list[str]) -> dict[str, set[str]]:
     already computes is the very defect class being counted here.
     """
     r = subprocess.run(  # noqa: S603
-        [sys.executable or "python3", str(ROOT / "tools" / "closure.py"),
-         "--check", check, *mods],
-        cwd=ROOT, capture_output=True, text=True, check=False,
+        [sys.executable or "python3", str(ROOT / "tools" / "closure.py"), "--check", check, *mods],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
         env={"PYTHONPATH": str(ROOT / "tools"), "PATH": "/usr/bin:/bin"},
     )
     out: dict[str, set[str]] = {}
     for ln in r.stdout.splitlines():
         parts = ln.split("\t")
-        if len(parts) < FIELDS or ":" in parts[1]:   # skip read:/file±/content± rows — imports only
+        if len(parts) < FIELDS or ":" in parts[1]:  # skip read:/file±/content± rows — imports only
             continue
         out.setdefault(parts[0], set()).add(Path(parts[1]).stem)
     return out
@@ -93,9 +96,13 @@ def dispatch_table(tree: ast.Module) -> dict[str, str]:
 
 def scripts_named(fn: ast.AST, sibling: set[str]) -> set[str]:
     """Collect sibling script basenames a witness names as a string constant."""
-    return {n.value.rsplit("/", 1)[-1] for n in ast.walk(fn)
-            if isinstance(n, ast.Constant) and isinstance(n.value, str)
-            and n.value.rsplit("/", 1)[-1] in sibling}
+    return {
+        n.value.rsplit("/", 1)[-1]
+        for n in ast.walk(fn)
+        if isinstance(n, ast.Constant)
+        and isinstance(n.value, str)
+        and n.value.rsplit("/", 1)[-1] in sibling
+    }
 
 
 def _stem(dotted: str) -> str:
@@ -122,7 +129,7 @@ def script_imports(path: Path, names: set[str]) -> set[str]:
 
 def cone(seeds: set[str], mods: list[str]) -> set[str]:
     """Expand `seeds` to the transitive engine cone the build would have to stage."""
-    paths = [m[len("paperkit/"):] for m in mods]
+    paths = [m[len("paperkit/") :] for m in mods]
     edges: dict[str, list[str]] = {}
     for m, i in dagderive.edges(ENGINE, paths):
         edges.setdefault(m, []).append(i)
@@ -166,7 +173,7 @@ def witness_modules(project: Path) -> list[Path]:
             if leaf.endswith(".py") and (checks / leaf).exists():
                 named.add(leaf)
     toml = project / "paper.toml"
-    if toml.exists():                       # the declared verb→script templates
+    if toml.exists():  # the declared verb→script templates
         for tok in toml.read_text().split():
             leaf = tok.strip("\"'{},").rsplit("/", 1)[-1]
             if leaf.endswith(".py") and (checks / leaf).exists():
@@ -199,11 +206,13 @@ def audit_witness(witness: Path, project: Path, mods: list[str]) -> list[Gap]:
         if fn is None:
             continue
         for script in sorted(scripts_named(fn, sibling)):
-            missing = sorted(cone(script_imports(checks / script, names), mods)
-                             - have.get(key, set()))
+            missing = sorted(
+                cone(script_imports(checks / script, names), mods) - have.get(key, set())
+            )
             if missing:
-                gaps.append(Gap(claim=key, script=f"{project.name}/checks/{script}",
-                                missing=missing))
+                gaps.append(
+                    Gap(claim=key, script=f"{project.name}/checks/{script}", missing=missing)
+                )
     return gaps
 
 
@@ -222,8 +231,10 @@ def main(argv: list[str]) -> int:
     # `sys.path.insert` + flat `import bib` shape as the generator that broke the build.  Third
     # instance of one defect in this tool: a population defined by a pattern that cannot express
     # the whole population (Λ·declared-partial).
-    projects = sorted({p.parent for p in ROOT.glob("*/checks") if p.is_dir()}
-                      | ({ROOT} if (ROOT / "checks").is_dir() else set()))
+    projects = sorted(
+        {p.parent for p in ROOT.glob("*/checks") if p.is_dir()}
+        | ({ROOT} if (ROOT / "checks").is_dir() else set())
+    )
 
     gaps: list[Gap] = []
     examined: list[str] = []
@@ -253,8 +264,10 @@ def main(argv: list[str]) -> int:
         OUT.write(f"  ⚑ NO bib-named witness found in: {', '.join(sorted(skipped))}\n")
     OUT.write(f"\n{len(gaps)} under-declared witness(es)\n")
     if gaps:
-        OUT.write("  ⚑ each stages a cone too small for the script it runs —\n"
-                  "    a ModuleNotFoundError waiting for a module to gain a dependency.\n")
+        OUT.write(
+            "  ⚑ each stages a cone too small for the script it runs —\n"
+            "    a ModuleNotFoundError waiting for a module to gain a dependency.\n"
+        )
     return 1 if gaps else 0
 
 

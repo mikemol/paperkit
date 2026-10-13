@@ -5,6 +5,7 @@ sandbox whose staged files are symlinks (processwrapper), resolve() escapes to t
 and imports the real, unmutated probe; under the hermetic linux-sandbox it stays inside and
 imports the staged (possibly mutated) bytecode.  Exit 0 = truth() holds; the pos cell (truth's
 body dropped) MUST flip this — if it doesn't, the harness is degraded and pk_canary fails LOUD."""
+
 import sys
 from pathlib import Path
 

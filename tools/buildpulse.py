@@ -27,6 +27,7 @@ was right to; the tool lived outside the tree until the tree was quiet.
     python3 tools/buildpulse.py --log <f> --window 3600 # rate over the last hour
     python3 tools/buildpulse.py --selftest              # prove every arm can fire
 """
+
 from __future__ import annotations
 
 import argparse
@@ -61,8 +62,8 @@ BUILD_EXE = "bazel"
 
 MINUTES_PER_HOUR = 60.0
 PAIR = 2
-DEFAULT_WINDOW = 3600.0        # seconds of history the rate is measured over
-DEFAULT_STALL = 1800.0         # seconds with an unmoved counter before calling it a stall
+DEFAULT_WINDOW = 3600.0  # seconds of history the rate is measured over
+DEFAULT_STALL = 1800.0  # seconds with an unmoved counter before calling it a stall
 EPS = 0.01
 
 
@@ -111,8 +112,12 @@ def read_trouble(log: Path, tail_bytes: int = 20_000) -> str:
 
 def build_alive() -> bool:
     """Report whether the //:hook build process is still running."""
-    r = subprocess.run(["pgrep", "-x", BUILD_EXE],  # noqa: S603, S607
-                       capture_output=True, text=True, check=False)
+    r = subprocess.run(
+        ["pgrep", "-x", BUILD_EXE],  # noqa: S603, S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     return r.returncode == 0
 
 
@@ -238,11 +243,13 @@ def _selftest() -> int:
         check("a clean tail yields no failure signature", read_trouble(good) == "")
 
         # ⟨F⟩ every failure signature is caught
-        for sig in ("FAIL: @@x//:y (Exit 1)",
-                    "ERROR: Build did NOT complete successfully",
-                    "java.lang.OutOfMemoryError: Java heap space",
-                    "Traceback (most recent call last):",
-                    "err: input dependency modified during execution"):
+        for sig in (
+            "FAIL: @@x//:y (Exit 1)",
+            "ERROR: Build did NOT complete successfully",
+            "java.lang.OutOfMemoryError: Java heap space",
+            "Traceback (most recent call last):",
+            "err: input dependency modified during execution",
+        ):
             f = d / "f.log"
             f.write_text(f"[1 / 2] fine\n{sig}\n")
             check(f"caught: {sig[:42]}", read_trouble(f) != "")
@@ -255,32 +262,44 @@ def _selftest() -> int:
         past = load(st)
         check("a seeded sample round-trips through load()", len(past) == 1)
         now = Sample(at=time.time(), done=42, total=100)
-        check("F — a frozen counter is reported as a stall",
-              stalled(now, past, DEFAULT_STALL) > 0)
-        check("δ — ONE action of progress clears the stall verdict",
-              stalled(Sample(at=now.at, done=43, total=100), past, DEFAULT_STALL) == 0.0)
+        check("F — a frozen counter is reported as a stall", stalled(now, past, DEFAULT_STALL) > 0)
+        check(
+            "δ — ONE action of progress clears the stall verdict",
+            stalled(Sample(at=now.at, done=43, total=100), past, DEFAULT_STALL) == 0.0,
+        )
 
         # ⚑ THE REGRESSION THIS SELFTEST ALREADY CAUGHT ONCE: a freeze LONGER than the window.
         # The first predicate kept only samples newer than stall_after, so the longer the outage
         # ran the more certainly it reported nothing.  A day-old frozen sample must still stall.
         far = Sample(at=old - 86_400, done=42, total=100)
-        check("F — a freeze OLDER than the window still stalls (not silence)",
-              stalled(now, [far, *past], DEFAULT_STALL) > 0)
+        check(
+            "F — a freeze OLDER than the window still stalls (not silence)",
+            stalled(now, [far, *past], DEFAULT_STALL) > 0,
+        )
 
         # a counter that moved recently is not a stall, even with old agreeing samples
-        check("P — a counter that moved since the old sample is not a stall",
-              stalled(Sample(at=now.at, done=99, total=100),
-                      [far, Sample(at=old + 1, done=98, total=100)], DEFAULT_STALL) == 0.0)
+        check(
+            "P — a counter that moved since the old sample is not a stall",
+            stalled(
+                Sample(at=now.at, done=99, total=100),
+                [far, Sample(at=old + 1, done=98, total=100)],
+                DEFAULT_STALL,
+            )
+            == 0.0,
+        )
 
         # ⟨P⟩ the rate is withheld until there is something to measure against
-        check("no prior sample ⇒ rate (0,0), never a false stall",
-              rate(now, [], DEFAULT_WINDOW) == (0.0, 0.0))
-        check("no prior sample ⇒ no stall verdict either",
-              stalled(now, [], DEFAULT_STALL) == 0.0)
-        r, span = rate(Sample(at=old + 600, done=142, total=1000),
-                       [Sample(at=old, done=42, total=1000)], DEFAULT_WINDOW)
-        check("100 actions in 10m reads as 10/min",
-              abs(r - 10.0) < EPS and abs(span - 10.0) < EPS)
+        check(
+            "no prior sample ⇒ rate (0,0), never a false stall",
+            rate(now, [], DEFAULT_WINDOW) == (0.0, 0.0),
+        )
+        check("no prior sample ⇒ no stall verdict either", stalled(now, [], DEFAULT_STALL) == 0.0)
+        r, span = rate(
+            Sample(at=old + 600, done=142, total=1000),
+            [Sample(at=old, done=42, total=1000)],
+            DEFAULT_WINDOW,
+        )
+        check("100 actions in 10m reads as 10/min", abs(r - 10.0) < EPS and abs(span - 10.0) < EPS)
 
     OUT.write(f"\nbuildpulse selftest: {ok}/{ok + len(bad)}\n")
     return 1 if bad else 0
@@ -291,10 +310,18 @@ def _parse(argv: list[str]) -> tuple[Path, Path, float, float, bool]:
     ap = argparse.ArgumentParser(description="Report a running build's progress and action rate.")
     ap.add_argument("--log", default="", help="the build's output file")
     ap.add_argument("--state", default="", help="where samples accumulate (default: <log>.pulse)")
-    ap.add_argument("--window", type=float, default=DEFAULT_WINDOW,
-                    help="seconds of history the rate is measured over")
-    ap.add_argument("--stall-after", type=float, default=DEFAULT_STALL,
-                    help="seconds with an unmoved counter before calling it a STALL")
+    ap.add_argument(
+        "--window",
+        type=float,
+        default=DEFAULT_WINDOW,
+        help="seconds of history the rate is measured over",
+    )
+    ap.add_argument(
+        "--stall-after",
+        type=float,
+        default=DEFAULT_STALL,
+        help="seconds with an unmoved counter before calling it a STALL",
+    )
     ap.add_argument("--selftest", action="store_true", help="prove every arm can fire, then exit")
     ns = ap.parse_args(argv)
     log: str = ns.log
@@ -302,8 +329,13 @@ def _parse(argv: list[str]) -> tuple[Path, Path, float, float, bool]:
     window: float = ns.window
     stall_after: float = ns.stall_after
     selftest: bool = ns.selftest
-    return (Path(log), Path(state) if state else Path(log + ".pulse"),
-            window, stall_after, selftest)
+    return (
+        Path(log),
+        Path(state) if state else Path(log + ".pulse"),
+        window,
+        stall_after,
+        selftest,
+    )
 
 
 def main(argv: list[str]) -> int:
@@ -338,14 +370,18 @@ def main(argv: list[str]) -> int:
         return 1
 
     if not build_alive():
-        OUT.write("  ⚑ the //:hook build process is GONE — finished, or killed.  Read the log's "
-                  "tail for its verdict; a pulse cannot tell a green exit from a kill.\n")
+        OUT.write(
+            "  ⚑ the //:hook build process is GONE — finished, or killed.  Read the log's "
+            "tail for its verdict; a pulse cannot tell a green exit from a kill.\n"
+        )
         return 1
 
     held = stalled(now, past, stall_after)
     if held:
-        OUT.write(f"  ⚑ STALL: the action counter has not moved in {held:.0f}m "
-                  f"(still {done:,}).  Alive but not progressing.\n")
+        OUT.write(
+            f"  ⚑ STALL: the action counter has not moved in {held:.0f}m "
+            f"(still {done:,}).  Alive but not progressing.\n"
+        )
         return 1
 
     return 0

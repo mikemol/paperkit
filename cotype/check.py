@@ -21,6 +21,7 @@ Every run also proves its own ⟨P,F,δ⟩ on in-memory mutated copies (never th
 
     python3 cotype/check.py <old-ledger> <new-ledger>     # exit 0 = monotone
 """
+
 import re
 import sys
 from pathlib import Path
@@ -47,8 +48,11 @@ def main(argv):
 
     gone = missing(old, new)
     if gone:
-        print("cotype-monotone: FAIL — ledger entries VANISHED (append-only, retirement-logged: "
-              "an entry is retired with a RETIRED: note and STAYS; it is never deleted):", file=sys.stderr)
+        print(
+            "cotype-monotone: FAIL — ledger entries VANISHED (append-only, retirement-logged: "
+            "an entry is retired with a RETIRED: note and STAYS; it is never deleted):",
+            file=sys.stderr,
+        )
         for k in gone:
             print(f"  - **{k}**", file=sys.stderr)
         return 1
@@ -59,12 +63,17 @@ def main(argv):
     if m:
         dropped = old.replace(m.group(0), "- (entry deleted)", 1)
         if not missing(old, dropped):
-            print("cotype-monotone: SELF-PROOF FAIL — deleting an entry from a copy went "
-                  "uncaught; the gate is unsound, refusing to pass.", file=sys.stderr)
+            print(
+                "cotype-monotone: SELF-PROOF FAIL — deleting an entry from a copy went "
+                "uncaught; the gate is unsound, refusing to pass.",
+                file=sys.stderr,
+            )
             return 1
 
-    print(f"cotype-monotone: OK ({len(keys(new))} entries, {len(keys(new) - keys(old))} new; "
-          "F-arm: one dropped entry is caught)")
+    print(
+        f"cotype-monotone: OK ({len(keys(new))} entries, {len(keys(new) - keys(old))} new; "
+        "F-arm: one dropped entry is caught)"
+    )
     return 0
 
 

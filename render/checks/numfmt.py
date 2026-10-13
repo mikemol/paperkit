@@ -25,6 +25,7 @@ which MathJax renders.
 OPT-IN: this is a standalone helper, not wired into the projector's `clean()` (a deliberately
 minimal common floor).  Import it where a project chooses to group emitted integers.
 """
+
 from __future__ import annotations
 
 _THIN = r"\,"
@@ -42,10 +43,10 @@ def group_digits(x: object, allowbreak: bool = False) -> str:
         sign, s = s[0], s[1:]
     if not s.isdigit():
         raise ValueError(f"group_digits: not a decimal integer: {x!r}")
-    if len(s) <= 4:                       # ≤4 digits: ungrouped, per the standard's threshold
+    if len(s) <= 4:  # ≤4 digits: ungrouped, per the standard's threshold
         return sign + s
-    head = len(s) % 3 or 3                # 1..3 leading digits, then exact groups of three
-    groups = [s[:head]] + [s[i:i + 3] for i in range(head, len(s), 3)]
+    head = len(s) % 3 or 3  # 1..3 leading digits, then exact groups of three
+    groups = [s[:head]] + [s[i : i + 3] for i in range(head, len(s), 3)]
     sep = _THIN_BREAK if allowbreak else _THIN
     return sign + sep.join(groups)
 
@@ -60,7 +61,8 @@ def ungroup(s: str) -> str:
 if __name__ == "__main__":
     # self-test: exactness recovery on a spread of magnitudes incl. a very long integer.
     import sys
-    cases = [0, 7, 495, 3125, 20736, 1814400, 3628800, 93963542400, 5 ** 125, -1814400]
+
+    cases = [0, 7, 495, 3125, 20736, 1814400, 3628800, 93963542400, 5**125, -1814400]
     bad = 0
     for n in cases:
         for ab in (False, True):

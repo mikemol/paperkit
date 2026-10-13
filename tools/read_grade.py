@@ -33,6 +33,7 @@ costs only the bytes.  ⚑ `grade` stays FIRST and unchanged in the object, so e
 consumer (pk_adequacy's `--field grade` aggregation, the adequacy assert) reads exactly what it
 read before — ADDITIVE, not a shape change.
 """
+
 import json
 import sys
 
@@ -45,7 +46,19 @@ c = json.load(open(sys.argv[1]))
 # the honest default for every record written before the axis existed and for every check that ran.
 # Without this the reading defaults reachable=True and reports "repo is not green" about a check
 # that merely could not RUN — the false statement grade.py:86-92 records as measured twice.
-r = mikemol.grade.grade.grade_from_sens(c["baseline"], c["sens"], reachable=c.get("reachable", True))
-print(json.dumps({"claim": c["claim"], "grade": r["grade"], "tests": r.get("tests", []),
-                  "baseline": r.get("baseline", ""), "why": r.get("why", ""),
-                  "not_higher": r.get("not_higher", ""), "not_lower": r.get("not_lower", "")}))
+r = mikemol.grade.grade.grade_from_sens(
+    c["baseline"], c["sens"], reachable=c.get("reachable", True)
+)
+print(
+    json.dumps(
+        {
+            "claim": c["claim"],
+            "grade": r["grade"],
+            "tests": r.get("tests", []),
+            "baseline": r.get("baseline", ""),
+            "why": r.get("why", ""),
+            "not_higher": r.get("not_higher", ""),
+            "not_lower": r.get("not_lower", ""),
+        }
+    )
+)

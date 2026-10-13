@@ -26,6 +26,7 @@ its own two-line fix.  The debt was invisible while every consumer reached this 
 `sys.path.insert` plus a bare `import config`, which mypy cannot follow: the injection HID it
 rather than causing it.  Typed here, at the owner, so naming the engine costs a caller nothing.
 """
+
 from __future__ import annotations
 
 import os
@@ -59,8 +60,8 @@ class Param:
     config: str | None = None
     default: Value | Callable[[], Value] = None
     choices: tuple[str, ...] | None = None
-    flag: bool = False                          # a boolean switch (presence), not a value
-    aliases: tuple[str, ...] = ()               # extra CLI spellings (e.g. --without-k)
+    flag: bool = False  # a boolean switch (presence), not a value
+    aliases: tuple[str, ...] = ()  # extra CLI spellings (e.g. --without-k)
     help: str = ""
 
     @property
@@ -117,7 +118,7 @@ def resolve(p: Param, config: dict[str, object] | None = None) -> Value:
     Flags resolve to bool; values validate against p.choices.
     """
     cfg = config or {}
-    raw = _ARGS.get(p.env, os.environ.get(p.env))      # arg (local) over env
+    raw = _ARGS.get(p.env, os.environ.get(p.env))  # arg (local) over env
     if p.flag:
         if raw is not None:
             return _truthy(raw)
@@ -159,9 +160,9 @@ def positionals(argv: Sequence[str], registry: Iterable[Param]) -> list[str]:
             skip = False
             continue
         if a in known:
-            skip = a in valued          # the next token is this flag's value
+            skip = a in valued  # the next token is this flag's value
             continue
         if a.startswith("-"):
-            continue                     # an --x=… or an unknown option — never positional
+            continue  # an --x=… or an unknown option — never positional
         out.append(a)
     return out

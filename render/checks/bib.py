@@ -35,6 +35,7 @@ against a corpus that goes to two, so `paper/model.bib`'s `edge-rests-grounds` l
 field entirely and the value's own tail was read as a NEW FIELD NAME.  `bibfidelity` counts
 properly — measured over 38 bibs: gained 3 fields, lost 0, changed 0.
 """
+
 from __future__ import annotations
 
 import re
@@ -74,10 +75,12 @@ def _markers() -> dict[str, str]:
 
 def _marked(src: str, markers: dict[str, str]) -> str:
     """Replace each [@key] with its verification marker, leaving unknown keys literal."""
+
     def sub(m: re.Match[str]) -> str:
         key: str = m.group(1)
         whole: str = m.group(0)
         return markers.get(key, whole)
+
     return CITE.sub(sub, src)
 
 
@@ -92,14 +95,25 @@ def _render(split: str) -> str:
     with tempfile.TemporaryDirectory() as d:
         md = Path(d) / "p.md"
         md.write_text(split)
-        argv = ["pandoc", str(md), "--citeproc",
-                "--bibliography", "../paper/references.bib", "-t", "plain"]
+        argv = [
+            "pandoc",
+            str(md),
+            "--citeproc",
+            "--bibliography",
+            "../paper/references.bib",
+            "-t",
+            "plain",
+        ]
         # ⚑ S603: argv is a LITERAL list — no shell, and the one interpolated element is a path
         # this function just created inside its own TemporaryDirectory.  The directive was
         # stripped by a RUF100 sweep run with only that rule enabled, where every noqa reads as
         # unused; restored with its reason so the next narrow run cannot silently drop it again.
-        out: str = subprocess.run(argv, capture_output=True,  # noqa: S603
-                                  text=True, check=True).stdout
+        out: str = subprocess.run(
+            argv,
+            capture_output=True,  # noqa: S603
+            text=True,
+            check=True,
+        ).stdout
         return out
 
 
@@ -110,8 +124,9 @@ def check() -> int:
 
     leftover = _literals(txt)
     if leftover:
-        sys.stderr.write(f"citations left LITERAL (unresolved) in the render: "
-                         f"{leftover[:SAMPLE]}\n")
+        sys.stderr.write(
+            f"citations left LITERAL (unresolved) in the render: {leftover[:SAMPLE]}\n"
+        )
         return 1
     if "machine-checked" not in txt:
         sys.stderr.write("no warrant rendered inline as a verification marker\n")
@@ -120,8 +135,10 @@ def check() -> int:
     if missing:
         sys.stderr.write(f"external sources did not render into the References list: {missing}\n")
         return 1
-    sys.stdout.write("bib ok: warrants inline (machine-checked), external sources author-date "
-                     "+ References, no literal [@key]\n")
+    sys.stdout.write(
+        "bib ok: warrants inline (machine-checked), external sources author-date "
+        "+ References, no literal [@key]\n"
+    )
     return 0
 
 

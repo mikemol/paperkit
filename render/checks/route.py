@@ -31,6 +31,7 @@ this FILE before the render/ PACKAGE.  bnd-package-shadow's failure class, one d
     python3 checks/route.py --which                 # print the selected route, run nothing
     python3 checks/route.py --selftest              # ⟨P,F,δ⟩: the selector dispatches on the format
 """
+
 from __future__ import annotations
 
 import os
@@ -70,8 +71,11 @@ def main(argv: list[str]) -> int:
         return _selftest()
     r = route(dict(os.environ))
     if r is None:
-        print(f"render: unknown PAPERKIT_FORMAT={os.environ.get('PAPERKIT_FORMAT')} "
-              f"(expected {'|'.join(_ROUTES)})", file=sys.stderr)
+        print(
+            f"render: unknown PAPERKIT_FORMAT={os.environ.get('PAPERKIT_FORMAT')} "
+            f"(expected {'|'.join(_ROUTES)})",
+            file=sys.stderr,
+        )
         return 2
     if "--which" in argv:
         print(r)

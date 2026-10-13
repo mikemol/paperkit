@@ -21,6 +21,7 @@ false pass.
 
     python3 checks/a11y_latex.py       # build the LaTeX deliverable, gate it PDF/UA-2 == 0
 """
+
 from __future__ import annotations
 
 import re
@@ -41,13 +42,18 @@ def _missing_glyphs(work: Path) -> list[str]:
     log = work / "p.log"
     if not log.exists():
         return []
-    return re.findall(r"Missing character: There is no (\S+ \(U\+[0-9A-F]+\))", log.read_text(errors="replace"))
+    return re.findall(
+        r"Missing character: There is no (\S+ \(U\+[0-9A-F]+\))", log.read_text(errors="replace")
+    )
 
 
 def main() -> int:
     if latex._deps_absent():
-        print(f"a11y-latex: {latex._deps_absent()} absent — CANNOT VERIFY the LaTeX format here "
-              "(not a pass)", file=sys.stderr)
+        print(
+            f"a11y-latex: {latex._deps_absent()} absent — CANNOT VERIFY the LaTeX format here "
+            "(not a pass)",
+            file=sys.stderr,
+        )
         return 3
     with tempfile.TemporaryDirectory() as t:
         d = Path(t)
@@ -56,22 +62,28 @@ def main() -> int:
             print("a11y-latex: FAIL — the LaTeX deliverable did not build", file=sys.stderr)
             return 1
         r = a11y.Result()
-        a11y.check_ua2(r, pdf, None, flavour="ua2")          # the conformance gate, UA-2 (subsumes .notdef)
-        a11y.check_tagged(r, pdf, None)                      # Tagged: yes
+        a11y.check_ua2(r, pdf, None, flavour="ua2")  # the conformance gate, UA-2 (subsumes .notdef)
+        a11y.check_tagged(r, pdf, None)  # Tagged: yes
         print(f"\n  a11y-latex (own paper, LaTeX format) — {pdf.name}")
         print("  " + "-" * 60)
         for name, ok, detail in r.rows:
             print(f"  {'✓' if ok else '✗'} {name:<30} {detail}")
         missing = _missing_glyphs(d)
         if missing:
-            print(f"  ! lualatex could not place {len(missing)} glyph(s) — extend the font fallback "
-                  f"in latex.py: {sorted(set(missing))[:8]}")
+            print(
+                f"  ! lualatex could not place {len(missing)} glyph(s) — extend the font fallback "
+                f"in latex.py: {sorted(set(missing))[:8]}"
+            )
         print("  " + "-" * 60)
         if r.ok():
-            print("  a11y-latex: PASS — paperkit's paper is PDF/UA-2 conformant through the LaTeX "
-                  "format (a higher standard than the docx route's UA-1, with recoverable MathML)")
+            print(
+                "  a11y-latex: PASS — paperkit's paper is PDF/UA-2 conformant through the LaTeX "
+                "format (a higher standard than the docx route's UA-1, with recoverable MathML)"
+            )
             return 0
-        print("  a11y-latex: FAIL — the LaTeX deliverable is not PDF/UA-2 conformant", file=sys.stderr)
+        print(
+            "  a11y-latex: FAIL — the LaTeX deliverable is not PDF/UA-2 conformant", file=sys.stderr
+        )
         return 1
 
 

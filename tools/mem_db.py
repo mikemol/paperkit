@@ -24,6 +24,7 @@ work that runs anyway.  `INSERT ... ON CONFLICT DO UPDATE SET bytes = max(...)` 
 the database serialises; the JSON equivalent is a read-modify-write across concurrent writers,
 and hand-rolling its "raise, never lower" rule is exactly where a bug already landed.
 """
+
 from __future__ import annotations
 
 import json
@@ -53,7 +54,7 @@ CREATE INDEX IF NOT EXISTS peak_by_claim ON peak (project, resolution, claim);
 def connect(db: Path) -> sqlite3.Connection:
     db.parent.mkdir(parents=True, exist_ok=True)
     c = sqlite3.connect(str(db), timeout=30)
-    c.execute("PRAGMA journal_mode=WAL")          # concurrent readers during a harvest
+    c.execute("PRAGMA journal_mode=WAL")  # concurrent readers during a harvest
     c.executescript(_SCHEMA)
     return c
 
@@ -71,7 +72,8 @@ def record(c: sqlite3.Connection, rows: list, run: str = "") -> int:
         "ON CONFLICT(project,resolution,claim,cell) DO UPDATE SET "
         "  bytes = max(bytes, excluded.bytes), run = excluded.run, at = excluded.at "
         "WHERE excluded.bytes > peak.bytes",
-        [(p, r, cl, ce, b, run, now) for p, r, cl, ce, b in rows])
+        [(p, r, cl, ce, b, run, now) for p, r, cl, ce, b in rows],
+    )
     c.commit()
     return len(rows)
 
@@ -85,7 +87,8 @@ def manifest(c: sqlite3.Connection, project: str) -> dict:
     out: dict = {"claims": {}}
     per_claim = c.execute(
         "SELECT resolution, claim, max(bytes) FROM peak WHERE project=? GROUP BY resolution, claim",
-        (project,)).fetchall()
+        (project,),
+    ).fetchall()
     if not per_claim:
         return out
     by_res: dict = {}
@@ -103,11 +106,17 @@ def provenance(c: sqlite3.Connection, project: str) -> dict:
     """What a bucket RESTS ON — the question a JSON of conclusions cannot answer."""
     row = c.execute(
         "SELECT count(*), min(bytes), max(bytes), max(at), count(DISTINCT run) "
-        "FROM peak WHERE project=?", (project,)).fetchone()
+        "FROM peak WHERE project=?",
+        (project,),
+    ).fetchone()
     n, lo, hi, at, runs = row
-    return {"cells": n, "min_mb": round((lo or 0) / 1048576, 1),
-            "max_mb": round((hi or 0) / 1048576, 1),
-            "measured_at": at, "runs": runs}
+    return {
+        "cells": n,
+        "min_mb": round((lo or 0) / 1048576, 1),
+        "max_mb": round((hi or 0) / 1048576, 1),
+        "measured_at": at,
+        "runs": runs,
+    }
 
 
 def main(argv: list) -> int:
@@ -116,8 +125,13 @@ def main(argv: list) -> int:
         return 2
     db, verb, project = Path(argv[0]), argv[1], argv[2]
     c = connect(db)
-    print(json.dumps(manifest(c, project) if verb == "manifest" else provenance(c, project),
-                     indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            manifest(c, project) if verb == "manifest" else provenance(c, project),
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 

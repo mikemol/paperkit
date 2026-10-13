@@ -19,6 +19,7 @@ and which OOMs at a 32MB cap.  Under-reporting is the dangerous direction: a man
 it sizes the cell BELOW what it needs, so the loop re-derives the same OOM every run and never
 converges.
 """
+
 from __future__ import annotations
 
 import pathlib

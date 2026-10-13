@@ -8,6 +8,7 @@ the gate's actual verdict.
 
     python3 paperkit/tests/boundaries_gate_json.py
 """
+
 from __future__ import annotations
 
 import json
@@ -31,11 +32,16 @@ def gate_json_raw(paper_toml=None, *flags):
         rc, o, e = paperkit.tests._fixture_model._call(paperkit.gate.main, ["--json", *flags, d])
         return rc, json.loads(o or "{}"), e
 
+
 C = paperkit.tests._fixture_model.entry("c", claim="anchored")
-DISTINCT = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
-            paperkit.tests._fixture_model.entry("b", claim="beta", check="file:r.tsv", frm="a")]
-SHARED = [paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
-          paperkit.tests._fixture_model.entry("b", claim="beta", check="file:w.bib", frm="a")]
+DISTINCT = [
+    paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
+    paperkit.tests._fixture_model.entry("b", claim="beta", check="file:r.tsv", frm="a"),
+]
+SHARED = [
+    paperkit.tests._fixture_model.entry("a", claim="alpha", check="file:w.bib"),
+    paperkit.tests._fixture_model.entry("b", claim="beta", check="file:w.bib", frm="a"),
+]
 
 
 def main() -> int:
@@ -62,53 +68,88 @@ def main() -> int:
     # not "did tomllib raise".  All four must exit 3, and NONE may report the downstream
     # "not built — run paperkit-project" line (that would misdiagnose an unusable config as
     # staleness — A67 / summit friction-cannot-gate-guard-misses-unloadable-config).
-    rc_norun, j_norun, _ = gate_json_raw(None)                       # no paper.toml
-    rc_nobib, j_nobib, e_nobib = gate_json_raw("[other]\nx=1\n")     # parses, no [paper] table
+    rc_norun, j_norun, _ = gate_json_raw(None)  # no paper.toml
+    rc_nobib, j_nobib, e_nobib = gate_json_raw("[other]\nx=1\n")  # parses, no [paper] table
     rc_titleonly, _, e_titleonly = gate_json_raw('[paper]\ntitle="t"\n')  # inputs default → absent
     rc_badw, _, e_badw = gate_json_raw(
-        '[paper]\ntitle="t"\nwarrants=["nope.bib"]\nrubric="r.tsv"\nout="o.md"\n')  # warrant absent
+        '[paper]\ntitle="t"\nwarrants=["nope.bib"]\nrubric="r.tsv"\nout="o.md"\n'
+    )  # warrant absent
     _misdiag = "not built"
 
     print("gate --json behaviors\n")
-    check("pass=true, project_ok=true on a clean doc (matches exit 0)",
-          j_ok["pass"] is True and j_ok["project_ok"] is True and rc_ok == 0)
-    check("pass=false, project_ok=false on drifted prose (matches exit 1)",
-          j_bad["pass"] is False and j_bad["project_ok"] is False and rc_bad == 1)
+    check(
+        "pass=true, project_ok=true on a clean doc (matches exit 0)",
+        j_ok["pass"] is True and j_ok["project_ok"] is True and rc_ok == 0,
+    )
+    check(
+        "pass=false, project_ok=false on drifted prose (matches exit 1)",
+        j_bad["pass"] is False and j_bad["project_ok"] is False and rc_bad == 1,
+    )
     check("collapses is empty when witnesses are distinct", j_distinct["collapses"] == {})
-    check("collapses ENUMERATES the shared witness, not just a count",
-          j_shared["collapses"].get("file:w.bib") == ["a", "b"])
+    check(
+        "collapses ENUMERATES the shared witness, not just a count",
+        j_shared["collapses"].get("file:w.bib") == ["a", "b"],
+    )
     # Ζ·gate·exit — availability lives in the exit code (0/1 = ran; 3 = CANNOT RUN) AND in --json.
-    check("available=true on a project that ran (pass or fail)",
-          j_ok.get("available") is True and j_bad.get("available") is True)
-    check("no paper.toml → exit 3 (CANNOT RUN), not 1 (ran-and-failed), no traceback",
-          rc_norun == 3)
-    check("CANNOT RUN → --json available:false, pass:false (not a fake pass, not a bare crash)",
-          j_norun.get("available") is False and j_norun.get("pass") is False)
-    check("a config that PARSES but is not gateable also CANNOT RUN (exit 3), not exit 1",
-          rc_nobib == 3 and rc_titleonly == 3 and rc_badw == 3)
-    check("no [paper] table → available:false (parses-but-unusable is on the cannot-run side)",
-          j_nobib.get("available") is False)
-    check("CANNOT RUN never MISDIAGNOSES an unusable config as 'not built' (A67)",
-          _misdiag not in e_nobib and _misdiag not in e_titleonly and _misdiag not in e_badw)
+    check(
+        "available=true on a project that ran (pass or fail)",
+        j_ok.get("available") is True and j_bad.get("available") is True,
+    )
+    check(
+        "no paper.toml → exit 3 (CANNOT RUN), not 1 (ran-and-failed), no traceback", rc_norun == 3
+    )
+    check(
+        "CANNOT RUN → --json available:false, pass:false (not a fake pass, not a bare crash)",
+        j_norun.get("available") is False and j_norun.get("pass") is False,
+    )
+    check(
+        "a config that PARSES but is not gateable also CANNOT RUN (exit 3), not exit 1",
+        rc_nobib == 3 and rc_titleonly == 3 and rc_badw == 3,
+    )
+    check(
+        "no [paper] table → available:false (parses-but-unusable is on the cannot-run side)",
+        j_nobib.get("available") is False,
+    )
+    check(
+        "CANNOT RUN never MISDIAGNOSES an unusable config as 'not built' (A67)",
+        _misdiag not in e_nobib and _misdiag not in e_titleonly and _misdiag not in e_badw,
+    )
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
     pairs = [
-        ("pass field tracks the gate verdict", "a drift line appended to out.md",
-         "clean → pass:true", j_ok["pass"] is True,
-         "drift → pass:false", j_bad["pass"] is False),
-        ("collapses enumerate shared witnesses",
-         "the second claim's check (file:r.tsv → file:w.bib)",
-         "distinct → {}", j_distinct["collapses"] == {},
-         "shared   → {file:w.bib: [a, b]}", j_shared["collapses"] != {}),
-        ("the exit code carries AVAILABILITY (ran-and-failed vs cannot-run)",
-         "whether paper.toml exists to read",
-         "present → ran, exit 1 on failure", rc_bad == 1,
-         "absent  → CANNOT RUN, exit 3", rc_norun == 3),
-        ("the boundary is 'gateable config', not merely 'valid TOML'",
-         "a declared warrant that exists vs one that does not",
-         "usable config → gates (exit 0/1)", rc_ok == 0,
-         "warrant absent → CANNOT RUN, exit 3", rc_badw == 3),
+        (
+            "pass field tracks the gate verdict",
+            "a drift line appended to out.md",
+            "clean → pass:true",
+            j_ok["pass"] is True,
+            "drift → pass:false",
+            j_bad["pass"] is False,
+        ),
+        (
+            "collapses enumerate shared witnesses",
+            "the second claim's check (file:r.tsv → file:w.bib)",
+            "distinct → {}",
+            j_distinct["collapses"] == {},
+            "shared   → {file:w.bib: [a, b]}",
+            j_shared["collapses"] != {},
+        ),
+        (
+            "the exit code carries AVAILABILITY (ran-and-failed vs cannot-run)",
+            "whether paper.toml exists to read",
+            "present → ran, exit 1 on failure",
+            rc_bad == 1,
+            "absent  → CANNOT RUN, exit 3",
+            rc_norun == 3,
+        ),
+        (
+            "the boundary is 'gateable config', not merely 'valid TOML'",
+            "a declared warrant that exists vs one that does not",
+            "usable config → gates (exit 0/1)",
+            rc_ok == 0,
+            "warrant absent → CANNOT RUN, exit 3",
+            rc_badw == 3,
+        ),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok

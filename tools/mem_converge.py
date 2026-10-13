@@ -29,6 +29,7 @@ Prints one line per project with a grid.  --check exits 1 if any has not converg
     trusting a past reading; an instrument earns trust per-use, a gate by proven
     soundness in both directions, and this has only ever been the former.
 """
+
 from __future__ import annotations
 
 import re
@@ -65,7 +66,7 @@ def _manifest_rel(root, proj) -> str:
     path = None
     if mod.is_file():
         try:
-            for m in re.finditer(r'bib\.project\(([^)]*)\)', mod.read_text()):
+            for m in re.finditer(r"bib\.project\(([^)]*)\)", mod.read_text()):
                 body = m.group(1)
                 nm = re.search(r'name\s*=\s*"paperkit_([^"]+)"', body)
                 pp = re.search(r'project\s*=\s*"([^"]+)"', body)
@@ -76,9 +77,11 @@ def _manifest_rel(root, proj) -> str:
             path = None
     if path is None:
         # ⚑ NAMED, never silently guessed: an undeclared project is a finding about the OWNER.
-        print("mem-converge: %s is not declared in MODULE.bazel — falling back to its name as a "
-              "path, which is the very conflation this function exists to avoid" % proj,
-              file=sys.stderr)
+        print(
+            "mem-converge: %s is not declared in MODULE.bazel — falling back to its name as a "
+            "path, which is the very conflation this function exists to avoid" % proj,
+            file=sys.stderr,
+        )
         path = proj
     return "mem.json" if path == "." else "%s/mem.json" % path
 
@@ -97,7 +100,7 @@ def survey(external: Path, root: Path) -> list:
             continue
         cells = _EVAL.findall(text)
         if not cells:
-            continue                                  # no grid → no def bucket owed
+            continue  # no grid → no def bucket owed
         # AT THE FLOOR = no `mem` attr at all, or `mem = 0` (calc.bzl's unmeasured sentinel).
         # Both fall back to the cold-start floor; only a positive value is a learned reservation.
         floor = 0
@@ -109,6 +112,7 @@ def survey(external: Path, root: Path) -> list:
         bucket = None
         if man.is_file():
             import json
+
             try:
                 bucket = json.loads(man.read_text()).get("def")
             except (OSError, ValueError):
@@ -129,15 +133,25 @@ def main(argv) -> int:
     bad = []
     for proj, cells, floor, bucket in rows:
         ok = bucket is not None and floor == 0
-        print("  %-11s cells=%-7s at-floor=%-7s def=%-6s %s"
-              % (proj, cells, floor, bucket if bucket is not None else "MISSING",
-                 "converged" if ok else "NOT CONVERGED"))
+        print(
+            "  %-11s cells=%-7s at-floor=%-7s def=%-6s %s"
+            % (
+                proj,
+                cells,
+                floor,
+                bucket if bucket is not None else "MISSING",
+                "converged" if ok else "NOT CONVERGED",
+            )
+        )
         if not ok:
             bad.append(proj)
     if bad:
-        print("mem-converge: %d of %d project(s) have NOT converged: %s — run an observe pass "
-              "(--config=memobserve), then mem_harvest.py + mem_project.py, then refetch"
-              % (len(bad), len(rows), ", ".join(bad)), file=sys.stderr)
+        print(
+            "mem-converge: %d of %d project(s) have NOT converged: %s — run an observe pass "
+            "(--config=memobserve), then mem_harvest.py + mem_project.py, then refetch"
+            % (len(bad), len(rows), ", ".join(bad)),
+            file=sys.stderr,
+        )
         return 1
     print("mem-converge: all %d grid project(s) converged" % len(rows))
     return 0

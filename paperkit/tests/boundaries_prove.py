@@ -15,6 +15,7 @@ certificate() (their fingerprint-null-plus-why discipline — the audit's revers
 
     python3 paperkit/tests/boundaries_prove.py
 """
+
 from __future__ import annotations
 
 import json
@@ -40,22 +41,34 @@ def main() -> int:
     # degraded-arm refusals") that no arm could move.  `Suite` counts the arms it is given.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import paperkit.tests._boundary
-    s = paperkit.tests._boundary.Suite("PROVE", "Ζ·prove·degrade — a certificate is never emitted unmeasured")
+
+    s = paperkit.tests._boundary.Suite(
+        "PROVE", "Ζ·prove·degrade — a certificate is never emitted unmeasured"
+    )
     check = s.check
 
     # P — the sound path: the same entry point, real engine, cheap verdict mode (the prove
     # mode's full def-sweep is gated separately as the library's __dcalc in //:hook — not
     # re-swept here; one oracle, two gates would drift).
-    p = subprocess.run([sys.executable, str(LIB / "concepts.py"), "claim-is-record"],
-                       cwd=LIB, capture_output=True, text=True)
+    p = subprocess.run(
+        [sys.executable, str(LIB / "concepts.py"), "claim-is-record"],
+        cwd=LIB,
+        capture_output=True,
+        text=True,
+    )
     check("P: the entry point runs a concept green against the REAL engine", p.returncode == 0)
 
     # F — the degraded arm: an engine that is not there.  The prove face must fail LOUD with
     # NO record — never a certificate whose empty fingerprint reads as "nothing flips it".
     with tempfile.TemporaryDirectory() as d:
         env = {**os.environ, "PAPERKIT_ENGINE": d}
-        f = subprocess.run([sys.executable, str(LIB / "concepts.py"), "adequacy-pitch", "--prove"],
-                           cwd=LIB, capture_output=True, text=True, env=env)
+        f = subprocess.run(
+            [sys.executable, str(LIB / "concepts.py"), "adequacy-pitch", "--prove"],
+            cwd=LIB,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
     check("F: with the engine unreachable, --prove exits NONZERO", f.returncode != 0)
     emitted_record = False
     for line in f.stdout.splitlines():
@@ -63,14 +76,19 @@ def main() -> int:
             emitted_record |= isinstance(json.loads(line), dict)
         except ValueError:
             pass
-    check("F: ...and emits NO record (an absent measurement cannot masquerade as an insensitive one)",
-          not emitted_record and '"fingerprint"' not in f.stdout)
+    check(
+        "F: ...and emits NO record (an absent measurement cannot masquerade as an insensitive one)",
+        not emitted_record and '"fingerprint"' not in f.stdout,
+    )
 
-    s.delta("a certificate is emitted only when the engine was REACHABLE to measure",
-            p.returncode == 0, not emitted_record,
-            p="real engine:   concepts.py <key> → exit 0",
-            f="engine absent: concepts.py <key> --prove → nonzero, zero records emitted",
-            d="one env var — PAPERKIT_ENGINE, present → an empty dir")
+    s.delta(
+        "a certificate is emitted only when the engine was REACHABLE to measure",
+        p.returncode == 0,
+        not emitted_record,
+        p="real engine:   concepts.py <key> → exit 0",
+        f="engine absent: concepts.py <key> --prove → nonzero, zero records emitted",
+        d="one env var — PAPERKIT_ENGINE, present → an empty dir",
+    )
     return s.finish()
 
 

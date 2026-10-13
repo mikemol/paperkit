@@ -15,6 +15,7 @@ check target's `data` from it; no strace at fetch (fast, deterministic).
 A degraded footprint (strace absent/can't attach → None) records the sentinel ["*"] = "all
 projects" (the repo rule over-declares), never a silent under-declaration.
 """
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -61,7 +62,11 @@ def _wired(repo_root: Path) -> list:
         # repo_root = git toplevel, so guard existence before the owner call.  A row's `project` gives a
         # NAME; `repo_root / "."` correctly resolves the root row to repo_root.)
         pdir = repo_root / proj.group(1)
-        f = paperkit.bib.load_bib(bib_path, pdir) if (pdir / "paper.toml").is_file() else paperkit.bib.parse(bib_path)
+        f = (
+            paperkit.bib.load_bib(bib_path, pdir)
+            if (pdir / "paper.toml").is_file()
+            else paperkit.bib.parse(bib_path)
+        )
         # a sandbox-tier check = has a check and its effective tier is sandbox (no tier field / "sandbox")
         if any(w.get("check") and (w.get("tier") or "sandbox") == "sandbox" for w in f.values()):
             out.append(proj.group(1))
@@ -81,8 +86,10 @@ def _root_files(repo_root: Path) -> set:
     m = _FILEGROUP_RE.search((repo_root / "BUILD.bazel").read_text())
     if not m:
         return set()
-    return {(lit[2:].replace(":", "/", 1) if lit.startswith("//") else lit)
-            for lit in re.findall(r'"([^"]+)"', m.group(1))}
+    return {
+        (lit[2:].replace(":", "/", 1) if lit.startswith("//") else lit)
+        for lit in re.findall(r'"([^"]+)"', m.group(1))
+    }
 
 
 def _covering(f: str, projects: set, root_files: set) -> set:
@@ -98,10 +105,10 @@ def _covering(f: str, projects: set, root_files: set) -> set:
         return {"paperkit"}
     s = set()
     if top in projects:
-        s.add(top)                       # under a project dir → coverable by @@//<proj>:files
+        s.add(top)  # under a project dir → coverable by @@//<proj>:files
     if f in root_files:
-        s.add(".")                       # cross-listed in //:files → coverable by the `.` token
-    return s or {"."}                    # a bare root file (.githooks/, a root bib/rubric/asset)
+        s.add(".")  # cross-listed in //:files → coverable by the `.` token
+    return s or {"."}  # a bare root file (.githooks/, a root bib/rubric/asset)
 
 
 def _imported(project_dir: Path, repo_root: Path) -> set:
@@ -113,7 +120,7 @@ def _imported(project_dir: Path, repo_root: Path) -> set:
     for b in paperkit.bib.load_config(project_dir)["bibs"]:
         try:
             out.add(str(Path(b).resolve().relative_to(repo_root)))
-        except ValueError:               # a bib outside the repo — ignore
+        except ValueError:  # a bib outside the repo — ignore
             continue
     return out
 
@@ -141,7 +148,7 @@ def _runtime_dependency_files(repo_root: Path) -> frozenset:
             try:
                 out.add(str(Path(dist.locate_file(rel)).resolve().relative_to(repo_root)))
             except ValueError:
-                continue                 # a dependency installed outside the repo -- not in scope
+                continue  # a dependency installed outside the repo -- not in scope
     return frozenset(out)
 
 
@@ -157,19 +164,38 @@ def _label_path(label: str) -> str | None:
     return f"{pkg}/{name}" if pkg else name
 
 
-def _missing(fp: list, declared: set, projects: set, root_files: set, name: str, imported: set,
-             built: set = frozenset(), deps: frozenset = frozenset()) -> list:
+def _missing(
+    fp: list,
+    declared: set,
+    projects: set,
+    root_files: set,
+    name: str,
+    imported: set,
+    built: set = frozenset(),
+    deps: frozenset = frozenset(),
+) -> list:
     """The reads tokens a check is MISSING: for each footprint file NOT already staged — by its own
     project, the engine, an imported warrant bib, a `builds` FILE label, or a DECLARED token's
     filegroup — the tokens that WOULD stage it (any one suffices).  [] iff every read is staged
     (the audit's soundness core).
     """
-    return sorted(set().union(*_uncovered(fp, declared, projects, root_files, name, imported,
-                                          built, deps).values()))
+    return sorted(
+        set().union(
+            *_uncovered(fp, declared, projects, root_files, name, imported, built, deps).values()
+        )
+    )
 
 
-def _uncovered(fp: list, declared: set, projects: set, root_files: set, name: str, imported: set,
-               built: set = frozenset(), deps: frozenset = frozenset()) -> dict:
+def _uncovered(
+    fp: list,
+    declared: set,
+    projects: set,
+    root_files: set,
+    name: str,
+    imported: set,
+    built: set = frozenset(),
+    deps: frozenset = frozenset(),
+) -> dict:
     """{footprint file: the reads tokens that WOULD stage it} for every read NOT already staged —
     `_missing` is its union.  Ζ·foot·files: the FILES are what a fix needs (a `builds` label names
     a file); a token like `report` says only which package, so the report printed tokens and left
@@ -185,9 +211,9 @@ def _uncovered(fp: list, declared: set, projects: set, root_files: set, name: st
         if p.suffix == ".pyc" and p.parent.name == "__pycache__":
             f = str(p.parent.parent / (p.name.split(".")[0] + ".py"))
         if f in imported:
-            continue                     # staged via warrant-imports composition, not reads=
+            continue  # staged via warrant-imports composition, not reads=
         if f in deps:
-            continue                     # the engine's own runtime dependency (paperkit:W313)
+            continue  # the engine's own runtime dependency (paperkit:W313)
         if Path(f).name == ".gitignore":
             # ⚑ Ζ·sandbox·declared — the Δ sandbox scope (layout._Scope) READS the repository's
             # ignore rules to drop non-content (caches, stale build copies, nested checkouts).  In a
@@ -206,7 +232,7 @@ def _uncovered(fp: list, declared: set, projects: set, root_files: set, name: st
             continue
         cov = _covering(f, projects, root_files)
         if not (cov & have):
-            out[f] = cov                 # any of these declared would cover f
+            out[f] = cov  # any of these declared would cover f
     return out
 
 
@@ -249,9 +275,13 @@ def build(repo_root: Path, names: list) -> dict:
         # is an EDGE, not a leaf: its footprint is never used, and stracing it reruns a sibling gate.  Skip
         # both by the DATA (the tier field) and the VERB (crosses=True), never by re-listing verbs/tiers.
         # strace is I/O-bound, so trace the rest CONCURRENTLY.
-        items = [(k, f["check"]) for k, f in sorted(F.items())
-                 if f.get("check") and not f["check"].startswith(paperkit.resolver.CROSSING)
-                 and (f.get("tier") or "sandbox") == "sandbox"]
+        items = [
+            (k, f["check"])
+            for k, f in sorted(F.items())
+            if f.get("check")
+            and not f["check"].startswith(paperkit.resolver.CROSSING)
+            and (f.get("tier") or "sandbox") == "sandbox"
+        ]
 
         def deps(chk):
             fp = paperkit.resolver.footprint(chk, pdir, custom, scope=repo_root)
@@ -295,13 +325,28 @@ def audit(repo_root: Path, names: list) -> list:
         built = _built(pdir)
         imported = _imported(pdir, repo_root)
         for k, fp in live.get(name, {}).items():
-            if "*" in fp:                            # degraded footprint (e.g. strace blocked) — skip
+            if "*" in fp:  # degraded footprint (e.g. strace blocked) — skip
                 continue
-            unc = _uncovered(fp, declared.get(k, set()), projects, root_files, name, imported,
-                             built.get(k, set()), runtime_deps)
+            unc = _uncovered(
+                fp,
+                declared.get(k, set()),
+                projects,
+                root_files,
+                name,
+                imported,
+                built.get(k, set()),
+                runtime_deps,
+            )
             if unc:
-                bad.append((name, k, sorted(set().union(*unc.values())),
-                            sorted(declared.get(k, set())), sorted(unc)))
+                bad.append(
+                    (
+                        name,
+                        k,
+                        sorted(set().union(*unc.values())),
+                        sorted(declared.get(k, set())),
+                        sorted(unc),
+                    )
+                )
     return bad
 
 
@@ -321,13 +366,28 @@ def audit_one(proj: str, claim: str) -> dict:
     F = paperkit.bib.parse_project(project_dir)
     f = F.get(claim)
     if not f or not f.get("check") or f["check"].startswith(paperkit.resolver.CROSSING):
-        return {"claim": claim, "ok": True, "skip": True}     # a crossing verb is an edge — no footprint
+        return {
+            "claim": claim,
+            "ok": True,
+            "skip": True,
+        }  # a crossing verb is an edge — no footprint
     fp = paperkit.resolver.footprint(f["check"], project_dir, custom, scope=repo_root)
     if fp is None:
-        return {"claim": claim, "ok": True, "degraded": True}  # strace blocked — over-declare, never fail
-    missing = _missing(fp, declared, projects, _root_files(repo_root), name,
-                       _imported(project_dir, repo_root), _built(project_dir).get(claim, set()),
-                       _runtime_dependency_files(repo_root))
+        return {
+            "claim": claim,
+            "ok": True,
+            "degraded": True,
+        }  # strace blocked — over-declare, never fail
+    missing = _missing(
+        fp,
+        declared,
+        projects,
+        _root_files(repo_root),
+        name,
+        _imported(project_dir, repo_root),
+        _built(project_dir).get(claim, set()),
+        _runtime_dependency_files(repo_root),
+    )
     # `engine` = the def-mutable surface (the modules whose def-sites the Ζ·mutant fanout sweeps);
     # pk_foot_learn aggregates it across claims → footprints.json (the def-scope manifest).
     return {"claim": claim, "ok": not missing, "missing": missing, "engine": _engine(fp)}
@@ -344,7 +404,9 @@ def _strace_works() -> bool:
     with tempfile.TemporaryDirectory() as d:
         p = Path(d)
         (p / "probe.txt").write_text("PK_PROBE\n")
-        return paperkit.resolver.footprint("cmd:grep -q PK_PROBE probe.txt", p, {}, scope=p) == ["probe.txt"]
+        return paperkit.resolver.footprint("cmd:grep -q PK_PROBE probe.txt", p, {}, scope=p) == [
+            "probe.txt"
+        ]
 
 
 def main(argv: list) -> int:
@@ -354,23 +416,34 @@ def main(argv: list) -> int:
         rest = [a for a in argv[1:] if a != "--only" and a != claim and not a.startswith("-")]
         print(json.dumps(audit_one(rest[0] if rest else ".", claim)))
         return 0
-    repo_root = Path(subprocess.run(["git", "rev-parse", "--show-toplevel"],
-                                    capture_output=True, text=True).stdout.strip())
+    repo_root = Path(
+        subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
+        ).stdout.strip()
+    )
     if not _strace_works():
-        print("paperkit-footdeps: DEGRADED — strace is unavailable on this host (a probe with a KNOWN "
-              "footprint traced empty); the footprint audit CANNOT verify declared reads and is SKIPPED, "
-              "not passed (Ζ·degrade·roots positive control — never a silent false green).  reads= are "
-              "unenforced here; run on a strace-capable host to gate them.", file=sys.stderr)
+        print(
+            "paperkit-footdeps: DEGRADED — strace is unavailable on this host (a probe with a KNOWN "
+            "footprint traced empty); the footprint audit CANNOT verify declared reads and is SKIPPED, "
+            "not passed (Ζ·degrade·roots positive control — never a silent false green).  reads= are "
+            "unenforced here; run on a strace-capable host to gate them.",
+            file=sys.stderr,
+        )
         return 0
     names = [a for a in argv[1:] if not a.startswith("-")] or _wired(repo_root)
     bad = audit(repo_root, names)
     if bad:
         for proj, k, miss, decl, files in bad:
-            print(f"paperkit-footdeps: {proj}:{k} footprint reads {miss} not in declared reads {decl} "
-                  f"— declare the files in `builds` (or the tokens in `reads`); unstaged: "
-                  f"{', '.join(files)}", file=sys.stderr)
+            print(
+                f"paperkit-footdeps: {proj}:{k} footprint reads {miss} not in declared reads {decl} "
+                f"— declare the files in `builds` (or the tokens in `reads`); unstaged: "
+                f"{', '.join(files)}",
+                file=sys.stderr,
+            )
         return 1
-    print(f"paperkit-footdeps: every declared `reads` ⊇ its Φ·footprint ({len(names)} projects audited)")
+    print(
+        f"paperkit-footdeps: every declared `reads` ⊇ its Φ·footprint ({len(names)} projects audited)"
+    )
     return 0
 
 

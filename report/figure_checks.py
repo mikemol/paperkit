@@ -6,6 +6,7 @@ Feature bullet-points and unit tests are the same thing viewed twice: claims.  S
 the figure's data/accessibility guarantees are themselves gated claims, asserted
 against the generated assets/dag.svg.  Run: figure_checks.py <property>.
 """
+
 import re
 import sys
 import xml.dom.minidom as minidom
@@ -14,10 +15,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SVG = (HERE / "assets" / "dag.svg").read_text()
 
-OKABE_ITO = {"#E69F00", "#56B4E9", "#009E73", "#F0E442",
-             "#0072B2", "#D55E00", "#CC79A7", "#000000"}
+OKABE_ITO = {"#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000"}
 INK = "#1a1a1a"
-NEUTRALS = {"white", "#ffffff", "#eeeeee", "#cccccc", "#999999", "none"}   # bg/gridlines/rings
+NEUTRALS = {"white", "#ffffff", "#eeeeee", "#cccccc", "#999999", "none"}  # bg/gridlines/rings
 
 
 def _fills():
@@ -76,18 +76,25 @@ def shows_layout():
     assert len(circles) > 1, f"the figure plots {len(circles)} node(s) — nothing to lay out"
     xs = {float(x) for x, _ in circles}
     ys = {float(y) for _, y in circles}
-    assert len(xs) > 1, ("every node shares one x — grounding depth is not on the horizontal "
-                         "axis, so there is no atoms-left-to-theses-right walk")
-    assert len(ys) > 1, ("every node shares one y — the effective grade is not on the vertical "
-                         "axis")
+    assert len(xs) > 1, (
+        "every node shares one x — grounding depth is not on the horizontal "
+        "axis, so there is no atoms-left-to-theses-right walk"
+    )
+    assert len(ys) > 1, "every node shares one y — the effective grade is not on the vertical axis"
     # the axis is LABELLED as a grade axis, so "vertical position" is not merely incidental spread
-    assert re.search(r"<text[^>]*>\s*(behavioral|existence|imported|vacuous|indeterminate)\s*<",
-                     SVG), "no grade rung is labelled on the figure's vertical axis"
+    assert re.search(
+        r"<text[^>]*>\s*(behavioral|existence|imported|vacuous|indeterminate)\s*<", SVG
+    ), "no grade rung is labelled on the figure's vertical axis"
 
 
-CHECKS = {"okabe-ito": okabe_ito, "dark-on-light": dark_on_light, "well-formed": well_formed,
-          "shows-clamp": shows_clamp, "shows-terminal": shows_terminal,
-          "shows-layout": shows_layout}
+CHECKS = {
+    "okabe-ito": okabe_ito,
+    "dark-on-light": dark_on_light,
+    "well-formed": well_formed,
+    "shows-clamp": shows_clamp,
+    "shows-terminal": shows_terminal,
+    "shows-layout": shows_layout,
+}
 
 
 def main(argv):

@@ -9,6 +9,7 @@ short (resumably) rather than blocking.
 
     python3 paperkit/tests/boundaries_driver.py
 """
+
 from __future__ import annotations
 
 import json
@@ -38,7 +39,7 @@ class W:
         return s if i >= N else {"c": i + 1, "r": s["r"] + [i * i]}
 
     def parse(self, s):
-        return {"done": s["c"] >= N, "results": s["r"], "progress": f'{s["c"]}/{N}'}
+        return {"done": s["c"] >= N, "results": s["r"], "progress": f"{s['c']}/{N}"}
 
     def serialize(self, s):
         return json.dumps(s, sort_keys=True)
@@ -80,7 +81,9 @@ def main() -> int:
 
     f = tempfile.mktemp()
     m2, _, d2 = paperkit.driver.drive(W(), state_path=f)
-    check("resumption via the persisted token yields the same verdict", d2 and m2["results"] == GOLD)
+    check(
+        "resumption via the persisted token yields the same verdict", d2 and m2["results"] == GOLD
+    )
     os.path.exists(f) and os.unlink(f)
 
     try:
@@ -92,8 +95,10 @@ def main() -> int:
 
     f2 = tempfile.mktemp()
     _, sb, db = paperkit.driver.drive(W(slow=0.02), state_path=f2, budget=0.001)
-    check("a budget stops before done (no blocking) — resumable",
-          (not db) and sb < N and Path(f2).exists())
+    check(
+        "a budget stops before done (no blocking) — resumable",
+        (not db) and sb < N and Path(f2).exists(),
+    )
     mr, _, dr = paperkit.driver.drive(W(), state_path=f2, budget=0)
     check("resumes from the persisted token to completion", dr and mr["results"] == GOLD)
     os.path.exists(f2) and os.unlink(f2)
@@ -101,12 +106,22 @@ def main() -> int:
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
     pairs = [
-        ("the budget toggles done ↔ resume (liveness)", "the time budget",
-         "budget 0    → done", paperkit.driver.drive(W())[2] is True,
-         "budget tiny → resume", paperkit.driver.drive(W(slow=0.02), budget=0.001)[2] is False),
-        ("the soundness obligation gates the run", "serialize fidelity (round-trip)",
-         "faithful  → runs", paperkit.driver.drive(W())[2] is True,
-         "drops field → rejected", _raises(lambda: paperkit.driver.drive(Broken()))),
+        (
+            "the budget toggles done ↔ resume (liveness)",
+            "the time budget",
+            "budget 0    → done",
+            paperkit.driver.drive(W())[2] is True,
+            "budget tiny → resume",
+            paperkit.driver.drive(W(slow=0.02), budget=0.001)[2] is False,
+        ),
+        (
+            "the soundness obligation gates the run",
+            "serialize fidelity (round-trip)",
+            "faithful  → runs",
+            paperkit.driver.drive(W())[2] is True,
+            "drops field → rejected",
+            _raises(lambda: paperkit.driver.drive(Broken())),
+        ),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok

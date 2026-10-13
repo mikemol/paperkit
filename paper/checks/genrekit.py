@@ -20,6 +20,7 @@ What is RESIDUE (stays per-genre): the objective itself — the only thing a gen
   · exit non-zero ⇒ the engine raises rather than reading an empty pagination.
   · the result is held to `is_total`: every input key in EXACTLY one output unit.
 """
+
 import json
 import os
 import sys

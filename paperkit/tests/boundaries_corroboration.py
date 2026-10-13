@@ -9,6 +9,7 @@ and a behaviorally-agreeing oracle share a GRADE but differ in corroboration.
 
     python3 paperkit/tests/boundaries_corroboration.py
 """
+
 from __future__ import annotations
 
 import json
@@ -19,8 +20,12 @@ import paperkit.tests._fixture_model
 
 
 def grade(check):
-    _, out = paperkit.tests._fixture_delta.discriminate([paperkit.tests._fixture_model.entry("w", claim="c", check=check)], "--all", "--json",
-                          assets={"a.txt": "CANON\n"})
+    _, out = paperkit.tests._fixture_delta.discriminate(
+        [paperkit.tests._fixture_model.entry("w", claim="c", check=check)],
+        "--all",
+        "--json",
+        assets={"a.txt": "CANON\n"},
+    )
     return json.loads(out)[0]
 
 
@@ -40,26 +45,37 @@ def main() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     print("Ε·agree·grade — the corroboration axis (orthogonal to the falsifiability grade)\n")
-    lone = grade("cmd:grep -q CANON a.txt")            # one witness, behavioral
+    lone = grade("cmd:grep -q CANON a.txt")  # one witness, behavioral
     indep = grade("agree:cat a.txt ||| printf CANON")  # two distinct producers, behavioral
-    trivial = grade("agree:printf CANON ||| printf CANON")   # identical producers
-    disagree = grade("agree:cat a.txt ||| printf NOPE")      # producers disagree
+    trivial = grade("agree:printf CANON ||| printf CANON")  # identical producers
+    disagree = grade("agree:cat a.txt ||| printf NOPE")  # producers disagree
 
-    check("a lone witness is behavioral but NOT independently corroborated",
-          lone["grade"] == "behavioral" and lone.get("corroboration", "single") == "single")
+    check(
+        "a lone witness is behavioral but NOT independently corroborated",
+        lone["grade"] == "behavioral" and lone.get("corroboration", "single") == "single",
+    )
     # Ζ·corro·honest — the value names what was MEASURED (the producer strings differ), not
     # what was hoped (they share no upstream).  `independent` is now reserved for a certified
     # disjoint read footprint, which nothing yet computes — so it must be UNREACHABLE here.
     # Ε·corro·phi landed, so `independent` is now REACHABLE — and earned by measurement rather
     # than by the producer strings differing.  These two producers read disjoint inputs.
-    check("agree: of producers with DISJOINT footprints is independent — certified, not assumed",
-          indep["grade"] == "behavioral" and indep["corroboration"] == "independent")
-    check("ORTHOGONAL — same falsifiability grade, different corroboration (not one scalar)",
-          lone["grade"] == indep["grade"] and lone.get("corroboration", "single") != indep["corroboration"])
-    check("identical producers concur TRIVIALLY — single; string-distinctness is a NECESSARY\n           condition and this is the case it correctly rejects",
-          trivial.get("corroboration", "single") == "single")
-    check("disagreeing producers do not corroborate — broken, no corroboration claimed",
-          disagree["grade"] == "broken" and disagree.get("corroboration", "single") == "single")
+    check(
+        "agree: of producers with DISJOINT footprints is independent — certified, not assumed",
+        indep["grade"] == "behavioral" and indep["corroboration"] == "independent",
+    )
+    check(
+        "ORTHOGONAL — same falsifiability grade, different corroboration (not one scalar)",
+        lone["grade"] == indep["grade"]
+        and lone.get("corroboration", "single") != indep["corroboration"],
+    )
+    check(
+        "identical producers concur TRIVIALLY — single; string-distinctness is a NECESSARY\n           condition and this is the case it correctly rejects",
+        trivial.get("corroboration", "single") == "single",
+    )
+    check(
+        "disagreeing producers do not corroborate — broken, no corroboration claimed",
+        disagree["grade"] == "broken" and disagree.get("corroboration", "single") == "single",
+    )
 
     # ---- Ε·corro·phi: the MEASURED verdict, from per-producer read footprints ----
     # `distinct` says the producer strings differ.  Their FOOTPRINTS say whether they share an
@@ -70,19 +86,26 @@ def main() -> int:
     import tempfile as _tf
 
     import paperkit.resolver
+
     _d = Path(_tf.mkdtemp())
     try:
         (_d / "a.txt").write_text("CANON\n")
         # two producers reading the SAME file — correlated, and the file is named
         v = paperkit.resolver.corroboration_of("agree:cat a.txt ||| cat a.txt && true", _d, {})
-        check("two producers reading one file are CORRELATED, and the shared read is NAMED",
-              v is not None and v[0] == "correlated" and "a.txt" in v[1])
+        check(
+            "two producers reading one file are CORRELATED, and the shared read is NAMED",
+            v is not None and v[0] == "correlated" and "a.txt" in v[1],
+        )
         # δ: the second producer reads NOTHING — the only change, and the verdict flips
         v2 = paperkit.resolver.corroboration_of("agree:cat a.txt ||| printf CANON", _d, {})
-        check("δ: a producer that reads nothing shared ⇒ INDEPENDENT, certified not assumed",
-              v2 is not None and v2[0] == "independent" and v2[1] == [])
-        check("a non-agree check has no producers to partition ⇒ None, never a verdict",
-              paperkit.resolver.corroboration_of("cmd:true", _d, {}) is None)
+        check(
+            "δ: a producer that reads nothing shared ⇒ INDEPENDENT, certified not assumed",
+            v2 is not None and v2[0] == "independent" and v2[1] == [],
+        )
+        check(
+            "a non-agree check has no producers to partition ⇒ None, never a verdict",
+            paperkit.resolver.corroboration_of("cmd:true", _d, {}) is None,
+        )
     finally:
         _sh.rmtree(_d, ignore_errors=True)
 
@@ -92,8 +115,12 @@ def main() -> int:
     ok = P == "independent" and F == "single"
     fails.append("distinct-producer-delta") if not ok else None
     print(f"  {'ok ' if ok else 'XX '}an independent oracle vs a copy flips corroboration")
-    print("      P (independent): agree:cat a.txt ||| printf CANON  — disjoint footprints — MEASURED")
-    print("      F (single):      agree:cat a.txt ||| cat a.txt     — the second producer is a copy")
+    print(
+        "      P (independent): agree:cat a.txt ||| printf CANON  — disjoint footprints — MEASURED"
+    )
+    print(
+        "      F (single):      agree:cat a.txt ||| cat a.txt     — the second producer is a copy"
+    )
     print("      δ (min delta): the second producer shares no read with the first\n")
 
     if fails:

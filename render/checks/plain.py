@@ -12,6 +12,7 @@ RETURNED COMPLAINT: an assert in a component is a crash where the framework want
 under `python -O` it is deleted entirely — the failure mode gcalculus measured across 2,839 of
 them.  A witness that cannot fail is worse than one that fails loudly.
 """
+
 from __future__ import annotations
 
 import os
@@ -29,12 +30,18 @@ def _project(target: str, d: str) -> tuple[str, str]:
     """Project a one-claim fixture for `target`; return (output, complaint)."""
     p = Path(d)
     (p / "paper.toml").write_text(
-        '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "out.md"\n')
+        '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\nout = "out.md"\n'
+    )
     (p / "r.tsv").write_text("s\tSec\n")
     (p / "w.bib").write_text(BIB)
-    env = dict(os.environ, PAPERKIT_TARGET=target)   # Ω·config: env selects the render target
-    r = subprocess.run([sys.executable, str(PROJ), "-o", "-", str(p)],
-                       capture_output=True, text=True, env=env, check=False)
+    env = dict(os.environ, PAPERKIT_TARGET=target)  # Ω·config: env selects the render target
+    r = subprocess.run(
+        [sys.executable, str(PROJ), "-o", "-", str(p)],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
     if r.returncode != 0:
         return "", f"projector failed for target={target}: {r.stderr}"
     return r.stdout, ""
@@ -47,8 +54,10 @@ def _compare(pandoc: str, plain: str) -> str:
     if "[@" in plain or "[^" in plain:
         return f"the plain target LEAKED a citation marker (should surface none): {plain!r}"
     if "projected claim" not in plain:
-        return ("the plain target dropped the claim prose — it must surface the SAME content, "
-                "only without the marker")
+        return (
+            "the plain target dropped the claim prose — it must surface the SAME content, "
+            "only without the marker"
+        )
     return ""
 
 
@@ -67,9 +76,11 @@ def check() -> int:
     if complaint:
         sys.stderr.write(complaint + "\n")
         return 1
-    sys.stdout.write("plain ok: pandoc surfaces [@a]; plain surfaces the same prose with NO "
-                     "citation marker (a clean submission view — the claim-DAG stays the "
-                     "author-side gate)\n")
+    sys.stdout.write(
+        "plain ok: pandoc surfaces [@a]; plain surfaces the same prose with NO "
+        "citation marker (a clean submission view — the claim-DAG stays the "
+        "author-side gate)\n"
+    )
     return 0
 
 

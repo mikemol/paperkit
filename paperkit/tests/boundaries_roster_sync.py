@@ -24,6 +24,7 @@ declaration; only an enumeration with nothing checking it is a tautology.
   F: a bib present in one roster and absent from the other is NAMED, in both directions.
   δ: membership of one roster — the arms print the difference, never a count.
 """
+
 import pathlib
 import re
 import sys
@@ -84,16 +85,21 @@ def main() -> int:
             raise SystemExit(
                 f"bnd-roster-sync: CANNOT RUN — {extra} is not staged, so the cross-project "
                 f"`//paper:<x>.bib` referrers it may carry are unreadable and the composed roster "
-                f"would be short (declare it in the warrant's `builds`)")
+                f"would be short (declare it in the warrant's `builds`)"
+            )
         for ref in re.findall(r'"//paper:([A-Za-z0-9_-]+\.bib)"', extra.read_text()):
             t.add(ref)
     b = build_roster(BUILD.read_text())
 
     check(f"P: both rosters are non-empty -> toml={sorted(t)}", bool(t) and bool(b))
-    check(f"F: no bib is declared in paper.toml but unstaged by BUILD.bazel -> {sorted(t - b)}",
-          not (t - b))
-    check(f"F: no bib is staged by BUILD.bazel but undeclared in paper.toml -> {sorted(b - t)}",
-          not (b - t))
+    check(
+        f"F: no bib is declared in paper.toml but unstaged by BUILD.bazel -> {sorted(t - b)}",
+        not (t - b),
+    )
+    check(
+        f"F: no bib is staged by BUILD.bazel but undeclared in paper.toml -> {sorted(b - t)}",
+        not (b - t),
+    )
     # ⚑ Ζ·roster·boundary — δ IS MEMBERSHIP, AND THE BOUNDARY OF A BOUNDARY IS EMPTY.
     #
     # This arm read `every named bib exists on disk`, which applies a SECOND operator: from the
@@ -116,17 +122,19 @@ def main() -> int:
     # PERTURBED COPY, so the δ is exercised rather than asserted.
     _probe = set(t)
     _probe.add("__pk-delta-probe.bib")
-    check(f"δ: ONE member added to a roster is named by the difference -> "
-          f"{sorted(_probe - b)}",
-          (_probe - b) == {"__pk-delta-probe.bib"} and not (t - b))
+    check(
+        f"δ: ONE member added to a roster is named by the difference -> {sorted(_probe - b)}",
+        (_probe - b) == {"__pk-delta-probe.bib"} and not (t - b),
+    )
     # ⚑ The arm that keeps the comparison HONEST: two rosters agreeing because both are empty, or
     # because the BUILD parse matched nothing, is a vacuous green.  This asserts the readers
     # actually read — a pattern change that stops matching reds here rather than passing silently.
-    check("F: the BUILD reader is not vacuous — it finds bibs in the real file",
-          len(b) > 1)
+    check("F: the BUILD reader is not vacuous — it finds bibs in the real file", len(b) > 1)
 
-    print(f"BOUNDARIES: {'PASS' if not fails else f'FAIL ({len(fails)})'} "
-          f"({len(t)} declared, {len(b)} staged, 2 independent sources)")
+    print(
+        f"BOUNDARIES: {'PASS' if not fails else f'FAIL ({len(fails)})'} "
+        f"({len(t)} declared, {len(b)} staged, 2 independent sources)"
+    )
     return 1 if fails else 0
 
 

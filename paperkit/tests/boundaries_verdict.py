@@ -10,6 +10,7 @@ red the gate (no false-red on a toolchain-less box) yet stays distinguishable fr
 
 Run:  python3 paperkit/tests/boundaries_verdict.py
 """
+
 from __future__ import annotations
 
 import json
@@ -38,15 +39,19 @@ def _agg(*verdicts: str) -> str:
             subprocess.run(["python3", VERDICT, "emit", "cmd", v, r], check=True)
             recs.append(r)
         out = f"{d}/g.json"
-        subprocess.run(["python3", VERDICT, "agg", "gate", out, "verdict", "fail", *recs], check=True)
+        subprocess.run(
+            ["python3", VERDICT, "agg", "gate", out, "verdict", "fail", *recs], check=True
+        )
         return json.load(open(out))["verdict"]
 
 
 def _run_ok(cmd: str) -> str:
     """resolves()'s cmd: arm, as a caller reads it."""
     import sys as _s
+
     _s.path.insert(0, str(ENG))
     import paperkit.resolver
+
     with tempfile.TemporaryDirectory() as d:
         v = paperkit.resolver.run_ok(cmd, Path(d))
         return "cannot-run" if v.is_unavailable() else ("pass" if v.passed else "fail")
@@ -71,8 +76,11 @@ def _cli_parity() -> list:
         ("rc 1 → fail (ran and did not hold)", _run_ok("false"), "fail"),
         ("rc 3 → cannot-run, NOT fail", _run_ok("exit 3"), "cannot-run"),
         ("rc 7 → fail (only 3 is typed)", _run_ok("exit 7"), "fail"),
-        ("un-spawnable → fail, not cannot-run (the shell RAN and reported 127)",
-         _run_ok("no-such-binary-xyz"), "fail"),
+        (
+            "un-spawnable → fail, not cannot-run (the shell RAN and reported 127)",
+            _run_ok("no-such-binary-xyz"),
+            "fail",
+        ),
     ]
 
 
@@ -97,17 +105,25 @@ def main() -> int:
     # the record layer carries three distinct verdicts, none collapsed to another.
     check("emit records `pass` verbatim", _emit("pass") == "pass")
     check("emit records `fail` verbatim", _emit("fail") == "fail")
-    check("emit records `cannot-run` as its OWN verdict (not pass, not fail)",
-          _emit("cannot-run") == "cannot-run")
-    check("an unknown verdict fails CLOSED (a caller bug is not silently a pass)",
-          _emit("garbage") == "fail")
+    check(
+        "emit records `cannot-run` as its OWN verdict (not pass, not fail)",
+        _emit("cannot-run") == "cannot-run",
+    )
+    check(
+        "an unknown verdict fails CLOSED (a caller bug is not silently a pass)",
+        _emit("garbage") == "fail",
+    )
 
     # the aggregator (pk_gate) keys on {fail} alone: cannot-run does not red, a real fail does.
-    check("a cannot-run alongside a pass does NOT red the gate (no false-red)",
-          _agg("cannot-run", "pass") == "pass")
+    check(
+        "a cannot-run alongside a pass does NOT red the gate (no false-red)",
+        _agg("cannot-run", "pass") == "pass",
+    )
     check("a cannot-run alone does NOT red the gate", _agg("cannot-run") == "pass")
-    check("a cannot-run does NOT MASK a real fail beside it (no false-green either)",
-          _agg("cannot-run", "fail") == "fail")
+    check(
+        "a cannot-run does NOT MASK a real fail beside it (no false-green either)",
+        _agg("cannot-run", "fail") == "fail",
+    )
     check("a plain fail still reds the gate", _agg("pass", "fail") == "fail")
 
     # ROUTE PARITY — the record layer above is pk_cmd's; this is the CLI resolver's.  Both routes
@@ -125,9 +141,15 @@ def main() -> int:
     F = _agg("fail")
     ok = P == "pass" and F == "fail"
     fails.append("cannot-run-vs-fail") if not ok else None
-    print(f"  {'ok ' if ok else 'XX '}exit 3 (cannot-run) leaves the gate green; exit 1 (fail) reds it")
-    print("      P (pass side): a check exits 3 — its toolchain is absent, verdict cannot-run, gate green")
-    print("      F (flag side): a check exits 1 — it ran and the property failed, verdict fail, gate red")
+    print(
+        f"  {'ok ' if ok else 'XX '}exit 3 (cannot-run) leaves the gate green; exit 1 (fail) reds it"
+    )
+    print(
+        "      P (pass side): a check exits 3 — its toolchain is absent, verdict cannot-run, gate green"
+    )
+    print(
+        "      F (flag side): a check exits 1 — it ran and the property failed, verdict fail, gate red"
+    )
     print("      δ (min delta): the exit code 3 vs 1 — cannot-verify vs the-property-is-false\n")
 
     if fails:

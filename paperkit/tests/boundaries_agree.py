@@ -9,6 +9,7 @@ across implementations, ruling out a shared bug a single check cannot catch.  Bo
 
     python3 paperkit/tests/boundaries_agree.py
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -41,7 +42,9 @@ def main() -> int:
     check("two producers that concur pass", ag("printf 42 ||| printf 42").passed)
     check("two producers that disagree flag", not ag("printf 42 ||| printf 43").passed)
     check("three producers that all concur pass", ag("printf x ||| printf x ||| printf x").passed)
-    check("three producers, one dissenting, flag", not ag("printf x ||| printf x ||| printf y").passed)
+    check(
+        "three producers, one dissenting, flag", not ag("printf x ||| printf x ||| printf y").passed
+    )
     check("a lone producer (no independence) flags", not ag("printf 42").passed)
     check("a producer that FAILS cannot concur", not ag("printf 42 ||| false").passed)
     check("agreement is on OUTPUT, not exit code alone", not ag("printf A ||| printf B").passed)
@@ -56,17 +59,24 @@ def main() -> int:
     # generalised.  The three states need three arms, and the contrast below is what makes this
     # one falsifiable rather than a restatement.
     _cr = ag("printf 42 ||| exit 3")
-    check("a producer that CANNOT RUN (rc 3) is cannot-run, NOT a dissent",
-          _cr.is_unavailable())
+    check("a producer that CANNOT RUN (rc 3) is cannot-run, NOT a dissent", _cr.is_unavailable())
     check("...and it carries which producer could not run", "exit 3" in (_cr.owner or ""))
-    check("δ: the same shape at rc 1 is a real FAIL — the codes are not interchangeable",
-          not ag("printf 42 ||| exit 1").passed and not ag("printf 42 ||| exit 1").is_unavailable())
+    check(
+        "δ: the same shape at rc 1 is a real FAIL — the codes are not interchangeable",
+        not ag("printf 42 ||| exit 1").passed and not ag("printf 42 ||| exit 1").is_unavailable(),
+    )
     # Ζ·tier·agree — a producer output is a whole DOCUMENT, not one line: two byte-identical MULTI-LINE
     # producers must concur (the render `agree:` producers are 19k-byte rendered documents).  This pins
     # BOTH agree implementations — the resolver CLI (here) and the bazel pk_agree/verdict.py path (below)
     # — on full-TEXT equality, not the line-collapse that reds identical multi-line documents.
-    check("two identical MULTI-LINE producers concur", ag("printf 'a\\nb\\nc' ||| printf 'a\\nb\\nc'").passed)
-    check("multi-line producers differing on one line flag", not ag("printf 'a\\nb\\nc' ||| printf 'a\\nX\\nc'").passed)
+    check(
+        "two identical MULTI-LINE producers concur",
+        ag("printf 'a\\nb\\nc' ||| printf 'a\\nb\\nc'").passed,
+    )
+    check(
+        "multi-line producers differing on one line flag",
+        not ag("printf 'a\\nb\\nc' ||| printf 'a\\nX\\nc'").passed,
+    )
 
     # The bazel path is a SECOND implementation (tools/verdict.py agree) — gate it directly on the same
     # multi-line property, so the two agree oracles cannot diverge (they did: the CLI compared full text
@@ -74,7 +84,9 @@ def main() -> int:
     import json
     import subprocess
     import tempfile
+
     VER = str(ENG.parent / "tools" / "verdict.py")
+
     def vagree(*texts):
         with tempfile.TemporaryDirectory() as d:
             ps = []
@@ -85,6 +97,7 @@ def main() -> int:
             out = f"{d}/v.json"
             subprocess.run(["python3", VER, "agree", "agree", out, *ps], check=True)
             return json.load(open(out))["verdict"] == "pass"
+
     check("verdict.py agree: identical multi-line texts concur", vagree("a\nb\nc\n", "a\nb\nc\n"))
     check("verdict.py agree: differing multi-line texts flag", not vagree("a\nb\nc\n", "a\nX\nc\n"))
     check("verdict.py agree: a __FAIL__ producer flags", not vagree("__FAIL__\n", "__FAIL__\n"))

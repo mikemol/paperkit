@@ -21,6 +21,7 @@ report says so rather than claiming or denying conformance a standard does not r
     python3 checks/wcag.py --emit                 # write assets/wcag-vpat.md (both routes)
     python3 checks/wcag.py --check                # assert the emitted VPAT is the fresh projection
 """
+
 from __future__ import annotations
 
 import sys
@@ -37,8 +38,9 @@ _TERMS = ("Supports", "Partially Supports", "Does Not Support", "Not Applicable"
 
 
 def _sc_sorted(level: str) -> list:
-    return sorted((s for s in wm.SC if wm.level(s) == level),
-                  key=lambda s: [int(x) for x in s.split(".")])
+    return sorted(
+        (s for s in wm.SC if wm.level(s) == level), key=lambda s: [int(x) for x in s.split(".")]
+    )
 
 
 def _wcag_row(sc: str, route: str) -> str:
@@ -51,9 +53,11 @@ def _wcag_tables(route: str) -> list:
     gradation.  Each row is the SC, its entailment verdict, and the attesting remark.
     """
     out = []
-    for level, title in (("A", "Table 1: Success Criteria, Level A"),
-                         ("AA", "Table 2: Success Criteria, Level AA"),
-                         ("AAA", "Table 3: Success Criteria, Level AAA")):
+    for level, title in (
+        ("A", "Table 1: Success Criteria, Level A"),
+        ("AA", "Table 2: Success Criteria, Level AA"),
+        ("AAA", "Table 3: Success Criteria, Level AAA"),
+    ):
         out.append(f"### {title}\n")
         out.append("| Criteria | Conformance Level | Remarks and Explanations |")
         out.append("| --- | --- | --- |")
@@ -68,11 +72,13 @@ def _section_508(route: str) -> list:
     for the criteria 508 incorporates; a WCAG-2.1-or-2.2-new criterion is OUT OF 508 SCOPE by version
     and disclosed as such, never given a 508 verdict it cannot bear.
     """
-    out = ["## Revised Section 508 Report\n",
-           "Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduced after "
-           "WCAG 2.0 are outside 508 scope by version (disclosed below, not scored as 508).\n",
-           "| Criteria | Conformance Level | Remarks and Explanations |",
-           "| --- | --- | --- |"]
+    out = [
+        "## Revised Section 508 Report\n",
+        "Section 508 incorporates WCAG 2.0 Level A and AA by reference. Criteria introduced after "
+        "WCAG 2.0 are outside 508 scope by version (disclosed below, not scored as 508).\n",
+        "| Criteria | Conformance Level | Remarks and Explanations |",
+        "| --- | --- | --- |",
+    ]
     for sc in sorted(wm.SC, key=lambda s: [int(x) for x in s.split(".")]):
         if wm.sc_508_required(sc):
             v = we.entail(sc, route)
@@ -86,18 +92,24 @@ def _en_301_549(route: str) -> list:
     is disclosed as Void (the standard adopts it Not Applicable to documents); a WCAG-2.2-new criterion
     has no clause in V3.2.1 and is disclosed as out of scope by version.
     """
-    out = ["## EN 301 549 V3.2.1 Report (Chapter 10, Non-web Documents)\n",
-           "EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to clause "
-           "10.x; criteria new in WCAG 2.2 have no clause in this version (out of scope by version).\n",
-           "| EN Clause | Criteria | Status | Remarks and Explanations |",
-           "| --- | --- | --- | --- |"]
+    out = [
+        "## EN 301 549 V3.2.1 Report (Chapter 10, Non-web Documents)\n",
+        "EN 301 549 V3.2.1 references WCAG 2.1. Chapter 10 maps each adopted criterion to clause "
+        "10.x; criteria new in WCAG 2.2 have no clause in this version (out of scope by version).\n",
+        "| EN Clause | Criteria | Status | Remarks and Explanations |",
+        "| --- | --- | --- | --- |",
+    ]
     for sc in sorted(wm.SC, key=lambda s: [int(x) for x in s.split(".")]):
         st = wm.en_status(sc)
         clause = wm.en_clause(sc) or "—"
         if st == "absent":
-            out.append(f"| — | {sc} {wm.SC[sc][0]} | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |")
+            out.append(
+                f"| — | {sc} {wm.SC[sc][0]} | Out of scope (post-2.1) | not in EN 301 549 V3.2.1 |"
+            )
         elif st == "void":
-            out.append(f"| {clause} | {sc} {wm.SC[sc][0]} | Void | not applicable to non-web documents per EN |")
+            out.append(
+                f"| {clause} | {sc} {wm.SC[sc][0]} | Void | not applicable to non-web documents per EN |"
+            )
         else:
             v = we.entail(sc, route)
             out.append(f"| {clause} | {sc} {wm.SC[sc][0]} | {v['verdict']} | {v['remark']} |")
@@ -117,8 +129,8 @@ def _report(route: str) -> str:
         f"(the office route reaches PDF/UA-1, the LaTeX route PDF/UA-2).",
         "",
         "**Attestation basis:** this report is a paperkit projection of a verified claim-DAG. Each "
-        "\"Supports\" is entailed by a warrant whose ⟨P,F,δ⟩ F-arm reds on the criterion's violation, "
-        "or by veraPDF (the PDF/UA validator); an unproven criterion is never \"Supports\". The report "
+        '"Supports" is entailed by a warrant whose ⟨P,F,δ⟩ F-arm reds on the criterion\'s violation, '
+        'or by veraPDF (the PDF/UA validator); an unproven criterion is never "Supports". The report '
         "is gated fresh, so the conformance claim and its machine-checked proof are one object.",
         "",
         "**Standards versions:** WCAG 2.2 (W3C Rec 2024-12-12); Revised Section 508 (WCAG 2.0 A/AA); "
@@ -142,9 +154,13 @@ def _report(route: str) -> str:
 
 def emit() -> str:
     """The full VPAT INT: both routes, one document (a consumer picks their deliverable's section)."""
-    parts = ["<!-- GENERATED by checks/wcag.py from wcag_model.py + wcag_entail.py — do not edit; "
-             "regenerate: python3 checks/wcag.py --emit -->",
-             "", "# paperkit — Accessibility Conformance Report (VPAT® International)", ""]
+    parts = [
+        "<!-- GENERATED by checks/wcag.py from wcag_model.py + wcag_entail.py — do not edit; "
+        "regenerate: python3 checks/wcag.py --emit -->",
+        "",
+        "# paperkit — Accessibility Conformance Report (VPAT® International)",
+        "",
+    ]
     for route in we.ROUTE_FINAL:
         parts.append(_report(route))
         parts.append("\n---\n")
@@ -164,7 +180,9 @@ def check() -> tuple[bool, list[str], list[str]]:
     if not _OUT.exists():
         problems.append(f"{_OUT.name} not emitted — run: python3 checks/wcag.py --emit")
     elif _OUT.read_text() != emit():
-        problems.append(f"{_OUT.name} drifted from the projection — regenerate: python3 checks/wcag.py --emit")
+        problems.append(
+            f"{_OUT.name} drifted from the projection — regenerate: python3 checks/wcag.py --emit"
+        )
     return (not problems), problems, [f"entailment: {c}" for c in cannot_e]
 
 
@@ -180,15 +198,19 @@ def main(argv: list[str]) -> int:
             for p in problems:
                 print(f"wcag --check: {p}", file=sys.stderr)
             return 1
-        if cannot_run:                                  # Ζ·tier·exit — freshness+registry sound, but a farm could not run
+        if cannot_run:  # Ζ·tier·exit — freshness+registry sound, but a farm could not run
             for c in cannot_run:
                 print(f"wcag --check: {c}", file=sys.stderr)
-            print("wcag --check: the VPAT projection is fresh and the registry is sound, but some F-arms "
-                  "CANNOT RUN here (toolchain absent) — those SCs disclose Not Evaluated (conservative).",
-                  file=sys.stderr)
-            return 3                                    # cannot-run, not a failure
-        print("wcag --check: the VPAT INT conformance report is the fresh projection of the standards "
-              "model and the proven entailment verdicts — every Supports is warrant-attested, gated fresh")
+            print(
+                "wcag --check: the VPAT projection is fresh and the registry is sound, but some F-arms "
+                "CANNOT RUN here (toolchain absent) — those SCs disclose Not Evaluated (conservative).",
+                file=sys.stderr,
+            )
+            return 3  # cannot-run, not a failure
+        print(
+            "wcag --check: the VPAT INT conformance report is the fresh projection of the standards "
+            "model and the proven entailment verdicts — every Supports is warrant-attested, gated fresh"
+        )
         return 0
     route = argv[argv.index("--route") + 1] if "--route" in argv else "latex"
     print(_report(route))

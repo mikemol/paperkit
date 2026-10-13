@@ -27,6 +27,7 @@ WHY A CLASS AND NOT A FROZEN TABLE.  The index MUTATES: growing it is the normal
 is ingested, labels are added), and `collisions()` is meaningful only against a live index.  A
 frozen structure would make the instrument unusable for the thing it exists to do.
 """
+
 from __future__ import annotations
 
 import re
@@ -44,7 +45,7 @@ class LabelMap:
     def __init__(self, concepts: dict | None = None, routes_for: dict | None = None):
         self.concepts = dict(concepts or {})
         self.routes_for = dict(routes_for or {})
-        self.index = {}                      # normalised label -> (concept, carrier)
+        self.index = {}  # normalised label -> (concept, carrier)
         for c, ls in self.concepts.items():
             for carrier, label in ls.items():
                 self.index[norm(label)] = (c, carrier)
@@ -70,7 +71,7 @@ class LabelMap:
         tw = t.split()
         for lab, (c, carrier) in self.index.items():
             lw = lab.split()
-            if lw and all(w in tw for w in lw):      # every label word, a WHOLE word of the term
+            if lw and all(w in tw for w in lw):  # every label word, a WHOLE word of the term
                 return c, carrier, self.routes_for.get(c)
         return None
 

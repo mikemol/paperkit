@@ -16,6 +16,7 @@ citation resolves, every required claim present, in order) BY CONSTRUCTION.
 
 DIR defaults to the current directory and must contain `paper.toml`.
 """
+
 from __future__ import annotations
 
 import csv
@@ -40,10 +41,17 @@ import paperkit.rhetoric
 # common floor.
 _LATEX = [
     (r"\\textsuperscript\{(\d)\}", lambda m: "⁰¹²³⁴⁵⁶⁷⁸⁹"[int(m.group(1))]),
-    (r"\\texttt\{([^{}]*)\}", r"\1"), (r"\\textbackslash", ""),
-    (r"\\&", "&"), (r"\\\$", "$"), (r"\\_", "_"),
-    (r"\\'e", "é"), (r'\\"o', "ö"), (r"\\'E", "É"),
-    (r"---", "—"), (r"(?<=\S)--(?=\S)", "–"), (r"\\equiv", "≡"),
+    (r"\\texttt\{([^{}]*)\}", r"\1"),
+    (r"\\textbackslash", ""),
+    (r"\\&", "&"),
+    (r"\\\$", "$"),
+    (r"\\_", "_"),
+    (r"\\'e", "é"),
+    (r'\\"o', "ö"),
+    (r"\\'E", "É"),
+    (r"---", "—"),
+    (r"(?<=\S)--(?=\S)", "–"),
+    (r"\\equiv", "≡"),
     (r"\$([^$]*)\$", r"\1"),
 ]
 
@@ -54,14 +62,14 @@ def clean(s: str) -> str:
     # braces) so neither the floor-flattening below nor the grouping-brace strip touches it. This
     # is the same shield discipline as \{ \}, one level up: the whole math span is literal.
     math: list = []
-    s = re.sub(r"(?<!\\)\$[^$]*\$",
-               lambda m: math.append(m.group(0)) or f"\x02{len(math) - 1}\x03", s)
+    s = re.sub(
+        r"(?<!\\)\$[^$]*\$", lambda m: math.append(m.group(0)) or f"\x02{len(math) - 1}\x03", s
+    )
     # A code span is LITERAL for the same reason inline math is: `--flavour` is a
     # command-line flag, not prose, and the en-dash rule below would silently
     # rewrite it to `–flavour` -- a flag the reader cannot type. Shield it the
     # same way, and restore it verbatim.
-    s = re.sub(r"`[^`\n]*`",
-               lambda m: math.append(m.group(0)) or f"\x02{len(math) - 1}\x03", s)
+    s = re.sub(r"`[^`\n]*`", lambda m: math.append(m.group(0)) or f"\x02{len(math) - 1}\x03", s)
     for pat, rep in _LATEX:
         s = re.sub(pat, rep, s)
     # Escaped braces \{ \} are LITERAL (e.g. set notation {1,2,3}); shield them
@@ -135,9 +143,19 @@ GLUE = ["and from that, ", "so "]
 # A placed (not woven) warrant emits an asset instead of a sentence.  WHICH
 # renderer runs is DECLARED by `as`; the suffix map below is the legacy fallback
 # for warrants that predate the field.
-FENCE = {".sh": "sh", ".bash": "sh", ".py": "python", ".toml": "toml",
-         ".bib": "bibtex", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
-         ".txt": "text", ".tsv": "text", ".md": ""}   # .md = raw include (legacy)
+FENCE = {
+    ".sh": "sh",
+    ".bash": "sh",
+    ".py": "python",
+    ".toml": "toml",
+    ".bib": "bibtex",
+    ".json": "json",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".txt": "text",
+    ".tsv": "text",
+    ".md": "",
+}  # .md = raw include (legacy)
 
 
 IMAGE_EXTS = {".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".emf"}
@@ -155,9 +173,10 @@ def _cell(s: str) -> str:
     """One table cell.  The FILE owns data; the ENGINE owns document syntax — so
     nothing a cell contains may become markup, a citation, or a heading.
     """
-    s = " ".join(str(s).split())            # newlines would break the row
-    return (s.replace("\\", "\\\\").replace("|", "\\|")
-             .replace("[", "\\[").replace("]", "\\]"))   # kills [@key] citations
+    s = " ".join(str(s).split())  # newlines would break the row
+    return (
+        s.replace("\\", "\\\\").replace("|", "\\|").replace("[", "\\[").replace("]", "\\]")
+    )  # kills [@key] citations
 
 
 def _rows(p: Path) -> list:
@@ -186,9 +205,9 @@ def render_table(p: Path) -> list:
     width = max(len(r) for r in rows)
     out = [[_cell(c) for c in r] + [""] * (width - len(r)) for r in rows]
     head, body = out[0], out[1:]
-    return (["| " + " | ".join(head) + " |",
-             "|" + "|".join([" --- "] * width) + "|"]
-            + ["| " + " | ".join(r) + " |" for r in body])
+    return ["| " + " | ".join(head) + " |", "|" + "|".join([" --- "] * width) + "|"] + [
+        "| " + " | ".join(r) + " |" for r in body
+    ]
 
 
 def _infer(p: Path) -> str:
@@ -213,11 +232,12 @@ def emit_block(cfg: dict, f: dict) -> list:
     and the projector and the gate resolve to the SAME path.
     """
     emit = f["emit"]
-    p = paperkit.bib.emit_path(cfg, emit)                       # project_dir first, then out.parent; None = absent
+    p = paperkit.bib.emit_path(cfg, emit)  # project_dir first, then out.parent; None = absent
     kind = (f.get("as") or "").strip().lower() or _infer(Path(emit))
     if kind not in RENDERERS:
-        raise ValueError(f"{emit}: unknown renderer as={kind!r}; "
-                         f"expected one of {', '.join(RENDERERS)}")
+        raise ValueError(
+            f"{emit}: unknown renderer as={kind!r}; expected one of {', '.join(RENDERERS)}"
+        )
     if kind == "image":
         return [f"![{clean(f.get('claim', 'figure'))}]({emit})"]
     if p is None:
@@ -236,6 +256,7 @@ def transitive_reduction(rests: dict) -> dict:
     clutter, not new grounding).  The `drop` rung — the zero of the reference's
     materialization ladder (drop < cite < expound < figure), need-proportioned.
     """
+
     def reaches(a, b) -> bool:
         seen, stk = set(), [x for x in rests.get(a, ()) if x != b]
         while stk:
@@ -246,6 +267,7 @@ def transitive_reduction(rests: dict) -> dict:
                 seen.add(n)
                 stk += list(rests.get(n, ()))
         return False
+
     return {k: [y for y in ys if not reaches(k, y)] for k, ys in rests.items()}
 
 
@@ -267,12 +289,13 @@ def references(k: str, targets: list, pos: dict, target: str = "pandoc") -> str:
         if target == "web":
             return f"[{human}](#{y})"
         if target == "footnote":
-            return human            # a footnote body cannot host a [@key]/anchor — name the claim in prose
+            return human  # a footnote body cannot host a [@key]/anchor — name the claim in prose
         return f"[@{y}]"
+
     back, fwd = [], []
     for y in targets:
         yp = pos.get(y)
-        if yp is None or yp == pos[k] - 1:        # cross-scope, or carried by the connective
+        if yp is None or yp == pos[k] - 1:  # cross-scope, or carried by the connective
             continue
         (back if yp < pos[k] else fwd).append(tok(y))
     parts = []
@@ -283,9 +306,15 @@ def references(k: str, targets: list, pos: dict, target: str = "pandoc") -> str:
     return f" ({'; '.join(parts)})" if parts else ""
 
 
-def weave(text: list, F: dict, primary: str, pos: dict | None = None,
-          reduced: dict | None = None, footnotes: dict | None = None,
-          target: str = "pandoc") -> str:
+def weave(
+    text: list,
+    F: dict,
+    primary: str,
+    pos: dict | None = None,
+    reduced: dict | None = None,
+    footnotes: dict | None = None,
+    target: str = "pandoc",
+) -> str:
     """Weave a run of prose-claim keys into one sentence-diagrammed paragraph.  A
     claim carrying a `link` is materialized at the EXPOUND rung of the reference
     ladder (drop < cite < expound < figure): a footnote marker on the sentence, the
@@ -293,27 +322,34 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
     document end.  Without a link (or no footnotes sink) the grounding is the CITE
     floor — the inline parenthetical.  `target` selects how citations materialize.
     """
+
     def clause(k: str) -> str:
         s = sentence(k, F[k], primary, target)
         link = F[k].get("link")
-        if target == "plain":                        # SUBMISSION view: no PROVENANCE surfaced, but an
-            if link and footnotes is not None:       # authored `link` footnote survives — the technical NAME,
-                footnotes[k] = clean(link)           # defocused out of the inline reading so the computations
-                return s + f"[^{k}]"                  # lead. (The proof backend stays the author-side gate.)
+        if target == "plain":  # SUBMISSION view: no PROVENANCE surfaced, but an
+            if (
+                link and footnotes is not None
+            ):  # authored `link` footnote survives — the technical NAME,
+                footnotes[k] = clean(
+                    link
+                )  # defocused out of the inline reading so the computations
+                return s + f"[^{k}]"  # lead. (The proof backend stays the author-side gate.)
             return s
         ref = references(k, (reduced or {}).get(k, F[k].get("rests-on", [])), pos or {}, target)
         link = F[k].get("link")
-        if link and footnotes is not None:           # expound: link + citations → footnote
+        if link and footnotes is not None:  # expound: link + citations → footnote
             footnotes[k] = clean(link) + ref
             return s + f"[^{k}]"
-        if target == "footnote" and footnotes is not None:   # CITE floor as a provenance footnote
+        if target == "footnote" and footnotes is not None:  # CITE floor as a provenance footnote
             footnotes[k] = _verify_note(F[k].get("check", "")) + ref
             return s + f"[^{k}]"
-        return s + ref                               # cite floor: inline parenthetical
+        return s + ref  # cite floor: inline parenthetical
+
     clauses = [clause(k) for k in text]
     clauses[0] = clauses[0][:1].upper() + clauses[0][1:]
-    clauses[1:] = [re.sub(r"^(The|A|An) ", lambda m: m.group(1).lower() + " ", c)
-                   for c in clauses[1:]]
+    clauses[1:] = [
+        re.sub(r"^(The|A|An) ", lambda m: m.group(1).lower() + " ", c) for c in clauses[1:]
+    ]
     parts, woven = [clauses[0]], 0
     for i in range(1, len(text)):
         f = F[text[i]]
@@ -324,13 +360,15 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
         # Default is the legacy "; " + `glue` weave.
         if f.get("join") is not None:
             j = f["join"] if f["join"].endswith(" ") else f["join"] + " "
-            if j.strip().endswith((".", "!", "?")):   # sentence boundary → capitalize
+            if j.strip().endswith((".", "!", "?")):  # sentence boundary → capitalize
                 clause = clause[:1].upper() + clause[1:]
             parts.append(j + clause)
             continue
         mv = f.get("move")
-        if mv:                                    # a typed `move` with no explicit `join`:
-            if mv in paperkit.rhetoric.MOVES:                       # realize its default connector (MOVES imported up top)
+        if mv:  # a typed `move` with no explicit `join`:
+            if (
+                mv in paperkit.rhetoric.MOVES
+            ):  # realize its default connector (MOVES imported up top)
                 conn = paperkit.rhetoric.MOVES[mv][1]
                 if conn.strip().endswith((".", "!", "?")):
                     parts.append(conn + clause[:1].upper() + clause[1:])
@@ -353,7 +391,9 @@ def weave(text: list, F: dict, primary: str, pos: dict | None = None,
 def project(cfg: dict, target: str = "pandoc") -> str:
     F, primary = {}, cfg["bibs"][0].name
     for b in cfg["bibs"]:
-        F.update(paperkit.bib.parse(b, cfg["consumer_fields"]))     # thread the project's declared consumer_fields
+        F.update(
+            paperkit.bib.parse(b, cfg["consumer_fields"])
+        )  # thread the project's declared consumer_fields
 
     by_sec = {}
     for k, f in F.items():
@@ -369,7 +409,7 @@ def project(cfg: dict, target: str = "pandoc") -> str:
     # transitive reduction of the grounding DAG — project only references the reader
     # cannot already reach through a shorter rests-on path (drop redundant clutter).
     reduced = transitive_reduction({k: f.get("rests-on", []) for k, f in F.items()})
-    footnotes: dict = {}                              # expound-rung materializations, in document order
+    footnotes: dict = {}  # expound-rung materializations, in document order
 
     lines = [f"# {cfg['title']}", ""]
     if cfg["subtitle"]:
@@ -403,7 +443,7 @@ def project(cfg: dict, target: str = "pandoc") -> str:
 
         for k in keys:
             f = F[k]
-            if f.get("depth"):                       # a nested proof step → indented list item (tight)
+            if f.get("depth"):  # a nested proof step → indented list item (tight)
                 if not in_list[0]:
                     _flush()
                     _blank()
@@ -441,7 +481,7 @@ def project(cfg: dict, target: str = "pandoc") -> str:
         lines += [f"[^{k}]: {v[:1].upper() + v[1:]}" for k, v in footnotes.items()] + [""]
     if cfg["references"]:
         lines += ["## References", ""]
-    return "\n".join(lines).rstrip("\n") + "\n"          # exactly one trailing newline (MD012-clean)
+    return "\n".join(lines).rstrip("\n") + "\n"  # exactly one trailing newline (MD012-clean)
 
 
 def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -> list:
@@ -498,7 +538,6 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
             groups.append(keys)
             sections.append(sk)
 
-
     # the PAGINATION — resolved from the registry, which REFUSES an unregistered name rather than
     # falling back (so a deck is never cut by a genre nobody asked for).
     spec = paperkit.genre.resolve(genre_name, project_dir)
@@ -510,10 +549,11 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
     # project with no grounding (measured: 7 of 11 in this repo) gets exactly the section cut it
     # would have had, and one WITH grounding gets a cut that answers to it.
     # an explicit γ overrides the genre's own; absent, the genre's declared value stands.
-    derived = paperkit.genre.partition(recs, float(gamma if gamma is not None
-                                              else spec.get("gamma", 1.0)))
+    derived = paperkit.genre.partition(
+        recs, float(gamma if gamma is not None else spec.get("gamma", 1.0))
+    )
     if not derived["degenerate"]:
-        order = {k: i for i, g in enumerate(groups) for k in g}   # document order, preserved
+        order = {k: i for i, g in enumerate(groups) for k in g}  # document order, preserved
         by_group: dict = {}
         for k in sorted(order, key=order.get):
             by_group.setdefault(derived["part"][k], []).append(k)
@@ -528,8 +568,9 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
     if objective is not None:
         units = objective(groups, recs)
     else:
-        units = paperkit.genre.run_declared(spec, groups, recs, cwd=project_dir,
-                                       spawn=paperkit.checkenv.spawn_declared)
+        units = paperkit.genre.run_declared(
+            spec, groups, recs, cwd=project_dir, spawn=paperkit.checkenv.spawn_declared
+        )
 
     # which section a unit came from — a unit never spans sections (the objective splits within a
     # group, never merges across), so the first key's section names the whole unit.
@@ -545,16 +586,15 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
             f = F.get(k, {})
             item = {"key": k, "claim": f.get("claim", "")}
             if f.get("depth"):
-                item["depth"] = f["depth"]          # proof-step nesting, as an indent level
+                item["depth"] = f["depth"]  # proof-step nesting, as an indent level
             if f.get("link"):
-                item["link"] = f["link"]            # the expound-rung note
+                item["link"] = f["link"]  # the expound-rung note
             if f.get("emit"):
                 # the placed asset, rendered by its declared `as` — the SAME lines the prose route
                 # emits, produced by the same function, so the two views cannot diverge.
-                item["emit"] = {"path": f["emit"], "as": f.get("as"),
-                                "lines": emit_block(cfg, f)}
+                item["emit"] = {"path": f["emit"], "as": f.get("as"), "lines": emit_block(cfg, f)}
             if f.get("check"):
-                item["check"] = f["check"]          # provenance: the render layer marks it
+                item["check"] = f["check"]  # provenance: the render layer marks it
             if f.get("note"):
                 # Ρ·deck·notes — the SPEAKER NOTE.  `note` was already in the bib grammar and
                 # engine-inert ("parsed but consumed nowhere, reserved"), so a deck reads the
@@ -562,44 +602,72 @@ def observe(cfg: dict, genre_name: str = "talk", project_dir=None, gamma=None) -
                 # claim, which is exactly the register a presenter needs and no other target wants.
                 item["note"] = f["note"]
             items.append(item)
-        out.append({"keys": list(u),
-                    "claims": [F[k].get("claim", "") for k in u],
-                    "items": items,
-                    "section": sec_of.get(u[0]) if u else None})
+        out.append(
+            {
+                "keys": list(u),
+                "claims": [F[k].get("claim", "") for k in u],
+                "items": items,
+                "section": sec_of.get(u[0]) if u else None,
+            }
+        )
     return out
 
 
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).  TARGET is also resolved by gate/discriminate — they reference
 # project.TARGET (the lowest common component in the DEPS lattice owns it).
-TARGET = paperkit.config.Param("target", "PAPERKIT_TARGET", config="target", default="pandoc", choices=("pandoc", "web", "footnote", "plain"),
-                      help="citation render target: pandoc ([@key] for citeproc/PDF), web (intra-page hyperlinks + anchors, for a blog), "
-                           "footnote (each clause's provenance as a document-end footnote — self-contained, no bibliography), "
-                           "or plain (no citation surfaced at all — a clean SUBMISSION view; the claim-DAG stays the author-side gate)")
+TARGET = paperkit.config.Param(
+    "target",
+    "PAPERKIT_TARGET",
+    config="target",
+    default="pandoc",
+    choices=("pandoc", "web", "footnote", "plain"),
+    help="citation render target: pandoc ([@key] for citeproc/PDF), web (intra-page hyperlinks + anchors, for a blog), "
+    "footnote (each clause's provenance as a document-end footnote — self-contained, no bibliography), "
+    "or plain (no citation surfaced at all — a clean SUBMISSION view; the claim-DAG stays the author-side gate)",
+)
 # Ρ·deck·genre·knob — the pagination genre.  choices is DELIBERATELY None: the genre set is an
 # OPEN registry (built-ins + a project's [genres.*]), so a static tuple here would either freeze
 # the set — contradicting the registry — or duplicate it and drift.  Validation therefore happens
 # where the set actually lives: genre.resolve() REFUSES an unregistered name, which is the same
 # reason resolver.VERBS validates a check type rather than config.Param enumerating them.
-GENRE = paperkit.config.Param("genre", "PAPERKIT_GENRE", config="genre", default="talk",
-                     help="pagination genre for --observe: a registered objective over the grouping "
-                          "(built-ins staged/talk/atomic/collection; a project adds its own with a "
-                          "[genres.<name>] table in paper.toml).  Validated by the registry, not by "
-                          "a fixed list — the set is open")
+GENRE = paperkit.config.Param(
+    "genre",
+    "PAPERKIT_GENRE",
+    config="genre",
+    default="talk",
+    help="pagination genre for --observe: a registered objective over the grouping "
+    "(built-ins staged/talk/atomic/collection; a project adds its own with a "
+    "[genres.<name>] table in paper.toml).  Validated by the registry, not by "
+    "a fixed list — the set is open",
+)
 # Ρ·deck·gamma·declare — the RESOLUTION dial, the deck-analog of --min-strength.  Each genre
 # carries a default γ (its own idea of how much to trust the grounding over the authored sections);
 # this makes that reachable, so a deck can be re-cut coarser or finer without inventing a genre.
 # Default None = "whatever the genre asks for", which keeps a genre's declared γ meaningful instead
 # of overriding it with an engine-wide constant.
-GAMMA = paperkit.config.Param("gamma", "PAPERKIT_GAMMA", config="gamma", default=None,
-                     help="observe: the grouping resolution γ, overriding the genre's own — "
-                          "γ→∞ recovers the authored sections, γ→0 the modularity optimum; "
-                          "omit to use the genre's declared value")
-OBSERVE = paperkit.config.Param("observe", "PAPERKIT_OBSERVE", flag=True,
-                       help="project: emit the DAG's segmentation into units (one per line, "
-                            "tab-separated keys) instead of the linearized document")
-CHECK = paperkit.config.Param("check", "PAPERKIT_CHECK", flag=True,
-                     help="project: verify the projection round-trips against the bib, then exit")
+GAMMA = paperkit.config.Param(
+    "gamma",
+    "PAPERKIT_GAMMA",
+    config="gamma",
+    default=None,
+    help="observe: the grouping resolution γ, overriding the genre's own — "
+    "γ→∞ recovers the authored sections, γ→0 the modularity optimum; "
+    "omit to use the genre's declared value",
+)
+OBSERVE = paperkit.config.Param(
+    "observe",
+    "PAPERKIT_OBSERVE",
+    flag=True,
+    help="project: emit the DAG's segmentation into units (one per line, "
+    "tab-separated keys) instead of the linearized document",
+)
+CHECK = paperkit.config.Param(
+    "check",
+    "PAPERKIT_CHECK",
+    flag=True,
+    help="project: verify the projection round-trips against the bib, then exit",
+)
 # The projector CLI's composed registry: exactly the Params its import cone hosts
 # (bnd-config asserts this completeness — a cone-resolved Param missing here would be
 # a silently ignored flag).
@@ -628,7 +696,15 @@ import paperkit.checkenv
 import paperkit.genre
 import paperkit.resolver  # noqa: E402  — qualified, so the knobs stay HOSTED by resolver
 
-REGISTRY = [TARGET, GENRE, GAMMA, OBSERVE, CHECK, paperkit.checkenv.PATH, paperkit.checkenv.ENGINE_PATH]
+REGISTRY = [
+    TARGET,
+    GENRE,
+    GAMMA,
+    OBSERVE,
+    CHECK,
+    paperkit.checkenv.PATH,
+    paperkit.checkenv.ENGINE_PATH,
+]
 
 
 def main(argv: list) -> int:
@@ -654,13 +730,15 @@ def main(argv: list) -> int:
             print(f"{u['section']}\t" + "\t".join(u["keys"]))
         return 0
 
-    out = project(cfg, paperkit.config.resolve(TARGET, pol))   # Ω·config: pandoc (default) | web
+    out = project(cfg, paperkit.config.resolve(TARGET, pol))  # Ω·config: pandoc (default) | web
 
     if paperkit.config.resolve(CHECK):
         tgt = cfg["out"]
         if not tgt.exists() or tgt.read_text() != out:
-            print(f"paperkit-project: {tgt.name} ≠ projection — regenerate "
-                  f"(paperkit-project)", file=sys.stderr)
+            print(
+                f"paperkit-project: {tgt.name} ≠ projection — regenerate (paperkit-project)",
+                file=sys.stderr,
+            )
             return 1
         print(f"paperkit-project: {tgt.name} ≡ projection ({len(out.split())} words)")
         return 0

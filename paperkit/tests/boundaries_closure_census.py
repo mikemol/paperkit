@@ -19,6 +19,7 @@ the coverage arms here assert what the census EXAMINED, not only what it found.
 
     python3 paperkit/tests/boundaries_closure_census.py
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -102,10 +103,14 @@ GEN_INERT = '''\
 import sys
 '''
 
-TOML = ('[paper]\ntitle = "synth"\nout = "SYNTH.md"\n\n'
-        '[checks.claim]\ncmd = "python3 checks/w.py {target}"\n')
-BIB = ("@misc{synth-formulas,\n  section = {s},\n"
-       "  claim   = {a synthetic claim},\n  check   = {claim:synth-formulas}\n}\n")
+TOML = (
+    '[paper]\ntitle = "synth"\nout = "SYNTH.md"\n\n'
+    '[checks.claim]\ncmd = "python3 checks/w.py {target}"\n'
+)
+BIB = (
+    "@misc{synth-formulas,\n  section = {s},\n"
+    "  claim   = {a synthetic claim},\n  check   = {claim:synth-formulas}\n}\n"
+)
 
 
 def _project(tmp: Path, gen: str) -> Path:
@@ -124,11 +129,18 @@ def _roots(check: Path, closure: Path) -> set[str]:
     mods = cc.engine_modules()
     r = subprocess.run(  # noqa: S603
         [PY, str(closure), "--check", str(check), "--relpath", "synth/checks/w.py", *mods],
-        cwd=ROOT, capture_output=True, text=True, check=False,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
         env={"PYTHONPATH": str(ROOT), "PATH": "/usr/bin:/bin"},
     )
-    return {Path(p).stem for ln in r.stdout.splitlines()
-            for c, p in [ln.split("\t")[:2]] if c == "synth-formulas" and ":" not in p}
+    return {
+        Path(p).stem
+        for ln in r.stdout.splitlines()
+        for c, p in [ln.split("\t")[:2]]
+        if c == "synth-formulas" and ":" not in p
+    }
 
 
 def _without_edge(tmp: Path) -> Path:
@@ -173,20 +185,25 @@ def _synthetic(s: Suite) -> None:
         # a generator importing no engine module needs no cone either way — the edge is not
         # staging the whole engine indiscriminately
         inert = _roots(_project(tmp / "b", GEN_INERT) / "checks" / "w.py", live)
-        s.check("a generator importing NO engine module stages no engine cone",
-                "bib" not in inert)
+        s.check("a generator importing NO engine module stages no engine cone", "bib" not in inert)
 
         s.section("P, F, delta minimum-delta pairs")
-        s.delta("the Xi-dag-script edge is what carries a subprocess generator's cone",
-                "bib" in with_edge, "bib" not in without,
-                p="P: with the edge, the witness stages bib + rubric",
-                f="F: with the edge removed, the identical witness stages neither",
-                d="one line — `wi |= _script_roots(fn)` in closure.py's per-claim loop")
-        s.delta("and it stages a cone only where the generator asks for one",
-                "bib" in with_edge, "bib" not in inert,
-                p="P: generator does `import bib` -> bib staged",
-                f="F: generator imports only sys -> nothing staged",
-                d="one import line in the generator")
+        s.delta(
+            "the Xi-dag-script edge is what carries a subprocess generator's cone",
+            "bib" in with_edge,
+            "bib" not in without,
+            p="P: with the edge, the witness stages bib + rubric",
+            f="F: with the edge removed, the identical witness stages neither",
+            d="one line — `wi |= _script_roots(fn)` in closure.py's per-claim loop",
+        )
+        s.delta(
+            "and it stages a cone only where the generator asks for one",
+            "bib" in with_edge,
+            "bib" not in inert,
+            p="P: generator does `import bib` -> bib staged",
+            f="F: generator imports only sys -> nothing staged",
+            d="one import line in the generator",
+        )
 
 
 def _coverage(s: Suite) -> None:
@@ -213,14 +230,16 @@ def _coverage(s: Suite) -> None:
         by_toml = _project(tmp / "t", GEN)
         found = {p.name for p in cc.witness_modules(by_toml)}
         s.check("a witness named only by the paper.toml verb template is found", "w.py" in found)
-        s.check("the generator beside it is not mistaken for a witness",
-                "gen_thing.py" not in found)
+        s.check(
+            "the generator beside it is not mistaken for a witness", "gen_thing.py" not in found
+        )
 
         # a project with NO witness at all must come back empty, not raise and not guess
         bare = tmp / "bare"
         (bare / "checks").mkdir(parents=True)
-        s.check("a project with no bib and no toml yields no witness",
-                cc.witness_modules(bare) == [])
+        s.check(
+            "a project with no bib and no toml yields no witness", cc.witness_modules(bare) == []
+        )
 
         # and a directory that is not a project at all
         s.check("a directory with no checks/ yields no witness", cc.witness_modules(tmp) == [])

@@ -31,6 +31,7 @@ bijective with the flat form — and an ambiguous stem now REFUSES instead of si
 ⚑ AST, NEVER GREP.  A grep matches the name in comments and strings; the project↔rhetoric
 "cycle" was such a phantom.
 """
+
 from __future__ import annotations
 
 import ast
@@ -77,7 +78,7 @@ def imports(text: str, names: set[str], pkg: str = "paperkit") -> set[str]:
             out |= {s for a in n.names if (s := stem_of(a.name, pkg)) in names}
         elif isinstance(n, ast.ImportFrom):
             mod = n.module or ""
-            if mod in names:                       # `from _fixture_model import fx`
+            if mod in names:  # `from _fixture_model import fx`
                 out.add(mod)
             elif mod == pkg or mod.startswith(pkg + "."):
                 # `from paperkit[.sub] import X` — X is the module, not the package
@@ -121,8 +122,10 @@ def stem_index(paths: list[str]) -> dict[str, str]:
         by_stem.setdefault(stem, []).append(p)
     dupes = {s: ms for s, ms in by_stem.items() if len(ms) > 1}
     if dupes:
-        msg = (f"two engine modules share a bare stem, so an import naming it is ambiguous: "
-               f"{dupes}.  The flat map silently kept one; this refuses instead.")
+        msg = (
+            f"two engine modules share a bare stem, so an import naming it is ambiguous: "
+            f"{dupes}.  The flat map silently kept one; this refuses instead."
+        )
         raise ValueError(msg)
     return {s: ms[0] for s, ms in by_stem.items()}
 
@@ -133,8 +136,9 @@ def edges(eng: Path, paths: list[str]) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for p in paths:
         stem = Path(p).stem
-        out.extend((p, index[imp])
-                   for imp in sorted(imports((eng / p).read_text(), set(index)) - {stem}))
+        out.extend(
+            (p, index[imp]) for imp in sorted(imports((eng / p).read_text(), set(index)) - {stem})
+        )
     return out
 
 

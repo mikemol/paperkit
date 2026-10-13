@@ -26,6 +26,7 @@ to another is a finding to record and remove, not a failure of the corpus — an
 deliberately, as the declared-seam regression fixture whose oracle IS `staged`, so it is exempted
 BY NAME with its reason rather than by relaxing the check.
 """
+
 import itertools
 import sys
 from pathlib import Path
@@ -46,13 +47,14 @@ ROOT = Path(__file__).resolve().parents[2]
 # check caught the ledger carrying a fact its own repair had invalidated.
 KNOWN_DUPLICATE = {
     ("brief", "staged", 4.0): "Ν-F1 — `brief` is the identity on the grouping, which IS `_staged`. "
-                              "Kept as the declared-seam regression fixture; `staged` at brief's "
-                              "own γ=4.0 is its oracle.",
+    "Kept as the declared-seam regression fixture; `staged` at brief's "
+    "own γ=4.0 is its oracle.",
 }
 
 
 def partition(cfg, genre, project, gamma=None):
     import paperkit.project
+
     units = [u["keys"] for u in paperkit.project.observe(cfg, genre, project, gamma)]
     return {k: i for i, u in enumerate(units) for k in u}, units
 
@@ -85,7 +87,9 @@ def main() -> int:
     print(f"⟨every genre partitions the corpus⟩\n")
     for g in names:
         total = len(cuts[g]) == len(keys)
-        print(f"  {'ok' if total else 'XX'} {g:<11} {sizes[g]:>3} unit(s) over {len(cuts[g])} claims")
+        print(
+            f"  {'ok' if total else 'XX'} {g:<11} {sizes[g]:>3} unit(s) over {len(cuts[g])} claims"
+        )
         if not total:
             bad += 1
 
@@ -96,8 +100,10 @@ def main() -> int:
         if d > 0.0:
             continue
         dupes.append((a, b))
-        print(f"  XX {a} ≡ {b} at their own γ — an UNDECLARED duplicate: two names, one reading",
-              file=sys.stderr)
+        print(
+            f"  XX {a} ≡ {b} at their own γ — an UNDECLARED duplicate: two names, one reading",
+            file=sys.stderr,
+        )
         bad += 1
     if not dupes:
         pairs = len(names) * (len(names) - 1) // 2
@@ -122,17 +128,23 @@ def main() -> int:
             bad += 1
             continue
         live = disagreement(cuts[a], cuts[b], keys)
-        print(f"  ok {a} ≡ {b} @γ={gamma} — ANALYTIC (both are the identity on the grouping, so "
-              f"at equal γ they cannot differ)")
+        print(
+            f"  ok {a} ≡ {b} @γ={gamma} — ANALYTIC (both are the identity on the grouping, so "
+            f"at equal γ they cannot differ)"
+        )
         print(f"     at their OWN declared γ they differ by {live:.3f} — measured above, not here")
         print(f"     {why}")
 
     if bad:
-        print(f"\nbnd-genre-census: {bad} problem(s) — a census reporting N vantages must HAVE N",
-              file=sys.stderr)
+        print(
+            f"\nbnd-genre-census: {bad} problem(s) — a census reporting N vantages must HAVE N",
+            file=sys.stderr,
+        )
         return 1
-    print(f"\nBOUNDARIES: PASS ({len(names)} registered genres, all distinct partitions, "
-          f"{len(KNOWN_DUPLICATE)} declared duplicate)")
+    print(
+        f"\nBOUNDARIES: PASS ({len(names)} registered genres, all distinct partitions, "
+        f"{len(KNOWN_DUPLICATE)} declared duplicate)"
+    )
     return 0
 
 

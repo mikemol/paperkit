@@ -45,8 +45,10 @@ FLAGS = ("--rc", "--seconds", "--run-id", "--url")
 # without string-matching prose that may be reworded.
 PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("bazel_target_fail", re.compile(r"^(?:FAIL|ERROR): (\S+) \(Exit (\d+)\)")),
-    ("gate_unresolvable",
-     re.compile(r"^paperkit-gate: check UNRESOLVABLE for \[@([\w.-]+)\]: (\S+)")),
+    (
+        "gate_unresolvable",
+        re.compile(r"^paperkit-gate: check UNRESOLVABLE for \[@([\w.-]+)\]: (\S+)"),
+    ),
     ("coherence_grounding", re.compile(r"^coherence: GROUNDING (\d+) of (\d+) rests-on")),
     ("coherence_miss", re.compile(r"^\s+\[@([\w.-]+)\] rests-on \[@([\w.-]+)\]")),
     ("jvm_oom", re.compile(r"^(java\.lang\.OutOfMemoryError.*)$")),
@@ -92,8 +94,7 @@ def findings(log: Path) -> list[Finding]:
         for kind, pat in PATTERNS:
             m = pat.match(line)
             if m:
-                out.append(Finding(kind, tuple(str(g) for g in m.groups()), lineno,
-                                   line[:MSG_MAX]))
+                out.append(Finding(kind, tuple(str(g) for g in m.groups()), lineno, line[:MSG_MAX]))
                 break
     return out
 
@@ -111,8 +112,12 @@ def push(events: list[Finding], url: str, common: dict[str, object]) -> tuple[bo
     try:
         conn = conn_cls(parts.hostname, parts.port, timeout=TIMEOUT_S)
         try:
-            conn.request("POST", target or "/", body=body,
-                         headers={"Content-Type": "application/stream+json"})
+            conn.request(
+                "POST",
+                target or "/",
+                body=body,
+                headers={"Content-Type": "application/stream+json"},
+            )
             status = conn.getresponse().status
         finally:
             conn.close()
@@ -159,7 +164,8 @@ def main(argv: list[str]) -> int:
     stamp = int(args.log.stat().st_mtime) if args.log.exists() else 0
     # A RUN ID ties one invocation's findings together; without it two runs interleave.
     common: dict[str, object] = {
-        "service": "paperkit", "host": host,
+        "service": "paperkit",
+        "host": host,
         "run": args.opts.get("--run-id") or os.environ.get("PK_RUN_ID") or f"{host}-{stamp}",
         "verdict": "red" if rc not in {"", "0"} else "green",
     }

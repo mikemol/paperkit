@@ -11,6 +11,7 @@ tool to the cwd — the project dir being gated.
 
     python3 paperkit/tests/boundaries_env.py
 """
+
 from __future__ import annotations
 
 import os
@@ -20,10 +21,21 @@ import paperkit.resolver
 import paperkit.checkenv
 
 DIRTY = {
-    "PATH": "/usr/bin" + os.pathsep + "." + os.pathsep + os.pathsep + "rel/x",  # abs kept; .,"",rel dropped
-    "HOME": "/h", "LC_ALL": "C", "PAPERKIT_CHECK_MB": "256",         # kept: needed + paperkit's knob
-    "LD_PRELOAD": "/evil.so", "IFS": " \t", "BASH_ENV": "/inj.sh",   # dropped: injection
-    "PYTHONPATH": "/x", "MEMBUDGET_PARENT": "abcd", "FOO": "bar",    # dropped: injection / retired / unknown
+    "PATH": "/usr/bin"
+    + os.pathsep
+    + "."
+    + os.pathsep
+    + os.pathsep
+    + "rel/x",  # abs kept; .,"",rel dropped
+    "HOME": "/h",
+    "LC_ALL": "C",
+    "PAPERKIT_CHECK_MB": "256",  # kept: needed + paperkit's knob
+    "LD_PRELOAD": "/evil.so",
+    "IFS": " \t",
+    "BASH_ENV": "/inj.sh",  # dropped: injection
+    "PYTHONPATH": "/x",
+    "MEMBUDGET_PARENT": "abcd",
+    "FOO": "bar",  # dropped: injection / retired / unknown
 }
 
 
@@ -45,39 +57,61 @@ def main() -> int:
     e = paperkit.checkenv.clean_env(DIRTY)
 
     print("env-sanitization behaviors\n")
-    check("keeps PATH's absolute dirs so a check's tools still resolve", e.get("PATH") == "/usr/bin")
-    check("DROPS PATH's relative/empty entries (Τ·path — they resolve to the gated cwd)",
-          all(p and os.path.isabs(p) for p in e.get("PATH", "").split(os.pathsep)))
+    check(
+        "keeps PATH's absolute dirs so a check's tools still resolve", e.get("PATH") == "/usr/bin"
+    )
+    check(
+        "DROPS PATH's relative/empty entries (Τ·path — they resolve to the gated cwd)",
+        all(p and os.path.isabs(p) for p in e.get("PATH", "").split(os.pathsep)),
+    )
     check("keeps HOME and locale (LC_ALL)", e.get("HOME") == "/h" and e.get("LC_ALL") == "C")
-    check("keeps paperkit's own knobs (PAPERKIT_*), DROPS the retired MEMBUDGET_* (Bazel bounds memory)",
-          e.get("PAPERKIT_CHECK_MB") == "256" and "MEMBUDGET_PARENT" not in e)
-    check("DROPS injection vectors (LD_PRELOAD, IFS, BASH_ENV)",
-          not any(k in e for k in ("LD_PRELOAD", "IFS", "BASH_ENV")))
+    check(
+        "keeps paperkit's own knobs (PAPERKIT_*), DROPS the retired MEMBUDGET_* (Bazel bounds memory)",
+        e.get("PAPERKIT_CHECK_MB") == "256" and "MEMBUDGET_PARENT" not in e,
+    )
+    check(
+        "DROPS injection vectors (LD_PRELOAD, IFS, BASH_ENV)",
+        not any(k in e for k in ("LD_PRELOAD", "IFS", "BASH_ENV")),
+    )
     # ⚑ PYTHONPATH IS NEVER INHERITED, BUT IT IS SET: the engine hands every check the directory
     # `paperkit` is importable from FIRST (the same value as PAPERKIT_PYTHONPATH), so a consumer
     # imports the engine as the package it is, then the roots the ENGINE's own runtime dependency
     # is importable from (mikemol-atomicwrite, paperkit:W313 -- derived, not inherited).  The
     # caller's own value, "/x" above, does not survive.
     entries = e.get("PYTHONPATH", "").split(os.pathsep)
-    check("PYTHONPATH is the engine's own (it first), never the caller's",
-          entries[0] == e.get("PAPERKIT_PYTHONPATH") and "/x" not in entries)
+    check(
+        "PYTHONPATH is the engine's own (it first), never the caller's",
+        entries[0] == e.get("PAPERKIT_PYTHONPATH") and "/x" not in entries,
+    )
     check("DROPS unknown vars (FOO) — default-deny, not block-list", "FOO" not in e)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
     pairs = [
-        ("a var survives iff it is on the allow-list (default-deny)",
-         "a variable's membership in the allow-list",
-         "PATH (listed) → kept", "PATH" in e,
-         "LD_PRELOAD (unlisted) → dropped", "LD_PRELOAD" not in e),
-        ("paperkit's own knobs pass; the shell's injection vectors do not",
-         "the variable's name (PAPERKIT_CHECK_MB vs BASH_ENV)",
-         "PAPERKIT_CHECK_MB → kept", "PAPERKIT_CHECK_MB" in e,
-         "BASH_ENV → dropped", "BASH_ENV" not in e),
-        ("a PATH entry survives iff it is absolute (Τ·path)",
-         "the entry's absoluteness (/usr/bin vs .)",
-         "/usr/bin (absolute) → kept", "/usr/bin" in e["PATH"].split(os.pathsep),
-         ". (relative, = the gated cwd) → dropped", "." not in e["PATH"].split(os.pathsep)),
+        (
+            "a var survives iff it is on the allow-list (default-deny)",
+            "a variable's membership in the allow-list",
+            "PATH (listed) → kept",
+            "PATH" in e,
+            "LD_PRELOAD (unlisted) → dropped",
+            "LD_PRELOAD" not in e,
+        ),
+        (
+            "paperkit's own knobs pass; the shell's injection vectors do not",
+            "the variable's name (PAPERKIT_CHECK_MB vs BASH_ENV)",
+            "PAPERKIT_CHECK_MB → kept",
+            "PAPERKIT_CHECK_MB" in e,
+            "BASH_ENV → dropped",
+            "BASH_ENV" not in e,
+        ),
+        (
+            "a PATH entry survives iff it is absolute (Τ·path)",
+            "the entry's absoluteness (/usr/bin vs .)",
+            "/usr/bin (absolute) → kept",
+            "/usr/bin" in e["PATH"].split(os.pathsep),
+            ". (relative, = the gated cwd) → dropped",
+            "." not in e["PATH"].split(os.pathsep),
+        ),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok

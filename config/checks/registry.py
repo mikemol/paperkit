@@ -38,7 +38,9 @@ def union():
     """
     src = Path("../paperkit/components.bzl").read_text()
     for node in ast.parse(src).body:
-        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "COMPONENTS" for t in node.targets):
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", None) == "COMPONENTS" for t in node.targets
+        ):
             comps = ast.literal_eval(node.value)
             break
     else:
@@ -54,21 +56,29 @@ def union():
         # W299 -- the stem is a bare filename from components.bzl, so it is qualified as a PACKAGE
         # module: a bare import_module(stem) resolved only because a sys.path insert put
         # paperkit/ first, which a census of import STATEMENTS did not see (it is a dynamic import).
-        out += [v for v in vars(importlib.import_module(f"paperkit.{stem}")).values() if isinstance(v, paperkit.config.Param)]
+        out += [
+            v
+            for v in vars(importlib.import_module(f"paperkit.{stem}")).values()
+            if isinstance(v, paperkit.config.Param)
+        ]
     deduped = list({id(p): p for p in out}.values())
     return sorted(deduped, key=lambda p: p.name)
 
 
 def precedence():
-    p = paperkit.config.Param("syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def"))
-    paperkit.config._ARGS.clear(); os.environ.pop(p.env, None)
+    p = paperkit.config.Param(
+        "syn-val", "PAPERKIT_SYN_VAL", config="syn_val", default="file", choices=("file", "def")
+    )
+    paperkit.config._ARGS.clear()
+    os.environ.pop(p.env, None)
     assert paperkit.config.resolve(p) == "file", "default"
     assert paperkit.config.resolve(p, {"syn_val": "def"}) == "def", "config over default"
     os.environ[p.env] = "file"
     assert paperkit.config.resolve(p, {"syn_val": "def"}) == "file", "env over config"
     paperkit.config.apply_args(["--syn-val", "def"], [p])
     assert paperkit.config.resolve(p, {"syn_val": "def"}) == "def", "arg over env"
-    paperkit.config._ARGS.clear(); os.environ.pop(p.env, None)
+    paperkit.config._ARGS.clear()
+    os.environ.pop(p.env, None)
 
 
 def well_formed():
@@ -90,9 +100,12 @@ def covers():
 
 
 def fresh():
-    gen = subprocess.run([sys.executable, "checks/gen_knobs.py"], capture_output=True, text=True, check=True).stdout
-    assert Path("assets/knobs.md").read_text().strip() == gen.strip(), \
+    gen = subprocess.run(
+        [sys.executable, "checks/gen_knobs.py"], capture_output=True, text=True, check=True
+    ).stdout
+    assert Path("assets/knobs.md").read_text().strip() == gen.strip(), (
         "assets/knobs.md drifted from the knob union — regenerate (checks/gen_knobs.py)"
+    )
 
 
 CHECKS = {"precedence": precedence, "well-formed": well_formed, "covers": covers, "fresh": fresh}

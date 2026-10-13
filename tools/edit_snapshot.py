@@ -30,6 +30,7 @@ prints its SHA without touching the worktree or the stash stack, so:
 ⚑ This module NEVER restores.  It records how to.  An automatic rollback would be a
 revert-in-disguise, and reverting is the thing that costs a day's work.
 """
+
 import contextvars
 import os
 import subprocess
@@ -211,40 +212,51 @@ class AmbientConflict(MutationContractError):
 
     def __str__(self):
         a = self.amb
-        same = (self.stated == self.ambient)
-        head = (f"⚑ {self.label}: {a.kw} is ALREADY BOUND for this invocation "
-                f"({self.ambient!r}) and is WRITE-ONCE.")
+        same = self.stated == self.ambient
+        head = (
+            f"⚑ {self.label}: {a.kw} is ALREADY BOUND for this invocation "
+            f"({self.ambient!r}) and is WRITE-ONCE."
+        )
         body = (
             f"  bound:    {self.ambient!r}  by {self.origin}\n"
-            f"  attempted:{self.stated!r}  at {self.label}\n")
+            f"  attempted:{self.stated!r}  at {self.label}\n"
+        )
         if same:
             # ⚑ A SECOND WRITE OF THE SAME VALUE IS STILL A DEFECT, AND SAYING SO IS THE
             # POINT.  It means two sites each believe they are the one that decides —
             # which is the ⟡index-coverage-wrong-store shape exactly. Today they agree;
             # nothing makes them agree tomorrow.
-            body += ("  ⚑ The values MATCH, which is not a reprieve: two sites each "
-                     "believe they are the\n    one that decides. They agree today and "
-                     "nothing makes them agree tomorrow — that\n    is the shape that "
-                     "put two stores in one report.\n")
+            body += (
+                "  ⚑ The values MATCH, which is not a reprieve: two sites each "
+                "believe they are the\n    one that decides. They agree today and "
+                "nothing makes them agree tomorrow — that\n    is the shape that "
+                "put two stores in one report.\n"
+            )
         else:
             body += f"  {a.two_readings}\n"
-        return head + "\n" + body + (
-            f"  ⚑ Successors, in the order you should try them:\n"
-            f"    1. READ IT, do not re-bind it: `edit_snapshot.{a.kw.upper()}.get()` "
-            f"returns the value\n"
-            f"       this invocation already established. A callee almost never needs "
-            f"to write.\n"
-            f"    2. BIND IT ONCE, AT ENTRY — where the operator's request is read "
-            f"(`require_at_entry`),\n"
-            f"       so every frame below inherits it and none has to assert anything.\n"
-            f"    3. If this genuinely is a NEW invocation (a fixture, a nested run over "
-            f"a different\n"
-            f"       target), give it a NEW CONTEXT rather than overwriting this one:\n"
-            f"           contextvars.copy_context().run(fn, ...)\n"
-            f"       or, for the one sanctioned in-tree divergence, "
-            f"`{a.kw.upper()}.override(...)`,\n"
-            f"       which runs the body in a copied context and must be registered in\n"
-            f"       `edit_snapshot.SANCTIONED_OVERRIDES`.")
+        return (
+            head
+            + "\n"
+            + body
+            + (
+                f"  ⚑ Successors, in the order you should try them:\n"
+                f"    1. READ IT, do not re-bind it: `edit_snapshot.{a.kw.upper()}.get()` "
+                f"returns the value\n"
+                f"       this invocation already established. A callee almost never needs "
+                f"to write.\n"
+                f"    2. BIND IT ONCE, AT ENTRY — where the operator's request is read "
+                f"(`require_at_entry`),\n"
+                f"       so every frame below inherits it and none has to assert anything.\n"
+                f"    3. If this genuinely is a NEW invocation (a fixture, a nested run over "
+                f"a different\n"
+                f"       target), give it a NEW CONTEXT rather than overwriting this one:\n"
+                f"           contextvars.copy_context().run(fn, ...)\n"
+                f"       or, for the one sanctioned in-tree divergence, "
+                f"`{a.kw.upper()}.override(...)`,\n"
+                f"       which runs the body in a copied context and must be registered in\n"
+                f"       `edit_snapshot.SANCTIONED_OVERRIDES`."
+            )
+        )
 
 
 class Ambient:
@@ -318,11 +330,11 @@ class Ambient:
                 f"{' / '.join(map(repr, self.vocab))}.\n"
                 f"  An unrecognised value REFUSES rather than passing — the escape "
                 f"must be at least as\n  strict as the contract it bypasses, or a typo "
-                f"satisfies it silently.")
+                f"satisfies it silently."
+            )
         cur = self._var.get()
         if cur is not None:
-            raise AmbientConflict(self, origin, value, cur,
-                                  self._origin.get() or "<unknown>")
+            raise AmbientConflict(self, origin, value, cur, self._origin.get() or "<unknown>")
         return self._var.set(value), self._origin.set(origin)
 
     def _reset(self, tokens):
@@ -397,11 +409,13 @@ class Ambient:
 #: declaration of where it is knowingly bypassed — the thing a reader of a refusal needs
 #: in order to tell "sanctioned divergence" from "someone got past the guard".
 SANCTIONED_OVERRIDES = {
-    ("intent", "prune_leaf_opens (dry-run writes-then-restores)"):
-        "This tool writes the file EVEN IN DRY RUN (writes, re-checks, restores at the "
-        "end), so on a stated --dry-run the filesystem truth is 'apply' while the "
-        "operator's request is 'dry-run'. A crash between the write and the restore "
-        "leaves the damage — which is precisely the snapshot's case.",
+    (
+        "intent",
+        "prune_leaf_opens (dry-run writes-then-restores)",
+    ): "This tool writes the file EVEN IN DRY RUN (writes, re-checks, restores at the "
+    "end), so on a stated --dry-run the filesystem truth is 'apply' while the "
+    "operator's request is 'dry-run'. A crash between the write and the restore "
+    "leaves the damage — which is precisely the snapshot's case.",
 }
 
 
@@ -411,11 +425,13 @@ class _Override:
             raise ValueError(
                 f"{amb.kw}.override({value!r}): not one of "
                 f"{' / '.join(map(repr, amb.vocab))}. An override is at least as strict "
-                f"as the contract it diverges from.")
+                f"as the contract it diverges from."
+            )
         if not reason or not str(reason).strip():
             raise ValueError(
                 f"{amb.kw}.override(...) requires a REASON. An override with no reason "
-                f"is `--no-verify` — a bypass that leaves no trace of why.")
+                f"is `--no-verify` — a bypass that leaves no trace of why."
+            )
         # ⚑⚑ AN UNREGISTERED OVERRIDE REFUSES, AND THE REFUSAL NAMES ITS SUCCESSOR.  A
         # refusal with no named successor is an invitation to invent one locally, which
         # is the route-around this whole mechanism is trying not to provoke.  So the
@@ -445,7 +461,8 @@ class _Override:
                 f"       in `edit_snapshot.SANCTIONED_OVERRIDES` under "
                 f"({amb.kw!r}, {label!r})\n"
                 f"       with the reason. That edit is REVIEWABLE, which is the point of "
-                f"the friction.")
+                f"the friction."
+            )
         self.amb, self.value, self.reason = amb, value, str(reason).strip()
         self.label, self._out, self._tokens = label, announce_to, None
 
@@ -466,9 +483,11 @@ class _Override:
         out = self._out or (lambda m: print(m, file=sys.stderr))
         cur, org = self.amb.get(), self.amb.origin()
         if cur is not None and cur != self.value:
-            out(f"   ⚑ {self.label}: {self.amb.kw} OVERRIDE {cur!r} → {self.value!r} "
+            out(
+                f"   ⚑ {self.label}: {self.amb.kw} OVERRIDE {cur!r} → {self.value!r} "
                 f"in a copied context (outer binding by {org} is unchanged)\n"
-                f"     reason: {self.reason}")
+                f"     reason: {self.reason}"
+            )
 
         def _inner():
             # ⚑ FRESH CONTEXT ⇒ THE VAR IS UNBOUND HERE ⇒ THIS IS A FIRST WRITE.
@@ -488,7 +507,7 @@ class _Override:
     # context manager protocol (missed __exit__)` BEFORE calling anything of mine — a
     # correct refusal with no named successor, which is the shape this file argues
     # against everywhere else. Caught by the case below, which asserted on the message.
-    def __exit__(self, *exc):        # pragma: no cover — __enter__ always raises first
+    def __exit__(self, *exc):  # pragma: no cover — __enter__ always raises first
         return False
 
     def __enter__(self):
@@ -500,15 +519,18 @@ class _Override:
             f"context:\n"
             f"      edit_snapshot.{self.amb.kw.upper()}.override({self.value!r}, "
             f"reason=…, label=…) \\\n"
-            f"          .run(lambda: <the work>)")
+            f"          .run(lambda: <the work>)"
+        )
 
 
 #: ⚑ THE TWO READINGS THIS VARIABLE CONFLATES, named in the refusal so a reader sees
 #: WHY the two values differ rather than only THAT they do.
 INTENT = Ambient(
-    "intent", ("apply", "dry-run"),
+    "intent",
+    ("apply", "dry-run"),
     "These are two different propositions spelled the same way — 'what the operator "
-    "asked for'\n  and 'what this branch actually does'.")
+    "asked for'\n  and 'what this branch actually does'.",
+)
 
 
 def _bind_intent(value, origin):
@@ -554,9 +576,11 @@ IntentConflict = AmbientConflict
 #: ENDED"*) — refusal is unconditional and env-independent. There is nothing here to
 #: duplicate and nothing to defer to.
 TENANT = Ambient(
-    "tenant", ("live", "sandbox"),
+    "tenant",
+    ("live", "sandbox"),
     "A read against the wrong tenant returns plausible rows nobody can distinguish; "
-    "two\n  independent resolutions in one process is how one report read two stores.")
+    "two\n  independent resolutions in one process is how one report read two stores.",
+)
 
 
 def naming_tenant(value, label):
@@ -675,6 +699,7 @@ def _copy_untracked(paths):
     recovery point at all.  Best-effort: a copy failure must not stop the work.
     """
     import shutil
+
     saved = []
     # ⚑⚑⚑ THE PER-INVOCATION COPIED SET — THIS IS WHERE `_snapshot_once`'s BUG DIES.
     # The 23 `_snapshot_once` helpers arm a module-level `_SNAPPED` on file ONE and
@@ -800,8 +825,10 @@ def snapshot(label, paths=()):
     _git("update-ref", f"refs/edit-snapshots/{sha[:12]}", sha)
     _record(sha, label, paths)
     if untracked:
-        print(f"  ⚑ {len(untracked)} UNTRACKED file(s) copied to "
-              f"{os.path.relpath(SNAPDIR, ROOT)}/ (git cannot hold them):")
+        print(
+            f"  ⚑ {len(untracked)} UNTRACKED file(s) copied to "
+            f"{os.path.relpath(SNAPDIR, ROOT)}/ (git cannot hold them):"
+        )
         for rel, dest in untracked[:5]:
             print(f"      cp {os.path.relpath(dest, ROOT)} {rel}")
         if len(untracked) > 5:
@@ -815,9 +842,11 @@ def _record(sha, label, paths):
         new = not os.path.exists(JOURNAL)
         with open(JOURNAL, "a", encoding="utf-8") as fh:
             if new:
-                fh.write("# sha\tlabel\tn_paths\tpaths\n"
-                         "# restore:  git checkout <sha> -- <path>...\n"
-                         "# list:     git show --stat <sha>\n")
+                fh.write(
+                    "# sha\tlabel\tn_paths\tpaths\n"
+                    "# restore:  git checkout <sha> -- <path>...\n"
+                    "# list:     git show --stat <sha>\n"
+                )
             rel = [os.path.relpath(p, ROOT) if os.path.isabs(p) else p for p in paths]
             fh.write(f"{sha}\t{label}\t{len(rel)}\t{','.join(rel[:40])}\n")
     except OSError:
@@ -883,6 +912,7 @@ def restore(sha, paths=(), apply=False):
         else:
             out.append((rel, "tracked"))
     import shutil
+
     for rel, src in untracked:
         if want and rel not in want:
             continue
@@ -977,6 +1007,7 @@ def require_explicit_mutation(label, argv=None, intent=None):
     """
     import os as _os
     import sys as _sys
+
     # ⚑ AN UNKNOWN `intent` IS A REFUSAL, NEVER A PASS.  Accepting any truthy value
     # would make `intent="maybe"` — or a typo — satisfy the contract silently, which is
     # the accepted-and-unvalidated shape this repo censuses.  The escape has to be at
@@ -1018,33 +1049,44 @@ def require_explicit_mutation(label, argv=None, intent=None):
         # this def is library-reachable from 58 importers.
         raise MutationContractError(
             f"⚑ {label}: BOTH --apply and --dry-run given — they are mutually "
-            f"exclusive. Refusing rather than picking one.")
+            f"exclusive. Refusing rather than picking one."
+        )
     # ⚑ A REFUSAL MUST NAME ITS SUCCESSOR.  A bare "state one" is half a gate: the caller
     # who typed `--dry` already believes they stated an intent, and telling them the
     # contract without telling them the WORD sends them back to guess again.  When a
     # near-miss is present the message leads with the exact substitution.
     near = [a for a in argv if a in NEAR_MISS_SPELLINGS]
-    msg = (f"⚑ {label}: neither --apply nor --dry-run was given.\n"
-           f"  A mutating tool must not GUESS: default-dry silently does nothing when you "
-           f"meant to write,\n  default-apply silently writes when you meant to look. "
-           f"State one.")
+    msg = (
+        f"⚑ {label}: neither --apply nor --dry-run was given.\n"
+        f"  A mutating tool must not GUESS: default-dry silently does nothing when you "
+        f"meant to write,\n  default-apply silently writes when you meant to look. "
+        f"State one."
+    )
     if near:
         sub = "\n".join(f"      {a}  →  {NEAR_MISS_SPELLINGS[a]}" for a in near)
-        msg += (f"\n  ⚑ you typed a NEAR MISS — this tool does not accept it as a "
-                f"statement of intent:\n{sub}\n"
-                f"    the two words the convention declares are `--apply` and "
-                f"`--dry-run`; there is no third.")
+        msg += (
+            f"\n  ⚑ you typed a NEAR MISS — this tool does not accept it as a "
+            f"statement of intent:\n{sub}\n"
+            f"    the two words the convention declares are `--apply` and "
+            f"`--dry-run`; there is no third."
+        )
     # ⚑⚑ THE ADVISORY IS ONLY HALF A RATCHET WITHOUT A CENSUS.  This contract is
     # advisory precisely so the population can be measured before it refuses — and
     # measuring it means recording every unstated invocation, not counting the ones a
     # human happened to notice.  Best-effort by construction; see `ratchet.
     # log_fallthrough`.  The verdict below is computed from `stated`, never from this.
     try:
-        _sys.path.insert(0, _os.path.join(
-            _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "scripts"))
+        _sys.path.insert(
+            0,
+            _os.path.join(
+                _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "scripts"
+            ),
+        )
         import tools.ratchet
-        tools.ratchet.log_fallthrough(label, "unstated-mutation", known=("--apply", "--dry-run"),
-                           argv=argv, exit_code=2)
+
+        tools.ratchet.log_fallthrough(
+            label, "unstated-mutation", known=("--apply", "--dry-run"), argv=argv, exit_code=2
+        )
     except Exception:
         pass
     # ⚑⚑ REFUSAL IS THE DEFAULT AS OF 2026-08-25 (⟡explicit-mutation-default).  The
@@ -1079,10 +1121,12 @@ def require_explicit_mutation(label, argv=None, intent=None):
     # somebody disables by editing this file, which is strictly worse — the bypass then
     # leaves no trace.  So `=0` is supported and ANNOUNCES ITSELF: an unarmed run must
     # never be mistakable for a compliant one in a log read later.
-    print(msg + "\n  ⚑ RUNNING UNARMED: SUBSTRATE_EXPLICIT_MUTATION=0 downgraded this "
-                "REFUSAL to a warning.\n    This tool may now write without either "
-                "--apply or --dry-run having been stated.",
-          file=_sys.stderr)
+    print(
+        msg + "\n  ⚑ RUNNING UNARMED: SUBSTRATE_EXPLICIT_MUTATION=0 downgraded this "
+        "REFUSAL to a warning.\n    This tool may now write without either "
+        "--apply or --dry-run having been stated.",
+        file=_sys.stderr,
+    )
     return "advisory"
 
 
@@ -1153,6 +1197,7 @@ def require_at_entry(label, argv=None, intent=None, paths=(), store=False):
     where that lives, once, instead of in 30 call sites.
     """
     import sys as _sys
+
     argv = _sys.argv if argv is None else argv
     if intent is None and "--selftest" in argv:
         return "selftest"
@@ -1182,19 +1227,21 @@ def require_at_entry(label, argv=None, intent=None, paths=(), store=False):
     # The snapshot rides the STATEMENT, not the write — that is the binding.
     stated_apply = (intent == "apply") or (intent is None and "--apply" in argv)
     if not stated_apply:
-        return verdict                     # a stated dry-run writes nothing to snapshot
+        return verdict  # a stated dry-run writes nothing to snapshot
     if store:
         # ⚑⚑⚑ A SNAPSHOT IS A FILESYSTEM ACT AND CANNOT CAPTURE A STORE MUTATION, so
         # this branch says so INSTEAD OF claiming one.  Printing "snapshot taken" here
         # would be a FALSE ASSURANCE — strictly worse than silence, because the operator
         # reads it as recoverable and it is not.  Naming the SUBSTITUTE is the other
         # half: leaving it at "not applicable" would read as an unguarded hole.
-        print(f"   ⚑ {label}: snapshot NOT APPLICABLE — this tool's writes land in the "
-              f"STORE, not the filesystem.\n"
-              f"     A file copy cannot capture them. Its protection is the stated "
-              f"--dry-run plus the\n"
-              f"     transaction boundary; there is no snapshot to recover from.",
-              file=_sys.stderr)
+        print(
+            f"   ⚑ {label}: snapshot NOT APPLICABLE — this tool's writes land in the "
+            f"STORE, not the filesystem.\n"
+            f"     A file copy cannot capture them. Its protection is the stated "
+            f"--dry-run plus the\n"
+            f"     transaction boundary; there is no snapshot to recover from.",
+            file=_sys.stderr,
+        )
         return verdict
     # ⚑ DELEGATES TO `guard`, NEVER REIMPLEMENTS IT.  A fifth spelling of the snapshot
     # would be this arc's own defect (`the-holder-is-not-the-worker`) recurring inside
@@ -1292,8 +1339,11 @@ def _selftest():
     check("worktree untouched by snapshotting", after, before)
 
     check("journal written", os.path.exists(JOURNAL), True)
-    check("announce tolerates a None sha (no snapshot != crash)",
-          announce(None, "x", out=lambda *_: None), None)
+    check(
+        "announce tolerates a None sha (no snapshot != crash)",
+        announce(None, "x", out=lambda *_: None),
+        None,
+    )
 
     # ⚑ THE TALLY MUST FOLLOW THE LAST CASE.  `ok` was computed HERE, so cases
     # appended below would have been added to `cases` and never counted — the
@@ -1308,18 +1358,26 @@ def _selftest():
     # like it succeeded.
     if sha:
         tr, un = contents(sha)
-        check("contents() reports BOTH halves of a snapshot",
-              isinstance(tr, list) and isinstance(un, list), True)
+        check(
+            "contents() reports BOTH halves of a snapshot",
+            isinstance(tr, list) and isinstance(un, list),
+            True,
+        )
         # a DRY restore must name every path it would touch, and never write
         rows = restore(sha, apply=False)
         check("a dry restore reports rows without writing", isinstance(rows, list), True)
-        check("...and every row carries HOW it would be restored",
-              all(h in ("tracked", "untracked-latest") or h.startswith("FAILED")
-                  for _r, h in rows), True)
+        check(
+            "...and every row carries HOW it would be restored",
+            all(h in ("tracked", "untracked-latest") or h.startswith("FAILED") for _r, h in rows),
+            True,
+        )
         # ⚑ the untracked store is keyed by PATH, so its verdict must not claim a
         # per-sha version.  A row labelled `untracked@<sha>` would be a lie.
-        check("untracked rows are labelled `latest`, not per-sha",
-              any(h == "untracked-latest" for _r, h in rows) or not un, True)
+        check(
+            "untracked rows are labelled `latest`, not per-sha",
+            any(h == "untracked-latest" for _r, h in rows) or not un,
+            True,
+        )
 
     # ⚑ THE RESTORE HINT MUST NAME THE SHA THE LISTING LEADS WITH.  `--holding`
     # prints newest-first; my first cut reversed only in the print loop and then
@@ -1332,18 +1390,23 @@ def _selftest():
     _j = [("aaa", "old", ["p/x.agda"]), ("bbb", "new", ["p/x.agda"])]
     _j.reverse()
     check("--holding leads with the NEWEST snapshot", _j[0][0], "bbb")
-    check("the restore hint names the LISTING'S FIRST row, not the journal's",
-          _j[0][0], "bbb")
+    check("the restore hint names the LISTING'S FIRST row, not the journal's", _j[0][0], "bbb")
 
     # ── require_explicit_mutation: the contract is the PAIR, not either flag ──
     # ⚑ DRIVEN THROUGH THE REAL FUNCTION with a constructed argv, never asserted
     # about `sys.argv` — the same discipline the `--holding` cases above record
     # ("the assertion must not be a tautology").  A case that reads today's argv
     # would pass because of how the selftest happens to be invoked.
-    check("--apply alone SATISFIES the contract",
-          _inv(require_explicit_mutation, "selftest", ["t", "--apply"]), None)
-    check("--dry-run alone SATISFIES it",
-          _inv(require_explicit_mutation, "selftest", ["t", "--dry-run"]), None)
+    check(
+        "--apply alone SATISFIES the contract",
+        _inv(require_explicit_mutation, "selftest", ["t", "--apply"]),
+        None,
+    )
+    check(
+        "--dry-run alone SATISFIES it",
+        _inv(require_explicit_mutation, "selftest", ["t", "--dry-run"]),
+        None,
+    )
     # ⚑⚑ REFUSAL IS NOW THE DEFAULT (⟡explicit-mutation-default, 2026-08-25), and the
     # not-satisfied path therefore `sys.exit(2)`s — which an INLINE case cannot observe
     # without killing the selftest.  So the three not-satisfied cases below run under an
@@ -1371,14 +1434,19 @@ def _selftest():
         into the seam.  Routing through `cli_main` keeps the observable pinned exactly
         where a caller observes it, and frees the frame beneath to raise.
         """
-        _e = {k: v for k, v in os.environ.items()
-              if k != "SUBSTRATE_EXPLICIT_MUTATION"}
+        _e = {k: v for k, v in os.environ.items() if k != "SUBSTRATE_EXPLICIT_MUTATION"}
         return subprocess.run(
-            [sys.executable, "-c",
-             "import sys; sys.path.insert(0, %r); import edit_snapshot as e;"
-             "sys.exit(e.cli_main(e.require_explicit_mutation, 't', %r) or 0)"
-             % (os.path.dirname(os.path.abspath(__file__)), argv)],
-            capture_output=True, text=True, env=_e).returncode
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.path.insert(0, %r); import edit_snapshot as e;"
+                "sys.exit(e.cli_main(e.require_explicit_mutation, 't', %r) or 0)"
+                % (os.path.dirname(os.path.abspath(__file__)), argv),
+            ],
+            capture_output=True,
+            text=True,
+            env=_e,
+        ).returncode
 
     def _raises_as_library(argv, intent=None):
         """THE OTHER ARM, AND IT IS NEW: the library frame must RAISE, never exit.
@@ -1396,30 +1464,41 @@ def _selftest():
         anyway, so a refusal catchable there is a refusal converted into an advisory
         print with the damage still done.
         """
-        _e = {k: v for k, v in os.environ.items()
-              if k != "SUBSTRATE_EXPLICIT_MUTATION"}
+        _e = {k: v for k, v in os.environ.items() if k != "SUBSTRATE_EXPLICIT_MUTATION"}
         return subprocess.run(
-            [sys.executable, "-c",
-             "import sys; sys.path.insert(0, %r); import edit_snapshot as e\n"
-             "try:\n"
-             "    e.require_explicit_mutation('t', %r, intent=%r)\n"
-             "    print('NO RAISE')\n"
-             "except SystemExit:\n"
-             "    print('EXITED')\n"
-             "except e.MutationContractError as x:\n"
-             "    print('RAISED', not isinstance(x, Exception))\n"
-             % (os.path.dirname(os.path.abspath(__file__)), argv, intent)],
-            capture_output=True, text=True, env=_e).stdout.strip()
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.path.insert(0, %r); import edit_snapshot as e\n"
+                "try:\n"
+                "    e.require_explicit_mutation('t', %r, intent=%r)\n"
+                "    print('NO RAISE')\n"
+                "except SystemExit:\n"
+                "    print('EXITED')\n"
+                "except e.MutationContractError as x:\n"
+                "    print('RAISED', not isinstance(x, Exception))\n"
+                % (os.path.dirname(os.path.abspath(__file__)), argv, intent),
+            ],
+            capture_output=True,
+            text=True,
+            env=_e,
+        ).stdout.strip()
 
     # ⚑ NEITHER is the whole point: it must NOT return None (the satisfied value).
-    check("NEITHER is advisory under =0 (never silent)",
-          _inv(require_explicit_mutation, "selftest", ["t"]), "advisory")
+    check(
+        "NEITHER is advisory under =0 (never silent)",
+        _inv(require_explicit_mutation, "selftest", ["t"]),
+        "advisory",
+    )
     check("...and REFUSES at the default (unset)", _refuses(["t"]), 2)
     # ⚑ A flag that merely CONTAINS the word must not satisfy it — `--apply-all`
     # is a different flag and reading it as consent is the substring defect this
     # repo has recorded on `--marks`/`--since` operand handling.
-    check("a longer flag containing `--apply` does NOT satisfy it",
-          _inv(require_explicit_mutation, "selftest", ["t", "--apply-all"]), "advisory")
+    check(
+        "a longer flag containing `--apply` does NOT satisfy it",
+        _inv(require_explicit_mutation, "selftest", ["t", "--apply-all"]),
+        "advisory",
+    )
     check("...and it REFUSES at the default", _refuses(["t", "--apply-all"]), 2)
     # ⚑ `intent` STATES IT IN CODE, for a fixture write where the process argv carries
     # `--selftest` and the operator asked for no mutation.  MEASURED: without this,
@@ -1430,19 +1509,24 @@ def _selftest():
     # would bless the divergence into the shared authority.  Both arms are driven: the
     # near-miss is refused, AND the refusal names the successor (a refusal that does not
     # is half a gate).
-    check("`--dry` does NOT satisfy the contract (it is not `--dry-run`)",
-          _inv(require_explicit_mutation, "selftest", ["t", "--dry"]), "advisory")
+    check(
+        "`--dry` does NOT satisfy the contract (it is not `--dry-run`)",
+        _inv(require_explicit_mutation, "selftest", ["t", "--dry"]),
+        "advisory",
+    )
     check("...and `--dry` REFUSES at the default", _refuses(["t", "--dry"]), 2)
     # ⚑ THE OFF-SWITCH MUST ANNOUNCE ITSELF.  An escape hatch that restores the old
     # behaviour SILENTLY is indistinguishable, in any log read later, from a compliant
     # run — which is how a bypass becomes permanent.  Pinned on the advisory arm above.
     import contextlib
     import io
+
     _unarmed = io.StringIO()
     with contextlib.redirect_stderr(_unarmed):
         _inv(require_explicit_mutation, "selftest", ["t"])
-    check("the =0 advisory SAYS it is running unarmed",
-          "RUNNING UNARMED" in _unarmed.getvalue(), True)
+    check(
+        "the =0 advisory SAYS it is running unarmed", "RUNNING UNARMED" in _unarmed.getvalue(), True
+    )
     if _prior is None:
         os.environ.pop("SUBSTRATE_EXPLICIT_MUTATION", None)
     else:
@@ -1450,19 +1534,33 @@ def _selftest():
     # ⚑ ALSO ROUTED THROUGH `cli_main` (⟡intent-conflict-reconverted): the exit code AND
     # the successor-naming text are CLI-boundary observables. The message is unchanged.
     _cap = subprocess.run(
-        [_sys_exe := sys.executable, "-c",
-         "import sys; sys.path.insert(0, %r); import edit_snapshot as e;"
-         "sys.exit(e.cli_main(e.require_explicit_mutation, 't', ['t', '--dry']) or 0)"
-         % os.path.dirname(os.path.abspath(__file__))],
-        capture_output=True, text=True, env={**os.environ,
-                                             "SUBSTRATE_EXPLICIT_MUTATION": "1"})
+        [
+            _sys_exe := sys.executable,
+            "-c",
+            "import sys; sys.path.insert(0, %r); import edit_snapshot as e;"
+            "sys.exit(e.cli_main(e.require_explicit_mutation, 't', ['t', '--dry']) or 0)"
+            % os.path.dirname(os.path.abspath(__file__)),
+        ],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "SUBSTRATE_EXPLICIT_MUTATION": "1"},
+    )
     check("...and under strict mode a near miss REFUSES", _cap.returncode, 2)
-    check("...and the refusal NAMES the successor `--dry-run`",
-          "--dry  →  --dry-run" in _cap.stderr, True)
-    check("intent='apply' satisfies the contract without touching argv",
-          _inv(require_explicit_mutation, "selftest", ["t"], intent="apply"), None)
-    check("intent='dry-run' likewise",
-          _inv(require_explicit_mutation, "selftest", ["t"], intent="dry-run"), None)
+    check(
+        "...and the refusal NAMES the successor `--dry-run`",
+        "--dry  →  --dry-run" in _cap.stderr,
+        True,
+    )
+    check(
+        "intent='apply' satisfies the contract without touching argv",
+        _inv(require_explicit_mutation, "selftest", ["t"], intent="apply"),
+        None,
+    )
+    check(
+        "intent='dry-run' likewise",
+        _inv(require_explicit_mutation, "selftest", ["t"], intent="dry-run"),
+        None,
+    )
     # ⚑ AND THE ESCAPE IS AT LEAST AS STRICT AS THE THING IT BYPASSES: an unrecognised
     # intent REFUSES rather than passing, or a typo would satisfy the contract silently.
     # ⚑⚑ THE REFUSAL IS NOW A RAISE, SO BOTH ARMS ARE DRIVEN (⟡intent-conflict-
@@ -1470,17 +1568,24 @@ def _selftest():
     # 58 files import — it now raises `AmbientVocabError`, and the CLI boundary still
     # renders it as exit 2.  The MESSAGE is unchanged; only the mechanism moved.
     import sys as _s
-    _r = subprocess.run([_s.executable, "-c",
-                         "import sys; sys.path.insert(0, %r); import edit_snapshot as e;"
-                         "sys.exit(e.cli_main(e.require_explicit_mutation, 't', ['t'],"
-                         " intent='maybe') or 0)"
-                         % os.path.dirname(os.path.abspath(__file__))],
-                        capture_output=True, text=True)
-    check("an unrecognised intent REFUSES (exit 2 at the boundary), never passes",
-          _r.returncode, 2)
-    check("...and the vocab refusal still NAMES the vocabulary it wanted",
-          "'apply' / 'dry-run'" in _r.stderr and "REFUSES rather than passing" in _r.stderr,
-          True)
+
+    _r = subprocess.run(
+        [
+            _s.executable,
+            "-c",
+            "import sys; sys.path.insert(0, %r); import edit_snapshot as e;"
+            "sys.exit(e.cli_main(e.require_explicit_mutation, 't', ['t'],"
+            " intent='maybe') or 0)" % os.path.dirname(os.path.abspath(__file__)),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    check("an unrecognised intent REFUSES (exit 2 at the boundary), never passes", _r.returncode, 2)
+    check(
+        "...and the vocab refusal still NAMES the vocabulary it wanted",
+        "'apply' / 'dry-run'" in _r.stderr and "REFUSES rather than passing" in _r.stderr,
+        True,
+    )
 
     # ⚑⚑⚑ THE LIBRARY ARM, STARVED SEPARATELY.  Every case above observes the CLI
     # boundary, where a raise and an exit are indistinguishable — which is exactly how
@@ -1488,12 +1593,21 @@ def _selftest():
     # frame BENEATH the boundary: what escapes must be a raise, and must NOT be an
     # `Exception` (31 measured `except Exception` sites would otherwise swallow it and
     # write anyway).
-    check("library: an unstated intent RAISES (not SystemExit) and is not an Exception",
-          _raises_as_library(["t"]), "RAISED True")
-    check("library: an unrecognised intent RAISES (not SystemExit) likewise",
-          _raises_as_library(["t"], intent="maybe"), "RAISED True")
-    check("library: BOTH flags RAISES rather than exiting",
-          _raises_as_library(["t", "--apply", "--dry-run"]), "RAISED True")
+    check(
+        "library: an unstated intent RAISES (not SystemExit) and is not an Exception",
+        _raises_as_library(["t"]),
+        "RAISED True",
+    )
+    check(
+        "library: an unrecognised intent RAISES (not SystemExit) likewise",
+        _raises_as_library(["t"], intent="maybe"),
+        "RAISED True",
+    )
+    check(
+        "library: BOTH flags RAISES rather than exiting",
+        _raises_as_library(["t", "--apply", "--dry-run"]),
+        "RAISED True",
+    )
 
     # ⚑⚑⚑ AND THE ARM THAT MATTERS MOST IS `guard`, NOT `require_explicit_mutation` —
     # because `guard` is what the 31 measured `except Exception` sites actually call, in
@@ -1507,73 +1621,110 @@ def _selftest():
     # derived from `Exception` (the obvious cut, written and reverted), this case would
     # report SWALLOWED — which is how the choice is demonstrated rather than asserted.
     _g = subprocess.run(
-        [sys.executable, "-c",
-         "import sys; sys.path.insert(0, %r); import edit_snapshot as e\n"
-         "try:\n"
-         "    try:\n"
-         "        e.guard('probe', [], intent='maybe')\n"
-         "    except Exception as x:\n"
-         "        print('SWALLOWED', type(x).__name__)\n"
-         "except SystemExit:\n"
-         "    print('EXITED')\n"
-         "except e.MutationContractError as x:\n"
-         "    print('PASSED-THROUGH', type(x).__name__)\n"
-         % os.path.dirname(os.path.abspath(__file__))],
-        capture_output=True, text=True)
-    check("guard: a refusal PASSES THROUGH the 31 sites' `except Exception` (not "
-          "swallowed, not an exit)", _g.stdout.strip(), "PASSED-THROUGH AmbientVocabError")
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.path.insert(0, %r); import edit_snapshot as e\n"
+            "try:\n"
+            "    try:\n"
+            "        e.guard('probe', [], intent='maybe')\n"
+            "    except Exception as x:\n"
+            "        print('SWALLOWED', type(x).__name__)\n"
+            "except SystemExit:\n"
+            "    print('EXITED')\n"
+            "except e.MutationContractError as x:\n"
+            "    print('PASSED-THROUGH', type(x).__name__)\n"
+            % os.path.dirname(os.path.abspath(__file__)),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    check(
+        "guard: a refusal PASSES THROUGH the 31 sites' `except Exception` (not "
+        "swallowed, not an exit)",
+        _g.stdout.strip(),
+        "PASSED-THROUGH AmbientVocabError",
+    )
 
     # ── require_at_entry: the Ⓐ44 entry form.  BOTH ARMS, or nothing is shown ──
     # ⚑ A ONE-ARMED TEST PROVES NOTHING.  A sibling shipped a delete-guard whose two
     # arms were BOTH satisfied, so neither was demonstrated; only starving each in turn
     # exposed it.  So: stated -> passes, selftest -> passes, and BARE -> exit 2 driven
     # in a fresh process at the real default.
-    check("entry: --apply alone satisfies it",
-          _inv(require_at_entry, "selftest", ["t", "--apply"]), None)
-    check("entry: --dry-run alone satisfies it",
-          _inv(require_at_entry, "selftest", ["t", "--dry-run"]), None)
+    check(
+        "entry: --apply alone satisfies it",
+        _inv(require_at_entry, "selftest", ["t", "--apply"]),
+        None,
+    )
+    check(
+        "entry: --dry-run alone satisfies it",
+        _inv(require_at_entry, "selftest", ["t", "--dry-run"]),
+        None,
+    )
     # ⚑ THE SELFTEST CARVE-OUT IS AN ORDERING FACT, NOT AN INTENT EXEMPTION: a
     # `--selftest` invocation exits before dispatch, so it never reaches the write it
     # would have had to declare.  It is verified as a DISTINCT verdict ("selftest",
     # not None) so it can never be confused with a stated intent in a log.
-    check("entry: --selftest passes WITHOUT a flag, and says which arm it took",
-          _inv(require_at_entry, "selftest", ["t", "--selftest"]), "selftest")
+    check(
+        "entry: --selftest passes WITHOUT a flag, and says which arm it took",
+        _inv(require_at_entry, "selftest", ["t", "--selftest"]),
+        "selftest",
+    )
     # ⚑ and an EXPLICIT intent still wins over the carve-out — a fixture that writes
     # must still SAY it writes, exactly as `guard`'s `intent` docstring records.
-    check("entry: an explicit intent overrides the selftest carve-out",
-          _inv(require_at_entry, "selftest", ["t", "--selftest"], intent="apply"), None)
+    check(
+        "entry: an explicit intent overrides the selftest carve-out",
+        _inv(require_at_entry, "selftest", ["t", "--selftest"], intent="apply"),
+        None,
+    )
 
     # ── the BINDING: stating --apply IS the snapshot (operator, 2026-08-25) ───────
     # ⚑⚑⚑ BOTH ARMS, STARVED IN TURN, for the reason the block above states: a
     # one-armed test proves nothing.  A stated `--apply` must SNAPSHOT; a stated
     # `--dry-run` must NOT (there is nothing to recover, and a snapshot on every read
     # would make the recovery log useless by burying real ones).
-    check("bind: a stated --dry-run takes NO snapshot",
-          _inv(require_at_entry, "selftest", ["t", "--dry-run"]), None)
+    check(
+        "bind: a stated --dry-run takes NO snapshot",
+        _inv(require_at_entry, "selftest", ["t", "--dry-run"]),
+        None,
+    )
     # ⚑ THE STORE ARM IS A DISTINCT VERDICT, NOT A SILENT SKIP.  A tool whose writes
     # land in postgres must be TOLD a snapshot is inapplicable and what protects it
     # instead — "snapshot taken" there is a false assurance, which this session has
     # repeatedly found to be worse than no signal at all.
-    check("bind: store=True still satisfies the contract (and says why, on stderr)",
-          _inv(require_at_entry, "selftest", ["t", "--apply"], store=True), None)
+    check(
+        "bind: store=True still satisfies the contract (and says why, on stderr)",
+        _inv(require_at_entry, "selftest", ["t", "--apply"], store=True),
+        None,
+    )
 
     def _refuses_entry(argv):
-        _e = {k: v for k, v in os.environ.items()
-              if k != "SUBSTRATE_EXPLICIT_MUTATION"}
+        _e = {k: v for k, v in os.environ.items() if k != "SUBSTRATE_EXPLICIT_MUTATION"}
         return subprocess.run(
-            [sys.executable, "-c",
-             "import sys; sys.path.insert(0, %r); import edit_snapshot as e;"
-             "e.require_at_entry('t', %r)"
-             % (os.path.dirname(os.path.abspath(__file__)), argv)],
-            capture_output=True, text=True, env=_e)
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.path.insert(0, %r); import edit_snapshot as e;"
+                "e.require_at_entry('t', %r)" % (os.path.dirname(os.path.abspath(__file__)), argv),
+            ],
+            capture_output=True,
+            text=True,
+            env=_e,
+        )
 
     _bare = _refuses_entry(["t"])
     check("entry: a BARE invocation REFUSES at the default", _bare.returncode, 2)
-    check("...and the refusal names the successors it wanted",
-          "--apply" in _bare.stderr and "--dry-run" in _bare.stderr, True)
+    check(
+        "...and the refusal names the successors it wanted",
+        "--apply" in _bare.stderr and "--dry-run" in _bare.stderr,
+        True,
+    )
     _nm = _refuses_entry(["t", "--force"])
-    check("entry: a near miss REFUSES and NAMES its successor",
-          (_nm.returncode, "--force  →  --apply" in _nm.stderr), (2, True))
+    check(
+        "entry: a near miss REFUSES and NAMES its successor",
+        (_nm.returncode, "--force  →  --apply" in _nm.stderr),
+        (2, True),
+    )
 
     # ── the AMBIENT vars: write-once, and BOTH ARMS STARVED ──────────────────────
     # ⚑⚑⚑ A REFUSAL THAT NEVER FIRES AND A REFUSAL THAT ALWAYS FIRES ARE
@@ -1601,8 +1752,11 @@ def _selftest():
         except AmbientConflict as e:
             return "raised" if "WRITE-ONCE" in str(e) else f"wrong msg: {e}"
 
-    check("ambient: a SECOND write RAISES (the positive control)",
-          _fresh(_second_write_raises), "raised")
+    check(
+        "ambient: a SECOND write RAISES (the positive control)",
+        _fresh(_second_write_raises),
+        "raised",
+    )
 
     # ⚑ THE SAME-VALUE SECOND WRITE IS *ALSO* A DEFECT, and this is the case that
     # proves the mechanism is not merely a value comparison. Two sites each believing
@@ -1616,8 +1770,11 @@ def _selftest():
         except AmbientConflict as e:
             return "raised" if "values MATCH" in str(e) else f"wrong msg: {e}"
 
-    check("ambient: a second write of the SAME value still RAISES",
-          _fresh(_second_write_same_value_still_raises), "raised")
+    check(
+        "ambient: a second write of the SAME value still RAISES",
+        _fresh(_second_write_same_value_still_raises),
+        "raised",
+    )
 
     # ⚑ THE NEGATIVE CONTROL: an agreeing `resolve` is a NO-OP, not a rebind. This is
     # what lets the 17 hardcoded `intent="apply"` sites keep working under `--apply`.
@@ -1626,8 +1783,11 @@ def _selftest():
         a.set("x", "entry")
         return a.resolve("a callee", stated="x")
 
-    check("ambient: an AGREEING resolve passes silently (negative control)",
-          _fresh(_agreeing_resolve_is_silent), "x")
+    check(
+        "ambient: an AGREEING resolve passes silently (negative control)",
+        _fresh(_agreeing_resolve_is_silent),
+        "x",
+    )
 
     def _disagreeing_resolve_raises():
         a = Ambient("probe", ("x", "y"), "two readings")
@@ -1638,8 +1798,7 @@ def _selftest():
         except AmbientConflict:
             return "raised"
 
-    check("ambient: a DISAGREEING resolve RAISES",
-          _fresh(_disagreeing_resolve_raises), "raised")
+    check("ambient: a DISAGREEING resolve RAISES", _fresh(_disagreeing_resolve_raises), "raised")
 
     # ⚑ AN UNBOUND resolve BINDS — the fixture / `_snapshot_once` case, where nothing
     # above stated anything so this site's statement IS the invocation's.
@@ -1647,8 +1806,9 @@ def _selftest():
         a = Ambient("probe", ("x", "y"), "two readings")
         return a.resolve("only site", stated="y"), a.get()
 
-    check("ambient: resolve with NOTHING bound binds it",
-          _fresh(_unbound_resolve_binds), ("y", "y"))
+    check(
+        "ambient: resolve with NOTHING bound binds it", _fresh(_unbound_resolve_binds), ("y", "y")
+    )
 
     # ── the override: registered, reasoned, and a NEW CONTEXT ────────────────────
     def _unregistered_override_refuses():
@@ -1659,19 +1819,18 @@ def _selftest():
         except ValueError as e:
             return "raised" if "NOT REGISTERED" in str(e) else f"wrong msg: {e}"
 
-    check("override: an UNREGISTERED label REFUSES", _unregistered_override_refuses(),
-          "raised")
+    check("override: an UNREGISTERED label REFUSES", _unregistered_override_refuses(), "raised")
 
     def _reasonless_override_refuses():
         try:
-            INTENT.override("apply", reason="",
-                            label="prune_leaf_opens (dry-run writes-then-restores)")
+            INTENT.override(
+                "apply", reason="", label="prune_leaf_opens (dry-run writes-then-restores)"
+            )
             return "NO RAISE"
         except ValueError as e:
             return "raised" if "requires a REASON" in str(e) else f"wrong msg: {e}"
 
-    check("override: a REASONLESS override REFUSES", _reasonless_override_refuses(),
-          "raised")
+    check("override: a REASONLESS override REFUSES", _reasonless_override_refuses(), "raised")
 
     # ⚑ THE REGISTERED ONE RUNS, IN A COPIED CONTEXT, AND LEAVES THE OUTER BINDING
     # UNTOUCHED. Both halves are the case: the body sees the override, and the caller
@@ -1679,41 +1838,55 @@ def _selftest():
     def _registered_override_is_scoped():
         INTENT.set("dry-run", "entry")
         inner = INTENT.override(
-            "apply", reason="writes then restores even on a dry run",
+            "apply",
+            reason="writes then restores even on a dry run",
             label="prune_leaf_opens (dry-run writes-then-restores)",
-            announce_to=lambda _m: None).run(lambda: INTENT.get())
+            announce_to=lambda _m: None,
+        ).run(lambda: INTENT.get())
         return inner, INTENT.get()
 
-    check("override: registered runs in a COPIED context; outer binding survives",
-          _fresh(_registered_override_is_scoped), ("apply", "dry-run"))
+    check(
+        "override: registered runs in a COPIED context; outer binding survives",
+        _fresh(_registered_override_is_scoped),
+        ("apply", "dry-run"),
+    )
 
     # ⚑ AND IT IS NOT A CONTEXT MANAGER — a `with` would mutate the current context and
     # undo it, the write-then-reset hole write-once exists to close.
     def _override_rejects_with():
         try:
-            with INTENT.override("apply", reason="r",
-                                 label="prune_leaf_opens (dry-run writes-then-restores)"):
+            with INTENT.override(
+                "apply", reason="r", label="prune_leaf_opens (dry-run writes-then-restores)"
+            ):
                 return "NO RAISE"
         except TypeError as e:
             return "raised" if "not a context manager" in str(e) else f"wrong: {e}"
 
-    check("override: `with` is REFUSED and names the .run() successor",
-          _fresh(_override_rejects_with), "raised")
+    check(
+        "override: `with` is REFUSED and names the .run() successor",
+        _fresh(_override_rejects_with),
+        "raised",
+    )
 
     # ── the tenant var: same mechanism, third declaration ────────────────────────
     def _tenant_names_itself():
         return naming_tenant("live", "a-report")
 
-    check("tenant: binding RETURNS the label a result must carry",
-          _fresh(_tenant_names_itself), "[tenant=live]")
+    check(
+        "tenant: binding RETURNS the label a result must carry",
+        _fresh(_tenant_names_itself),
+        "[tenant=live]",
+    )
 
     def _two_independent_tenant_resolutions_raise():
         """⟡index-coverage-wrong-store, in miniature: two functions, one report."""
+
         def _coverage():
             return naming_tenant("sandbox", "_live_indexed")
 
         def _selectivity():
             return naming_tenant("live", "_selectivity")
+
         _coverage()
         try:
             _selectivity()
@@ -1721,8 +1894,11 @@ def _selftest():
         except AmbientConflict as e:
             return "raised" if "_live_indexed" in str(e) else f"wrong msg: {e}"
 
-    check("tenant: TWO INDEPENDENT resolutions in one process RAISE, naming the first",
-          _fresh(_two_independent_tenant_resolutions_raise), "raised")
+    check(
+        "tenant: TWO INDEPENDENT resolutions in one process RAISE, naming the first",
+        _fresh(_two_independent_tenant_resolutions_raise),
+        "raised",
+    )
 
     # ⚑ THE SNAPSHOT RECORD IS PER-INVOCATION, AND THE COPIED SET ACCUMULATES — the
     # `_snapshot_once` bug. A latch would leave `copied` at one member.
@@ -1733,8 +1909,11 @@ def _selftest():
         st["copied"].add("b.agda")
         return len(SNAPSHOT_STATE.get()["copied"])
 
-    check("snapshot: the per-invocation copied set ACCUMULATES (not a latch)",
-          _fresh(_snapshot_state_accumulates), 2)
+    check(
+        "snapshot: the per-invocation copied set ACCUMULATES (not a latch)",
+        _fresh(_snapshot_state_accumulates),
+        2,
+    )
 
     # ⚑⚑⚑ THIS CASE FAILED TWICE AND THE CASE WAS THE BUG BOTH TIMES — recorded rather
     # than quietly corrected, because the wrong belief behind it is the exact one this
@@ -1755,8 +1934,11 @@ def _selftest():
         _fresh(lambda: _probe_var.set({"armed": True}))
         return _fresh(lambda: _probe_var.get())
 
-    check("snapshot: a write in one context does NOT reach a sibling "
-          "(a module global would)", _writes_do_not_cross_contexts(), None)
+    check(
+        "snapshot: a write in one context does NOT reach a sibling (a module global would)",
+        _writes_do_not_cross_contexts(),
+        None,
+    )
 
     ok = sum(1 for _, good, _, _ in cases if good)
     for name, good, got, want in cases:
@@ -1850,12 +2032,13 @@ if __name__ == "__main__":
             for p in hit[:5]:
                 print(f"      {p}")
             if len(hit) > 5:
-                print(f"      … {len(hit)-5} more matching path(s)")
-        print(f"{len(rows)} snapshot(s) hold a path matching {frag!r} "
-              f"(newest first)")
+                print(f"      … {len(hit) - 5} more matching path(s)")
+        print(f"{len(rows)} snapshot(s) hold a path matching {frag!r} (newest first)")
         if rows:
-            print(f"   restore:  python3 scratch/edit_snapshot.py "
-                  f"--from-snapshot={rows[0][0][:12]} <path> --apply")
+            print(
+                f"   restore:  python3 scratch/edit_snapshot.py "
+                f"--from-snapshot={rows[0][0][:12]} <path> --apply"
+            )
         sys.exit(0)
 
     if "--list" in sys.argv:
@@ -1877,8 +2060,7 @@ if __name__ == "__main__":
     # rewrite the usage line to match the `=` spelling. Deleting the declaration would have
     # paid the key down while removing the only place a reader learns the mode exists.
     _FROM_SNAPSHOT = "--from-snapshot"
-    _fs = next((a.split("=", 1)[1] for a in sys.argv
-                if a.startswith(_FROM_SNAPSHOT + "=")), None)
+    _fs = next((a.split("=", 1)[1] for a in sys.argv if a.startswith(_FROM_SNAPSHOT + "=")), None)
     if _fs:
         _paths = [a for a in sys.argv[1:] if not a.startswith("-")]
         _ap = "--apply" in sys.argv
@@ -1892,11 +2074,15 @@ if __name__ == "__main__":
             # ⚑ SAY WHAT THE UNTRACKED HALF ACTUALLY IS.  `.edit-snapshots/` is
             # keyed by PATH, so it holds the most recent pre-write copy — not one
             # per SHA.  A caller must not read this as a historical version.
-            print("   ⚑ untracked entries are the MOST RECENT pre-write copy "
-                  "(the store is keyed by path, not by sha)")
+            print(
+                "   ⚑ untracked entries are the MOST RECENT pre-write copy "
+                "(the store is keyed by path, not by sha)"
+            )
         if not _ap:
             print("\nDry run — pass --apply to execute.")
         sys.exit(0)
     print(__doc__)
-    print("usage: edit_snapshot.py [--selftest|--list]\n"
-          "       edit_snapshot.py --from-snapshot=<sha> [paths] [--apply]")
+    print(
+        "usage: edit_snapshot.py [--selftest|--list]\n"
+        "       edit_snapshot.py --from-snapshot=<sha> [paths] [--apply]"
+    )

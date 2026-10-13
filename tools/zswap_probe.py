@@ -29,6 +29,7 @@ Scope: measured against linux-source 7.0.0-30.30.  These are claims about THIS p
     trusting a past reading; an instrument earns trust per-use, a gate by proven
     soundness in both directions, and this has only ever been the former.
 """
+
 import json
 import sys
 from pathlib import Path
@@ -62,8 +63,13 @@ def stat_keys(d: Path, keys):
 # row as one kind.  current/zswap/zswapped are INSTANTANEOUS; peak is CUMULATIVE since cgroup
 # creation on a never-written fd (per-fd reset semantics), so on a long-lived cgroup it spans
 # unrelated history and is not comparable to a short-lived action's peak.  Labelled per FIELD.
-_VALIDITY = {"current": "instantaneous", "zswap": "instantaneous", "zswapped": "instantaneous",
-             "zswap_max": "config", "peak": "cumulative-since-cgroup-creation"}
+_VALIDITY = {
+    "current": "instantaneous",
+    "zswap": "instantaneous",
+    "zswapped": "instantaneous",
+    "zswap_max": "config",
+    "peak": "cumulative-since-cgroup-creation",
+}
 
 
 def zswap_bound(leaf: Path) -> dict:
@@ -83,7 +89,7 @@ def zswap_bound(leaf: Path) -> dict:
         cur = read(d, "memory.zswap.current")
         levels.append({"cgroup": str(d), "zswap_max": v, "zswap_current": cur})
         if isinstance(v, str) and v != "max" and binding is None:
-            binding = str(d)                       # the nearest ancestor that can refuse a store
+            binding = str(d)  # the nearest ancestor that can refuse a store
         if d == root:
             break
         d = d.parent
@@ -95,9 +101,14 @@ def sample() -> dict:
     # ONE pass, in the tightest window available: stat first (it carries both zswap counters),
     # then the single-value files.  A wider window is a bigger skew under reclaim.
     st = stat_keys(d, ("zswap", "zswapped"))
-    out = {"cgroup": str(d), "is_root": str(d) == "/sys/fs/cgroup",
-           "current": read(d, "memory.current"), "peak": read(d, "memory.peak"),
-           "zswap_max": read(d, "memory.zswap.max"), **st}
+    out = {
+        "cgroup": str(d),
+        "is_root": str(d) == "/sys/fs/cgroup",
+        "current": read(d, "memory.current"),
+        "peak": read(d, "memory.peak"),
+        "zswap_max": read(d, "memory.zswap.max"),
+        **st,
+    }
     z, zd = out.get("zswap"), out.get("zswapped")
     if isinstance(z, int) and isinstance(zd, int) and z > 0:
         # application bytes per backend byte.  UNBOUNDED this is compressibility; BOUNDED it also
@@ -122,8 +133,11 @@ def sample() -> dict:
     # bounded it is eviction churn.  Two quantities, one formula — so the state travels with it.
     hier = zswap_bound(d)
     if "compression_ratio" in out:
-        out["ratio_means"] = ("compressibility" if hier["effective_bound_at"] == "unbounded-to-root"
-                              else "eviction-churn-under-bound")
+        out["ratio_means"] = (
+            "compressibility"
+            if hier["effective_bound_at"] == "unbounded-to-root"
+            else "eviction-churn-under-bound"
+        )
     # Ρ·mem·provenance — WHICH SETTINGS WERE IN EFFECT, recorded beside the number.  Three times in
     # one investigation a setting correct for its own purpose disabled a different capability with
     # no error: MemorySwapMax=0 made zswap unmeasurable, the observe flag living in the action key
@@ -132,14 +146,16 @@ def sample() -> dict:
     # carries the conditions that decide whether it is a measurement or an artifact, the same way a
     # source quote carries its version pin.
     out["_conditions"] = {
-        "swap_max": read(d, "memory.swap.max"),        # 0 ⇒ zswap can never be exercised here
+        "swap_max": read(d, "memory.swap.max"),  # 0 ⇒ zswap can never be exercised here
         "own_cgroup": not str(d).endswith(".scope") or "sandbox" in str(d) or "run-p" in str(d),
-        "cgroup_is_leaf": not any(x.is_dir() and (x / "cgroup.procs").exists()
-                                  for x in d.iterdir()) if d.is_dir() else None,
+        "cgroup_is_leaf": not any(x.is_dir() and (x / "cgroup.procs").exists() for x in d.iterdir())
+        if d.is_dir()
+        else None,
     }
     out["hierarchy"] = hier
-    out["_validity"] = dict(_VALIDITY, memory_max="config", pinned_at_ceiling="derived",
-                            ratio_means="derived")
+    out["_validity"] = dict(
+        _VALIDITY, memory_max="config", pinned_at_ceiling="derived", ratio_means="derived"
+    )
     return out
 
 
@@ -170,15 +186,19 @@ def _selftest() -> int:
     fails = []
     if not separates():
         fails.append("P: intact predicate does not separate saturated from unsaturated")
-    for name, kw in (("sign-swapped gap", {"flip": True}),
-                     ("tolerance widened to 1GB", {"tol_abs": 10 ** 9}),
-                     ("tolerance driven to 0", {"tol_abs": 0, "tol_rel": 10 ** 9})):
+    for name, kw in (
+        ("sign-swapped gap", {"flip": True}),
+        ("tolerance widened to 1GB", {"tol_abs": 10**9}),
+        ("tolerance driven to 0", {"tol_abs": 0, "tol_rel": 10**9}),
+    ):
         if separates(**kw):
             fails.append(f"F: mutant '{name}' SURVIVED — the predicate is not reading the gap")
     for f in fails:
         print(f"  XX {f}", file=sys.stderr)
-    print("ZSWAP_PROBE SELFTEST: " + ("PASS (1 P-arm, 3 valid mutants caught)" if not fails
-                                      else f"FAIL ({len(fails)})"))
+    print(
+        "ZSWAP_PROBE SELFTEST: "
+        + ("PASS (1 P-arm, 3 valid mutants caught)" if not fails else f"FAIL ({len(fails)})")
+    )
     return 1 if fails else 0
 
 

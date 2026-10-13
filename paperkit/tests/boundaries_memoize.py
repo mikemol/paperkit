@@ -12,6 +12,7 @@ invalidates exactly the checks whose footprint it touches; and --no-cache recomp
 
     python3 paperkit/tests/boundaries_memoize.py
 """
+
 from __future__ import annotations
 
 import json
@@ -37,8 +38,18 @@ import paperkit.cache
 
 
 def _disc(proj, *flags):
-    return subprocess.run([sys.executable, str(paperkit.tests._fixture_model.DISCRIMINATE), "--all", "--json", *flags, str(proj)],
-                          capture_output=True, text=True).stdout
+    return subprocess.run(
+        [
+            sys.executable,
+            str(paperkit.tests._fixture_model.DISCRIMINATE),
+            "--all",
+            "--json",
+            *flags,
+            str(proj),
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout
 
 
 def _grades(out):
@@ -65,8 +76,15 @@ def main() -> int:
 
     d = tempfile.mkdtemp()
     try:
-        proj = paperkit.tests._fixture_model._write(d, [paperkit.tests._fixture_model.entry("w", claim="alpha", check="cmd:true")], None,
-                      (("s", "Sec"),), "t", False, False)
+        proj = paperkit.tests._fixture_model._write(
+            d,
+            [paperkit.tests._fixture_model.entry("w", claim="alpha", check="cmd:true")],
+            None,
+            (("s", "Sec"),),
+            "t",
+            False,
+            False,
+        )
 
         print("Μ behaviors\n")
         k1, k2 = paperkit.cache.content_key(proj), paperkit.cache.content_key(proj)
@@ -83,25 +101,41 @@ def main() -> int:
         out1 = _disc(proj)
         check("first run writes the cache", (proj / ".delta-cache.json").exists())
         out2 = _disc(proj)
-        check("second run (unchanged) returns the same grades",
-              _grades(out2) == _grades(out1) and out1.strip().startswith("["))
-        check("a cache hit is VISIBLE — the reused run reports grader 'cache'",
-              all(r.get("grader") == "cache" for r in json.loads(out2)))
+        check(
+            "second run (unchanged) returns the same grades",
+            _grades(out2) == _grades(out1) and out1.strip().startswith("["),
+        )
+        check(
+            "a cache hit is VISIBLE — the reused run reports grader 'cache'",
+            all(r.get("grader") == "cache" for r in json.loads(out2)),
+        )
         out3 = _disc(proj, "--no-cache")
         check("--no-cache recomputes the same grades", _grades(out3) == _grades(out1))
 
         # Δ·footprint-cache: editing a file re-grades ONLY the checks that READ it.  The
         # per-check grader field shows it — the toucher is graded fresh, the rest "cache".
-        fpp = paperkit.tests._fixture_model._write(tempfile.mkdtemp(),
-                     [paperkit.tests._fixture_model.entry("ca", claim="reads a", check="cmd:grep -q FOO fa.txt"),
-                      paperkit.tests._fixture_model.entry("cb", claim="reads b", check="cmd:grep -q BAR fb.txt")],
-                     {"fa.txt": "FOO\n", "fb.txt": "BAR\n"}, (("s", "Sec"),), "t", False, False)
+        fpp = paperkit.tests._fixture_model._write(
+            tempfile.mkdtemp(),
+            [
+                paperkit.tests._fixture_model.entry(
+                    "ca", claim="reads a", check="cmd:grep -q FOO fa.txt"
+                ),
+                paperkit.tests._fixture_model.entry(
+                    "cb", claim="reads b", check="cmd:grep -q BAR fb.txt"
+                ),
+            ],
+            {"fa.txt": "FOO\n", "fb.txt": "BAR\n"},
+            (("s", "Sec"),),
+            "t",
+            False,
+            False,
+        )
 
         def graders(p):
             return {r["check"]: r.get("grader") for r in json.loads(_disc(p))}
 
-        graders(fpp)                                   # cold run: populate the per-check cache
-        (fpp / "fa.txt").write_text("FOO EDITED\n")    # touch only ca's footprint
+        graders(fpp)  # cold run: populate the per-check cache
+        (fpp / "fa.txt").write_text("FOO EDITED\n")  # touch only ca's footprint
         g = graders(fpp)
         ca_fresh = g.get("cmd:grep -q FOO fa.txt") != "cache"
         cb_reused = g.get("cmd:grep -q BAR fb.txt") == "cache"
@@ -114,21 +148,28 @@ def main() -> int:
         gd = Path(tempfile.mkdtemp())
         mod = gd / "mod.py"
         fh, fine = paperkit.cache.footprint_hash, paperkit.discriminate._fine
-        DEF = fine({"grade": "behavioral", "tests": ["mod.py::foo"]})   # sensitive to foo, not bar
-        FILE = fine({"grade": "behavioral", "tests": ["mod.py"]})       # whole-file sensitive
+        DEF = fine({"grade": "behavioral", "tests": ["mod.py::foo"]})  # sensitive to foo, not bar
+        FILE = fine({"grade": "behavioral", "tests": ["mod.py"]})  # whole-file sensitive
         mod.write_text("def foo():\n    return 1\n\ndef bar():\n    return 2\n")
         k_def0, k_file0 = fh(gd, ["mod.py"], DEF), fh(gd, ["mod.py"], FILE)
-        mod.write_text("def foo():\n    return 1\n\ndef bar():\n    return 999\n")     # non-depended
+        mod.write_text("def foo():\n    return 1\n\ndef bar():\n    return 999\n")  # non-depended
         reuse_nondep = fh(gd, ["mod.py"], DEF) == k_def0
-        mod.write_text("def foo():\n    return 42\n\ndef bar():\n    return 2\n")      # depended
+        mod.write_text("def foo():\n    return 42\n\ndef bar():\n    return 2\n")  # depended
         regrade_dep = fh(gd, ["mod.py"], DEF) != k_def0
-        mod.write_text("def foo():\n    return 12345\n\ndef bar():\n    return 2\n")   # def-body edit
+        mod.write_text(
+            "def foo():\n    return 12345\n\ndef bar():\n    return 2\n"
+        )  # def-body edit
         sound_file = fh(gd, ["mod.py"], FILE) != k_file0
         shutil.rmtree(gd, ignore_errors=True)
-        check("Δ·grain: a def the check does NOT depend on → grade reused (the def key holds)", reuse_nondep)
+        check(
+            "Δ·grain: a def the check does NOT depend on → grade reused (the def key holds)",
+            reuse_nondep,
+        )
         check("Δ·grain: a def the check DEPENDS on → re-graded (the def key changes)", regrade_dep)
-        check("Δ·grain SOUNDNESS: a FILE-granular grade keeps the WHOLE-file key — a def-body edit invalidates",
-              sound_file)
+        check(
+            "Δ·grain SOUNDNESS: a FILE-granular grade keeps the WHOLE-file key — a def-body edit invalidates",
+            sound_file,
+        )
 
         # ── Ζ·checkcache·keys ──────────────────────────────────────────────────────────────────
         # THE SECOND CACHE IN THIS TREE, and its key had a scheduled expiry.  checkcache.py keys a
@@ -169,18 +210,23 @@ def main() -> int:
         try:
             (eng / "ccfake_engine.py").write_text("VALUE = 1\n")
             wit = cc / "concepts.py"
-            wit.write_text("def w_reaches(x):\n"            # reachable BY NAME as an engine module
-                           "    import ccfake_engine as FE\n"   # is after the retirement, with
-                           "    assert FE.VALUE\n"               # nothing the witness itself put
-                           "def w_reaches_not(x):\n"             # on sys.path.
-                           "    assert True\n")
+            wit.write_text(
+                "def w_reaches(x):\n"  # reachable BY NAME as an engine module
+                "    import ccfake_engine as FE\n"  # is after the retirement, with
+                "    assert FE.VALUE\n"  # nothing the witness itself put
+                "def w_reaches_not(x):\n"  # on sys.path.
+                "    assert True\n"
+            )
 
             def ckey(fn, route):
                 """The key checkcache derives, asked of it as a program."""
                 r = subprocess.run(
                     [sys.executable, str(ENGINE / "checkcache.py"), "--key", str(wit), fn, route],
-                    capture_output=True, text=True,
-                    env={**os.environ, "PYTHONPATH": str(eng)}, check=False)
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, "PYTHONPATH": str(eng)},
+                    check=False,
+                )
                 return r.stdout.strip()
 
             # ⚑ `eng` is on the child's PYTHONPATH and NOT in checkcache's search list (which is
@@ -194,14 +240,16 @@ def main() -> int:
             def _dirsearch_only(mod, search):
                 # the PRE-FIX resolution, verbatim in behavior: directories only, no import system
                 for d in search:
-                    for cand in (d / f"{mod.replace('.', '/')}.py",
-                                 d / mod.replace(".", "/") / "__init__.py"):
+                    for cand in (
+                        d / f"{mod.replace('.', '/')}.py",
+                        d / mod.replace(".", "/") / "__init__.py",
+                    ):
                         if cand.is_file():
                             return cand
                 return None
 
             old_before = _dirsearch_only("ccfake_engine", [cc])
-            (eng / "ccfake_engine.py").write_text("VALUE = 999\n")     # EDIT the engine module
+            (eng / "ccfake_engine.py").write_text("VALUE = 999\n")  # EDIT the engine module
             k_after, k_ctl_after = ckey("w_reaches", "r/e"), ckey("w_reaches_not", "r/n")
             old_after = _dirsearch_only("ccfake_engine", [cc])
 
@@ -212,43 +260,76 @@ def main() -> int:
             shutil.rmtree(eng, ignore_errors=True)
             shutil.rmtree(cc, ignore_errors=True)
 
-        check("Ζ·checkcache·keys: search_path() mutates nothing and returns only the declared dir",
-              search_is_pure)
-        check("Ζ·checkcache·keys: an engine module is resolved to a FILE with no caller mutation",
-              reaches_content)
-        check("Ζ·checkcache·keys F-ARM: editing an engine module the witness loads MOVES its key",
-              key_moved)
-        check("Ζ·checkcache·keys control: a witness that cannot reach it keeps its key",
-              control_held)
-        check("Ζ·checkcache·keys counterfactual: the pre-fix directory search MISSES that module "
-              "(so the F arm dates a real stale-green, not a precaution)", old_was_blind)
+        check(
+            "Ζ·checkcache·keys: search_path() mutates nothing and returns only the declared dir",
+            search_is_pure,
+        )
+        check(
+            "Ζ·checkcache·keys: an engine module is resolved to a FILE with no caller mutation",
+            reaches_content,
+        )
+        check(
+            "Ζ·checkcache·keys F-ARM: editing an engine module the witness loads MOVES its key",
+            key_moved,
+        )
+        check(
+            "Ζ·checkcache·keys control: a witness that cannot reach it keeps its key", control_held
+        )
+        check(
+            "Ζ·checkcache·keys counterfactual: the pre-fix directory search MISSES that module "
+            "(so the F arm dates a real stale-green, not a precaution)",
+            old_was_blind,
+        )
         print()
 
         print("⟨P, F, δ⟩ minimum-delta pairs\n")
         pairs = [
-            ("the content key tracks mutable inputs only", "whether the changed file is an input",
-             "edited .bib → key changes", k3 != k1,
-             "added .log  → key holds", k4 == k3),
-            ("a grade is reused iff the inputs hold", "the project content (via the cache)",
-             "unchanged → cache hit, same grades", _grades(out1) == _grades(out2),
-             "--no-cache → recomputed, same grades", _grades(out3) == _grades(out1)),
-            ("the cache invalidates PER CHECK, on its footprint", "which check's footprint the edited file is in",
-             "ca reads fa.txt (edited) → re-graded", ca_fresh,
-             "cb reads fb.txt (untouched) → reused", cb_reused),
-            ("Δ·grain keys on the DEFINITIONS a check depends on, not the whole file",
-             "whether the edited def is in the check's measured sensitivity set",
-             "non-depended def edited → grade reused", reuse_nondep,
-             "depended def edited → grade re-graded", regrade_dep),
+            (
+                "the content key tracks mutable inputs only",
+                "whether the changed file is an input",
+                "edited .bib → key changes",
+                k3 != k1,
+                "added .log  → key holds",
+                k4 == k3,
+            ),
+            (
+                "a grade is reused iff the inputs hold",
+                "the project content (via the cache)",
+                "unchanged → cache hit, same grades",
+                _grades(out1) == _grades(out2),
+                "--no-cache → recomputed, same grades",
+                _grades(out3) == _grades(out1),
+            ),
+            (
+                "the cache invalidates PER CHECK, on its footprint",
+                "which check's footprint the edited file is in",
+                "ca reads fa.txt (edited) → re-graded",
+                ca_fresh,
+                "cb reads fb.txt (untouched) → reused",
+                cb_reused,
+            ),
+            (
+                "Δ·grain keys on the DEFINITIONS a check depends on, not the whole file",
+                "whether the edited def is in the check's measured sensitivity set",
+                "non-depended def edited → grade reused",
+                reuse_nondep,
+                "depended def edited → grade re-graded",
+                regrade_dep,
+            ),
             # ⚑ THE δ IS THE INSTRUMENT, NOT THE EDIT.  Both sides here edit the SAME module by the
             # SAME bytes and ask the SAME question; the only thing that varies is WHICH resolution
             # answers it.  That is what makes this a measurement of the fix rather than a
             # restatement of it — the pre-fix arm is shown BLIND to an edit the post-fix arm sees,
             # so the suite would fail if the hole were reopened AND would have failed before it
             # was closed.
-            ("Ζ·checkcache·keys: the key tracks engine-module CONTENT without a path mutation",
-             "whether module→file resolution asks the import system or only a mutated search path",
-             "find_spec resolution → the edit moves the key", key_moved,
-             "pre-fix directory search → the same edit is INVISIBLE", old_was_blind),
+            (
+                "Ζ·checkcache·keys: the key tracks engine-module CONTENT without a path mutation",
+                "whether module→file resolution asks the import system or only a mutated search path",
+                "find_spec resolution → the edit moves the key",
+                key_moved,
+                "pre-fix directory search → the same edit is INVISIBLE",
+                old_was_blind,
+            ),
         ]
         n_deltas = len(pairs)
         for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:

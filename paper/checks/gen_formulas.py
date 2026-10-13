@@ -13,6 +13,7 @@ not authored prose.
     python3 checks/gen_formulas.py            # print the table to stdout (the fresh source)
     python3 checks/gen_formulas.py --check     # assert assets/formulas.md == the projection
 """
+
 from __future__ import annotations
 
 import re
@@ -25,14 +26,10 @@ import paperkit.bib  # noqa: E402
 # spans is the row's formula (a claim may carry more than one — index into its spans).  This is the
 # ONLY authored part: the label and the selection; the FORMULA itself is read from the claim.
 ROWS = [
-    ("edge-rests-grounds", "clamp", 0,
-     "the effective grade is the weakest along `rests-on`"),
-    ("grounding-reflected", "disjoint", 0,
-     "a grounding edge the measurement cannot see"),
-    ("emergence-collapse", "increment", 0,
-     "the claim's irreducible sensitivity residual"),
-    ("emergence-collapse", "collapse", 1,
-     "the claim adds no sensitivity beyond its grounding"),
+    ("edge-rests-grounds", "clamp", 0, "the effective grade is the weakest along `rests-on`"),
+    ("grounding-reflected", "disjoint", 0, "a grounding edge the measurement cannot see"),
+    ("emergence-collapse", "increment", 0, "the claim's irreducible sensitivity residual"),
+    ("emergence-collapse", "collapse", 1, "the claim adds no sensitivity beyond its grounding"),
 ]
 
 # an inline-math span in a claim value: $...$ with escaped-$ ignored (mirrors the projector's shield)
@@ -41,9 +38,11 @@ _MATH = re.compile(r"(?<!\\)\$(?!\$)(.+?)(?<!\\)\$", re.S)
 
 def _claims() -> dict:
     recs = {}
-    pdir = Path(__file__).resolve().parents[1]           # the paper project dir (has paper.toml)
+    pdir = Path(__file__).resolve().parents[1]  # the paper project dir (has paper.toml)
     for f in sorted(pdir.glob("*.bib")):
-        recs.update(paperkit.bib.load_bib(f, pdir))               # route through the owner — bind paper's consumer_fields
+        recs.update(
+            paperkit.bib.load_bib(f, pdir)
+        )  # route through the owner — bind paper's consumer_fields
     return recs
 
 
@@ -54,7 +53,9 @@ def table() -> str:
         claim = recs.get(key, {}).get("claim", "")
         spans = _MATH.findall(claim)
         if idx >= len(spans):
-            sys.exit(f"gen_formulas: claim {key} has no math span #{idx} — the table's owner changed")
+            sys.exit(
+                f"gen_formulas: claim {key} has no math span #{idx} — the table's owner changed"
+            )
         lines.append(f"| {label} | {gloss} | ${spans[idx].strip()}$ |")
     return "\n".join(lines) + "\n"
 
@@ -67,8 +68,11 @@ def main(argv: list[str]) -> int:
             print(f"gen_formulas --check: {asset} is absent — regenerate", file=sys.stderr)
             return 1
         if asset.read_text().strip() != out.strip():
-            print("gen_formulas --check: assets/formulas.md drifted from the claims that own the "
-                  "formulas — regenerate (checks/gen_formulas.py > assets/formulas.md)", file=sys.stderr)
+            print(
+                "gen_formulas --check: assets/formulas.md drifted from the claims that own the "
+                "formulas — regenerate (checks/gen_formulas.py > assets/formulas.md)",
+                file=sys.stderr,
+            )
             return 1
         print("gen_formulas --check: the formula table matches its owning claims")
         return 0

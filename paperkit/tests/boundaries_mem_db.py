@@ -8,6 +8,7 @@ delta is one cell's peak crossing a pow2 boundary.
 
     python3 paperkit/tests/boundaries_mem_db.py
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -35,31 +36,40 @@ def main() -> int:
         c = tools.mem_db.connect(d / "m.db")
 
         # ---- P: a manifest is a QUERY over observations ----
-        tools.mem_db.record(c, [("lib", "file", "a", "a__calc", 200 * MB),
-                     ("lib", "file", "b", "b__calc", 100 * MB)], run="r1")
+        tools.mem_db.record(
+            c,
+            [("lib", "file", "a", "a__calc", 200 * MB), ("lib", "file", "b", "b__calc", 100 * MB)],
+            run="r1",
+        )
         m = tools.mem_db.manifest(c, "lib")
-        check("P: the resolution default is the pow2 of the WORST cell",
-              m["file"] == 256)
-        check("P: a claim below that default is recorded as an override",
-              m["claims"] == {"b": 128})
-        check("P: a claim AT the default is not an override (no redundant rows)",
-              "a" not in m["claims"])
+        check("P: the resolution default is the pow2 of the WORST cell", m["file"] == 256)
+        check("P: a claim below that default is recorded as an override", m["claims"] == {"b": 128})
+        check(
+            "P: a claim AT the default is not an override (no redundant rows)",
+            "a" not in m["claims"],
+        )
 
         # ---- the property JSON could not provide ----
         p = tools.mem_db.provenance(c, "lib")
-        check("P: the bucket carries its EVIDENCE — cell count and the measured range",
-              p["cells"] == 2 and p["min_mb"] == 100.0 and p["max_mb"] == 200.0)
+        check(
+            "P: the bucket carries its EVIDENCE — cell count and the measured range",
+            p["cells"] == 2 and p["min_mb"] == 100.0 and p["max_mb"] == 200.0,
+        )
 
         # ---- F: monotone. A narrower re-measure must not erode a reservation ----
         # A harvest sees only the cells that happened to run; a smaller reading is evidence of a
         # narrower measurement, never that a cell got cheaper.  Enforced by the upsert's `max`,
         # not by a hand-written merge — which is where the bug landed when it WAS hand-written.
         tools.mem_db.record(c, [("lib", "file", "a", "a__calc", 10 * MB)], run="r2-narrow")
-        check("F: a LOWER reading for the same cell leaves the reservation unchanged",
-              tools.mem_db.manifest(c, "lib")["file"] == 256)
+        check(
+            "F: a LOWER reading for the same cell leaves the reservation unchanged",
+            tools.mem_db.manifest(c, "lib")["file"] == 256,
+        )
         tools.mem_db.record(c, [("lib", "file", "a", "a__calc", 900 * MB)], run="r3-bigger")
-        check("F: a HIGHER reading RAISES it — the rule is monotone, not frozen",
-              tools.mem_db.manifest(c, "lib")["file"] == 1024)
+        check(
+            "F: a HIGHER reading RAISES it — the rule is monotone, not frozen",
+            tools.mem_db.manifest(c, "lib")["file"] == 1024,
+        )
 
         # ---- δ: one cell crossing a pow2 boundary is the whole difference ----
         c2 = tools.mem_db.connect(d / "n.db")
@@ -67,16 +77,19 @@ def main() -> int:
         lo = tools.mem_db.manifest(c2, "x")["def"]
         tools.mem_db.record(c2, [("x", "def", "k", "k__c2", 257 * MB)])
         hi = tools.mem_db.manifest(c2, "x")["def"]
-        check("δ: 256MB → 256; one more MB in a sibling cell → 512",
-              (lo, hi) == (256, 512))
+        check("δ: 256MB → 256; one more MB in a sibling cell → 512", (lo, hi) == (256, 512))
 
         # ---- P: a claim's reservation is the MAX over its cells (a def grid runs concurrently) ----
-        check("P: a def claim's many cells reduce to their worst, not their mean",
-              tools.mem_db.manifest(c2, "x")["def"] == 512)
+        check(
+            "P: a def claim's many cells reduce to their worst, not their mean",
+            tools.mem_db.manifest(c2, "x")["def"] == 512,
+        )
 
         # ---- F: an unmeasured project yields an empty manifest, not a wrong one ----
-        check("F: a project with no observations yields {} — absence is not a measurement",
-              tools.mem_db.manifest(c, "never-measured") == {"claims": {}})
+        check(
+            "F: a project with no observations yields {} — absence is not a measurement",
+            tools.mem_db.manifest(c, "never-measured") == {"claims": {}},
+        )
     finally:
         shutil.rmtree(d, ignore_errors=True)
 

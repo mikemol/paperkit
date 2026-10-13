@@ -11,6 +11,7 @@ of its footprint cannot change its verdict.  Bounds:
 
     python3 paperkit/tests/boundaries_footprint.py
 """
+
 from __future__ import annotations
 
 import json
@@ -35,8 +36,12 @@ def fp(check):
 
 def sens(check):
     # Δ's sensitivity `tests` for the same check, over a fixture shipping a.txt
-    _, out = paperkit.tests._fixture_delta.discriminate([paperkit.tests._fixture_model.entry("w", claim="c", check=check)], "--all", "--json",
-                          assets={"a.txt": "FOO\n"})
+    _, out = paperkit.tests._fixture_delta.discriminate(
+        [paperkit.tests._fixture_model.entry("w", claim="c", check=check)],
+        "--all",
+        "--json",
+        assets={"a.txt": "FOO\n"},
+    )
     return json.loads(out)[0].get("tests", [])
 
 
@@ -80,11 +85,13 @@ def main() -> int:
     print("      δ (min delta): the check greps one more file (b.txt)\n")
 
     # the keystone delta: read footprint ⊋ sensitivity — sound to cache on where `tests` is not
-    blind = "cmd:cat a.txt >/dev/null 2>&1; true"   # READS a.txt; always exits 0 (corruption-blind)
+    blind = "cmd:cat a.txt >/dev/null 2>&1; true"  # READS a.txt; always exits 0 (corruption-blind)
     fblind, sblind = fp(blind), sens(blind)
     ok2 = fblind == ["a.txt"] and "a.txt" not in sblind
     fails.append("reads-superset-sensitivity") if not ok2 else None
-    print(f"  {'ok ' if ok2 else 'XX '}read footprint ⊋ Δ sensitivity (the gap that makes reads the sound cache key)")
+    print(
+        f"  {'ok ' if ok2 else 'XX '}read footprint ⊋ Δ sensitivity (the gap that makes reads the sound cache key)"
+    )
     print(f"      P (footprint):   {fblind}  — the check READS a.txt")
     print(f"      F (sensitivity): {sblind}  — no single corruption FLIPS it (corruption-blind)")
     print("      δ (min delta): a check can read an input that its sensitivity set misses\n")

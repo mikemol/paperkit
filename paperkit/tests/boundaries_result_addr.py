@@ -20,6 +20,7 @@ typo'd address look like a failing sibling.
 
 Run:  python3 paperkit/tests/boundaries_result_addr.py
 """
+
 from __future__ import annotations
 
 import json
@@ -44,13 +45,15 @@ def _sib(tmp: Path, green: bool = True) -> Path:
     (g / "").mkdir(parents=True, exist_ok=True)
     (g / "paper.toml").write_text(
         '[paper]\ntitle = "t"\nwarrants = ["w.bib"]\nrubric = "r.tsv"\n'
-        'out = "out.md"\nnumbered = false\nreferences = false\n')
+        'out = "out.md"\nnumbered = false\nreferences = false\n'
+    )
     (g / "r.tsv").write_text("s\tSec\n")
     (g / "w.bib").write_text(
         "@misc{c,\n  section = {s}, claim = {a sibling claim},\n"
         f"  check = {{{'file:w.bib' if green else 'cmd:false'}}}\n}}\n"
         "@misc{d,\n  section = {s}, claim = {a second sibling claim},\n"
-        "  check = {file:r.tsv}\n}\n")
+        "  check = {file:r.tsv}\n}\n"
+    )
     # c and d must not share a witness: --without-K forbids two cited claims collapsing onto one
     # (proof-irrelevance refused -- K-and-without-K-in-paperkit), and result: passes --without-K.
     # The WHOLE-project gate additionally enforces PROJECT (committed prose == the projection), so
@@ -58,16 +61,22 @@ def _sib(tmp: Path, green: bool = True) -> Path:
     # invariant -- which is itself the asymmetry this suite pins: the leaf answers about ONE claim,
     # the node answers about the document.  Built by running the projector (Φ: reuse the validated
     # path, do not hand-write prose that drifts when the format moves).
-    subprocess.run([sys.executable, str(ENG / "project.py"), str(g)],
-                   check=True, capture_output=True, text=True)
+    subprocess.run(
+        [sys.executable, str(ENG / "project.py"), str(g)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     return g
 
 
 def _leaf(project: Path, claim: str) -> dict:
     """The sibling gate's --only leaf, as a machine consumer sees it."""
-    r = subprocess.run([sys.executable, GATE, "--json", "--safe", "--without-K",
-                        "--only", claim, str(project)],
-                       capture_output=True, text=True)          # Λ·separate-filehandles
+    r = subprocess.run(
+        [sys.executable, GATE, "--json", "--safe", "--without-K", "--only", claim, str(project)],
+        capture_output=True,
+        text=True,
+    )  # Λ·separate-filehandles
     return {"rc": r.returncode, "rec": json.loads(r.stdout or "{}")}
 
 
@@ -89,7 +98,8 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as d:
         tmp = Path(d)
-        here = tmp / "here"; here.mkdir()
+        here = tmp / "here"
+        here.mkdir()
 
         # ── 1. the leaf SPEAKS: pass / fail / refuse are three distinct machine-readable answers ──
         g_ok = _sib(tmp / "ok", green=True)
@@ -100,14 +110,28 @@ def main() -> int:
         r = _leaf(g_ok, "no-such-key")
 
         checks = [
-            ("leaf pass  → rc 0, available, pass",
-             p["rc"] == 0 and p["rec"].get("available") is True and p["rec"].get("pass") is True, p),
-            ("leaf fail  → rc 1, available, NOT pass",
-             f["rc"] == 1 and f["rec"].get("available") is True and f["rec"].get("pass") is False, f),
-            ("leaf refuse→ rc 3, NOT available (a typo'd key is a caller bug)",
-             r["rc"] == 3 and r["rec"].get("available") is False, r),
-            ("leaf names WHICH claim it answered (an answer without its question is unusable)",
-             p["rec"].get("only") == "c" and p["rec"].get("check") == "file:w.bib", p),
+            (
+                "leaf pass  → rc 0, available, pass",
+                p["rc"] == 0 and p["rec"].get("available") is True and p["rec"].get("pass") is True,
+                p,
+            ),
+            (
+                "leaf fail  → rc 1, available, NOT pass",
+                f["rc"] == 1
+                and f["rec"].get("available") is True
+                and f["rec"].get("pass") is False,
+                f,
+            ),
+            (
+                "leaf refuse→ rc 3, NOT available (a typo'd key is a caller bug)",
+                r["rc"] == 3 and r["rec"].get("available") is False,
+                r,
+            ),
+            (
+                "leaf names WHICH claim it answered (an answer without its question is unusable)",
+                p["rec"].get("only") == "c" and p["rec"].get("check") == "file:w.bib",
+                p,
+            ),
         ]
         print("  ⟨leaf⟩ the --only leaf answers in machine-readable form")
         for label, ok, got in checks:
@@ -119,27 +143,44 @@ def main() -> int:
         print("\n  ⟨address⟩ per-warrant delegation is FINER than the whole gate")
         rel_bad = Path("..") / g_bad.relative_to(tmp).parts[0] / "g"
         addr = [
-            ("P: result:<sib>#d  → pass  (the named warrant holds)",
-             _resolve(f"result:{rel_bad}#d", here), "pass"),
-            ("F: result:<sib>#c  → fail  (the named warrant does not)",
-             _resolve(f"result:{rel_bad}#c", here), "fail"),
-            ("δ: result:<sib>    → fail  (whole gate: c reds it, so #d's truth is INVISIBLE)",
-             _resolve(f"result:{rel_bad}", here), "fail"),
+            (
+                "P: result:<sib>#d  → pass  (the named warrant holds)",
+                _resolve(f"result:{rel_bad}#d", here),
+                "pass",
+            ),
+            (
+                "F: result:<sib>#c  → fail  (the named warrant does not)",
+                _resolve(f"result:{rel_bad}#c", here),
+                "fail",
+            ),
+            (
+                "δ: result:<sib>    → fail  (whole gate: c reds it, so #d's truth is INVISIBLE)",
+                _resolve(f"result:{rel_bad}", here),
+                "fail",
+            ),
         ]
         for label, got, want in addr:
             ok = got == want
             print(f"    {'ok  ' if ok else 'FAIL'} {label:<62} got={got}")
             if not ok:
                 fails.append(f"{label} — got {got}, want {want}")
-        print("    δ is the POINT: #d is green while the project is red — bare result: cannot say so.")
+        print(
+            "    δ is the POINT: #d is green while the project is red — bare result: cannot say so."
+        )
 
         # ── 3. the tristate survives the address ────────────────────────────────────────────────
         print("\n  ⟨tristate⟩ cannot-run is preserved, never collapsed to fail")
         tri = [
-            ("a claim key naming no check → cannot-run (caller bug, not a refutation)",
-             _resolve(f"result:{rel_bad}#no-such-key", here), "cannot-run"),
-            ("an unreachable sibling → cannot-run",
-             _resolve("result:../nonexistent#c", here), "cannot-run"),
+            (
+                "a claim key naming no check → cannot-run (caller bug, not a refutation)",
+                _resolve(f"result:{rel_bad}#no-such-key", here),
+                "cannot-run",
+            ),
+            (
+                "an unreachable sibling → cannot-run",
+                _resolve("result:../nonexistent#c", here),
+                "cannot-run",
+            ),
         ]
         for label, got, want in tri:
             ok = got == want
@@ -163,16 +204,23 @@ def main() -> int:
         v_key = paperkit.resolver.resolves(f"result:{rel_bad}#no-such-key", here, {})
         v_gone = paperkit.resolver.resolves("result:../nonexistent#c", here, {})
         att = [
-            ("the sibling RAN and declined → owner names the citation",
-             bool(v_key.owner) and "no-such-key" in v_key.owner, True),
-            ("...and carries the delegate's own account, not a disjunction",
-             bool(v_key.why), True),
-            ("the sibling was UNREACHABLE → owner is filled too (was the bare singleton)",
-             bool(v_gone.owner), True),
-            ("...and says what could not be reached",
-             bool(v_gone.why), True),
-            ("δ: the two cannot-runs are DISTINGUISHABLE — same verdict, different owner",
-             v_key.owner != v_gone.owner, True),
+            (
+                "the sibling RAN and declined → owner names the citation",
+                bool(v_key.owner) and "no-such-key" in v_key.owner,
+                True,
+            ),
+            ("...and carries the delegate's own account, not a disjunction", bool(v_key.why), True),
+            (
+                "the sibling was UNREACHABLE → owner is filled too (was the bare singleton)",
+                bool(v_gone.owner),
+                True,
+            ),
+            ("...and says what could not be reached", bool(v_gone.why), True),
+            (
+                "δ: the two cannot-runs are DISTINGUISHABLE — same verdict, different owner",
+                v_key.owner != v_gone.owner,
+                True,
+            ),
         ]
         for label, got, want in att:
             ok = got == want
@@ -185,7 +233,9 @@ def main() -> int:
         rel_ok = Path("..") / g_ok.relative_to(tmp).parts[0] / "g"
         got = _resolve(f"result:{rel_ok}", here)
         ok = got == "pass"
-        print(f"    {'ok  ' if ok else 'FAIL'} result:<green sibling> → pass                        got={got}")
+        print(
+            f"    {'ok  ' if ok else 'FAIL'} result:<green sibling> → pass                        got={got}"
+        )
         if not ok:
             fails.append(f"bare result: on a green sibling — got {got}")
 
@@ -195,10 +245,13 @@ def main() -> int:
         # shlex.quote leaves a shell-safe token BARE, so assert the address is CARRIED, and that a
         # metacharacter-bearing key would be QUOTED -- the injection seam Λ·trace·quote closed.
         nasty = paperkit.resolver._check_cmd(f"result:{rel_bad}#a b;rm", {}, here)
-        ok = ("--only" in cmd and " c " in f" {cmd} "
-              and ("'a b;rm'" in nasty or '"a b;rm"' in nasty))
-        print(f"    {'ok  ' if ok else 'FAIL'} traced command carries the --only address; a "
-              f"metacharacter key is quoted")
+        ok = (
+            "--only" in cmd and " c " in f" {cmd} " and ("'a b;rm'" in nasty or '"a b;rm"' in nasty)
+        )
+        print(
+            f"    {'ok  ' if ok else 'FAIL'} traced command carries the --only address; a "
+            f"metacharacter key is quoted"
+        )
         if not ok:
             fails.append(f"trace address/quoting: {cmd} || {nasty}")
 
@@ -218,13 +271,21 @@ def main() -> int:
     (_d / "sib" / "paper.toml").write_text("[paper]\n")
     (_d / "citer").mkdir()
     for label, got, want in [
-        ("a sibling NAME resolves to the sibling, not <citer>/<name>",
-         paperkit.resolver._sibling_for(_d / "citer", "sib"), (_d / "sib").resolve()),
-        ("the same name resolves from the tree root too",
-         paperkit.resolver._sibling_for(_d, "sib"), (_d / "sib").resolve()),
-        ("an unresolvable name is returned UNCHANGED (the gate reports its own cannot-run)",
-         pathlib.Path(str(paperkit.resolver._sibling_for(_d / "citer", "no-such-project"))),
-         pathlib.Path("no-such-project")),
+        (
+            "a sibling NAME resolves to the sibling, not <citer>/<name>",
+            paperkit.resolver._sibling_for(_d / "citer", "sib"),
+            (_d / "sib").resolve(),
+        ),
+        (
+            "the same name resolves from the tree root too",
+            paperkit.resolver._sibling_for(_d, "sib"),
+            (_d / "sib").resolve(),
+        ),
+        (
+            "an unresolvable name is returned UNCHANGED (the gate reports its own cannot-run)",
+            pathlib.Path(str(paperkit.resolver._sibling_for(_d / "citer", "no-such-project"))),
+            pathlib.Path("no-such-project"),
+        ),
     ]:
         ok = got == want
         print(f"    {'ok  ' if ok else 'FAIL'} seam: {label}")
@@ -238,7 +299,9 @@ def main() -> int:
         (_d / "mine").mkdir()
         (_d / "mine" / "paper.toml").write_text("[paper]\n")
         ok = paperkit.resolver._sibling_for(_d / "citer", "mine") == (_d / "mine").resolve()
-        print(f"    {'ok  ' if ok else 'FAIL'} seam: a consumer's OWN sibling wins over the engine tree")
+        print(
+            f"    {'ok  ' if ok else 'FAIL'} seam: a consumer's OWN sibling wins over the engine tree"
+        )
         if not ok:
             fails.append("seam: consumer-first ladder")
     finally:

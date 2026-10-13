@@ -17,13 +17,14 @@ Output (stdout) is the project's manifest, DELTA-ENCODED against the next-coarse
 Buckets are clamped to the pow2 levels the resource_set map (calc.bzl _RS) provides.  A peak of 0
 (observe ran without per-action cgroup isolation) is dropped — it carries no measurement.
 """
+
 import json
 import sys
 from pathlib import Path
 
 LO, HI = 4, 4096  # the pow2 reservation range (calc.bzl _RS) — starts TINY: an over-reservation
-                  # is silent (idle cores), an under-reservation is LOUD (the cap kills, the
-                  # failure names the cell, the next pass raises it).  Grow on evidence.
+# is silent (idle cores), an under-reservation is LOUD (the cap kills, the
+# failure names the cell, the next pass raises it).  Grow on evidence.
 
 
 def pow2(mb):
@@ -49,7 +50,7 @@ def resolution(stem):
         return "def", stem[: -len("__dcalc")]
     if stem.endswith("__calc"):
         return "file", stem[: -len("__calc")]
-    if "__" in stem:                       # a pk_eval grid cell: <claim>__<site>
+    if "__" in stem:  # a pk_eval grid cell: <claim>__<site>
         return "def", stem.split("__", 1)[0]
     return None, stem
 
@@ -62,8 +63,7 @@ def main() -> int:
     """
     peaks = {}
 
-
-    unavailable = {}   # reason -> [claim]: named, never folded into 0
+    unavailable = {}  # reason -> [claim]: named, never folded into 0
     for arg in sys.argv[1:]:
         p = Path(arg)
         res, claim = resolution(p.stem)
@@ -88,8 +88,11 @@ def main() -> int:
 
     if unavailable:
         for why, claims in sorted(unavailable.items()):
-            print(f"mem_learn: {len(claims)} claim(s) UNAVAILABLE ({why}) — not measured this run, "
-                  f"not a zero: {sorted(claims)[:4]}{'...' if len(claims) > 4 else ''}", file=sys.stderr)
+            print(
+                f"mem_learn: {len(claims)} claim(s) UNAVAILABLE ({why}) — not measured this run, "
+                f"not a zero: {sorted(claims)[:4]}{'...' if len(claims) > 4 else ''}",
+                file=sys.stderr,
+            )
 
     manifest = {"claims": {}}
     for res, claims in sorted(peaks.items()):

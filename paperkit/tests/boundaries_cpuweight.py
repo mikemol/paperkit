@@ -10,6 +10,7 @@ operator's terminal instead of the build, which reads back as success while doin
 
     python3 paperkit/tests/boundaries_cpuweight.py
 """
+
 from __future__ import annotations
 
 import os
@@ -34,10 +35,14 @@ def main() -> int:
 
     # ---- the reading (P): the box's contention signal is the runnable RATIO, not loadavg ----
     ratio, blocked = tools.cpuweight.runnable_ratio()
-    check("P: runnable_ratio() reads a non-negative ratio and a blocked count",
-          ratio >= 0 and blocked >= 0)
-    check("P: the ratio is per-core (procs_running normalised by cpu_count)",
-          abs(ratio * (os.cpu_count() or 1) - round(ratio * (os.cpu_count() or 1))) < 1e-9)
+    check(
+        "P: runnable_ratio() reads a non-negative ratio and a blocked count",
+        ratio >= 0 and blocked >= 0,
+    )
+    check(
+        "P: the ratio is per-core (procs_running normalised by cpu_count)",
+        abs(ratio * (os.cpu_count() or 1) - round(ratio * (os.cpu_count() or 1))) < 1e-9,
+    )
 
     # ---- δ: the SITE.  The defect worth a suite: a weight that lands on the OPERATOR'S
     # cgroup instead of the build's, throttling their terminal/editor while the build runs
@@ -45,21 +50,31 @@ def main() -> int:
     # than discovering one -- so the arm asserts membership is exclusive, not merely likely.
     self_cg = tools.cpuweight._cgroup_of("self")
     cg, why = tools.cpuweight.build_cgroup("paperkit-boundaries-test.scope")
-    check("δ: build_cgroup() CREATES a cgroup (does not adopt the caller's)",
-          cg is not None and cg != self_cg)
+    check(
+        "δ: build_cgroup() CREATES a cgroup (does not adopt the caller's)",
+        cg is not None and cg != self_cg,
+    )
     if cg:
         d = tools.cpuweight.CGROUP_ROOT / cg.lstrip("/")
-        check("δ: the created cgroup is EMPTY — membership is by construction, not inspection",
-              d.joinpath("cgroup.procs").read_text().strip() == "")
-        check("δ: it exposes a writable cpu.weight (the `cpu` controller is delegated)",
-              tools.cpuweight._writable_weight_file(cg) is not None)
+        check(
+            "δ: the created cgroup is EMPTY — membership is by construction, not inspection",
+            d.joinpath("cgroup.procs").read_text().strip() == "",
+        )
+        check(
+            "δ: it exposes a writable cpu.weight (the `cpu` controller is delegated)",
+            tools.cpuweight._writable_weight_file(cg) is not None,
+        )
         # the caller's own cgroup must be untouched by any of this
         # ACTUALLY run apply() and confirm the caller's cgroup is untouched — the vacuous
         # version of this arm (guarded so it never ran) would pass against the very bug it
         # names, since a test that does not exercise the path cannot observe the damage.
         self_f = tools.cpuweight.CGROUP_ROOT / self_cg.lstrip("/") / "cpu.weight"
         before = self_f.read_text().strip()
-        build_f = tools.cpuweight.CGROUP_ROOT / tools.cpuweight.build_cgroup()[0].lstrip("/") / "cpu.weight"
+        build_f = (
+            tools.cpuweight.CGROUP_ROOT
+            / tools.cpuweight.build_cgroup()[0].lstrip("/")
+            / "cpu.weight"
+        )
         build_before = build_f.read_text().strip()
         # ⚑ Ζ·arm·sound — AN ABSENT PRECONDITION IS `cannot-run`, NOT `fail`.  This arm WRITES the
         # build cgroup's cpu.weight and asserts it reads back 37.  A sandboxed cell cannot write
@@ -71,19 +86,25 @@ def main() -> int:
         # discarded.  The probe is the OWNER's own `_writable_weight_file`, already used one arm
         # above — asking the module whether the capability exists rather than inferring it.
         if build_f == self_f:
-            print(f"  ~~ δ: apply() — SKIPPED: the caller's cgroup IS the build's ({build_f}), so "
-                  "'weights the BUILD's' and 'leaves the CALLER's untouched' name one file and "
-                  "cannot both hold.  The property needs two DISTINCT cgroups to be measurable.")
+            print(
+                f"  ~~ δ: apply() — SKIPPED: the caller's cgroup IS the build's ({build_f}), so "
+                "'weights the BUILD's' and 'leaves the CALLER's untouched' name one file and "
+                "cannot both hold.  The property needs two DISTINCT cgroups to be measurable."
+            )
             raise SystemExit(3)
         try:
-            tools.cpuweight.apply(37)                               # default path: targets the BUILD's cgroup
+            tools.cpuweight.apply(37)  # default path: targets the BUILD's cgroup
             _bw, _sw = build_f.read_text().strip(), self_f.read_text().strip()
-            print(f"     [δ operands] build_f={build_f} -> {_bw!r} (want 37); "
-                  f"self_f={self_f} -> {_sw!r} (want {before!r})")
+            print(
+                f"     [δ operands] build_f={build_f} -> {_bw!r} (want 37); "
+                f"self_f={self_f} -> {_sw!r} (want {before!r})"
+            )
             # ⚑ this line is why the precondition is right: it showed both paths resolving to
             # paperkit-build.scope/cpu.weight in a cell, which no amount of reading would have.
-            check("δ: apply() weights the BUILD's cgroup, and the CALLER's is untouched",
-                  _bw == "37" and _sw == before)
+            check(
+                "δ: apply() weights the BUILD's cgroup, and the CALLER's is untouched",
+                _bw == "37" and _sw == before,
+            )
         finally:
             build_f.write_text(f"{build_before}\n")  # idempotent: leave no state behind
         try:
@@ -95,25 +116,34 @@ def main() -> int:
     d = Path(tempfile.mkdtemp())
     try:
         real_root = tools.cpuweight.CGROUP_ROOT
-        tools.cpuweight.CGROUP_ROOT = d                       # an empty tree: no cpu.weight anywhere
+        tools.cpuweight.CGROUP_ROOT = d  # an empty tree: no cpu.weight anywhere
         changed, why = tools.cpuweight.apply(20, pid="self")
-        check("F: cpu.weight absent → no change, and the reason NAMES the cgroup",
-              changed is False and "not writable" in why)
-        check("F: an unreachable lever still returns cleanly (a QoL knob never fails a build)",
-              isinstance(changed, bool) and isinstance(why, str))
+        check(
+            "F: cpu.weight absent → no change, and the reason NAMES the cgroup",
+            changed is False and "not writable" in why,
+        )
+        check(
+            "F: an unreachable lever still returns cleanly (a QoL knob never fails a build)",
+            isinstance(changed, bool) and isinstance(why, str),
+        )
     finally:
         tools.cpuweight.CGROUP_ROOT = real_root
         import shutil
+
         shutil.rmtree(d, ignore_errors=True)
 
     # ---- F: a bogus pid has no cgroup → named no-op, not a traceback ----
-    changed, why = tools.cpuweight.apply(20, pid=2 ** 30)
-    check("F: a nonexistent pid → no change, reason names the missing cgroup entry",
-          changed is False and "cgroup" in why)
+    changed, why = tools.cpuweight.apply(20, pid=2**30)
+    check(
+        "F: a nonexistent pid → no change, reason names the missing cgroup entry",
+        changed is False and "cgroup" in why,
+    )
 
     # ---- P: main() is best-effort — it returns 0 even when it cannot weight anything ----
-    check("P: main() exits 0 even when the lever is unreachable (never fails a build)",
-          tools.cpuweight.main(["--weight=20", "--report"]) == 0)
+    check(
+        "P: main() exits 0 even when the lever is unreachable (never fails a build)",
+        tools.cpuweight.main(["--weight=20", "--report"]) == 0,
+    )
 
     # ---- Ζ·cell·admit·server: the property that MATTERS is where the CELLS are ----
     # The earlier suite asked "was a cgroup created and joined", and that passed while every
@@ -121,12 +151,16 @@ def main() -> int:
     # server JVM does, and it outlives any invocation (measured: alive 2h14m in the operator's
     # terminal cgroup while `joined=True` was printed).  A success message about the action is
     # not evidence about the outcome.
-    check("server: the servers that fork cells are enumerable",
-          isinstance(tools.cpuweight.build_servers(), list))
+    check(
+        "server: the servers that fork cells are enumerable",
+        isinstance(tools.cpuweight.build_servers(), list),
+    )
     cgv, _ = tools.cpuweight.build_cgroup()
     ok_v, why_v = tools.cpuweight.verify(cgv) if cgv else (False, "no cgroup")
-    check("server: verify() answers about CELLS, not about the cgroup's existence",
-          isinstance(ok_v, bool) and ("cell" in why_v or "nothing to verify" in why_v))
+    check(
+        "server: verify() answers about CELLS, not about the cgroup's existence",
+        isinstance(ok_v, bool) and ("cell" in why_v or "nothing to verify" in why_v),
+    )
     # F: the instrument must not COUNT ITSELF.  A /proc/*/cmdline substring test matches this
     # very process and any shell running `pgrep -f linux-sandbox` beside it — measured: it
     # reported 10 cells outside, two of which were the check and its parent shell.
@@ -142,20 +176,27 @@ def main() -> int:
     # Earlier versions spawned a decoy and compared counts; that is flaky by construction (the
     # population changes under the test, and a `bash -c "... # marker"` decoy execs the marker
     # away before it is sampled).  A rule is a function; test it as one.
-    argv_rule = lambda a, c: ("linux-sandbox" in a or "execroot/_main" in a)
-    comm_rule = lambda a, c: tools.cpuweight.is_cell(c)          # the LIVE predicate, not a copy of it
+    argv_rule = lambda a, c: "linux-sandbox" in a or "execroot/_main" in a
+    comm_rule = lambda a, c: tools.cpuweight.is_cell(c)  # the LIVE predicate, not a copy of it
     #                     (argv,                                    comm)
     A_CELL = ("/x/linux-sandbox -W /tmp -- python3 check.py", "linux-sandbox")
     A_PROBE = ("pgrep -f linux-sandbox", "pgrep")
     A_SHELL = ("bash -c grep linux-sandbox /tmp/execroot/_main", "bash")
-    check("F: the comm rule counts a real cell and NOT a process merely naming one",
-          comm_rule(*A_CELL) and not comm_rule(*A_PROBE) and not comm_rule(*A_SHELL))
-    check("F: the argv rule counts ALL THREE — it counts the instrument and its own shell",
-          argv_rule(*A_CELL) and argv_rule(*A_PROBE) and argv_rule(*A_SHELL))
-    check("F: so the two rules DISAGREE on exactly the self-matches (the measured defect: "
-          "10 argv-matched vs 6 real, two of them the check and its parent)",
-          sum(argv_rule(*x) for x in (A_CELL, A_PROBE, A_SHELL)) -
-          sum(comm_rule(*x) for x in (A_CELL, A_PROBE, A_SHELL)) == 2)
+    check(
+        "F: the comm rule counts a real cell and NOT a process merely naming one",
+        comm_rule(*A_CELL) and not comm_rule(*A_PROBE) and not comm_rule(*A_SHELL),
+    )
+    check(
+        "F: the argv rule counts ALL THREE — it counts the instrument and its own shell",
+        argv_rule(*A_CELL) and argv_rule(*A_PROBE) and argv_rule(*A_SHELL),
+    )
+    check(
+        "F: so the two rules DISAGREE on exactly the self-matches (the measured defect: "
+        "10 argv-matched vs 6 real, two of them the check and its parent)",
+        sum(argv_rule(*x) for x in (A_CELL, A_PROBE, A_SHELL))
+        - sum(comm_rule(*x) for x in (A_CELL, A_PROBE, A_SHELL))
+        == 2,
+    )
 
     # ⚑ A DECOY WHOSE LIFETIME WE END, NOT ONE WE WAIT OUT (a peer's RAII-by-liveness form).
     #
@@ -174,9 +215,13 @@ def main() -> int:
     # (the executable) and the sentinel is an ordinary argv token, both correct on the FIRST read.
     # Removing the exec removed the race rather than tolerating it.
     _r, _w = os.pipe()
-    decoy = subprocess.Popen(["cat", "-", "linux-sandbox-sentinel"], stdin=_r,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    os.close(_r)              # only the child holds the read end; it blocks until we close _w
+    decoy = subprocess.Popen(
+        ["cat", "-", "linux-sandbox-sentinel"],
+        stdin=_r,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    os.close(_r)  # only the child holds the read end; it blocks until we close _w
     try:
         # ⚑ NO SLEEP.  This read `time.sleep(0.2)` — load-bearing for the OLDER assertion, which
         # walked /proc and needed the decoy visible to a scan.  The rewrite below reads ONE file
@@ -226,16 +271,22 @@ def main() -> int:
             decoy_argv = Path(f"/proc/{decoy.pid}/cmdline").read_bytes()
             if b"linux-sandbox" in decoy_argv and decoy_comm:
                 break
-            if decoy.poll() is not None:   # the child died before exec'ing — stop, do not spin
+            if decoy.poll() is not None:  # the child died before exec'ing — stop, do not spin
                 break
-        check("F: the decoy's ARGV carries the sentinel (the premise the next arm needs)",
-              b"linux-sandbox" in decoy_argv)
-        check(f"F: the decoy's argv says linux-sandbox but its comm is {decoy_comm!r}, "
-              "and is_cell() reads comm — so it is not a cell",
-              not tools.cpuweight.is_cell(decoy_comm))
+        check(
+            "F: the decoy's ARGV carries the sentinel (the premise the next arm needs)",
+            b"linux-sandbox" in decoy_argv,
+        )
+        check(
+            f"F: the decoy's argv says linux-sandbox but its comm is {decoy_comm!r}, "
+            "and is_cell() reads comm — so it is not a cell",
+            not tools.cpuweight.is_cell(decoy_comm),
+        )
     finally:
-        os.close(_w)          # EOF -> the child exits; its lifetime ended by US, not by a timer
-        decoy.wait(timeout=5)   # rc is incidental — cat fails on the sentinel, which is argv, not a file
+        os.close(_w)  # EOF -> the child exits; its lifetime ended by US, not by a timer
+        decoy.wait(
+            timeout=5
+        )  # rc is incidental — cat fails on the sentinel, which is argv, not a file
 
     print(f"CPUWEIGHT BOUNDARIES: {'PASS' if not _fails else 'FAIL'}")
     return 1 if _fails else 0
@@ -243,4 +294,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

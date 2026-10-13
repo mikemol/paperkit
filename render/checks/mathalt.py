@@ -17,6 +17,7 @@ silent partial description).
     describe_formulas(pdf, alts) -> int                   # the API pdf.py calls
     python3 checks/mathalt.py --selftest                  # ⟨P,F,δ⟩
 """
+
 from __future__ import annotations
 
 import re
@@ -25,8 +26,8 @@ from pathlib import Path
 
 try:
     import pikepdf
-except ImportError:                          # Ζ·tier·exit — pikepdf absent is CANNOT-RUN (exit 3, guarded
-    pikepdf = None                           # in main), not an uncaught ImportError read as a failure
+except ImportError:  # Ζ·tier·exit — pikepdf absent is CANNOT-RUN (exit 3, guarded
+    pikepdf = None  # in main), not an uncaught ImportError read as a failure
 
 _MATH_SPAN = re.compile(r"(?<!\\)\$(?!\$)([^$]+?)\$|\$\$(.+?)\$\$", re.S)
 
@@ -77,7 +78,8 @@ def describe_formulas(pdf: Path, alts: list[str]) -> int:
     if len(formulas) != len(alts):
         raise SystemExit(
             f"mathalt: {len(formulas)} /Formula element(s) but {len(alts)} equation(s) — the "
-            "positional match cannot be trusted; refusing to describe (7.7 would be left partial)")
+            "positional match cannot be trusted; refusing to describe (7.7 would be left partial)"
+        )
     for elem, alt in zip(formulas, alts):
         elem["/Alt"] = pikepdf.String(alt)
     doc.save(str(pdf))
@@ -96,6 +98,7 @@ def _selftest() -> int:
     δ: whether the /Formula has an /Alt — the exact bit clause 7.7 checks.
     """
     import tempfile
+
     fails = []
 
     def check(desc, cond) -> None:
@@ -117,13 +120,16 @@ def _selftest() -> int:
         except SystemExit:
             raised = True
         check("F: a count mismatch (2 formulas, 1 alt) raises, describes nothing", raised)
-        check("F: nothing was described on the mismatch (still 2 undescribed)",
-              _undescribed(pdf) == 2)
+        check(
+            "F: nothing was described on the mismatch (still 2 undescribed)", _undescribed(pdf) == 2
+        )
 
         # P: matched counts describe both
         n = describe_formulas(pdf, [r"a = b", r"x + y"])
-        check("P: matched alts describe every /Formula (0 undescribed remain)",
-              n == 2 and _undescribed(pdf) == 0)
+        check(
+            "P: matched alts describe every /Formula (0 undescribed remain)",
+            n == 2 and _undescribed(pdf) == 0,
+        )
         # the alt text landed verbatim
         doc = pikepdf.open(str(pdf))
         alts = [str(f.get("/Alt")) for f in _formulas(doc)]
@@ -132,8 +138,10 @@ def _selftest() -> int:
         # paper_equations extracts inline + display math in order
         (dd / "p.md").write_text("text $a+b$ and $$\\frac{c}{d}$$ done\n")
         eqs = paper_equations(dd / "p.md")
-        check("paper_equations reads inline and display math in document order",
-              eqs == ["a+b", r"\frac{c}{d}"])
+        check(
+            "paper_equations reads inline and display math in document order",
+            eqs == ["a+b", r"\frac{c}{d}"],
+        )
 
     if fails:
         print(f"MATHALT SELFTEST: FAIL ({len(fails)})")
@@ -148,19 +156,31 @@ def _make_fixture(pdf: Path) -> None:
     page = doc.add_blank_page(page_size=(200, 100))
     page.Contents = doc.make_stream(b"BT /F1 12 Tf 20 50 Td (eq) Tj ET")
     page.Resources = pikepdf.Dictionary(
-        Font=pikepdf.Dictionary(F1=pikepdf.Dictionary(
-            Type=pikepdf.Name.Font, Subtype=pikepdf.Name.Type1, BaseFont=pikepdf.Name.Helvetica)))
-    f1 = doc.make_indirect(pikepdf.Dictionary(Type=pikepdf.Name.StructElem, S=pikepdf.Name("/Formula")))
-    f2 = doc.make_indirect(pikepdf.Dictionary(Type=pikepdf.Name.StructElem, S=pikepdf.Name("/Formula")))
-    root = doc.make_indirect(pikepdf.Dictionary(
-        Type=pikepdf.Name.StructTreeRoot, K=pikepdf.Array([f1, f2])))
+        Font=pikepdf.Dictionary(
+            F1=pikepdf.Dictionary(
+                Type=pikepdf.Name.Font, Subtype=pikepdf.Name.Type1, BaseFont=pikepdf.Name.Helvetica
+            )
+        )
+    )
+    f1 = doc.make_indirect(
+        pikepdf.Dictionary(Type=pikepdf.Name.StructElem, S=pikepdf.Name("/Formula"))
+    )
+    f2 = doc.make_indirect(
+        pikepdf.Dictionary(Type=pikepdf.Name.StructElem, S=pikepdf.Name("/Formula"))
+    )
+    root = doc.make_indirect(
+        pikepdf.Dictionary(Type=pikepdf.Name.StructTreeRoot, K=pikepdf.Array([f1, f2]))
+    )
     doc.Root.StructTreeRoot = root
     doc.save(str(pdf))
 
 
 def main(argv: list[str]) -> int:
-    if pikepdf is None:                      # Ζ·tier·exit — the toolchain (pikepdf) is absent here
-        print("mathalt: pikepdf absent — CANNOT VERIFY the /Formula alt text (not a pass)", file=sys.stderr)
+    if pikepdf is None:  # Ζ·tier·exit — the toolchain (pikepdf) is absent here
+        print(
+            "mathalt: pikepdf absent — CANNOT VERIFY the /Formula alt text (not a pass)",
+            file=sys.stderr,
+        )
         return 3
     if argv and argv[0] == "--selftest":
         return _selftest()
@@ -175,7 +195,9 @@ def main(argv: list[str]) -> int:
     left = _undescribed(pdf)
     print(f"mathalt: described {n} formula(s); {left} undescribed remain")
     if left:
-        print("mathalt: FAIL — a /Formula element still carries no /Alt (PDF/UA 7.7)", file=sys.stderr)
+        print(
+            "mathalt: FAIL — a /Formula element still carries no /Alt (PDF/UA 7.7)", file=sys.stderr
+        )
         return 1
     print("mathalt: ok — every equation carries a text alternative (PDF/UA 7.7)")
     return 0

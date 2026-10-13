@@ -28,6 +28,7 @@ the sufficient half — it fails whenever a competing package directory can win.
 
     python3 paperkit/tests/boundaries_package_shadow.py
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -38,7 +39,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent.parent   # the repo root, which HOLDS `paperkit/`
+ROOT = Path(__file__).resolve().parent.parent.parent  # the repo root, which HOLDS `paperkit/`
 LIVE = ROOT / "paperkit"
 # ⚑ W310 — THE ENGINE'S OWN RUNTIME DEPENDENCIES, AFTER THE ENTRIES UNDER TEST.  `paperkit.bib` imports
 # mikemol.grade (the ladder is an mtools dist now), so a probe interpreter whose PYTHONPATH held only
@@ -69,8 +70,11 @@ def resolve(path_entries: list[str]) -> dict[str, object]:
     env.pop("PYTHONHOME", None)
     r = subprocess.run(  # noqa: S603
         [sys.executable, "-c", _PROBE],
-        cwd=tempfile.gettempdir(),   # never the repo root — cwd must not smuggle a path entry in
-        env=env, capture_output=True, text=True, check=False,
+        cwd=tempfile.gettempdir(),  # never the repo root — cwd must not smuggle a path entry in
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if r.returncode != 0:
         return {"file": None, "hasattr": None, "err": r.stderr.strip().splitlines()[-1:]}
@@ -115,8 +119,7 @@ def main() -> int:
 
     live_first = resolve([str(ROOT)])
     lf = str(live_first.get("file") or "")
-    check("the live tree resolves `paperkit.bib` to the live tree",
-          lf.startswith(str(LIVE)))
+    check("the live tree resolves `paperkit.bib` to the live tree", lf.startswith(str(LIVE)))
 
     with tempfile.TemporaryDirectory() as td:
         decoy = plant_competitor(Path(td))
@@ -125,15 +128,19 @@ def main() -> int:
 
         # ⚑ THE ARM THAT MATTERS.  Resolution is read off __file__.  Stated as the FACT the suite
         # asserts about the mechanism: a directory named `paperkit` earlier on the path WINS.
-        check("a competing `paperkit/` dir earlier on the path WINS (read off __file__)",
-              sf.startswith(str(decoy)) and not sf.startswith(str(LIVE)))
+        check(
+            "a competing `paperkit/` dir earlier on the path WINS (read off __file__)",
+            sf.startswith(str(decoy)) and not sf.startswith(str(LIVE)),
+        )
 
         # ⚑ THE ARM THAT EXPLAINS WHY THE OLD PROBE WAS BLIND.  This does not test the engine; it
         # tests the INSTRUMENT — it asserts that hasattr CANNOT tell the arms apart, so that if a
         # future edit ever weakens the arm above into an attribute check, this line documents that
         # the weaker check is vacuous.  If this ever fails, the decoy stopped modelling the hazard.
-        check("hasattr CANNOT distinguish the arms — it is True on BOTH (why __file__ is required)",
-              live_first.get("hasattr") is True and shadowed.get("hasattr") is True)
+        check(
+            "hasattr CANNOT distinguish the arms — it is True on BOTH (why __file__ is required)",
+            live_first.get("hasattr") is True and shadowed.get("hasattr") is True,
+        )
 
         # The repo must not be CARRYING such a directory.  This is the standing guard: `.gitignore`
         # hides `build/` from a diff, so nothing else in the tree would report its return.
@@ -142,24 +149,30 @@ def main() -> int:
             for p in ROOT.glob("*/**/paperkit/__init__.py")
             if not p.is_relative_to(LIVE) and ".venv" not in p.parts and "bazel-" not in str(p)
         )
-        check(f"no second importable `paperkit/` package exists in the tree (found: {strays or 'none'})",
-              not strays)
+        check(
+            f"no second importable `paperkit/` package exists in the tree (found: {strays or 'none'})",
+            not strays,
+        )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     with tempfile.TemporaryDirectory() as td:
         decoy = plant_competitor(Path(td))
-        P = resolve([str(ROOT)])                      # only the live tree reachable
-        F = resolve([str(decoy), str(ROOT)])          # ONE extra sys.path entry
+        P = resolve([str(ROOT)])  # only the live tree reachable
+        F = resolve([str(decoy), str(ROOT)])  # ONE extra sys.path entry
         pf, ff = str(P.get("file") or ""), str(F.get("file") or "")
         ok = pf.startswith(str(LIVE)) and ff.startswith(str(decoy))
         if not ok:
             fails.append("shadow-delta")
-        print(f"  {'ok ' if ok else 'XX '}one sys.path entry flips the ENGINE that `from paperkit import bib` serves")
+        print(
+            f"  {'ok ' if ok else 'XX '}one sys.path entry flips the ENGINE that `from paperkit import bib` serves"
+        )
         print(f"      P (live):   {pf}")
         print(f"      F (shadow): {ff}")
         print("      δ (min delta): one directory named `paperkit` earlier on sys.path")
-        print(f"      ⚑ hasattr(bib,'dep_order') = {P.get('hasattr')} in P and {F.get('hasattr')} in F"
-              " — identical, which is why the arms read __file__\n")
+        print(
+            f"      ⚑ hasattr(bib,'dep_order') = {P.get('hasattr')} in P and {F.get('hasattr')} in F"
+            " — identical, which is why the arms read __file__\n"
+        )
 
     if fails:
         print(f"BOUNDARIES: FAIL ({len(fails)} drifted)")

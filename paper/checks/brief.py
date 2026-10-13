@@ -53,6 +53,7 @@ order.  Empty lines are skipped rather than emitted as empty units, because a un
 is not a page of a brief; `is_total` compares multisets of KEYS, so skipping them is invisible to
 the invariant and honest about what a unit is.  No key is created, dropped, reordered or split.
 """
+
 import genrekit
 
 

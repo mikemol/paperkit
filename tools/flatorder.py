@@ -20,6 +20,7 @@ at each rung so the cost is known before the first edit rather than discovered a
     python3 tools/flatorder.py                  # the population, in repair order
     python3 tools/flatorder.py --roots          # just the leaves — where to start
 """
+
 from __future__ import annotations
 
 import re
@@ -71,7 +72,10 @@ def unresolved(paths: list[Path]) -> dict[str, set[str]]:
     """
     proc: subprocess.CompletedProcess[str] = subprocess.run(  # noqa: S603
         [str(ROOT / MYPY[0]), *MYPY[1:], *[str(p) for p in paths]],
-        cwd=ROOT, capture_output=True, text=True, check=False,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     out: dict[str, set[str]] = {}
     for ln in proc.stdout.splitlines():
@@ -85,7 +89,10 @@ def ruff_count(path: str) -> int:
     """Count a file's ruff findings — the cost of converting it at its rung."""
     proc: subprocess.CompletedProcess[str] = subprocess.run(  # noqa: S603
         [str(ROOT / RUFF[0]), *RUFF[1:], path],
-        cwd=ROOT, capture_output=True, text=True, check=False,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     return len([ln for ln in proc.stdout.splitlines() if ln.startswith(path)])
 
@@ -128,7 +135,10 @@ def finding_codes(path: str) -> dict[str, int]:
     """Count a file's ruff findings BY RULE, so mechanical and manual work separate."""
     proc: subprocess.CompletedProcess[str] = subprocess.run(  # noqa: S603
         [str(ROOT / RUFF[0]), *RUFF[1:], path],
-        cwd=ROOT, capture_output=True, text=True, check=False,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     out: dict[str, int] = {}
     for ln in proc.stdout.splitlines():
@@ -148,8 +158,10 @@ def layer(pop: dict[str, set[str]], owners: dict[str, str]) -> list[list[str]]:
     remaining = dict(pop)
     rungs: list[list[str]] = []
     while remaining:
-        blocked = {f: {owners[n] for n in names if owners.get(n) in remaining}
-                   for f, names in remaining.items()}
+        blocked = {
+            f: {owners[n] for n in names if owners.get(n) in remaining}
+            for f, names in remaining.items()
+        }
         ready = sorted(f for f, deps in blocked.items() if not deps)
         if not ready:
             rungs.append(sorted(remaining))
@@ -197,17 +209,21 @@ def main(argv: list[str]) -> int:
             OUT.write(f"    {f:<46} {cost:>4} ({cost - m:>3} manual) · {unres}\n")
 
     OUT.write(f"\n{len(pop)} file(s) across {len(rungs)} rung(s) · {total} ruff findings\n")
-    OUT.write(f"  {mech} MECHANICAL ({100 * mech // max(total, 1)}%) · "
-              f"{total - mech} needing judgement\n")
+    OUT.write(
+        f"  {mech} MECHANICAL ({100 * mech // max(total, 1)}%) · {total - mech} needing judgement\n"
+    )
     if manual:
         top = sorted(manual.items(), key=_by_count)[:8]
-        OUT.write("  the judgement half, by rule: "
-                  + ", ".join(f"{k}={v}" for k, v in top) + "\n")
+        OUT.write("  the judgement half, by rule: " + ", ".join(f"{k}={v}" for k, v in top) + "\n")
     if dropped:
-        OUT.write("\n  ⚑ EXCLUDED as third-party (no in-repo owner, a full name cannot fix):\n"
-                  f"      {', '.join(dropped)}\n")
-    OUT.write("  ⚑ converting a file before its rung imports its dependencies' debt into its\n"
-              "    own gate verdict — the per-file gate has no partial credit.\n")
+        OUT.write(
+            "\n  ⚑ EXCLUDED as third-party (no in-repo owner, a full name cannot fix):\n"
+            f"      {', '.join(dropped)}\n"
+        )
+    OUT.write(
+        "  ⚑ converting a file before its rung imports its dependencies' debt into its\n"
+        "    own gate verdict — the per-file gate has no partial credit.\n"
+    )
     return 0
 
 

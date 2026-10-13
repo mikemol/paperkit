@@ -42,6 +42,7 @@ a MISSING TOOL must exit 1 (FAILED), never 2.  A check that cannot run has not b
 apply-and-pass; reading it as "not mine" lets a gate skip it silently, which is the one failure a
 gate exists to prevent.  Resolvers for external toolchains (an `agda:` verb, say) state this explicitly.
 """
+
 from __future__ import annotations
 
 import sys
@@ -102,12 +103,12 @@ def dispatch(routes: dict, key: str, name: str = "concept", report: bool = True)
     """
     node = walk(routes, key)
     if node is None:
-        return 2                                    # not mine — fall through
+        return 2  # not mine — fall through
     fn, arg = node
     try:
         fn(arg) if arg is not None else fn()
     except KeyError:
-        return 2                                    # "not an argument I serve" — also not mine
+        return 2  # "not an argument I serve" — also not mine
     except AssertionError as e:
         if report:
             print(f"{name}/{key}: FAILED — {e}", file=sys.stderr)
@@ -184,6 +185,7 @@ def register_meta(routes: dict, ops=("total", "occupancy", "distinct")) -> dict:
     expect `meta/` to see it.  Mutates and returns ROUTES.
     """
     meta = meta_family(routes)
-    routes["meta"] = {op: {fam: (meta, f"{op}/{fam}") for fam in routes if fam != "meta"}
-                      for op in ops}
+    routes["meta"] = {
+        op: {fam: (meta, f"{op}/{fam}") for fam in routes if fam != "meta"} for op in ops
+    }
     return routes

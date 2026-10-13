@@ -15,6 +15,7 @@ set-equality over source where it is Starlark.
 
     python3 paperkit/tests/boundaries_dispatch.py     # exit 0 = every site derives from VERBS
 """
+
 from __future__ import annotations
 
 import inspect
@@ -43,11 +44,17 @@ def main() -> int:
 
     print("Λ·registry — the verb set's dispatch boundary\n")
     print("⟨one owner⟩\n")
-    check("resolver.VERBS declares the built-in set, and every entry is fully specified",
-          bool(paperkit.resolver.VERBS) and all(
-              {"arg", "verb", "passes", "crosses"} <= set(s) for s in paperkit.resolver.VERBS.values()))
-    check(f"the crossing verbs are DERIVED, not re-listed: {', '.join(sorted(CROSSING))}",
-          set(paperkit.resolver.CROSSING) == {f"{v}:" for v in CROSSING} and bool(CROSSING))
+    check(
+        "resolver.VERBS declares the built-in set, and every entry is fully specified",
+        bool(paperkit.resolver.VERBS)
+        and all(
+            {"arg", "verb", "passes", "crosses"} <= set(s) for s in paperkit.resolver.VERBS.values()
+        ),
+    )
+    check(
+        f"the crossing verbs are DERIVED, not re-listed: {', '.join(sorted(CROSSING))}",
+        set(paperkit.resolver.CROSSING) == {f"{v}:" for v in CROSSING} and bool(CROSSING),
+    )
 
     print("\n⟨every site derives⟩\n")
     # 1. the VERDICT path — every declared verb reaches a real branch.  An unknown TARGET under a
@@ -56,49 +63,66 @@ def main() -> int:
     #    refuted — ask-result-tristate).  The discriminating assertion: no verb RAISES, none PASSES a
     #    bogus target, and the set stays closed.
     dispatched = all(
-        not paperkit.resolver.resolves(f"{v}:no-such-target-{v}", ENGINE, {}).passed for v in paperkit.resolver.VERBS)
+        not paperkit.resolver.resolves(f"{v}:no-such-target-{v}", ENGINE, {}).passed
+        for v in paperkit.resolver.VERBS
+    )
     check("resolver.resolves dispatches every declared verb (no fallthrough, no raise)", dispatched)
-    check("the built-in set is CLOSED — an undeclared type is UNAVAILABLE (cannot check ≠ refuted)",
-          paperkit.resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable())
+    check(
+        "the built-in set is CLOSED — an undeclared type is UNAVAILABLE (cannot check ≠ refuted)",
+        paperkit.resolver.resolves("nosuchverb:x", ENGINE, {}).is_unavailable(),
+    )
 
     # 2. the FOOTPRINT command — file: opens only its target (None); every other verb runs something.
     cmds = {v: paperkit.resolver._check_cmd(f"{v}:t", {}) for v in paperkit.resolver.VERBS}
-    check("resolver._check_cmd covers every verb (None only for the verb that runs nothing)",
-          cmds["file"] is None and all(c for v, c in cmds.items() if v != "file"))
+    check(
+        "resolver._check_cmd covers every verb (None only for the verb that runs nothing)",
+        cmds["file"] is None and all(c for v, c in cmds.items() if v != "file"),
+    )
 
     # 3. the GRADE path — a crossing verb is DELEGATED to its owner, never swept locally.  This is
     #    the one that was silently wrong: a missing arm falls through to a local sweep, which cannot
     #    see a witness outside this project's mutation surface and can only read `indeterminate`.
     for v in sorted(CROSSING):
         rec = paperkit.grader.grade_check(f"{v}:t", ROOT, set(), {}, ROOT)
-        check(f"grader.grade_check delegates {v}: (crosses=True → imported, not a local sweep)",
-              rec.get("grade") == "imported")
+        check(
+            f"grader.grade_check delegates {v}: (crosses=True → imported, not a local sweep)",
+            rec.get("grade") == "imported",
+        )
     # ...and a LOCAL verb must NOT be delegated: stamping `imported` on a check this project owns
     # would assert a grade nothing ever measured.  Read the arms out of grade_check itself, so the
     # assertion is set-EQUALITY against VERBS rather than a list maintained here.
     src = inspect.getsource(paperkit.grader.grade_check)
     chunks = re.split(r'\n    if typ == "(\w+)":', src)
-    delegated = {chunks[i] for i in range(1, len(chunks), 2)
-                 if '"grade": "imported"' in chunks[i + 1]}
-    check(f"delegation is EXACTLY the crossing set (grade_check delegates {delegated or '{}'})",
-          delegated == CROSSING)
+    delegated = {
+        chunks[i] for i in range(1, len(chunks), 2) if '"grade": "imported"' in chunks[i + 1]
+    }
+    check(
+        f"delegation is EXACTLY the crossing set (grade_check delegates {delegated or '{}'})",
+        delegated == CROSSING,
+    )
 
     # 4. the FOOTPRINT AUDIT — skips exactly the crossing verbs, by asking the verb.  Count the
     #    code SHAPE (`startswith(paperkit.resolver.CROSSING)`), never a bare substring: a mention in a
     #    comment would inflate the tally, and a magic expected-count is the very defect at issue.
     skips = FOOTDEPS_SRC.count("startswith(paperkit.resolver.CROSSING)")
     hardcoded = re.findall(r'startswith\(\s*[\'"](\w+):', FOOTDEPS_SRC)
-    check(f"footdeps' {skips} skip sites ask resolver.CROSSING, and none hardcodes a verb"
-          + (f" (found {hardcoded})" if hardcoded else ""),
-          skips >= 2 and not hardcoded)
+    check(
+        f"footdeps' {skips} skip sites ask resolver.CROSSING, and none hardcodes a verb"
+        + (f" (found {hardcoded})" if hardcoded else ""),
+        skips >= 2 and not hardcoded,
+    )
 
     # 5. the GENERATOR — Starlark cannot import the engine, so assert by set-equality over source
     #    that every crossing verb is wired to a cross-repo RECORD dep, and no local verb is.
     for v in sorted(CROSSING):
-        check(f"tools/bibtex.bzl branches on {v}: (a cross-repo record dep, not a local action)",
-              f'startswith("{v}:")' in BIBTEX_SRC)
-    check("...and skips their local footprint, as footdeps does",
-          all(f'"{v}:"' in BIBTEX_SRC for v in CROSSING) and "no local footprint" in BIBTEX_SRC)
+        check(
+            f"tools/bibtex.bzl branches on {v}: (a cross-repo record dep, not a local action)",
+            f'startswith("{v}:")' in BIBTEX_SRC,
+        )
+    check(
+        "...and skips their local footprint, as footdeps does",
+        all(f'"{v}:"' in BIBTEX_SRC for v in CROSSING) and "no local footprint" in BIBTEX_SRC,
+    )
 
     print("\n⟨location-free dispatch⟩\n")
     # Λ·location — paperkit is used as a COMPILER from an external checkout, but all nine of its own
@@ -126,23 +150,35 @@ def main() -> int:
         # pass equally against a resolver that still hardcoded the name and prove nothing.
         (far / "library" / "paper.toml").write_text(
             '[paper]\ntitle="t"\nrubric="r.tsv"\nwarrants=["concepts.bib"]\nout="l.md"\n'
-            '\n[checks.claim]\ncmd = "python3 witness.py {target}"\n')
+            '\n[checks.claim]\ncmd = "python3 witness.py {target}"\n'
+        )
         (far / "library" / "witness.py").write_text(
-            "import sys\nsys.exit(0 if sys.argv[1:2] == ['mine'] else 2)\n")
+            "import sys\nsys.exit(0 if sys.argv[1:2] == ['mine'] else 2)\n"
+        )
         (far / "doc").mkdir()
-        check("a project outside this repo resolves concept: to ITS OWN library, not the engine's",
-              paperkit.resolver._library_for(far / "doc") == far / "library")
-        check("...and one with NO library falls back to the engine's (fallback, never assumption)",
-              paperkit.resolver._library_for(Path(d)) == paperkit.resolver._LIBRARY)
+        check(
+            "a project outside this repo resolves concept: to ITS OWN library, not the engine's",
+            paperkit.resolver._library_for(far / "doc") == far / "library",
+        )
+        check(
+            "...and one with NO library falls back to the engine's (fallback, never assumption)",
+            paperkit.resolver._library_for(Path(d)) == paperkit.resolver._LIBRARY,
+        )
         # Λ·library·fallthrough — per-KEY ownership, both sides reachable (the audit's reverse
         # finding: directory-level selection eclipsed ALL engine keys from any repo owning a
         # library, the exact inverse of the shadowing the seam was built to fix).
-        check("a key the project library OWNS resolves project-side",
-              paperkit.resolver.resolves("concept:mine", far / "doc", {}).passed)
-        check("a key it answers 'not mine' (exit 2) FALLS THROUGH to the engine's library",
-              paperkit.resolver.resolves("concept:claim-is-record", far / "doc", {}).passed)
-        check("a key owned NOWHERE is UNAVAILABLE (exit 2 everywhere = cannot witness, not refuted)",
-              paperkit.resolver.resolves("concept:no-such-concept", far / "doc", {}).is_unavailable())
+        check(
+            "a key the project library OWNS resolves project-side",
+            paperkit.resolver.resolves("concept:mine", far / "doc", {}).passed,
+        )
+        check(
+            "a key it answers 'not mine' (exit 2) FALLS THROUGH to the engine's library",
+            paperkit.resolver.resolves("concept:claim-is-record", far / "doc", {}).passed,
+        )
+        check(
+            "a key owned NOWHERE is UNAVAILABLE (exit 2 everywhere = cannot witness, not refuted)",
+            paperkit.resolver.resolves("concept:no-such-concept", far / "doc", {}).is_unavailable(),
+        )
     # ⚑ THE EXPECTED VALUE IS THE ENGINE'S OWN ANSWER, NOT A PATH SPELLED HERE.  This read
     # `== ROOT / "library"` — a second copy of where the library lives — and RED when Ζ·cite·resolve
     # moved it inside the package (guard-must-not-copy: the arm carried its own copy of the location
@@ -150,21 +186,29 @@ def main() -> int:
     # to THE ENGINE'S, whatever the engine says that is; `resolver._LIBRARY` is the owner of that
     # answer, so the arm asks the owner.  It still discriminates: a project that DID own a library
     # would resolve elsewhere, which the far-tree arms above measure directly.
-    check("in-repo resolution is UNCHANGED by the seam (a project with no library of its own "
-          "resolves to the ENGINE's, wherever the engine declares that to be)",
-          paperkit.resolver._library_for(ROOT / "paper") == paperkit.resolver._LIBRARY)
+    check(
+        "in-repo resolution is UNCHANGED by the seam (a project with no library of its own "
+        "resolves to the ENGINE's, wherever the engine declares that to be)",
+        paperkit.resolver._library_for(ROOT / "paper") == paperkit.resolver._LIBRARY,
+    )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair\n")
     # The exact drift that shipped: a new crossing verb whose skip-set was never updated.  F is
     # built by reverting footdeps to the hardcoded literal — one token — and must be CAUGHT.
     f_src = FOOTDEPS_SRC.replace("startswith(paperkit.resolver.CROSSING)", 'startswith("result:")')
-    caught = (not re.findall(r'startswith\(\s*[\'"](\w+):', FOOTDEPS_SRC)
-              and re.findall(r'startswith\(\s*[\'"](\w+):', f_src) == ["result"] * skips)
+    caught = (
+        not re.findall(r'startswith\(\s*[\'"](\w+):', FOOTDEPS_SRC)
+        and re.findall(r'startswith\(\s*[\'"](\w+):', f_src) == ["result"] * skips
+    )
     fails.append("dispatch-delta") if not caught else None
     print(f"  {'ok ' if caught else 'XX '}re-hardcoding footdeps' skip-set to `result:` is CAUGHT")
-    print("      P (intact):  footdeps asks resolver.CROSSING → concept: is skipped by construction")
-    print("      F (reverted): the literal returns → concept: is straced, a whole library witness reruns")
-    print("      δ (min delta): one token, `resolver.CROSSING` → `\"result:\"`\n")
+    print(
+        "      P (intact):  footdeps asks resolver.CROSSING → concept: is skipped by construction"
+    )
+    print(
+        "      F (reverted): the literal returns → concept: is straced, a whole library witness reruns"
+    )
+    print('      δ (min delta): one token, `resolver.CROSSING` → `"result:"`\n')
 
     # ── ask-result-tristate: the ARM — UNAVAILABLE ≠ FAIL ─────────────────────────────────────────
     # resolves() answers a Verdict, not a bool: a crossing check whose sibling is UNREACHABLE is
@@ -187,12 +231,21 @@ def main() -> int:
         ("unknown.is_unavailable()", unknown.is_unavailable(), repr(unknown)),
         ("cmd:false is FAIL", cmd_ran_failed is paperkit.resolver.FAIL, repr(cmd_ran_failed)),
         ("cmd:true is PASS", cmd_ran_passed is paperkit.resolver.PASS, repr(cmd_ran_passed)),
-        ("not UNAVAILABLE.passed", not paperkit.resolver.UNAVAILABLE.passed, repr(paperkit.resolver.UNAVAILABLE.passed)),
+        (
+            "not UNAVAILABLE.passed",
+            not paperkit.resolver.UNAVAILABLE.passed,
+            repr(paperkit.resolver.UNAVAILABLE.passed),
+        ),
         ("no __bool__", no_bool, repr(hasattr(paperkit.resolver.Verdict, "__bool__"))),
         # the determinism set needs three DISTINGUISHABLE outcomes, identity-hashable
-        ("set{PASS,FAIL,UNAVAILABLE} == 3",
-         len({paperkit.resolver.PASS, paperkit.resolver.FAIL, paperkit.resolver.UNAVAILABLE}) == 3,
-         repr(len({paperkit.resolver.PASS, paperkit.resolver.FAIL, paperkit.resolver.UNAVAILABLE}))),
+        (
+            "set{PASS,FAIL,UNAVAILABLE} == 3",
+            len({paperkit.resolver.PASS, paperkit.resolver.FAIL, paperkit.resolver.UNAVAILABLE})
+            == 3,
+            repr(
+                len({paperkit.resolver.PASS, paperkit.resolver.FAIL, paperkit.resolver.UNAVAILABLE})
+            ),
+        ),
     ]
     arm_ok = all(ok for _, ok, _ in terms)
     if not arm_ok:
@@ -200,15 +253,21 @@ def main() -> int:
             print(f"      [{'ok' if ok else 'XX'}] {name} -> {got}")
     fails.append("tristate-arm") if not arm_ok else None
     print(f"  {'ok ' if arm_ok else 'XX '}an UNREACHABLE crossing check is UNAVAILABLE, not FAIL")
-    print("      P (arm):     result:absent → UNAVAILABLE, unknown verb → UNAVAILABLE (cannot evaluate)")
+    print(
+        "      P (arm):     result:absent → UNAVAILABLE, unknown verb → UNAVAILABLE (cannot evaluate)"
+    )
     print("      F (folded):  a ran-and-failed check (cmd:false) → FAIL; the two must NOT coincide")
     print("      δ (min delta): the sibling is present/reachable vs absent/unreachable")
-    print("      (no __bool__ so no consumer folds silently; identity-hashable so the determinism set works)\n")
+    print(
+        "      (no __bool__ so no consumer folds silently; identity-hashable so the determinism set works)\n"
+    )
 
     if fails:
         print(f"DISPATCH: FAIL ({len(fails)} sites drifted from resolver.VERBS)")
         return 1
-    print(f"DISPATCH: PASS ({len(paperkit.resolver.VERBS)} verbs, {len(CROSSING)} crossing, 5 sites, 2 deltas)")
+    print(
+        f"DISPATCH: PASS ({len(paperkit.resolver.VERBS)} verbs, {len(CROSSING)} crossing, 5 sites, 2 deltas)"
+    )
     return 0
 
 

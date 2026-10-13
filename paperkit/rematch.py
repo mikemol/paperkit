@@ -29,6 +29,7 @@ takes an already-built `Match`/`Pattern` and calls a METHOD on it.  The module n
 in annotations, so the import belongs in the type-checking block — which also means this seam
 adds no import cost to a witness that does not use it.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

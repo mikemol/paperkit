@@ -10,6 +10,7 @@ drift from each other.
     cite_split(paper_md) -> str      # the resolved markdown a format node renders from
     title(paper_md)      -> str      # the document title (for pandoc --metadata / a LaTeX \title)
 """
+
 from __future__ import annotations
 
 import re
@@ -31,8 +32,9 @@ def cite_split(paper_md: Path) -> str:
         c = re.search(r"\bcheck\s*=\s*\{(\w+):", m.group(2))
         if c:
             mk[m.group(1)] = _MARK.get(c.group(1), "(machine-checked)")
-    return re.sub(r"\[@([A-Za-z][\w:.+-]*)\]", lambda x: mk.get(x.group(1), x.group(0)),
-                  paper_md.read_text())
+    return re.sub(
+        r"\[@([A-Za-z][\w:.+-]*)\]", lambda x: mk.get(x.group(1), x.group(0)), paper_md.read_text()
+    )
 
 
 def title(paper_md: Path) -> str:

@@ -16,6 +16,7 @@ fields it wants.
 Scalar fields are carried verbatim (LaTeX un-expanded — the projector cleans on
 render); the edge/token fields (`from`, `rests-on`, `reads`) are lists.
 """
+
 from __future__ import annotations
 
 import ast as _ast
@@ -46,9 +47,25 @@ import paperkit.rubric
 # toolchain, cached + stamped)}; a non-sandbox check runs on the host, gated but not swept.
 # paperkit parses and carries it so it is a quiet, owned field, not a loud-dropped unknown; the
 # generator reads the same bib text (Ζ·tier).
-_SCALAR = ("title", "author", "year", "note", "section", "claim",
-           "check", "glue", "join", "move", "emit", "as", "mem", "link", "depth", "tier",
-           "entails")
+_SCALAR = (
+    "title",
+    "author",
+    "year",
+    "note",
+    "section",
+    "claim",
+    "check",
+    "glue",
+    "join",
+    "move",
+    "emit",
+    "as",
+    "mem",
+    "link",
+    "depth",
+    "tier",
+    "entails",
+)
 # list-valued fields.  `from` = prose-order edge (dep_order + glue); `rests-on` =
 # grounding/entailment edge (adequacy clamping, NOT prose) — the two are often
 # reversed (prose runs general→specific, grounding specific→general); `reads` =
@@ -94,8 +111,8 @@ _SCOPES = mikemol.grade.grade.SCOPES
 # stops being a gap the engine must maintain and becomes what it always was: a field its project
 # had not declared.  A guard must not copy the set it guards, and the engine no longer claims to
 # know what standard BibTeX contains.
-_WARNED: set = set()          # (file, key, field) already reported — a build parses each bib
-                               # many times
+_WARNED: set = set()  # (file, key, field) already reported — a build parses each bib
+# many times
 
 
 def _unescaped_braces(s: str) -> Iterator[tuple[int, str]]:
@@ -112,7 +129,7 @@ def _unescaped_braces(s: str) -> Iterator[tuple[int, str]]:
             while j >= 0 and s[j] == "\\":
                 bs += 1
                 j -= 1
-            if bs % 2 == 0:                      # even (incl. zero) backslashes → a real brace
+            if bs % 2 == 0:  # even (incl. zero) backslashes → a real brace
                 yield i, ch
 
 
@@ -126,13 +143,13 @@ def _scalar_value(body: str, name: str) -> str | None:
     m = re.search(r"\b" + re.escape(name) + r"\s*=\s*\{", body)
     if not m:
         return None
-    start = m.end()                              # first char inside the opening brace
+    start = m.end()  # first char inside the opening brace
     depth = 1
     for i, ch in _unescaped_braces(body[start:]):
         depth += 1 if ch == "{" else -1
         if depth == 0:
-            return body[start:start + i]
-    return None                    # unbalanced — no closing brace (caller sees absent)
+            return body[start : start + i]
+    return None  # unbalanced — no closing brace (caller sees absent)
 
 
 def _entries(text: str) -> Iterator[tuple[str, str, str]]:
@@ -171,8 +188,8 @@ def _entries(text: str) -> Iterator[tuple[str, str, str]]:
     """
     for m in re.finditer(r"@(\w+)\s*\{\s*([^,\s}]+)\s*,", text):
         typ, key = m.group(1), m.group(2)
-        start = m.end()                              # first char after the key's comma
-        depth = 1                                    # the `{` that opened the entry
+        start = m.end()  # first char after the key's comma
+        depth = 1  # the `{` that opened the entry
         end = None
         for i, ch in _unescaped_braces(text[start:]):
             depth += 1 if ch == "{" else -1
@@ -182,7 +199,7 @@ def _entries(text: str) -> Iterator[tuple[str, str, str]]:
         # unbalanced ⇒ the entry runs to the end of input; the caller's field extraction then
         # sees what the author actually wrote (a swallowed field is ABSENT, which is what the
         # gate refuses on) rather than nothing at all.
-        yield typ, key, text[start:start + end] if end is not None else text[start:]
+        yield typ, key, text[start : start + end] if end is not None else text[start:]
 
 
 def _top_fields(body: str) -> list:
@@ -194,17 +211,17 @@ def _top_fields(body: str) -> list:
     throw off the depth (same fix as _scalar_value).
     """
     names, depth = [], 0
-    real = dict(_unescaped_braces(body))                 # index → real brace char (escaped skipped)
+    real = dict(_unescaped_braces(body))  # index → real brace char (escaped skipped)
     for m in re.finditer(r"([A-Za-z][\w-]*)\s*=\s*\{|[{}]", body):
         tok = m.group(0)
         if tok in "{}":
-            if m.start() in real:                        # count only UNescaped structural braces
+            if m.start() in real:  # count only UNescaped structural braces
                 depth += 1 if tok == "{" else -1
                 depth = max(0, depth)
-        else:                                            # a `name = {` — a field only at top level
+        else:  # a `name = {` — a field only at top level
             if depth == 0:
                 names.append(m.group(1))
-            depth += 1                                   # entered the value's brace
+            depth += 1  # entered the value's brace
     return names
 
 
@@ -259,8 +276,7 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
             # 24-name `_BIBTEX` roster, which made standard reference metadata quiet AND still
             # dropped (see the deleted roster's note above).  Every non-engine field now takes the
             # SAME route: declare it in `consumer_fields` to carry it, or hear about it.
-            unknown = [n for n in e.fields
-                       if n not in scalars and n not in _LIST]
+            unknown = [n for n in e.fields if n not in scalars and n not in _LIST]
             for n in unknown:
                 if (path.name, key, n) not in _WARNED:
                     _WARNED.add((path.name, key, n))
@@ -272,11 +288,15 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
                         f"paperkit-bib: {path.name} @{key}: field '{n}' is not a paperkit field "
                         f"and was DROPPED (not silently) — paperkit reads "
                         f"{', '.join(list(_SCALAR) + list(_LIST))}"
-                        + (f" plus this project's declared {', '.join(consumer_fields)}"
-                           if consumer_fields else "")
-                        + f'; declare it in this project\'s paper.toml '
-                          f'[paper] consumer_fields = ["{n}", ...] to CARRY it '
-                          f"(engine-inert, like `note`), or use an engine field, or remove it\n")
+                        + (
+                            f" plus this project's declared {', '.join(consumer_fields)}"
+                            if consumer_fields
+                            else ""
+                        )
+                        + f"; declare it in this project's paper.toml "
+                        f'[paper] consumer_fields = ["{n}", ...] to CARRY it '
+                        f"(engine-inert, like `note`), or use an engine field, or remove it\n"
+                    )
             # Ξ·entails — REFUSE an unrecognized scope rather than warn.  The drop-warning above is
             # right for an unknown FIELD (it may be deliberate documentation), but `entails` is a
             # known field whose value gates a clamp: a typo'd `entails = {fragmnt}` would read as
@@ -289,8 +309,10 @@ def parse(path: Path, consumer_fields: tuple = ()) -> dict:
             # guards — so the copy is inverted instead: `_SCOPES` is the owner and grade.SCOPE_C
             # DERIVES its keys from it, one direction, checked by boundaries_scope.py.
             if "entails" in f and f["entails"] not in _SCOPES:
-                msg = (f"paperkit-bib: {path.name} @{key}: entails = {{{f['entails']}}} is not "
-                       f"a scope — use one of {', '.join(sorted(_SCOPES))}")
+                msg = (
+                    f"paperkit-bib: {path.name} @{key}: entails = {{{f['entails']}}} is not "
+                    f"a scope — use one of {', '.join(sorted(_SCOPES))}"
+                )
                 raise SystemExit(msg)
             out[key] = f
     return out
@@ -352,8 +374,12 @@ def _param_config_keys() -> tuple:
             if getattr(fn, "id", None) != "Param" and getattr(fn, "attr", None) != "Param":
                 continue
             for kw in node.keywords:
-                if kw.arg == "config" and isinstance(kw.value, _ast.Constant) \
-                        and isinstance(kw.value.value, str) and kw.value.value not in out:
+                if (
+                    kw.arg == "config"
+                    and isinstance(kw.value, _ast.Constant)
+                    and isinstance(kw.value.value, str)
+                    and kw.value.value not in out
+                ):
                     out.append(kw.value.value)
     return tuple(out)
 
@@ -377,9 +403,11 @@ _SCHEMA_TABLES = frozenset({"genres"})
 
 def _refuse_misplaced(key: str, where: str) -> None:
     """Exit LOUDLY: `key` belongs under [paper] but was declared `where` instead."""
-    sys.exit(f"paperkit: `{key}` is declared {where}, but it belongs under [paper].  TOML "
-             f"scoped it out of the [paper] table, so the engine reads NONE of it and the "
-             f"build would still report success.  Move it below the [paper] header.")
+    sys.exit(
+        f"paperkit: `{key}` is declared {where}, but it belongs under [paper].  TOML "
+        f"scoped it out of the [paper] table, so the engine reads NONE of it and the "
+        f"build would still report success.  Move it below the [paper] header."
+    )
 
 
 def _misplaced_paper_key_top_level(raw: dict, keys: set) -> None:
@@ -458,8 +486,8 @@ def _misplaced_paper_key(cfg: Path) -> None:
     """
     keys = set(paper_keys()) | set(_param_config_keys())
     raw = tomllib.loads(cfg.read_text())
-    _misplaced_paper_key_top_level(raw, keys)         # the TOP level: a key above [paper]
-    _misplaced_paper_key_in_table(raw, keys)          # any NON-[paper] table, and its subtables
+    _misplaced_paper_key_top_level(raw, keys)  # the TOP level: a key above [paper]
+    _misplaced_paper_key_in_table(raw, keys)  # any NON-[paper] table, and its subtables
 
 
 def _misplaced_consumer_fields(cfg: Path) -> list:
@@ -486,10 +514,12 @@ def _misplaced_consumer_fields(cfg: Path) -> list:
             for sub, inner in [*list(body.items()), (table, body)]:
                 d = inner if isinstance(inner, dict) else body
                 if isinstance(d, dict) and "consumer_fields" in d:
-                    sys.exit(f"paperkit: `consumer_fields` is declared under [{table}"
-                             f"{'.' + sub if isinstance(inner, dict) else ''}], but it belongs "
-                             f"under [paper].  TOML scoped it into that table, so the engine sees "
-                             f"NONE and every field you declared would drop silently.")
+                    sys.exit(
+                        f"paperkit: `consumer_fields` is declared under [{table}"
+                        f"{'.' + sub if isinstance(inner, dict) else ''}], but it belongs "
+                        f"under [paper].  TOML scoped it into that table, so the engine sees "
+                        f"NONE and every field you declared would drop silently."
+                    )
     return []
 
 
@@ -498,7 +528,7 @@ def load_config(project: Path) -> dict:
     cfg = project / "paper.toml"
     if not cfg.exists():
         sys.exit(f"paperkit: no paper.toml in {project}")
-    _misplaced_paper_key(cfg)          # Ζ·toml·scope — refuse a [paper] key scoped out of [paper]
+    _misplaced_paper_key(cfg)  # Ζ·toml·scope — refuse a [paper] key scoped out of [paper]
     p = tomllib.loads(cfg.read_text()).get("paper", {})
     return {
         "title": p.get("title", "Untitled"),
@@ -539,9 +569,13 @@ def load_config(project: Path) -> dict:
         # The declaration is the policy (the project's), the exclusion is the mechanism (the
         # engine's) — the same split as consumer_fields above.  Same shape as `tier`, which
         # already means "gated but not graded" for a host-run check the sandbox cannot grade.
-        "nonmechanical": tuple(sorted(
-            t for t, spec in tomllib.loads(cfg.read_text()).get("checks", {}).items()
-            if isinstance(spec, dict) and spec.get("mechanical") is False)),
+        "nonmechanical": tuple(
+            sorted(
+                t
+                for t, spec in tomllib.loads(cfg.read_text()).get("checks", {}).items()
+                if isinstance(spec, dict) and spec.get("mechanical") is False
+            )
+        ),
     }
 
 
@@ -580,11 +614,13 @@ def parse_project(project_dir: Path) -> dict:
         # order.  Naming both files is the whole diagnosis.
         for k in entries:
             if k in claims:
-                msg = (f"paperkit-bib: {project_dir.name}: claim key {k!r} is defined TWICE — "
-                       f"in {Path(claims[k].get('_src', '?')).name} and {b.name}.  A project's "
-                       f"bibs compose into ONE flat namespace, so the second definition would "
-                       f"REPLACE the first (silently, with its own `check` — or none, which "
-                       f"disarms the claim while leaving it cited).  Rename one, or remove it.")
+                msg = (
+                    f"paperkit-bib: {project_dir.name}: claim key {k!r} is defined TWICE — "
+                    f"in {Path(claims[k].get('_src', '?')).name} and {b.name}.  A project's "
+                    f"bibs compose into ONE flat namespace, so the second definition would "
+                    f"REPLACE the first (silently, with its own `check` — or none, which "
+                    f"disarms the claim while leaving it cited).  Rename one, or remove it."
+                )
                 raise SystemExit(msg)
         claims.update(entries)
     return claims
@@ -681,7 +717,7 @@ def emit_anchors(cfg: dict, emit: str) -> list:
     seen, hits = set(), []
     for anchor in (cfg["project_dir"], cfg["out"].parent):
         d = Path(anchor).resolve()
-        if d in seen:                            # in-repo: the two anchors are one dir
+        if d in seen:  # in-repo: the two anchors are one dir
             continue
         seen.add(d)
         p = d / emit

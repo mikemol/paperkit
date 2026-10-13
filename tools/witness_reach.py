@@ -18,6 +18,7 @@ check; that is a different question and the gate's to ask.
     python3 tools/witness_reach.py            # every witness tree
     python3 tools/witness_reach.py render     # one project's checks/
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -49,10 +50,18 @@ def probe(tree: Path, name: str) -> tuple[int, str]:
     except the `if __name__ == "__main__"` body.
     """
     stem = name[: -len(".py")]
-    code = ("import sys; sys.path.insert(0, 'checks'); "
-            f"import importlib; importlib.import_module({stem!r})")
-    r = subprocess.run(["python3", "-c", code], cwd=tree.parent,  # noqa: S603, S607
-                       capture_output=True, text=True, timeout=120, check=False)
+    code = (
+        "import sys; sys.path.insert(0, 'checks'); "
+        f"import importlib; importlib.import_module({stem!r})"
+    )
+    r = subprocess.run(
+        ["python3", "-c", code],
+        cwd=tree.parent,  # noqa: S603, S607
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
     tail = [ln for ln in (r.stdout + r.stderr).splitlines() if ln.strip()]
     return r.returncode, (tail[-1][:96] if tail else "")
 

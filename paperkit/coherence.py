@@ -48,6 +48,7 @@ for structure; definition-resolution fingerprints for sensitivity, grounding, an
     coherence.py --json [DIR]     # structured
     coherence.py --from-cache [DIR]   # read .delta-cache.json — no re-sweep, partial-grade OK
 """
+
 from __future__ import annotations
 
 import json
@@ -69,7 +70,7 @@ def _linearize(records: list) -> dict:
     """
     frm = {r["key"]: r.get("from", []) for r in records}
     secs, order = [], {}
-    for r in records:                       # sections in first-appearance order
+    for r in records:  # sections in first-appearance order
         s = r.get("section")
         order.setdefault(s, []).append(r["key"])
         if s not in secs:
@@ -109,14 +110,18 @@ def structure_residual(records: list, discharged=frozenset()) -> dict:
         k = r["key"]
         for y in r.get("rests-on", []):
             if y not in pos or k not in pos:
-                long_edges.append((k, y, None))      # cross-scope target — always owed
+                long_edges.append((k, y, None))  # cross-scope target — always owed
             elif pos[y] == pos[k] - 1:
-                carried += 1                          # the immediate predecessor: connective carries it
+                carried += 1  # the immediate predecessor: connective carries it
             else:
                 long_edges.append((k, y, pos[k] - pos[y]))
     undischarged = sum(1 for k, _, _ in long_edges if k not in discharged)
-    return {"carried": carried, "owed": len(long_edges), "undischarged": undischarged,
-            "long_edges": long_edges}
+    return {
+        "carried": carried,
+        "owed": len(long_edges),
+        "undischarged": undischarged,
+        "long_edges": long_edges,
+    }
 
 
 def grouping_residual(records: list, gamma: float = 1.0, discharged=frozenset()) -> dict:
@@ -163,19 +168,38 @@ def grouping_residual(records: list, gamma: float = 1.0, discharged=frozenset())
     # a deck on this partition, this face measures how far it sits from the authored sigma.  A
     # second copy would drift, and the residual would then be measuring a grouping no deck uses.
     import paperkit.genre
+
     g = paperkit.genre.partition(records, gamma)
     if g["degenerate"]:
-        return {"claims": len(keys), "edges": 0, "residual": 0, "undischarged": 0,
-                "gamma": gamma, "sections": len(sigma), "moved": [], "acknowledged": [],
-                "degenerate": True, "within_sigma": 0, "within_frac": None}
+        return {
+            "claims": len(keys),
+            "edges": 0,
+            "residual": 0,
+            "undischarged": 0,
+            "gamma": gamma,
+            "sections": len(sigma),
+            "moved": [],
+            "acknowledged": [],
+            "degenerate": True,
+            "within_sigma": 0,
+            "within_frac": None,
+        }
     part, edges, within = g["part"], g["edges"], g["within"]
     moved = sorted(k for k in keys if part[k] != sec[k])
     ack = [k for k in moved if k in discharged]
-    return {"claims": len(keys), "edges": edges, "residual": len(moved),
-            "undischarged": len([k for k in moved if k not in discharged]),
-            "gamma": gamma, "sections": len(sigma), "moved": moved, "acknowledged": ack,
-            "degenerate": False, "within_sigma": within,
-            "within_frac": round(within / edges, 3) if edges else None}
+    return {
+        "claims": len(keys),
+        "edges": edges,
+        "residual": len(moved),
+        "undischarged": len([k for k in moved if k not in discharged]),
+        "gamma": gamma,
+        "sections": len(sigma),
+        "moved": moved,
+        "acknowledged": ack,
+        "degenerate": False,
+        "within_sigma": within,
+        "within_frac": round(within / edges, 3) if edges else None,
+    }
 
 
 def sensitivity_residual(records: list) -> dict:
@@ -194,7 +218,7 @@ def sensitivity_residual(records: list) -> dict:
     return {
         "behavioral": behavioral,
         "signatures": len(classes),
-        "collapse": behavioral - len(classes),          # redundant witnesses, by sensitivity
+        "collapse": behavioral - len(classes),  # redundant witnesses, by sensitivity
         "largest_class": len(largest),
         "largest_signature": list(largest and sorted(sigs.keys(), key=lambda k: len(sigs[k]))[-1]),
     }
@@ -230,14 +254,16 @@ def scope_residual(records: list) -> dict:
     # not been through it — a face that measures nothing while reporting residual 0 is the
     # degenerate-green this whole apparatus exists to refuse.  `entails` is the author's own word
     # and is always present when declared, so it is the primary read.
-    declared = [r for r in records
-                if (r.get("entails") or r.get("scope") or "full") != "full"]
-    contradicted = [r["key"] for r in declared
-                    if not r.get("tests") and r.get("grade") in ("vacuous", "indeterminate")]
+    declared = [r for r in records if (r.get("entails") or r.get("scope") or "full") != "full"]
+    contradicted = [
+        r["key"]
+        for r in declared
+        if not r.get("tests") and r.get("grade") in ("vacuous", "indeterminate")
+    ]
     return {
-        "declared": len(declared),                      # claims disclosing a shortfall
+        "declared": len(declared),  # claims disclosing a shortfall
         "behavioral": len([r for r in declared if r.get("grade") == "behavioral"]),
-        "residual": len(contradicted),                  # disclosures their evidence contradicts
+        "residual": len(contradicted),  # disclosures their evidence contradicts
         "contradicted": sorted(contradicted),
         # Ζ·symdiff, one face over — `residual: 0` over ZERO declarations is not a clean bill, it
         # is a face that measured nothing, and the two render identically once collapsed to a
@@ -284,10 +310,13 @@ def _engine_cap(tests, universal=frozenset()) -> set:
     computed quotient by universality — and only the old `paperkit/`-only INCLUSION filter is
     gone, since that is the part that made a self-contained project read as vacuous.
     """
-    return {t for t in tests
-            if t not in universal
-            and not t.startswith("checks/")
-            and not t.startswith("paperkit/tests/")}
+    return {
+        t
+        for t in tests
+        if t not in universal
+        and not t.startswith("checks/")
+        and not t.startswith("paperkit/tests/")
+    }
 
 
 def _universal_sites(records: list) -> frozenset:
@@ -309,9 +338,15 @@ def _universal_sites(records: list) -> frozenset:
     fingerprints the frame is UNDEFINED, and the identity quotient is the honest answer: report
     what was measured rather than subtract a frame that was never established.
     """
-    sets = [{t for t in r.get("tests", [])
-             if not t.startswith("checks/") and not t.startswith("paperkit/tests/")}
-            for r in records if r.get("tests")]
+    sets = [
+        {
+            t
+            for t in r.get("tests", [])
+            if not t.startswith("checks/") and not t.startswith("paperkit/tests/")
+        }
+        for r in records
+        if r.get("tests")
+    ]
     sets = [s for s in sets if s]
     if len(sets) < 2:
         return frozenset()
@@ -350,8 +385,7 @@ def unmeasured_edges(records: list, all_keys=frozenset()) -> dict:
             if y in graded:
                 continue
             (dangling if (all_keys and y not in all_keys) else pending).append([r["key"], y])
-    return {"pending": pending, "dangling": dangling,
-            "unmeasured": len(pending) + len(dangling)}
+    return {"pending": pending, "dangling": dangling, "unmeasured": len(pending) + len(dangling)}
 
 
 def grounding_residual(records: list, discharged=frozenset(), universal=frozenset()) -> dict:
@@ -377,20 +411,25 @@ def grounding_residual(records: list, discharged=frozenset(), universal=frozense
         sx = S.get(k, set())
         for y in r.get("rests-on", []):
             sy = S.get(y)
-            if not sy:                          # Y measures no engine capability — no claim to test
+            if not sy:  # Y measures no engine capability — no claim to test
                 continue
             edges += 1
             if sx & sy:
                 reflected += 1
             elif not sx:
-                rhetorical += 1                 # X's fingerprint is empty — vacuously disjoint (measured)
+                rhetorical += 1  # X's fingerprint is empty — vacuously disjoint (measured)
             elif k in discharged:
-                pass                            # author-acknowledged via a `link` footnote
+                pass  # author-acknowledged via a `link` footnote
             else:
                 undischarged += 1
                 misses.append([k, y])
-    return {"grounding_edges": edges, "reflected": reflected, "rhetorical": rhetorical,
-            "undischarged": undischarged, "misses": misses}
+    return {
+        "grounding_edges": edges,
+        "reflected": reflected,
+        "rhetorical": rhetorical,
+        "undischarged": undischarged,
+        "misses": misses,
+    }
 
 
 def emergence_residual(records: list, universal=frozenset()) -> dict:
@@ -423,7 +462,12 @@ def emergence_residual(records: list, universal=frozenset()) -> dict:
             increments.append([k, delta])
         else:
             collapse += 1
-    return {"collapse": collapse, "increment": len(increments), "leaf": leaf, "increments": increments}
+    return {
+        "collapse": collapse,
+        "increment": len(increments),
+        "leaf": leaf,
+        "increments": increments,
+    }
 
 
 def report(records: list, discharged=frozenset(), all_keys=frozenset()) -> dict:
@@ -431,46 +475,59 @@ def report(records: list, discharged=frozenset(), all_keys=frozenset()) -> dict:
     # Ζ·torsor — derive the frame ONCE from the whole record set, then measure every face in it.
     # The origin (the universal sites) is computed, not declared, so it cannot go stale.
     universal = _universal_sites(cited)
-    return {"claims": len(cited),
-            # Ν·vac — vacuous iff no cited claim retains ANY discriminating site once the frame's
-            # origin is quotiented out.  This is now FRAME-RELATIVE and therefore honest: a
-            # document whose witnesses all trip exactly the same sites cannot be told apart by
-            # this measurement, whether that is a degraded sweep or a corpus too thinly graded to
-            # separate.  Either way no real verdict is possible — callers must refuse green.
-            "vacuous": bool(cited) and not any(_engine_cap(r.get("tests", []), universal)
-                                               for r in cited),
-            "frame": {"universal": sorted(universal), "quotiented": len(universal)},
-            "structure": structure_residual(cited, discharged),
-            "sensitivity": sensitivity_residual(cited),
-            "grounding": grounding_residual(cited, discharged, universal),
-            "emergence": emergence_residual(cited, universal),
-            # Ρ·deck·residual — the AUTHORED section grouping vs the grounding-derived one.
-            # Reads only the bib (no sweep), so it is meaningful even on a degraded grade.
-            "grouping": grouping_residual(cited, discharged=discharged),
-            # Ξ·entails — the DECLARED scope against the measured reach.  Like grouping this reads
-            # a bib declaration, but unlike it the declaration is checked against the SWEEP, so it
-            # is meaningful only where a grade was established.
-            "scope": scope_residual(cited),
-            # Ζ·symdiff — what STRUCTURE counted and the measured faces could not see.  Reported
-            # beside them so a partial reading declares its own incompleteness.
-            "unmeasured": unmeasured_edges(cited, all_keys)}
+    return {
+        "claims": len(cited),
+        # Ν·vac — vacuous iff no cited claim retains ANY discriminating site once the frame's
+        # origin is quotiented out.  This is now FRAME-RELATIVE and therefore honest: a
+        # document whose witnesses all trip exactly the same sites cannot be told apart by
+        # this measurement, whether that is a degraded sweep or a corpus too thinly graded to
+        # separate.  Either way no real verdict is possible — callers must refuse green.
+        "vacuous": bool(cited)
+        and not any(_engine_cap(r.get("tests", []), universal) for r in cited),
+        "frame": {"universal": sorted(universal), "quotiented": len(universal)},
+        "structure": structure_residual(cited, discharged),
+        "sensitivity": sensitivity_residual(cited),
+        "grounding": grounding_residual(cited, discharged, universal),
+        "emergence": emergence_residual(cited, universal),
+        # Ρ·deck·residual — the AUTHORED section grouping vs the grounding-derived one.
+        # Reads only the bib (no sweep), so it is meaningful even on a degraded grade.
+        "grouping": grouping_residual(cited, discharged=discharged),
+        # Ξ·entails — the DECLARED scope against the measured reach.  Like grouping this reads
+        # a bib declaration, but unlike it the declaration is checked against the SWEEP, so it
+        # is meaningful only where a grade was established.
+        "scope": scope_residual(cited),
+        # Ζ·symdiff — what STRUCTURE counted and the measured faces could not see.  Reported
+        # beside them so a partial reading declares its own incompleteness.
+        "unmeasured": unmeasured_edges(cited, all_keys),
+    }
 
 
 def _records(project_dir: Path) -> list:
     # def resolution: the sensitivity face is only meaningful at the per-definition
     # fingerprint — at file resolution every witness collapses to the import-crash
     # signature.  This is the costly grade (the on-demand precision pass), not the hook's.
-    r = subprocess.run([sys.executable, str(_ENGINE / "discriminate.py"),
-                        "--resolution", "def", "--json", str(project_dir)],
-                       capture_output=True, text=True)
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(_ENGINE / "discriminate.py"),
+            "--resolution",
+            "def",
+            "--json",
+            str(project_dir),
+        ],
+        capture_output=True,
+        text=True,
+    )
     # Ν·loud — the sweep's exit code is a VERDICT, not noise.  A whole-project --json run returns 0;
     # a non-zero is a real failure (a refused key, a crash) whose stdout is empty or partial, and
     # `json.loads(... or "[]")` would silently read it as an EMPTY document — a vacuous report
     # presented as a real one.  Surface it instead of banking the swallow (finding A's consumer face).
     if r.returncode != 0:
-        raise SystemExit(f"Ν·loud: `discriminate --resolution def --json {project_dir}` exited "
-                         f"{r.returncode} — the ∂² faces have nothing sound to read.  "
-                         f"stderr:\n{r.stderr.strip()}")
+        raise SystemExit(
+            f"Ν·loud: `discriminate --resolution def --json {project_dir}` exited "
+            f"{r.returncode} — the ∂² faces have nothing sound to read.  "
+            f"stderr:\n{r.stderr.strip()}"
+        )
     return json.loads(r.stdout or "[]")
 
 
@@ -486,9 +543,17 @@ def _records_from_calcs(project_dir: Path, calc_files: list) -> list:
         c = json.loads(Path(f).read_text())
         k = c["claim"]
         st = F.get(k, {})
-        recs.append({"key": k, "tests": c.get("sens", []), "rests-on": st.get("rests-on", []),
-                     "section": st.get("section", ""), "from": st.get("from", []),
-                     "grade": "behavioral" if c.get("sens") else "vacuous", "cited": True})
+        recs.append(
+            {
+                "key": k,
+                "tests": c.get("sens", []),
+                "rests-on": st.get("rests-on", []),
+                "section": st.get("section", ""),
+                "from": st.get("from", []),
+                "grade": "behavioral" if c.get("sens") else "vacuous",
+                "cited": True,
+            }
+        )
     return recs
 
 
@@ -515,8 +580,9 @@ def _coverage(project_dir: Path, records: list) -> tuple:
     # that is complete.  Measured on paper: 112 bib claims, 85 with a local certificate, and of
     # the 27 without, 26 are `concept:` imports and 1 is `cmd:` — none of them a miss.
     F = F_of(project_dir)
-    eligible = {k: f for k, f in F.items()
-                if not str(f.get("check") or "").startswith(("concept:", "cmd:"))}
+    eligible = {
+        k: f for k, f in F.items() if not str(f.get("check") or "").startswith(("concept:", "cmd:"))
+    }
     edges = sum(len(f.get("rests-on") or []) for f in eligible.values())
     seen = sum(len(r.get("rests-on") or []) for r in records)
     return len(have & set(eligible)), len(eligible), seen, edges
@@ -556,15 +622,21 @@ def _records_from_cache(project_dir: Path) -> list:
     # exits 1, which read as "a threshold was missed" and put a caller bug in the verdict channel.
     p = project_dir / ".delta-cache.json"
     if not p.is_file():
-        print(f"Ν·loud: no .delta-cache.json in {project_dir} — run "
-              "`discriminate.py --resolution def --state S --budget N` first", file=sys.stderr)
+        print(
+            f"Ν·loud: no .delta-cache.json in {project_dir} — run "
+            "`discriminate.py --resolution def --state S --budget N` first",
+            file=sys.stderr,
+        )
         raise SystemExit(_REFUSE)
     cached = json.loads(p.read_text())
     if cached.get("resolution") != "def":
-        print(f"Ν·loud: .delta-cache.json is {cached.get('resolution')!r} resolution, not 'def' — "
-              "at file resolution every witness collapses to the import-crash signature, so the "
-              "sensitivity, grounding and emergence faces would read a measurement that cannot "
-              "discriminate.  Re-grade with --resolution def.", file=sys.stderr)
+        print(
+            f"Ν·loud: .delta-cache.json is {cached.get('resolution')!r} resolution, not 'def' — "
+            "at file resolution every witness collapses to the import-crash signature, so the "
+            "sensitivity, grounding and emergence faces would read a measurement that cannot "
+            "discriminate.  Re-grade with --resolution def.",
+            file=sys.stderr,
+        )
         raise SystemExit(_REFUSE)
     F = paperkit.bib.parse_project(project_dir)
     # a check may serve SEVERAL claims (binding dilution) — the cache keys by check, the faces
@@ -578,10 +650,17 @@ def _records_from_cache(project_dir: Path) -> list:
         g = entry.get("grade") or {}
         for k in by_check.get(chk, []):
             st = F.get(k, {})
-            recs.append({"key": k, "tests": g.get("tests", []),
-                         "rests-on": st.get("rests-on", []), "section": st.get("section", ""),
-                         "from": st.get("from", []), "grade": g.get("grade", "indeterminate"),
-                         "cited": True})
+            recs.append(
+                {
+                    "key": k,
+                    "tests": g.get("tests", []),
+                    "rests-on": st.get("rests-on", []),
+                    "section": st.get("section", ""),
+                    "from": st.get("from", []),
+                    "grade": g.get("grade", "indeterminate"),
+                    "cited": True,
+                }
+            )
     return recs
 
 
@@ -607,9 +686,12 @@ def _vacuous_exit(project_dir: Path, rep: dict) -> bool:
     """
     if not rep["vacuous"]:
         return False
-    print(f"Ν·vac: coherence over {project_dir.name or project_dir}: NO claim tests any engine "
-          f"capability ({rep['claims']} claims, every fingerprint empty) — a vacuous measurement "
-          f"(a degraded def-sweep?); refusing to emit a verdict.", file=sys.stderr)
+    print(
+        f"Ν·vac: coherence over {project_dir.name or project_dir}: NO claim tests any engine "
+        f"capability ({rep['claims']} claims, every fingerprint empty) — a vacuous measurement "
+        f"(a degraded def-sweep?); refusing to emit a verdict.",
+        file=sys.stderr,
+    )
     return True
 
 
@@ -631,13 +713,16 @@ def _grounding_exit(rep: dict) -> int:
     g = rep["grounding"]
     if g["undischarged"] == 0:
         return 0
-    print(f"coherence: GROUNDING {g['undischarged']} of {g['grounding_edges']} rests-on edge(s) "
-          f"un-acknowledged — the claim tests engine capability, but DISJOINT from its premise's. "
-          f"Overlap the fingerprints, or discharge with a `link` stating why they diverge:",
-          file=sys.stderr)
+    print(
+        f"coherence: GROUNDING {g['undischarged']} of {g['grounding_edges']} rests-on edge(s) "
+        f"un-acknowledged — the claim tests engine capability, but DISJOINT from its premise's. "
+        f"Overlap the fingerprints, or discharge with a `link` stating why they diverge:",
+        file=sys.stderr,
+    )
     for x, y in g["misses"]:
-        print(f"  [@{x}] rests-on [@{y}] — tests engine capability, but not [@{y}]'s",
-              file=sys.stderr)
+        print(
+            f"  [@{x}] rests-on [@{y}] — tests engine capability, but not [@{y}]'s", file=sys.stderr
+        )
     return 1
 
 
@@ -649,11 +734,14 @@ def _residual_exit(rep: dict, max_resid) -> int:
         return 0
     gr = rep["grouping"]
     if gr["undischarged"] > max_resid:
-        print(f"coherence: GROUPING RESIDUAL {gr['undischarged']} exceeds --max-residual "
-              f"{max_resid} — {gr['undischarged']} claim(s) group outside their section with no "
-              f"`link` acknowledging why.  Refile them, or discharge each with a `link` stating "
-              f"the cross-reference it makes: "
-              f"{[k for k in gr['moved'] if k not in gr['acknowledged']]}", file=sys.stderr)
+        print(
+            f"coherence: GROUPING RESIDUAL {gr['undischarged']} exceeds --max-residual "
+            f"{max_resid} — {gr['undischarged']} claim(s) group outside their section with no "
+            f"`link` acknowledging why.  Refile them, or discharge each with a `link` stating "
+            f"the cross-reference it makes: "
+            f"{[k for k in gr['moved'] if k not in gr['acknowledged']]}",
+            file=sys.stderr,
+        )
         return 1
     return 0
 
@@ -681,24 +769,32 @@ def main(argv: list) -> int:
     # measurement has no help; the flag is answered here, first, touching nothing.
     if "--help" in argv or "-h" in argv:
         print(__doc__.strip().split("\n\n")[0])
-        print("\nusage: coherence.py [project] [--json] [--from-calcs <calc.json>...] "
-              "[--from-cache] [--max-residual N]\n"
-              "  (no project)        the current directory\n"
-              "  --json              emit the full report as JSON, not just the exit verdict\n"
-              "  --from-calcs …      read CACHED def-sweep certificates (__dcalc) — no re-sweep;\n"
-              "                      REFUSES (exit 2) if the calc set covers only part of the graph\n"
-              "  --from-cache        read the accumulated per-check cache from --state increments\n"
-              "  --max-residual N    fail when the grouping residual exceeds N\n"
-              "\nExit: 0 coherent, 1 a face is red, 2 CANNOT-RUN (a partial or vacuous reading).\n"
-              "⚑ Bare, this SWEEPS: it grades every check to fingerprint it, which is minutes, not\n"
-              "  seconds.  --from-calcs is the gate's path and reads what the build already banked.")
+        print(
+            "\nusage: coherence.py [project] [--json] [--from-calcs <calc.json>...] "
+            "[--from-cache] [--max-residual N]\n"
+            "  (no project)        the current directory\n"
+            "  --json              emit the full report as JSON, not just the exit verdict\n"
+            "  --from-calcs …      read CACHED def-sweep certificates (__dcalc) — no re-sweep;\n"
+            "                      REFUSES (exit 2) if the calc set covers only part of the graph\n"
+            "  --from-cache        read the accumulated per-check cache from --state increments\n"
+            "  --max-residual N    fail when the grouping residual exceeds N\n"
+            "\nExit: 0 coherent, 1 a face is red, 2 CANNOT-RUN (a partial or vacuous reading).\n"
+            "⚑ Bare, this SWEEPS: it grades every check to fingerprint it, which is minutes, not\n"
+            "  seconds.  --from-calcs is the gate's path and reads what the build already banked."
+        )
         return 0
     as_json = "--json" in argv
     max_resid = _max_residual(argv)
     # the flag's VALUE is not a positional project dir
-    argv = [a for i, a in enumerate(argv)
-            if not (a == "--max-residual" or a.startswith("--max-residual=")
-                    or (i and argv[i - 1] == "--max-residual"))]
+    argv = [
+        a
+        for i, a in enumerate(argv)
+        if not (
+            a == "--max-residual"
+            or a.startswith("--max-residual=")
+            or (i and argv[i - 1] == "--max-residual")
+        )
+    ]
     pos = [a for a in argv if not a.startswith("-")]
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
     if "--from-calcs" in argv:
@@ -710,11 +806,14 @@ def main(argv: list) -> int:
             # Ζ·cohere·artifact — REFUSE a partial reading rather than report it as whole.  Exit 2
             # (cannot-run), never 0 or 1: a measurement over part of the graph is neither a pass
             # nor a refutation, and reading it as either is the error this guard exists for.
-            print(f"Ν·partial: coherence over {project_dir.name or project_dir}: the calc set "
-                  f"covers {n_claims}/{tot_claims} claims and {n_edges}/{tot_edges} rests-on "
-                  f"edges — an INCOMPLETE reading.  `:cohere` consumes the def-sweep certificates "
-                  f"(__dcalc); a glob that also matches file-resolution __calc records silently "
-                  f"reads a fraction of the graph.  Refusing to emit a verdict.", file=sys.stderr)
+            print(
+                f"Ν·partial: coherence over {project_dir.name or project_dir}: the calc set "
+                f"covers {n_claims}/{tot_claims} claims and {n_edges}/{tot_edges} rests-on "
+                f"edges — an INCOMPLETE reading.  `:cohere` consumes the def-sweep certificates "
+                f"(__dcalc); a glob that also matches file-resolution __calc records silently "
+                f"reads a fraction of the graph.  Refusing to emit a verdict.",
+                file=sys.stderr,
+            )
             return 2
         rep = report(recs, _discharged(project_dir), _all_keys(project_dir))
         if as_json:
@@ -738,45 +837,63 @@ def main(argv: list) -> int:
         return 2
     s, se, g, e = rep["structure"], rep["sensitivity"], rep["grounding"], rep["emergence"]
     print(f"coherence (∂²): {project_dir.name or project_dir} — {rep['claims']} cited claims")
-    print(f"  structure  : {s['carried']} grounding edges carried by the prose connective, "
-          f"{s['owed']} are LONG edges owed a projected cross-reference; {s['undischarged']} "
-          f"un-acknowledged (advisory — project the reference, or discharge with a `link`)")
-    print(f"  sensitivity: {se['behavioral']} behavioral witnesses → {se['signatures']} distinct "
-          f"sensitivity signatures ({se['collapse']} collapse); the largest {se['largest_class']} "
-          f"share {se['largest_signature']}")
-    print(f"  grounding  : {g['reflected']}/{g['grounding_edges']} rests-on edges reflected in "
-          f"measured engine sensitivity; {g['rhetorical']} vacuously disjoint (rhetorical — the "
-          f"claim tests no engine capability); {g['undischarged']} genuine, un-acknowledged "
-          f"(advisory — overlap the fingerprints, or discharge with a `link`)")
+    print(
+        f"  structure  : {s['carried']} grounding edges carried by the prose connective, "
+        f"{s['owed']} are LONG edges owed a projected cross-reference; {s['undischarged']} "
+        f"un-acknowledged (advisory — project the reference, or discharge with a `link`)"
+    )
+    print(
+        f"  sensitivity: {se['behavioral']} behavioral witnesses → {se['signatures']} distinct "
+        f"sensitivity signatures ({se['collapse']} collapse); the largest {se['largest_class']} "
+        f"share {se['largest_signature']}"
+    )
+    print(
+        f"  grounding  : {g['reflected']}/{g['grounding_edges']} rests-on edges reflected in "
+        f"measured engine sensitivity; {g['rhetorical']} vacuously disjoint (rhetorical — the "
+        f"claim tests no engine capability); {g['undischarged']} genuine, un-acknowledged "
+        f"(advisory — overlap the fingerprints, or discharge with a `link`)"
+    )
     for x, y in g["misses"]:
         print(f"               [@{x}] rests-on [@{y}] — tests engine capability, but not [@{y}]'s")
-    print(f"  emergence  : {e['collapse']} claims COLLAPSE (engine sensitivity ⊆ grounding → witness "
-          f"emerges by consumption), {e['increment']} INCREMENT (test engine capability beyond their "
-          f"grounding), {e['leaf']} LEAF axioms (no grounding → self-contained checks)")
+    print(
+        f"  emergence  : {e['collapse']} claims COLLAPSE (engine sensitivity ⊆ grounding → witness "
+        f"emerges by consumption), {e['increment']} INCREMENT (test engine capability beyond their "
+        f"grounding), {e['leaf']} LEAF axioms (no grounding → self-contained checks)"
+    )
     for x, d in e["increments"]:
-        print(f"               [@{x}] +{len(d)} engine site(s) beyond its grounding "
-              f"— e.g. {[t.split('::')[-1] for t in d[:3]]}")
+        print(
+            f"               [@{x}] +{len(d)} engine site(s) beyond its grounding "
+            f"— e.g. {[t.split('::')[-1] for t in d[:3]]}"
+        )
     gr = rep["grouping"]
     if gr["degenerate"]:
-        print(f"  grouping   : no rests-on edges between cited claims — σ ({gr['sections']} "
-              f"sections) is the only partition the grounding graph can express, so the "
-              f"residual is trivially 0 (nothing to disagree with)")
+        print(
+            f"  grouping   : no rests-on edges between cited claims — σ ({gr['sections']} "
+            f"sections) is the only partition the grounding graph can express, so the "
+            f"residual is trivially 0 (nothing to disagree with)"
+        )
     else:
         pct = "—" if gr["within_frac"] is None else f"{gr['within_frac']:.0%}"
-        print(f"  grouping   : d(σ,P*) = {gr['residual']} of {gr['claims']} claims move when the "
-              f"section grouping is re-derived from rests-on modularity (γ={gr['gamma']}); "
-              f"{gr['undischarged']} un-acknowledged; "
-              f"{gr['within_sigma']}/{gr['edges']} grounding edges ({pct}) already stay "
-              f"within-section")
+        print(
+            f"  grouping   : d(σ,P*) = {gr['residual']} of {gr['claims']} claims move when the "
+            f"section grouping is re-derived from rests-on modularity (γ={gr['gamma']}); "
+            f"{gr['undischarged']} un-acknowledged; "
+            f"{gr['within_sigma']}/{gr['edges']} grounding edges ({pct}) already stay "
+            f"within-section"
+        )
         for k in gr["moved"]:
             ack = " [discharged by `link`]" if k in gr["acknowledged"] else ""
-            print(f"               [@{k}] — its grounding lives outside its section "
-                  f"(MISFILED, or a deliberate cross-reference the prose owes a callback){ack}")
+            print(
+                f"               [@{k}] — its grounding lives outside its section "
+                f"(MISFILED, or a deliberate cross-reference the prose owes a callback){ack}"
+            )
     um = rep["unmeasured"]
     if um["unmeasured"]:
-        print(f"  unmeasured : {len(um['pending'])} declared edge(s) STRUCTURE counts that "
-              f"grounding and emergence CANNOT see — the target is not graded, so those faces "
-              f"skip the edge silently; {len(um['dangling'])} point at no bib entry at all")
+        print(
+            f"  unmeasured : {len(um['pending'])} declared edge(s) STRUCTURE counts that "
+            f"grounding and emergence CANNOT see — the target is not graded, so those faces "
+            f"skip the edge silently; {len(um['dangling'])} point at no bib entry at all"
+        )
         for x, y in um["pending"][:6]:
             print(f"               [@{x}] rests-on [@{y}] — target ungraded (grade it to measure)")
         for x, y in um["dangling"]:

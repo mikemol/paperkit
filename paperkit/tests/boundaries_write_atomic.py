@@ -16,6 +16,7 @@ write against a real hardlinked pair and asserts the twin survives.
 
 Run:  python3 paperkit/tests/boundaries_write_atomic.py
 """
+
 from __future__ import annotations
 
 import json
@@ -56,38 +57,52 @@ def main() -> int:
         mikemol.atomicwrite.durable.write_atomic(live, "REWRITTEN\n")
         check("P: write_atomic → twin keeps its bytes", twin.read_text() == "ORIGINAL\n")
         check("P: write_atomic → the file HAS the new bytes", live.read_text() == "REWRITTEN\n")
-        check("P: write_atomic → the alias is BROKEN (a new inode, links back to 1)",
-              live.stat().st_nlink == 1 and live.stat().st_ino != twin.stat().st_ino)
+        check(
+            "P: write_atomic → the alias is BROKEN (a new inode, links back to 1)",
+            live.stat().st_nlink == 1 and live.stat().st_ino != twin.stat().st_ino,
+        )
 
         live2, twin2 = _twinned(d, "f.py", "ORIGINAL\n")
         live2.write_text("REWRITTEN\n")
-        check("F: write_text → twin is CORRUPTED (the failure this closes)",
-              twin2.read_text() == "REWRITTEN\n")
+        check(
+            "F: write_text → twin is CORRUPTED (the failure this closes)",
+            twin2.read_text() == "REWRITTEN\n",
+        )
         print("     δ: one call — replace the path vs truncate the inode.\n")
 
         # ── the helper must not leave debris, and must clean up after itself on failure ─────────
         mikemol.atomicwrite.durable.write_atomic(d / "bytes.bin", b"\x00\x01\x02")
-        check("bytes are written as bytes (not str-coerced)",
-              (d / "bytes.bin").read_bytes() == b"\x00\x01\x02")
-        check("no temp files left behind on success",
-              not [p for p in d.iterdir() if p.name.endswith(".tmp")])
+        check(
+            "bytes are written as bytes (not str-coerced)",
+            (d / "bytes.bin").read_bytes() == b"\x00\x01\x02",
+        )
+        check(
+            "no temp files left behind on success",
+            not [p for p in d.iterdir() if p.name.endswith(".tmp")],
+        )
 
         # A write that raises mid-flight must leave neither a temp nor a damaged target.
         keep, ktwin = _twinned(d, "k.py", "KEEP\n")
+
         # A str subclass overriding __len__ does NOT raise — f.write() never consults it, so the
         # write succeeds and the arm proves nothing.  Caught by this suite failing: the target read
         # back as the new content, not the old.  Use an object that genuinely breaks the write.
         class _Boom:
             def __str__(self) -> str:
                 raise RuntimeError("boom")
+
         try:
-            mikemol.atomicwrite.durable.write_atomic(keep, _Boom())      # f.write() rejects a non-str → TypeError
+            mikemol.atomicwrite.durable.write_atomic(
+                keep, _Boom()
+            )  # f.write() rejects a non-str → TypeError
         except Exception:
             pass
         check("a failed write leaves the target untouched", keep.read_text() == "KEEP\n")
         check("a failed write leaves its twin untouched", ktwin.read_text() == "KEEP\n")
-        check("a failed write leaves no temp behind",
-              not [p for p in d.iterdir() if p.name.endswith(".tmp")])
+        check(
+            "a failed write leaves no temp behind",
+            not [p for p in d.iterdir() if p.name.endswith(".tmp")],
+        )
 
         # ── the replace must PRESERVE the target's mode ─────────────────────────────────────────
         # mkstemp creates at 0600 (it is built for secrets), so a naive replace NARROWS every file
@@ -99,28 +114,41 @@ def main() -> int:
         m.write_text("x\n")
         os.chmod(m, 0o664)
         mikemol.atomicwrite.durable.write_atomic(m, "y\n")
-        check("the replace PRESERVES an existing file's mode (0664 stays 0664)",
-              (m.stat().st_mode & 0o777) == 0o664 and m.read_text() == "y\n")
+        check(
+            "the replace PRESERVES an existing file's mode (0664 stays 0664)",
+            (m.stat().st_mode & 0o777) == 0o664 and m.read_text() == "y\n",
+        )
         ro = d / "ro.py"
         ro.write_text("x\n")
         os.chmod(ro, 0o444)
         mikemol.atomicwrite.durable.write_atomic(ro, "y\n")
-        check("   ...including a read-only one (the writer does not widen either)",
-              (ro.stat().st_mode & 0o777) == 0o444)
+        check(
+            "   ...including a read-only one (the writer does not widen either)",
+            (ro.stat().st_mode & 0o777) == 0o444,
+        )
         fresh = d / "fresh.py"
         mikemol.atomicwrite.durable.write_atomic(fresh, "z\n")
-        check("a NEW file gets the umask default, not mkstemp's 0600",
-              (fresh.stat().st_mode & 0o777) != 0o600)
+        check(
+            "a NEW file gets the umask default, not mkstemp's 0600",
+            (fresh.stat().st_mode & 0o777) != 0o600,
+        )
 
         # ── the duplicated implementation must AGREE (verdict.py cannot import the engine) ──────
         vlive, vtwin = _twinned(d, "v.json", "ORIGINAL\n")
-        subprocess.run([sys.executable, str(ROOT / "tools" / "verdict.py"),
-                        "emit", "cmd", "pass", str(vlive)], check=True,
-                       capture_output=True, text=True)
-        check("verdict.py's own copy also spares the twin (Λ·guard-must-not-copy: gated, not trusted)",
-              vtwin.read_text() == "ORIGINAL\n")
-        check("verdict.py still writes a valid record",
-              json.loads(vlive.read_text())["verdict"] == "pass")
+        subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "verdict.py"), "emit", "cmd", "pass", str(vlive)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        check(
+            "verdict.py's own copy also spares the twin (Λ·guard-must-not-copy: gated, not trusted)",
+            vtwin.read_text() == "ORIGINAL\n",
+        )
+        check(
+            "verdict.py still writes a valid record",
+            json.loads(vlive.read_text())["verdict"] == "pass",
+        )
 
         # ── the MUTATION writers must NOT be converted (their in-place write is the mechanism) ──
         # The grader hands a check the very path it mutates; a replace would give the check a
@@ -129,8 +157,10 @@ def main() -> int:
         m.write_text("ORIGINAL\n")
         ino_before = m.stat().st_ino
         m.write_text("MUTANT\n")
-        check("in-place write keeps the inode (the grader's mechanism, deliberately unconverted)",
-              m.stat().st_ino == ino_before)
+        check(
+            "in-place write keeps the inode (the grader's mechanism, deliberately unconverted)",
+            m.stat().st_ino == ino_before,
+        )
 
     print()
     if fails:

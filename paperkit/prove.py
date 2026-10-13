@@ -13,6 +13,7 @@ rather than re-implementing the sweep.  A second implementation would be a secon
 
     python3 concepts.py <key> --prove      # the certificate, as JSON
 """
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-OWNER = Path(__file__).resolve().parent                 # the library: the concept's owner
+OWNER = Path(__file__).resolve().parent  # the library: the concept's owner
 ROOT = OWNER.parent
 ENGINE = Path(os.environ.get("PAPERKIT_ENGINE") or ROOT / "paperkit")
 
@@ -39,22 +40,31 @@ def certificate(key: str) -> dict:
     # unlabelled fingerprint read as a def fingerprint OVERSTATES the ground it carries; a labelled
     # one is honestly weaker.  Reported by a downstream consumer who now records it explicitly.
     resolution = "def"
-    argv = [sys.executable, str(ENGINE / "discriminate.py"), "--only", key,
-            "--calc", "--resolution", resolution, str(OWNER)]
+    argv = [
+        sys.executable,
+        str(ENGINE / "discriminate.py"),
+        "--only",
+        key,
+        "--calc",
+        "--resolution",
+        resolution,
+        str(OWNER),
+    ]
     r = subprocess.run(argv, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"prove {key}: the def-sweep failed — {r.stderr.strip()[-400:]}")
     calc = json.loads(r.stdout)
     baseline, sens = bool(calc.get("baseline")), calc.get("sens", [])
     import mikemol.grade.grade  # the ONE ladder — derived, never re-declared here
+
     return {
         "concept": key,
         "owner": OWNER.name,
-        "resolution": resolution,     # the frame the fingerprint was measured in — never implicit
+        "resolution": resolution,  # the frame the fingerprint was measured in — never implicit
         "claim": calc.get("claim", key),
         "verdict": "pass" if baseline else "fail",
         "baseline": baseline,
         "grade": mikemol.grade.grade.grade_from_sens(baseline, sens)["grade"],
         "sens": sens,
-        "fingerprint": sens,                # alias: the ⟨verdict, fingerprint⟩ vocabulary
+        "fingerprint": sens,  # alias: the ⟨verdict, fingerprint⟩ vocabulary
     }

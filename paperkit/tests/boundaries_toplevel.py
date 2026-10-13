@@ -19,6 +19,7 @@ contributing any engine-module read root is the violation.
 
     python3 paperkit/tests/boundaries_toplevel.py     # exit 0 = every witness module clean
 """
+
 from __future__ import annotations
 
 import ast
@@ -53,8 +54,10 @@ def witness_modules():
     for d in emerge_dirs():
         toml = ROOT / d / "paper.toml" if d != "." else ROOT / "paper.toml"
         if not toml.is_file():
-            raise SystemExit(f"bnd-toplevel: emerge project {d!r}'s paper.toml is NOT STAGED — "
-                             "add its token to the bnd-toplevel claim's reads")
+            raise SystemExit(
+                f"bnd-toplevel: emerge project {d!r}'s paper.toml is NOT STAGED — "
+                "add its token to the bnd-toplevel claim's reads"
+            )
         claim = tomllib.loads(toml.read_text()).get("checks", {}).get("claim", {})
         if not claim:
             continue
@@ -66,8 +69,10 @@ def witness_modules():
         # shorter population still satisfies "every module I found is clean".
         witness = claim.get("witness", "")
         if not witness:
-            raise SystemExit(f"bnd-toplevel: {toml} declares [checks.claim] but no `witness` — "
-                             "the module is no longer inferred from `cmd`; declare it")
+            raise SystemExit(
+                f"bnd-toplevel: {toml} declares [checks.claim] but no `witness` — "
+                "the module is no longer inferred from `cmd`; declare it"
+            )
         p = (toml.parent / witness).resolve()
         out[str(p.relative_to(ROOT))] = p
     return out
@@ -82,7 +87,6 @@ def toplevel_reads(text, names):
         if not isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             found |= tools.closure._reads(stmt, names)
     return found
-
 
 
 def _has_claim_check(project_dir):
@@ -102,49 +106,59 @@ def main() -> int:
         fails.append(desc) if not cond else None
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
-    components = paperkit.tests.boundaries_components._literal(ENGINE / "components.bzl", "COMPONENTS")
-    names = {f[:-len(".py")].rsplit("/", 1)[-1] for fs in components.values() for f in fs}
+    components = paperkit.tests.boundaries_components._literal(
+        ENGINE / "components.bzl", "COMPONENTS"
+    )
+    names = {f[: -len(".py")].rsplit("/", 1)[-1] for fs in components.values() for f in fs}
     mods = witness_modules()
 
     print("Ζ·bnd·toplevel — witness modules' top level is read-free\n")
     # Λ·cardinality — the derived set is PINNED to the named membership (anti-vacuity: a broken
     # derivation returning ∅ would otherwise pass everything).  A new emerge project with a
     # [checks.claim] extends this set — the guard fails LOUD until it does (fail-closed).
-    check(f"witness modules derived from MODULE.bazel's emerge projects {emerge_dirs()}: "
-          f"{', '.join(sorted(mods)) or 'none'}",
-          # Ζ·library·grid — library joined this set when it declared [checks.claim].  It had 42
-          # bare `cmd:` checks running one script with the key as its argument, which is the same
-          # shape paper and root declare; the undeclared spelling cost it the def-sweep GRID (42
-          # monolithic ~10-minute sweeps instead of 48,011 parallel cells).  Its top level was
-          # already read-free, so the membership pin is the only thing that had to move.
-          # ⚑ Ζ·cite·resolve — PINNED TO THE POPULATION, NOT TO A LIST OF PATHS.  This carried the
-          # literal set {checks/readme.py, library/concepts.py, paper/checks/claims.py} and RED when
-          # the library moved inside the package — the third arm in this suite family to break on a
-          # path it kept its own copy of, and the comment above already recorded having to edit it
-          # once before ("the membership pin is the only thing that had to move").  A set literal
-          # that must be edited whenever the derivation legitimately changes is not measuring the
-          # derivation; it is measuring whether someone remembered to edit it.
-          #
-          # The anti-vacuity concern it was defending is REAL: a broken derivation returning ∅ would
-          # pass every per-module arm below.  But ∅ is what needs refusing, and the honest pin is
-          # AGREEMENT BETWEEN THE TWO SIDES — every emerge project that declares a [checks.claim]
-          # contributes exactly one witness module.  That fails loud on a derivation returning ∅, on
-          # one dropping a project, and on one inventing a module, while staying silent when a path
-          # legitimately moves.
-          bool(mods) and len(mods) == len([d for d in emerge_dirs() if _has_claim_check(d)]))
+    check(
+        f"witness modules derived from MODULE.bazel's emerge projects {emerge_dirs()}: "
+        f"{', '.join(sorted(mods)) or 'none'}",
+        # Ζ·library·grid — library joined this set when it declared [checks.claim].  It had 42
+        # bare `cmd:` checks running one script with the key as its argument, which is the same
+        # shape paper and root declare; the undeclared spelling cost it the def-sweep GRID (42
+        # monolithic ~10-minute sweeps instead of 48,011 parallel cells).  Its top level was
+        # already read-free, so the membership pin is the only thing that had to move.
+        # ⚑ Ζ·cite·resolve — PINNED TO THE POPULATION, NOT TO A LIST OF PATHS.  This carried the
+        # literal set {checks/readme.py, library/concepts.py, paper/checks/claims.py} and RED when
+        # the library moved inside the package — the third arm in this suite family to break on a
+        # path it kept its own copy of, and the comment above already recorded having to edit it
+        # once before ("the membership pin is the only thing that had to move").  A set literal
+        # that must be edited whenever the derivation legitimately changes is not measuring the
+        # derivation; it is measuring whether someone remembered to edit it.
+        #
+        # The anti-vacuity concern it was defending is REAL: a broken derivation returning ∅ would
+        # pass every per-module arm below.  But ∅ is what needs refusing, and the honest pin is
+        # AGREEMENT BETWEEN THE TWO SIDES — every emerge project that declares a [checks.claim]
+        # contributes exactly one witness module.  That fails loud on a derivation returning ∅, on
+        # one dropping a project, and on one inventing a module, while staying silent when a path
+        # legitimately moves.
+        bool(mods) and len(mods) == len([d for d in emerge_dirs() if _has_claim_check(d)]),
+    )
     for rel, p in sorted(mods.items()):
         r = toplevel_reads(p.read_text(), names)
-        check(f"{rel}: top-level engine-source reads == ∅"
-              + (f" — found {sorted(r)}" if r else ""), not r)
+        check(
+            f"{rel}: top-level engine-source reads == ∅" + (f" — found {sorted(r)}" if r else ""),
+            not r,
+        )
 
     print("\n⟨P, F, δ⟩ minimum-delta pair (in-memory, never the tree)\n")
     f_text = 'from pathlib import Path\nSRC = (Path("x") / "gate.py").read_text()\n\ndef w():\n    pass\n'
     p_text = 'from pathlib import Path\n\ndef w():\n    src = (Path("x") / "gate.py").read_text()\n'
     ok = toplevel_reads(f_text, names) == {"gate"} and not toplevel_reads(p_text, names)
     fails.append("toplevel-delta") if not ok else None
-    print(f"  {'ok ' if ok else 'XX '}a module-level source read is CAUGHT; the same read inside the witness is SANCTIONED")
+    print(
+        f"  {'ok ' if ok else 'XX '}a module-level source read is CAUGHT; the same read inside the witness is SANCTIONED"
+    )
     print("      P (in the witness):  src = …read_text() inside the def — scoped to its rows")
-    print("      F (module level):    SRC = …read_text() at top level — a staged input of EVERY row")
+    print(
+        "      F (module level):    SRC = …read_text() at top level — a staged input of EVERY row"
+    )
     print("      δ (min delta): moving one read_text from the witness body to module level\n")
 
     if fails:

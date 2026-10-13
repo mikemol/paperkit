@@ -21,6 +21,7 @@ silently.  One deliberately-excepted table demonstrates the exception is real an
     preamble_defs(max_order) -> str                    # the nicematrix \Rule<k> + \usepackage lines
     python3 checks/ruler_inject.py                     # ⟨P,F,δ⟩ over a synthetic longtable
 """
+
 from __future__ import annotations
 
 import re
@@ -30,10 +31,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mikemol import rulerseq
 
-_OFF = "%ruler:off"                       # the typed exception marker (a raw-latex comment)
+_OFF = "%ruler:off"  # the typed exception marker (a raw-latex comment)
 # A table, optionally preceded by the %ruler:off marker on its own line — the marker travels WITH the
 # table so the injector sees the exception (it is placed just before \begin{longtable} in the source).
-_TABLE = re.compile(r"(?:" + re.escape(_OFF) + r"[^\n]*\n\s*)?\\begin\{longtable\}.*?\\end\{longtable\}", re.S)
+_TABLE = re.compile(
+    r"(?:" + re.escape(_OFF) + r"[^\n]*\n\s*)?\\begin\{longtable\}.*?\\end\{longtable\}", re.S
+)
 
 
 def _inject_one(table: str) -> tuple[str, int, bool]:
@@ -50,12 +53,12 @@ def _inject_one(table: str) -> tuple[str, int, bool]:
     rows = [ln for ln in data.split("\\\\") if ln.strip() and "&" in ln]
     n = len(rows)
     if excepted or n < 2:
-        return table, n, excepted     # nothing to rule (0/1 rows) or opted out
+        return table, n, excepted  # nothing to rule (0/1 rows) or opted out
     # rebuild the data region inserting \Rule<cycle_order(i)> after the i-th row (boundary i).
     out = []
     for i, row in enumerate(rows, start=0):
         out.append(row + r"\\")
-        if i + 1 < n:                 # a rule at boundary i+1 (between row i and row i+1)
+        if i + 1 < n:  # a rule at boundary i+1 (between row i and row i+1)
             out.append("\n" + rulerseq.rule(i + 1, "tex") + "\n")
     ruled = table.replace(m.group(0), head + "".join(out) + "\n" + tail)
     return ruled, n, False
@@ -87,27 +90,45 @@ def max_order_of(report: list[dict]) -> int:
     """The largest cycle order the report's ruled tables reach (for preamble_defs).  A table of n
     rows has boundaries up to order floor(log2(n-1)).
     """
-    orders = [rulerseq.cycle_order(i)
-              for t in report if not t["excepted"] and t["rows"] >= 2
-              for i in range(1, t["rows"])]
+    orders = [
+        rulerseq.cycle_order(i)
+        for t in report
+        if not t["excepted"] and t["rows"] >= 2
+        for i in range(1, t["rows"])
+    ]
     return max(orders) if orders else 0
 
 
 def _selftest() -> int:
     ok = 0
-    tbl = (r"\begin{longtable}[]{@{}cc@{}}" "\n\\toprule\\noalign{}\n"
-           r"a & b \\" "\n\\midrule\\noalign{}\n\\endhead\n\\bottomrule\\noalign{}\n\\endlastfoot\n"
-           r"1 & 2 \\" "\n" r"3 & 4 \\" "\n" r"5 & 6 \\" "\n" r"7 & 8 \\" "\n\\end{longtable}")
+    tbl = (
+        r"\begin{longtable}[]{@{}cc@{}}"
+        "\n\\toprule\\noalign{}\n"
+        r"a & b \\"
+        "\n\\midrule\\noalign{}\n\\endhead\n\\bottomrule\\noalign{}\n\\endlastfoot\n"
+        r"1 & 2 \\"
+        "\n"
+        r"3 & 4 \\"
+        "\n"
+        r"5 & 6 \\"
+        "\n"
+        r"7 & 8 \\"
+        "\n\\end{longtable}"
+    )
     # P: a 4-data-row table gets a rule at each of its 3 interior boundaries, orders [0,1,0].
     ruled, report = inject(tbl)
     if report != [{"rows": 4, "excepted": False}]:
         ok = 1
-    got = re.findall(r"\\(Rule\w+)", ruled)                       # findall the name after the backslash
-    want = [rulerseq.rule(i, "tex")[1:] for i in (1, 2, 3)]       # rule() → "\RuleXXX"; drop the backslash
+    got = re.findall(r"\\(Rule\w+)", ruled)  # findall the name after the backslash
+    want = [
+        rulerseq.rule(i, "tex")[1:] for i in (1, 2, 3)
+    ]  # rule() → "\RuleXXX"; drop the backslash
     if got != want:
         ok = 1
     # F: a %ruler:off table is left unruled and RECORDED excepted (no silent drop).
-    off_ruled, off_report = inject(tbl.replace(r"\begin{longtable}", _OFF + "\n" + r"\begin{longtable}"))
+    off_ruled, off_report = inject(
+        tbl.replace(r"\begin{longtable}", _OFF + "\n" + r"\begin{longtable}")
+    )
     if not off_report[0]["excepted"] or re.search(r"\\Rule\w+", off_ruled):
         ok = 1
     # δ: the ONE difference between ruled and excepted is the marker; same table, marker flips it.
@@ -119,11 +140,16 @@ def _selftest() -> int:
         ok = 1
     if ok == 0:
         print("ruler-inject: ok — every LaTeX table ruled by construction, exceptions named")
-        print(f"  P: a 4-row table gets rules at boundaries 1,2,3 (orders {[rulerseq.cycle_order(i) for i in (1,2,3)]})")
+        print(
+            f"  P: a 4-row table gets rules at boundaries 1,2,3 (orders {[rulerseq.cycle_order(i) for i in (1, 2, 3)]})"
+        )
         print("  F: a %ruler:off table is left unruled and RECORDED excepted (no silent drop)")
         print("  δ: the %ruler:off marker — same table, its presence flips ruled → excepted")
         return 0
-    print("ruler-inject: FAIL — the by-construction injection or the exception is wrong", file=sys.stderr)
+    print(
+        "ruler-inject: FAIL — the by-construction injection or the exception is wrong",
+        file=sys.stderr,
+    )
     return 1
 
 

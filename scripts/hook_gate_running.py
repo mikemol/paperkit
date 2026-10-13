@@ -41,6 +41,7 @@ silent, which is the shape `settings.json` warns about at length.
 `STRUCT_HOOK_BLOCK=1`) makes it refuse. Verify BY MAKING IT FIRE — `scripts/check --only routes`
 runs both arms — never by reading `settings.json`.
 """
+
 import json
 import os
 import sys
@@ -48,7 +49,8 @@ import sys
 # The tree this hook guards. A gate process is OURS iff its cwd is this directory —
 # `CLAUDE_PROJECT_DIR` when the harness supplies it, else the file's own repo root.
 PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__)))
+    os.path.dirname(os.path.abspath(__file__))
+)
 
 # ⚑ THE GATE'S OWN WRITES MUST NOT BE BLOCKED BY THE GATE RUNNING. `scripts/check` and the
 # things it calls legitimately write caches and stamps while running. This hook only sees
@@ -153,7 +155,7 @@ def _gate_pids():
                 out.append((pid, " ".join(argv)))
                 break
             if base in ("bazel", "bazelisk"):
-                rest = [t for t in toks[i + 1:] if not t.startswith("-")]
+                rest = [t for t in toks[i + 1 :] if not t.startswith("-")]
                 if rest and rest[0] in ("test", "build", "run", "coverage"):
                     out.append((pid, " ".join(argv)))
                 break
@@ -213,10 +215,17 @@ def main() -> int:
     if own is None:
         own = os.environ.get("STRUCT_HOOK_BLOCK")
     if own == "1":
-        print(json.dumps({"hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": msg}}))
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": msg,
+                    }
+                }
+            )
+        )
         return 0
     sys.stderr.write(msg + "\n")
     return 0
@@ -236,16 +245,24 @@ def _selftest() -> bool:
 
     # The detector must not report the CURRENT process as a gate: this selftest runs with the
     # project as cwd, which is exactly the condition a naive match would fire on.
-    check("the hook does not detect ITSELF as a running gate",
-          any(int(p) == os.getpid() for p, _c in _gate_pids()), False)
+    check(
+        "the hook does not detect ITSELF as a running gate",
+        any(int(p) == os.getpid() for p, _c in _gate_pids()),
+        False,
+    )
 
     # A path outside the tree is never guarded, however the gate is doing.
-    check("a scratchpad path is out of scope",
-          _target({"tool_input": {"file_path": "/tmp/x.md"}}), "/tmp/x.md")
-    check("a call with no path is ignored",
-          _target({"tool_input": {"command": "ls"}}), None)
-    check("notebook_path is recognised as a write target",
-          _target({"tool_input": {"notebook_path": "/a/b.ipynb"}}), "/a/b.ipynb")
+    check(
+        "a scratchpad path is out of scope",
+        _target({"tool_input": {"file_path": "/tmp/x.md"}}),
+        "/tmp/x.md",
+    )
+    check("a call with no path is ignored", _target({"tool_input": {"command": "ls"}}), None)
+    check(
+        "notebook_path is recognised as a write target",
+        _target({"tool_input": {"notebook_path": "/a/b.ipynb"}}),
+        "/a/b.ipynb",
+    )
 
     # ⚑ THE EXEMPTION LIST MUST START EMPTY — every entry is an unchecked claim that the gate
     # does not read that path. If this arm fails, someone added one and owes a reason.

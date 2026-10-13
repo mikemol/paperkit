@@ -19,6 +19,7 @@ breaks; anything else the sort changed is harmless reordering within one group.
     python3 tools/sortaudit.py                  # paperkit/tests (the swept population)
     python3 tools/sortaudit.py render/checks    # any other tree
 """
+
 from __future__ import annotations
 
 import re
@@ -32,15 +33,25 @@ OUT = sys.stdout
 
 def changed(tree: str) -> list[str]:
     """List the .py files under `tree` that differ from HEAD."""
-    r = subprocess.run(["git", "diff", "--name-only", "HEAD", "--", tree],  # noqa: S603, S607
-                       cwd=ROOT, capture_output=True, text=True, check=False)
+    r = subprocess.run(
+        ["git", "diff", "--name-only", "HEAD", "--", tree],  # noqa: S603, S607
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     return [ln for ln in r.stdout.splitlines() if ln.endswith(".py")]
 
 
 def at_head(path: str) -> str:
     """Read a file's committed text."""
-    r = subprocess.run(["git", "show", f"HEAD:{path}"],  # noqa: S603, S607
-                       cwd=ROOT, capture_output=True, text=True, check=False)
+    r = subprocess.run(
+        ["git", "show", f"HEAD:{path}"],  # noqa: S603, S607
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     return r.stdout
 
 
@@ -98,8 +109,7 @@ def _binds_only(stmt: str, selfdep: set) -> bool:
     bound = re.findall(r"import\s+(.+)$", stmt)
     if not bound:
         return False
-    names = {n.split(" as ")[-1].strip().split(".")[0]
-             for n in bound[0].split(",") if n.strip()}
+    names = {n.split(" as ")[-1].strip().split(".")[0] for n in bound[0].split(",") if n.strip()}
     return bool(names) and names <= selfdep
 
 
@@ -121,10 +131,11 @@ def main(argv: list[str]) -> int:
         # an import that USED to sit after the bootstrap and now sits before it
         # Ζ·sortaudit·selfdep — an import the BOOTSTRAP ITSELF uses must sit above it.
         selfdep = _bootstrap_names((ROOT / f).read_text())
-        moved = [s for s in now
-                 if s in was
-                 and not _binds_only(s, selfdep)
-                 and now.index(s) < b_now <= was.index(s)]
+        moved = [
+            s
+            for s in now
+            if s in was and not _binds_only(s, selfdep) and now.index(s) < b_now <= was.index(s)
+        ]
         if moved:
             risky += 1
             OUT.write(f"  ⚑ {f}\n")

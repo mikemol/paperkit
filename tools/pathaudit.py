@@ -27,6 +27,7 @@ files still carry one so the retirement is a worked list rather than a grep in a
     python3 tools/pathaudit.py             # every site, grouped by what it reaches for
     python3 tools/pathaudit.py --probe     # and whether the target imports WITHOUT the mutation
 """
+
 from __future__ import annotations
 
 import ast
@@ -84,10 +85,20 @@ def sites(tree: Path) -> list[tuple[str, int, str, bool]]:
             if node.func.attr not in ("insert", "append"):
                 continue
             tgt = node.func.value
-            if (isinstance(tgt, ast.Attribute) and tgt.attr == "path"
-                    and isinstance(tgt.value, ast.Name) and tgt.value.id == "sys"):
-                out.append((str(p.relative_to(ROOT)), node.lineno, ast.unparse(node),
-                            node.lineno in in_function))
+            if (
+                isinstance(tgt, ast.Attribute)
+                and tgt.attr == "path"
+                and isinstance(tgt.value, ast.Name)
+                and tgt.value.id == "sys"
+            ):
+                out.append(
+                    (
+                        str(p.relative_to(ROOT)),
+                        node.lineno,
+                        ast.unparse(node),
+                        node.lineno in in_function,
+                    )
+                )
     return out
 
 
@@ -106,8 +117,13 @@ def importable(name: str) -> tuple[bool, str]:
     inside it) — those have different owners and different fixes, and a boolean conflates them.
     """
     exe = str(ROOT / ".venv" / "bin" / "python3")
-    r = subprocess.run([exe, "-c", f"import {name}"],  # noqa: S603
-                       cwd=str(ROOT.parent), capture_output=True, text=True, check=False)
+    r = subprocess.run(
+        [exe, "-c", f"import {name}"],  # noqa: S603
+        cwd=str(ROOT.parent),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if r.returncode == 0:
         return (True, "")
     tail = [ln for ln in r.stderr.splitlines() if ln.strip()]
@@ -134,19 +150,23 @@ def main(argv: list[str]) -> int:
             OUT.write(f"      :{line}  {'[runtime] ' if in_function else ''}{src}\n")
 
     OUT.write(f"\n{len(by_file)} file(s) mutate sys.path · {len(found)} site(s)\n")
-    OUT.write(f"  {runtime} classified RUNTIME (inside a function: a dynamic load or a search at\n"
-              f"  call time); the other {len(found) - runtime} are module-level bootstraps the\n"
-              "  package declaration already covers.\n")
+    OUT.write(
+        f"  {runtime} classified RUNTIME (inside a function: a dynamic load or a search at\n"
+        f"  call time); the other {len(found) - runtime} are module-level bootstraps the\n"
+        "  package declaration already covers.\n"
+    )
 
     if "--probe" in argv:
         OUT.write("\nreachable WITHOUT any mutation (venv, cwd outside the repo):\n")
         for name in PROBES:
             ok, why = importable(name)
             OUT.write(f"    {name:<20} {'yes' if ok else 'NO ':<4}{why}\n")
-        OUT.write("  ⚑ a `yes` is a mutation with nothing left to do — pyproject already declares\n"
-                  "    the package.  A `NO` naming a MISSING MODULE is a flat import inside an\n"
-                  "    otherwise-reachable package: the package resolves, the module's own\n"
-                  "    `import x` does not, which is Ζ·flat rather than a declaration gap.\n")
+        OUT.write(
+            "  ⚑ a `yes` is a mutation with nothing left to do — pyproject already declares\n"
+            "    the package.  A `NO` naming a MISSING MODULE is a flat import inside an\n"
+            "    otherwise-reachable package: the package resolves, the module's own\n"
+            "    `import x` does not, which is Ζ·flat rather than a declaration gap.\n"
+        )
     return 0
 
 

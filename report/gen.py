@@ -11,6 +11,7 @@ regenerates and diffs, so a stale report fails its own gate.
     python3 report/gen.py            # refresh assets + project REPORT.md
     python3 report/gen.py --check    # exit 1 if any committed asset is stale
 """
+
 import json
 import os
 import re
@@ -58,14 +59,17 @@ def _record(name: str, project: str) -> str:
     """
     env = os.environ.get("PAPERKIT_CONSUMED_RECORDS")
     if env is None:
-        raise CannotGrade(f"no consumed {name} record for {project} — these tables read "
-                          "Bazel-built records only; refresh with `python3 tools/report_refresh.py`")
+        raise CannotGrade(
+            f"no consumed {name} record for {project} — these tables read "
+            "Bazel-built records only; refresh with `python3 tools/report_refresh.py`"
+        )
     recs = dict(p.partition("=")[::2] for p in env.split())
     key = f"{_repo(project)}/{name}"
     if key not in recs:
         kind = name.split(".")[0]
-        raise CannotGrade(f"no consumed record {key} — the warrant must declare "
-                          f"`consumes = {{*#{kind}}}`")
+        raise CannotGrade(
+            f"no consumed record {key} — the warrant must declare `consumes = {{*#{kind}}}`"
+        )
     return Path(recs[key]).read_text()
 
 
@@ -111,7 +115,7 @@ def _gate_once(project, *flags):
     except json.JSONDecodeError:
         return {"error": "no verdict"}
     if not flags or "error" in struct:
-        return struct                        # --without-K collapses: structure only
+        return struct  # --without-K collapses: structure only
     verdict = json.loads(_record("gate_rec", project) or "{}").get("verdict")
     if verdict == "cannot-run":
         return {**struct, "error": "cannot run here"}
@@ -187,8 +191,11 @@ def _project_paths() -> set:
     and a developer checkout disagreed.  `git check-ignore` was added to exclude it.  Reading the
     roster removes the walk that needed the exclusion: a stale copy is not in MODULE.bazel.
     """
-    return set(re.findall(r'bib\.project\([^)]*project\s*=\s*"([^"]+)"',
-                          (ROOT / "MODULE.bazel").read_text()))
+    return set(
+        re.findall(
+            r'bib\.project\([^)]*project\s*=\s*"([^"]+)"', (ROOT / "MODULE.bazel").read_text()
+        )
+    )
 
 
 def _hook_names():
@@ -200,13 +207,17 @@ def _hook_names():
     diverged for the twelfth.  So the repo→project map is read from MODULE.bazel — its owner —
     rather than assumed to be the identity.
     """
-    block = re.search(r'test_suite\(name = "hook".*?tests = \[(.*?)\]',
-                      (ROOT / "BUILD.bazel").read_text(), re.S).group(1)
-    repo_to_project = dict(re.findall(
-        r'bib\.project\(\s*name\s*=\s*"paperkit_(\w+)"[^)]*?project\s*=\s*"([^"]+)"',
-        (ROOT / "MODULE.bazel").read_text()))
+    block = re.search(
+        r'test_suite\(name = "hook".*?tests = \[(.*?)\]', (ROOT / "BUILD.bazel").read_text(), re.S
+    ).group(1)
+    repo_to_project = dict(
+        re.findall(
+            r'bib\.project\(\s*name\s*=\s*"paperkit_(\w+)"[^)]*?project\s*=\s*"([^"]+)"',
+            (ROOT / "MODULE.bazel").read_text(),
+        )
+    )
     out = set()
-    for repo in re.findall(r'@paperkit_(\w+)//:gate\b', block):
+    for repo in re.findall(r"@paperkit_(\w+)//:gate\b", block):
         proj = repo_to_project.get(repo, repo)
         out.add("README" if proj == "." else proj)
     return out
@@ -262,15 +273,19 @@ def gate_md():
     ondemand = _ondemand_names()
     rows = []
     for name, proj in _all_docs():
-        if name in ondemand:   # non-reproducible gate — listed, not run (see rpt-reproducible)
+        if name in ondemand:  # non-reproducible gate — listed, not run (see rpt-reproducible)
             rows.append(f"| {name} | on-demand | — | — | — | {_tier(name)} |")
             continue
         g = _gate(proj, "--safe")
         status = f"n/a — {g['error']}" if "error" in g else ("PASS" if g.get("pass") else "FAIL")
-        rows.append(f"| {name} | {status} | {'yes' if g.get('project_ok') else '—'} | "
-                    f"{g.get('verified', 0)} | {g.get('sections', 0)} | {_tier(name)} |")
-    return ("| document | gate (--safe) | prose ≡ projection | checks verified | sections | CI tier |\n"
-            "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
+        rows.append(
+            f"| {name} | {status} | {'yes' if g.get('project_ok') else '—'} | "
+            f"{g.get('verified', 0)} | {g.get('sections', 0)} | {_tier(name)} |"
+        )
+    return (
+        "| document | gate (--safe) | prose ≡ projection | checks verified | sections | CI tier |\n"
+        "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n"
+    )
 
 
 def _delta_section(name, recs):
@@ -291,13 +306,17 @@ def _delta_section(name, recs):
         e = r.get("effective_grade", r["grade"])
         return r["grade"] if r.get("clamp", 0) == 0 else f"{r['grade']} → **{e}**"
 
-    rows = [f"| `{r['key']}` | {cell(r)} | `{r['check']}` | "
-            f"{r.get('why', '')} | {r.get('not_higher', '')} | {r.get('not_lower', '')} |"
-            for r in recs]
-    return (f"### {name}\n\n_{len(recs)} cited claims — self-grade: {selfs}; effective "
-            f"(clamped by entailment): {effs}; {clamped} clamped below self._\n\n"
-            "| claim | self → effective | witness | why this grade | why not higher | why not lower |\n"
-            "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n")
+    rows = [
+        f"| `{r['key']}` | {cell(r)} | `{r['check']}` | "
+        f"{r.get('why', '')} | {r.get('not_higher', '')} | {r.get('not_lower', '')} |"
+        for r in recs
+    ]
+    return (
+        f"### {name}\n\n_{len(recs)} cited claims — self-grade: {selfs}; effective "
+        f"(clamped by entailment): {effs}; {clamped} clamped below self._\n\n"
+        "| claim | self → effective | witness | why this grade | why not higher | why not lower |\n"
+        "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(rows) + "\n"
+    )
 
 
 def delta_md():
@@ -309,12 +328,16 @@ def without_k_md():
     for name, proj in _graded():
         groups = _gate(proj).get("collapses", {})
         if not groups:
-            parts.append(f"**{name}** — every cited claim carries a distinct witness; "
-                         "`--without-K` is clean.")
+            parts.append(
+                f"**{name}** — every cited claim carries a distinct witness; "
+                "`--without-K` is clean."
+            )
         else:
             rows = [f"| `{c}` | {len(k)} | {', '.join(k)} |" for c, k in sorted(groups.items())]
-            parts.append(f"**{name}**\n\n| shared witness | claims | collapsed onto it |\n"
-                         "| --- | --- | --- |\n" + "\n".join(rows))
+            parts.append(
+                f"**{name}**\n\n| shared witness | claims | collapsed onto it |\n"
+                "| --- | --- | --- |\n" + "\n".join(rows)
+            )
     return "\n\n".join(parts) + "\n"
 
 
@@ -327,8 +350,12 @@ def dag_svg():
     return figure.svg([r for r in _delta("paper") if r["grade"] in mikemol.grade.grade.rungs()])
 
 
-GENERATORS = {"gate.md": gate_md, "delta.md": delta_md, "without-k.md": without_k_md,
-              "dag.svg": dag_svg}
+GENERATORS = {
+    "gate.md": gate_md,
+    "delta.md": delta_md,
+    "without-k.md": without_k_md,
+    "dag.svg": dag_svg,
+}
 
 
 def main(argv):
@@ -349,8 +376,11 @@ def main(argv):
         wanted = [a for a in argv[1:] if not a.startswith("--")]
         unknown = [a for a in wanted if a not in GENERATORS]
         if unknown:
-            print(f"report: unknown asset(s) {', '.join(unknown)} — "
-                  f"known: {', '.join(GENERATORS)} (use --all for every asset)", file=sys.stderr)
+            print(
+                f"report: unknown asset(s) {', '.join(unknown)} — "
+                f"known: {', '.join(GENERATORS)} (use --all for every asset)",
+                file=sys.stderr,
+            )
             return 2
         names = wanted or (list(GENERATORS) if "--all" in argv else [])
         if not names:
@@ -360,11 +390,17 @@ def main(argv):
         # rather than yielding [], so this reports CANNOT-RUN (exit 3, resolver._CANNOT_RUN)
         # instead of accusing four committed assets of drift they do not have.
         try:
-            stale = [n for n in names
-                     if not (ASSETS / n).exists() or (ASSETS / n).read_text() != GENERATORS[n]()]
+            stale = [
+                n
+                for n in names
+                if not (ASSETS / n).exists() or (ASSETS / n).read_text() != GENERATORS[n]()
+            ]
         except CannotGrade as e:
-            print(f"report: cannot check freshness — {e}\nThe committed assets are NOT accused of "
-                  "drift; the pipeline that regenerates them could not run.", file=sys.stderr)
+            print(
+                f"report: cannot check freshness — {e}\nThe committed assets are NOT accused of "
+                "drift; the pipeline that regenerates them could not run.",
+                file=sys.stderr,
+            )
             return 3
         if stale:
             print(f"report stale: {', '.join(stale)} — run python3 report/gen.py", file=sys.stderr)
@@ -385,8 +421,11 @@ def main(argv):
     try:
         produced = {name: g() for name, g in GENERATORS.items()}
     except CannotGrade as e:
-        print(f"report: cannot generate — {e}\nNo asset was written; the committed copies are "
-              "unchanged.", file=sys.stderr)
+        print(
+            f"report: cannot generate — {e}\nNo asset was written; the committed copies are "
+            "unchanged.",
+            file=sys.stderr,
+        )
         return 3
     ASSETS.mkdir(exist_ok=True)
     for name, text in produced.items():

@@ -64,6 +64,7 @@ basis the per-check key refines: a grade is a pure function of project+engine co
 
 DIR defaults to the current directory and must contain paper.toml.
 """
+
 from __future__ import annotations
 
 import json
@@ -104,31 +105,83 @@ _REFUSE = 3
 
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).
-MIN_STRENGTH = paperkit.config.Param("min-strength", "PAPERKIT_MIN_STRENGTH", config="min_strength",
-                            help="Δ adequacy floor on the FALSIFIABILITY axis")
-MIN_CORRO = paperkit.config.Param("min-corroboration", "PAPERKIT_MIN_CORROBORATION", config="min_corroboration",
-                         help="Δ floor on the orthogonal CORROBORATION axis")
-RESOLUTION = paperkit.config.Param("resolution", "PAPERKIT_RESOLUTION", config="resolution", default="file",
-                          choices=("file", "def"), help="Δ mutation surface: file (project only) or def (+ engine)")
-STATE = paperkit.config.Param("state", "PAPERKIT_STATE",
-                     help="resumable grading: the resumption-token file (persisted between calls)")
-BUDGET = paperkit.config.Param("budget", "PAPERKIT_BUDGET",
-                      help="seconds per Δ invocation (<=0 = run to completion; unset = batch grade)")
-ALL = paperkit.config.Param("all", "PAPERKIT_ALL", flag=True,
-                   help="Δ grades every checked warrant, not only cited ones")
-FOOTPRINT = paperkit.config.Param("footprint", "PAPERKIT_FOOTPRINT", flag=True,
-                         help="print each check's READ footprint and exit")
-NO_CACHE = paperkit.config.Param("no-cache", "PAPERKIT_NO_CACHE", flag=True,
-                        help="ignore the Δ footprint-cache (re-grade every check)")
-MUTANT = paperkit.config.Param("mutant", "PAPERKIT_MUTANT",
-                      help="Ζ·mutant: with --only, probe ONE def-site (path or path::qualname) — mutate it, report whether it flips the check, exit (the sweep's atom, for a pk_mutant action)")
+MIN_STRENGTH = paperkit.config.Param(
+    "min-strength",
+    "PAPERKIT_MIN_STRENGTH",
+    config="min_strength",
+    help="Δ adequacy floor on the FALSIFIABILITY axis",
+)
+MIN_CORRO = paperkit.config.Param(
+    "min-corroboration",
+    "PAPERKIT_MIN_CORROBORATION",
+    config="min_corroboration",
+    help="Δ floor on the orthogonal CORROBORATION axis",
+)
+RESOLUTION = paperkit.config.Param(
+    "resolution",
+    "PAPERKIT_RESOLUTION",
+    config="resolution",
+    default="file",
+    choices=("file", "def"),
+    help="Δ mutation surface: file (project only) or def (+ engine)",
+)
+STATE = paperkit.config.Param(
+    "state",
+    "PAPERKIT_STATE",
+    help="resumable grading: the resumption-token file (persisted between calls)",
+)
+BUDGET = paperkit.config.Param(
+    "budget",
+    "PAPERKIT_BUDGET",
+    help="seconds per Δ invocation (<=0 = run to completion; unset = batch grade)",
+)
+ALL = paperkit.config.Param(
+    "all", "PAPERKIT_ALL", flag=True, help="Δ grades every checked warrant, not only cited ones"
+)
+FOOTPRINT = paperkit.config.Param(
+    "footprint", "PAPERKIT_FOOTPRINT", flag=True, help="print each check's READ footprint and exit"
+)
+NO_CACHE = paperkit.config.Param(
+    "no-cache",
+    "PAPERKIT_NO_CACHE",
+    flag=True,
+    help="ignore the Δ footprint-cache (re-grade every check)",
+)
+MUTANT = paperkit.config.Param(
+    "mutant",
+    "PAPERKIT_MUTANT",
+    help="Ζ·mutant: with --only, probe ONE def-site (path or path::qualname) — mutate it, report whether it flips the check, exit (the sweep's atom, for a pk_mutant action)",
+)
 # The Δ CLI's composed registry: exactly the Params its import cone hosts — its own 9 plus
 # every host below it in the DEPS lattice (bnd-config asserts this completeness — a
 # cone-resolved Param missing here would be a silently ignored flag).
-REGISTRY = [MIN_STRENGTH, MIN_CORRO, RESOLUTION, STATE, BUDGET, ALL, FOOTPRINT, NO_CACHE, MUTANT,
-            paperkit.grader.DELTA_REPEAT, paperkit.grader.DELTA_PULSE, paperkit.layout.ROOT, paperkit.checkenv.PATH, paperkit.checkenv.ENGINE_PATH,
-            paperkit.gate.SAFE, paperkit.gate.WITHOUT_K, paperkit.gate.JOBS, paperkit.gate.JSON, paperkit.gate.ONLY, paperkit.gate.INVARIANTS,
-            paperkit.project.TARGET, paperkit.project.GENRE, paperkit.project.GAMMA, paperkit.project.OBSERVE, paperkit.project.CHECK]
+REGISTRY = [
+    MIN_STRENGTH,
+    MIN_CORRO,
+    RESOLUTION,
+    STATE,
+    BUDGET,
+    ALL,
+    FOOTPRINT,
+    NO_CACHE,
+    MUTANT,
+    paperkit.grader.DELTA_REPEAT,
+    paperkit.grader.DELTA_PULSE,
+    paperkit.layout.ROOT,
+    paperkit.checkenv.PATH,
+    paperkit.checkenv.ENGINE_PATH,
+    paperkit.gate.SAFE,
+    paperkit.gate.WITHOUT_K,
+    paperkit.gate.JOBS,
+    paperkit.gate.JSON,
+    paperkit.gate.ONLY,
+    paperkit.gate.INVARIANTS,
+    paperkit.project.TARGET,
+    paperkit.project.GENRE,
+    paperkit.project.GAMMA,
+    paperkit.project.OBSERVE,
+    paperkit.project.CHECK,
+]
 
 
 def _fine(rec: dict) -> list:
@@ -140,13 +193,17 @@ def _fine(rec: dict) -> list:
 
 
 def main(argv: list) -> int:
-    paperkit.config.apply_args(argv, REGISTRY)   # Ω·config: capture args process-locally (arg overrides env)
+    paperkit.config.apply_args(
+        argv, REGISTRY
+    )  # Ω·config: capture args process-locally (arg overrides env)
     pos = paperkit.config.positionals(argv, REGISTRY)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
-    sandbox_root = paperkit.layout._sandbox_root(project_dir)   # resolve+validate the sandbox root up front (home-guard) — clean exit before any sweep
+    sandbox_root = paperkit.layout._sandbox_root(
+        project_dir
+    )  # resolve+validate the sandbox root up front (home-guard) — clean exit before any sweep
     cfg = paperkit.bib.load_config(project_dir)
     raw = tomllib.loads((project_dir / "paper.toml").read_text())
-    pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
+    pol, custom = raw.get("paper", {}), raw.get("checks", {})  # project policy + custom check types
     presupposed = paperkit.grader.presupposed_inputs(project_dir, cfg)
 
     # every knob resolved through the ONE pipeline (env [post-arg] > paper.toml [paper] > default),
@@ -159,12 +216,18 @@ def main(argv: list) -> int:
     # Μ·kernel·shrink·grade-edge).  Listing them would let the knob and the ladder disagree —
     # a floor the ladder cannot rank.
     if min_strength is not None and min_strength not in mikemol.grade.grade.ORDER:
-        raise SystemExit(f"paperkit: --min-strength must be one of {sorted(mikemol.grade.grade.ORDER)} (got {min_strength!r})")
+        raise SystemExit(
+            f"paperkit: --min-strength must be one of {sorted(mikemol.grade.grade.ORDER)} (got {min_strength!r})"
+        )
     if min_corro is not None and min_corro not in mikemol.grade.grade.CORRO_C:
-        raise SystemExit(f"paperkit: --min-corroboration must be one of {sorted(mikemol.grade.grade.CORRO_C)} (got {min_corro!r})")
+        raise SystemExit(
+            f"paperkit: --min-corroboration must be one of {sorted(mikemol.grade.grade.CORRO_C)} (got {min_corro!r})"
+        )
     resolution = paperkit.config.resolve(RESOLUTION, pol)
     state_file = paperkit.config.resolve(STATE)
-    budget_raw = paperkit.config.resolve(BUDGET)     # None = batch grade; a value = resumable under a budget
+    budget_raw = paperkit.config.resolve(
+        BUDGET
+    )  # None = batch grade; a value = resumable under a budget
     budget = float(budget_raw) if budget_raw else 0.0
     consider_all = paperkit.config.resolve(ALL)
     as_json = paperkit.config.resolve(paperkit.gate.JSON)
@@ -199,9 +262,11 @@ def main(argv: list) -> int:
             # while this path exited 0.  Absence gets its own denotation (an `error` record) and its
             # own loud exit: a key that names nothing is a caller bug, not a measurement.
             # (Reported by a downstream consumer, who lost a debugging cycle reading it as "repo red".)
-            print(json.dumps({"claim": only,
-                              "error": "no-check" if f else "no-such-claim"}), file=sys.stderr)
-            return _REFUSE                     # a key naming nothing is a caller bug, NOT a resume
+            print(
+                json.dumps({"claim": only, "error": "no-check" if f else "no-such-claim"}),
+                file=sys.stderr,
+            )
+            return _REFUSE  # a key naming nothing is a caller bug, NOT a resume
         chk = f["check"]
         mutant = paperkit.config.resolve(MUTANT)
         if mutant:
@@ -209,8 +274,15 @@ def main(argv: list) -> int:
             # report whether it flips the check.  A pk_mutant action runs this per (claim, site);
             # pk_sens aggregates the {flipped} records into the `sens` fingerprint the in-process
             # sweep used to compute alone.  No sweep here — one mutation, hermetic.
-            print(json.dumps({"claim": only, "site": mutant,
-                              "flipped": paperkit.grader.mutate_one(project_dir, chk, custom, mutant)}))
+            print(
+                json.dumps(
+                    {
+                        "claim": only,
+                        "site": mutant,
+                        "flipped": paperkit.grader.mutate_one(project_dir, chk, custom, mutant),
+                    }
+                )
+            )
             return 0
         res = paperkit.grader._grade_parallel(project_dir, [chk], custom, presupposed, resolution)
         rec = res[chk]
@@ -221,8 +293,11 @@ def main(argv: list) -> int:
             # Μ·sweep·atom — carry the orthogonal decision-coverage axis (if grade_check measured any
             # reached-but-unasserted decision) onto the __dcalc record, so the grade/cohere reading and
             # the compliance disclosure see it without re-sweeping.  Absent ⇒ no such decision (common).
-            calc = {"claim": only, "baseline": rec.get("baseline", rec["grade"] != "broken"),
-                    "sens": rec.get("tests", [])}
+            calc = {
+                "claim": only,
+                "baseline": rec.get("baseline", rec["grade"] != "broken"),
+                "sens": rec.get("tests", []),
+            }
             # ⚡ Ζ·calc·why·carry — CARRY THE CHECK'S OWN ACCOUNT ONTO THE CALC RECORD.
             # grader.py sets rec["check_said"] on a failing baseline (Ζ·calc·why) and this dict
             # dropped it, so the record every consumer reads said `{"baseline": false, "sens": []}`
@@ -255,12 +330,11 @@ def main(argv: list) -> int:
                 calc["decisions_unasserted"] = rec["decisions_unasserted"]
             print(json.dumps(calc))
         else:
-            print(json.dumps({"claim": only, "grade": rec["grade"]}))   # the grade INTERPRETATION
+            print(json.dumps({"claim": only, "grade": rec["grade"]}))  # the grade INTERPRETATION
         return 0
 
     # which warrants to grade
-    keys = [k for k, f in F.items() if f.get("check")
-            and (consider_all or k in cited)]
+    keys = [k for k, f in F.items() if f.get("check") and (consider_all or k in cited)]
 
     # share counts: how many CONSIDERED warrants lean on each distinct check
     share: dict[str, list] = {}
@@ -271,7 +345,12 @@ def main(argv: list) -> int:
         # Φ·footprint: each considered check's READ footprint (the project files it opens),
         # the SOUND per-check key a footprint cache invalidates on — a diff touching none of
         # a check's footprint cannot change its verdict.  Reads ⊇ Δ's sensitivity `tests`.
-        print(json.dumps({c: paperkit.resolver.footprint(c, project_dir, custom) for c in sorted(share)}, indent=2))
+        print(
+            json.dumps(
+                {c: paperkit.resolver.footprint(c, project_dir, custom) for c in sorted(share)},
+                indent=2,
+            )
+        )
         return 0
 
     # Δ·footprint-cache: a Δ grade is a pure function of its inputs, so cache it PER CHECK,
@@ -286,14 +365,23 @@ def main(argv: list) -> int:
     # change (declared or re-inferred) changes what the pristine copy contains, which can flip a
     # baseline without touching any footprint file — so the root is part of the cache validity,
     # exactly like `resolution`.
-    valid = (cached.get("engine") == engine and cached.get("resolution") == resolution
-             and cached.get("root") == str(sandbox_root))
+    valid = (
+        cached.get("engine") == engine
+        and cached.get("resolution") == resolution
+        and cached.get("root") == str(sandbox_root)
+    )
     entries = cached.get("checks", {}) if valid else {}
 
     reuse, stale = {}, []
     for c in share:
         e = entries.get(c)
-        if e and paperkit.cache.footprint_hash(project_dir, e["footprint"], _fine(e.get("grade", {}))) == e["fp"]:
+        if (
+            e
+            and paperkit.cache.footprint_hash(
+                project_dir, e["footprint"], _fine(e.get("grade", {}))
+            )
+            == e["fp"]
+        ):
             reuse[c] = e
         else:
             stale.append(c)
@@ -319,27 +407,36 @@ def main(argv: list) -> int:
     # whole interaction was unreachable.
     if state_file is not None and stale:
         sidecar = Path(str(state_file) + ".stale")
-        prior = (sidecar.read_text().splitlines()
-                 if Path(state_file).exists() and sidecar.exists() else None)
+        prior = (
+            sidecar.read_text().splitlines()
+            if Path(state_file).exists() and sidecar.exists()
+            else None
+        )
         if prior is not None and prior != stale:
             if set(stale) <= set(prior):
                 # the expected shrink — banked grades left the stale set.  Drop the token: its
                 # cursor counts a longer list, and every grade it stood for is already cached.
                 Path(state_file).unlink(missing_ok=True)
-                print(f"paperkit-discriminate: {len(prior) - len(stale)} banked grade(s) left the "
-                      f"stale set; resumption token reset (the grades are durable in the cache, "
-                      f"so nothing is re-measured)", file=sys.stderr)
+                print(
+                    f"paperkit-discriminate: {len(prior) - len(stale)} banked grade(s) left the "
+                    f"stale set; resumption token reset (the grades are durable in the cache, "
+                    f"so nothing is re-measured)",
+                    file=sys.stderr,
+                )
             else:
-                print(f"Ν·loud: {state_file} was written against a stale set this run does not "
-                      f"extend ({len(prior)} check(s) then, {len(stale)} now, "
-                      f"{len(set(stale) - set(prior))} of them unseen) — an edit, a changed root "
-                      f"or a different project.  Its cursor no longer names the same claims.  "
-                      f"Delete it and re-run.", file=sys.stderr)
-                return _REFUSE                 # a token naming a different set is a bug, NOT a resume
+                print(
+                    f"Ν·loud: {state_file} was written against a stale set this run does not "
+                    f"extend ({len(prior)} check(s) then, {len(stale)} now, "
+                    f"{len(set(stale) - set(prior))} of them unseen) — an edit, a changed root "
+                    f"or a different project.  Its cursor no longer names the same claims.  "
+                    f"Delete it and re-run.",
+                    file=sys.stderr,
+                )
+                return _REFUSE  # a token naming a different set is a bug, NOT a resume
         try:
             sidecar.write_text("\n".join(stale))
         except OSError:
-            pass                              # a read-only state dir is not a grading failure
+            pass  # a read-only state dir is not a grading failure
 
     fresh, fresh_grader = {}, None
     if stale and state_file is None and budget_raw is None:
@@ -368,15 +465,27 @@ def main(argv: list) -> int:
                 for c, rec in meaning["graded"].items():
                     fp = rec.get("_footprint", [])
                     if fp is None:
-                        continue                  # Φ·degrade — uncacheable, as below
-                    banked[c] = {"grade": {k: v for k, v in rec.items() if k != "_footprint"},
-                                 "footprint": fp,
-                                 "fp": paperkit.cache.footprint_hash(project_dir, fp, _fine(rec))}
-                paperkit.cache.save(project_dir, {"engine": engine, "resolution": resolution,
-                                          "root": str(sandbox_root), "checks": banked})
-            print(f"paperkit-discriminate: graded {meaning['progress']} in {steps} increment(s) — "
-                  f"not done; state persisted to {state_file} ({len(meaning['graded'])} grade(s) "
-                  f"banked to the cache), re-run to resume", file=sys.stderr)
+                        continue  # Φ·degrade — uncacheable, as below
+                    banked[c] = {
+                        "grade": {k: v for k, v in rec.items() if k != "_footprint"},
+                        "footprint": fp,
+                        "fp": paperkit.cache.footprint_hash(project_dir, fp, _fine(rec)),
+                    }
+                paperkit.cache.save(
+                    project_dir,
+                    {
+                        "engine": engine,
+                        "resolution": resolution,
+                        "root": str(sandbox_root),
+                        "checks": banked,
+                    },
+                )
+            print(
+                f"paperkit-discriminate: graded {meaning['progress']} in {steps} increment(s) — "
+                f"not done; state persisted to {state_file} ({len(meaning['graded'])} grade(s) "
+                f"banked to the cache), re-run to resume",
+                file=sys.stderr,
+            )
             return 2
         fresh = meaning["graded"]
         fresh_grader = "GradeWitness"
@@ -387,31 +496,54 @@ def main(argv: list) -> int:
     for c, e in reuse.items():
         graded[c], grader_of[c] = e["grade"], "cache"
     for c in stale:
-        fp = fresh[c].pop("_footprint", [])   # computed once during grading (scoping + cache); strip from the record
+        fp = fresh[c].pop(
+            "_footprint", []
+        )  # computed once during grading (scoping + cache); strip from the record
         graded[c], grader_of[c] = fresh[c], fresh_grader
         if fp is None:
-            continue                          # Φ·degrade: untraceable footprint — UNCACHEABLE (re-grade
+            continue  # Φ·degrade: untraceable footprint — UNCACHEABLE (re-grade
             # every run).  Storing it under [] would over-reuse a grade whose inputs we never saw.
-        new_entries[c] = {"grade": fresh[c], "footprint": fp,
-                          "fp": paperkit.cache.footprint_hash(project_dir, fp, _fine(fresh[c]))}
+        new_entries[c] = {
+            "grade": fresh[c],
+            "footprint": fp,
+            "fp": paperkit.cache.footprint_hash(project_dir, fp, _fine(fresh[c])),
+        }
 
     if not no_cache:
-        paperkit.cache.save(project_dir, {"engine": engine, "resolution": resolution,
-                                  "root": str(sandbox_root), "checks": new_entries})
+        paperkit.cache.save(
+            project_dir,
+            {
+                "engine": engine,
+                "resolution": resolution,
+                "root": str(sandbox_root),
+                "checks": new_entries,
+            },
+        )
 
     if stale:
-        print(f"paperkit-discriminate: graded by {fresh_grader} "
-              f"({len(stale)} graded, {len(reuse)} reused from footprint cache)", file=sys.stderr)
+        print(
+            f"paperkit-discriminate: graded by {fresh_grader} "
+            f"({len(stale)} graded, {len(reuse)} reused from footprint cache)",
+            file=sys.stderr,
+        )
     else:
-        print(f"paperkit-discriminate: all {len(reuse)} grade(s) reused from footprint cache", file=sys.stderr)
+        print(
+            f"paperkit-discriminate: all {len(reuse)} grade(s) reused from footprint cache",
+            file=sys.stderr,
+        )
     records = []
     for k in keys:
         chk = F[k]["check"]
         g = dict(graded[chk])
-        g.update(key=k, check=chk, cited=k in cited, section=F[k].get("section"),
-                 shared_with=[o for o in share[chk] if o != k])
+        g.update(
+            key=k,
+            check=chk,
+            cited=k in cited,
+            section=F[k].get("section"),
+            shared_with=[o for o in share[chk] if o != k],
+        )
         g["from"] = F[k].get("from", [])
-        g["rests-on"] = F[k].get("rests-on", [])     # grounding edges (for clamping)
+        g["rests-on"] = F[k].get("rests-on", [])  # grounding edges (for clamping)
         g["grader"] = grader_of[chk]
         records.append(g)
 
@@ -434,39 +566,57 @@ def main(argv: list) -> int:
         floor = mikemol.grade.grade.ORDER[min_strength]
         weak = [r for r in records if mikemol.grade.grade.STRENGTH.get(r["grade"], 0) < floor]
         if weak:
-            print(f"\npaperkit-discriminate: {len(weak)} warrant(s) below "
-                  f"strength '{min_strength}':", file=sys.stderr)
+            print(
+                f"\npaperkit-discriminate: {len(weak)} warrant(s) below strength '{min_strength}':",
+                file=sys.stderr,
+            )
             for r in weak:
                 print(f"  [@{r['key']}] {r['grade']} — {r['check']}", file=sys.stderr)
             rc = 1
         else:
-            print(f"\npaperkit-discriminate: all {len(records)} warrant(s) "
-                  f"meet strength '{min_strength}'")
+            print(
+                f"\npaperkit-discriminate: all {len(records)} warrant(s) "
+                f"meet strength '{min_strength}'"
+            )
     if min_corro is not None:
         floor = mikemol.grade.grade.CORRO_C[min_corro]
-        weak = [r for r in records if mikemol.grade.grade.CORRO_C.get(r.get("corroboration", "single"), 0) < floor]
+        weak = [
+            r
+            for r in records
+            if mikemol.grade.grade.CORRO_C.get(r.get("corroboration", "single"), 0) < floor
+        ]
         if weak:
-            print(f"\npaperkit-discriminate: {len(weak)} warrant(s) below "
-                  f"corroboration '{min_corro}':", file=sys.stderr)
+            print(
+                f"\npaperkit-discriminate: {len(weak)} warrant(s) below "
+                f"corroboration '{min_corro}':",
+                file=sys.stderr,
+            )
             for r in weak:
-                print(f"  [@{r['key']}] {r.get('corroboration', 'single')} — {r['check']}", file=sys.stderr)
+                print(
+                    f"  [@{r['key']}] {r.get('corroboration', 'single')} — {r['check']}",
+                    file=sys.stderr,
+                )
             rc = 1
         else:
-            print(f"\npaperkit-discriminate: all {len(records)} warrant(s) "
-                  f"meet corroboration '{min_corro}'")
+            print(
+                f"\npaperkit-discriminate: all {len(records)} warrant(s) "
+                f"meet corroboration '{min_corro}'"
+            )
     return rc
 
 
 def report(records, share, graded, n_cited, n_checked, consider_all) -> None:
     scope = "all checked" if consider_all else f"of {n_cited} cited"
-    print(f"paperkit-discriminate (Δ): {n_checked} {scope} warrant(s) carry a "
-          f"check, {len(share)} distinct check(s)\n")
+    print(
+        f"paperkit-discriminate (Δ): {n_checked} {scope} warrant(s) carry a "
+        f"check, {len(share)} distinct check(s)\n"
+    )
     # Ζ·ladder — the ladder's own total order (grade.RANK_C), not a second copy of it.
     order = mikemol.grade.grade.RANK_C
     for r in sorted(records, key=lambda r: (order.get(r["grade"], 9), r["key"])):
         share_n = len(r["shared_with"]) + 1
         dil = f"  (shared by {share_n} claims)" if share_n > 1 else ""
-        crash = (r["grade"] == "behavioral" and not r.get("content_sensitive"))
+        crash = r["grade"] == "behavioral" and not r.get("content_sensitive")
         tag = "  ⚠ config/crash-sensitive only" if crash else ""
         # Ζ·surface·kind — a grade is only as complete as the surface it was measured over.  Say so
         # NEXT TO the grade, because the number of inputs the sweep could not touch is exactly what
@@ -477,8 +627,11 @@ def report(records, share, graded, n_cited, n_checked, consider_all) -> None:
         # This printed nothing unless the value was `independent`, so widening the axis
         # would have made every record silent — the value most worth showing is the one
         # that says the producers were never checked for shared ground.
-        corro = (f"  + {r['corroboration']} ({r.get('producers','?')} producers)"
-                 if r.get("corroboration", "single") != "single" else "")
+        corro = (
+            f"  + {r['corroboration']} ({r.get('producers', '?')} producers)"
+            if r.get("corroboration", "single") != "single"
+            else ""
+        )
         print(f"  {r['grade']:13} [@{r['key']}]{dil}{tag}{corro}")
         print(f"  {'':13} check: {r['check']}")
         if r["tests"]:
@@ -495,16 +648,19 @@ def report(records, share, graded, n_cited, n_checked, consider_all) -> None:
     print(f"  summary (self-grade): {summary}")
     eff_counts: dict[str, int] = {}
     for r in records:
-        eff_counts[r.get("effective_grade", r["grade"])] = \
+        eff_counts[r.get("effective_grade", r["grade"])] = (
             eff_counts.get(r.get("effective_grade", r["grade"]), 0) + 1
+        )
     print(f"  summary (effective):  {', '.join(f'{n} {g}' for g, n in sorted(eff_counts.items()))}")
     clamped = [r for r in records if r.get("clamp", 0) > 0]
     vac = counts.get("vacuous", 0)
     if vac:
         print(f"  ⚠ {vac} cited claim(s) rest on a check that PROVABLY cannot fail.")
     if clamped:
-        print(f"  ⚠ {len(clamped)} cited claim(s) are CLAMPED below their self grade by "
-              f"weaker premises (effective < self).")
+        print(
+            f"  ⚠ {len(clamped)} cited claim(s) are CLAMPED below their self grade by "
+            f"weaker premises (effective < self)."
+        )
 
 
 if __name__ == "__main__":

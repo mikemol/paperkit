@@ -10,6 +10,7 @@ may want the .odt itself, or route it on to a PDF (pdf.py --via odf).
     odt(paper_md, out_odt) -> Path        # produce the .odt (the node's morphism)
     python3 checks/odf.py                 # produce + gate: a valid ODF package
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -31,10 +32,20 @@ def odt(paper_md: Path, out_odt: Path) -> Path:
     with tempfile.TemporaryDirectory() as t:
         md = Path(t) / "p.md"
         md.write_text(source.cite_split(paper_md))
-        subprocess.run(["pandoc", str(md), "--citeproc", "--bibliography",
-                        str(paper_md.parent / "references.bib"),
-                        "--metadata", f"title={source.title(paper_md)}", "-o", str(out_odt)],
-                       check=True)
+        subprocess.run(
+            [
+                "pandoc",
+                str(md),
+                "--citeproc",
+                "--bibliography",
+                str(paper_md.parent / "references.bib"),
+                "--metadata",
+                f"title={source.title(paper_md)}",
+                "-o",
+                str(out_odt),
+            ],
+            check=True,
+        )
     return out_odt
 
 
@@ -45,10 +56,14 @@ def main() -> int:
         z = zipfile.ZipFile(out)
         names = z.namelist()
         content = "content.xml" in names
-        mimetype = "mimetype" in names and z.read("mimetype") == b"application/vnd.oasis.opendocument.text"
+        mimetype = (
+            "mimetype" in names and z.read("mimetype") == b"application/vnd.oasis.opendocument.text"
+        )
         ok = content and mimetype and out.stat().st_size > 0
-        print(f"odf: {'ok' if ok else 'FAIL'} — paper.md → .odt "
-              f"({'valid ODF (content.xml + odt mimetype)' if ok else 'not a valid ODF package'})")
+        print(
+            f"odf: {'ok' if ok else 'FAIL'} — paper.md → .odt "
+            f"({'valid ODF (content.xml + odt mimetype)' if ok else 'not a valid ODF package'})"
+        )
         return 0 if ok else 1
 
 

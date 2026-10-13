@@ -25,6 +25,7 @@ This check gates the bound so it cannot rot into a comment nobody honours.  It a
 
     python3 checks/deck_bound.py    # assert the bound holds
 """
+
 from __future__ import annotations
 
 import sys
@@ -33,8 +34,12 @@ import graph
 
 # The slide objects the coalgebra declares (Ρ·deck·node).  Derived from the graph, not restated:
 # a slide object is one that no PDF route passes through and that a SLIDE_ROUTE terminates at.
-SLIDE_OBJECTS = tuple(sorted({path[-1] for path in graph.SLIDE_ROUTES.values()} |
-                             {o for path in graph.SLIDE_ROUTES.values() for o in path[1:]}))
+SLIDE_OBJECTS = tuple(
+    sorted(
+        {path[-1] for path in graph.SLIDE_ROUTES.values()}
+        | {o for path in graph.SLIDE_ROUTES.values() for o in path[1:]}
+    )
+)
 
 
 def _projector_targets() -> set[str]:
@@ -47,14 +52,18 @@ def _projector_targets() -> set[str]:
     default (`pandoc` never appears in a `target == …` comparison).
     """
     import paperkit.project  # the owner of the target knob
+
     return set(paperkit.project.TARGET.choices or ())
 
 
 def main() -> int:
     # ── 1. the POSITIVE half: the slide formats really are first-class in the coalgebra ──
     if not SLIDE_OBJECTS:
-        print("deck_bound: the coalgebra declares no slide objects — the claim's first clause "
-              "('paperkit emits a gated .pptx and .odp') has no referent", file=sys.stderr)
+        print(
+            "deck_bound: the coalgebra declares no slide objects — the claim's first clause "
+            "('paperkit emits a gated .pptx and .odp') has no referent",
+            file=sys.stderr,
+        )
         return 1
     for obj in ("pptx", "odp"):
         if obj not in graph.OBJECTS:
@@ -63,28 +72,37 @@ def main() -> int:
     for name, path in graph.SLIDE_ROUTES.items():
         for a, b in zip(path, path[1:]):
             if (a, b) not in graph.MORPHISMS:
-                print(f"deck_bound: slide route {name} uses undeclared edge {a}->{b}",
-                      file=sys.stderr)
+                print(
+                    f"deck_bound: slide route {name} uses undeclared edge {a}->{b}", file=sys.stderr
+                )
                 return 1
 
     # ── 2. the FALSIFIER: the projector must not treat a slide format as an observation ──
     targets = _projector_targets()
     if not targets:
-        print("deck_bound: read NO render targets out of project.py — the falsifier cannot see "
-              "its subject, so a slide target could be added unnoticed (source-grep witness lost "
-              "its grip; re-point it at the projector's dispatch)", file=sys.stderr)
+        print(
+            "deck_bound: read NO render targets out of project.py — the falsifier cannot see "
+            "its subject, so a slide target could be added unnoticed (source-grep witness lost "
+            "its grip; re-point it at the projector's dispatch)",
+            file=sys.stderr,
+        )
         return 1
     leaked = sorted(set(SLIDE_OBJECTS) & targets)
     if leaked:
-        print(f"deck_bound: project.py now dispatches on slide target(s) {leaked} — a slide format "
-              "has become a projector OBSERVATION.  The DECK BOUND no longer holds: either this is "
-              "Ρ·deck·observe landing (rewrite the claim and this check), or a transform has been "
-              "mislabelled as an observation.", file=sys.stderr)
+        print(
+            f"deck_bound: project.py now dispatches on slide target(s) {leaked} — a slide format "
+            "has become a projector OBSERVATION.  The DECK BOUND no longer holds: either this is "
+            "Ρ·deck·observe landing (rewrite the claim and this check), or a transform has been "
+            "mislabelled as an observation.",
+            file=sys.stderr,
+        )
         return 1
 
-    print(f"deck_bound: slide objects {list(SLIDE_OBJECTS)} are first-class in the coalgebra "
-          f"({len(graph.SLIDE_ROUTES)} composing routes); project.py's {len(targets)} render "
-          f"targets {sorted(targets)} include none of them — transforms, not observations")
+    print(
+        f"deck_bound: slide objects {list(SLIDE_OBJECTS)} are first-class in the coalgebra "
+        f"({len(graph.SLIDE_ROUTES)} composing routes); project.py's {len(targets)} render "
+        f"targets {sorted(targets)} include none of them — transforms, not observations"
+    )
     return 0
 
 

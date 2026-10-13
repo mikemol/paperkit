@@ -23,13 +23,48 @@ corpus where it did, that would be a true reading about the corpus, not a broken
 TOTALITY.  Every key lands under exactly one letter.  A claim with no significant term (empty, or
 all stop-words) lands under `?`, which sorts first — visible rather than silently dropped.
 """
+
 import genrekit
 
 # Leading function words an index skips.  Deliberately SMALL and closed: this is not a linguistic
 # stop-list, it is the set of words that begin a claim sentence without being its subject.
-STOP = {"a", "an", "the", "every", "each", "no", "any", "this", "that", "these", "those",
-        "it", "its", "they", "there", "what", "when", "which", "who", "if", "and", "or",
-        "but", "for", "to", "of", "in", "on", "at", "by", "is", "are", "was", "were", "be"}
+STOP = {
+    "a",
+    "an",
+    "the",
+    "every",
+    "each",
+    "no",
+    "any",
+    "this",
+    "that",
+    "these",
+    "those",
+    "it",
+    "its",
+    "they",
+    "there",
+    "what",
+    "when",
+    "which",
+    "who",
+    "if",
+    "and",
+    "or",
+    "but",
+    "for",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "by",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+}
 
 
 def term(text):

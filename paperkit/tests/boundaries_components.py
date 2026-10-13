@@ -25,6 +25,7 @@ rather than merely unlikely.
 Stdlib plus the derivation module, deliberately: this guard imports NO engine module, so it adds
 no edge to the DAG it guards.  Run from anywhere; paths derive from __file__.
 """
+
 from __future__ import annotations
 
 import ast
@@ -58,7 +59,8 @@ def _literal(path: Path, name: str) -> dict[str, list[str]]:
         # ⚑ `isinstance(t, ast.Name)` rather than `getattr(t, "id", None)` — a getattr on an AST
         # node returns Any and poisons the comparison; the narrow form says what a target IS.
         if isinstance(node, ast.Assign) and any(
-                isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            isinstance(t, ast.Name) and t.id == name for t in node.targets
+        ):
             val: object = ast.literal_eval(node.value)
             if not isinstance(val, dict):
                 break
@@ -91,10 +93,11 @@ def engine_files() -> set[str]:
     partition covers the files the engine package owns.
     """
     subpkgs = {b.parent for b in ENG.rglob("BUILD.bazel") if b.parent != ENG}
-    return {p.relative_to(ENG).as_posix()
-            for p in ENG.rglob("*.py")
-            if "__pycache__" not in p.parts
-            and not any(sp in p.parents for sp in subpkgs)}
+    return {
+        p.relative_to(ENG).as_posix()
+        for p in ENG.rglob("*.py")
+        if "__pycache__" not in p.parts and not any(sp in p.parents for sp in subpkgs)
+    }
 
 
 def totality(components: dict[str, list[str]], files: set[str]) -> tuple[list[str], list[str]]:
@@ -130,8 +133,9 @@ def cycle(deps: dict[str, list[str]]) -> str | None:
     return None
 
 
-def violations(components: dict[str, list[str]], deps: dict[str, list[str]],
-               edges: set[tuple[str, str]]) -> list[tuple[str, str, str, str]]:
+def violations(
+    components: dict[str, list[str]], deps: dict[str, list[str]], edges: set[tuple[str, str]]
+) -> list[tuple[str, str, str, str]]:
     """Find import edges that cross the architecture: (module, imported, its comp, needed comp).
 
     ⚑ BOTH SIDES ARE PATHS, SO THE PARTITION IS INDEXED DIRECTLY.  This carried a private
@@ -163,8 +167,10 @@ def main() -> int:
 
     s.section("partition")
     missing, invented = totality(components, files)
-    s.check(f"the partition is TOTAL over the real tree ({len(files)} files)",
-            not missing and not invented)
+    s.check(
+        f"the partition is TOTAL over the real tree ({len(files)} files)",
+        not missing and not invented,
+    )
     if missing or invented:
         sys.stdout.write(f"      missing={missing} invented={invented}\n")
     s.check("the partition is DISJOINT (no file in two components)", not duplicates(components))
@@ -173,8 +179,10 @@ def main() -> int:
     s.section("dag")
     s.check("DEPS is acyclic", cycle(deps) is None)
     live = set(dagderive.edges(ENG, sorted(files)))
-    s.check(f"dag.bzl IMPORTS is FRESH against tools/dagderive.py ({len(live)} edges)",
-            committed == live)
+    s.check(
+        f"dag.bzl IMPORTS is FRESH against tools/dagderive.py ({len(live)} edges)",
+        committed == live,
+    )
     if committed != live:
         sys.stdout.write(f"      committed-only={sorted(committed - live)[:SHOWN]}\n")
         sys.stdout.write(f"      live-only={sorted(live - committed)[:SHOWN]}\n")
@@ -190,21 +198,28 @@ def main() -> int:
         sys.stdout.write(f"      {mod} ({a}) imports {dst} ({b}) — not in DEPS[{a}]\n")
 
     f_total = {c: list(fs) for c, fs in components.items()}
-    f_total["gate"] = []                                    # δ: drop one file from the partition
+    f_total["gate"] = []  # δ: drop one file from the partition
     f_dup = {c: list(fs) for c, fs in components.items()}
-    f_dup["kernel"] = [*f_dup["kernel"], "gate.py"]         # δ: one file in two components
-    f_edge = committed | {("config.py", "grader.py")}       # δ: one edge against the DAG's grain
-    s.delta("dropping a file, double-listing it, and one upward edge are each CAUGHT",
-            totality(components, files) == ([], []) and not violations(components, deps,
-                                                                       committed),
-            (totality(f_total, files)[0] == ["gate.py"]
-             and duplicates(f_dup) == ["gate.py"]
-             and violations(components, deps, f_edge)
-             == [("config.py", "grader.py", "kernel", "delta")]),
-            ("partition total+disjoint, every edge inside DEPS",
-             ("gate.py unplaced → totality; gate.py twice → disjointness; "
-              "config.py→grader.py → an edge kernel may not take"),
-             "one file, one duplicate, one edge"))
+    f_dup["kernel"] = [*f_dup["kernel"], "gate.py"]  # δ: one file in two components
+    f_edge = committed | {("config.py", "grader.py")}  # δ: one edge against the DAG's grain
+    s.delta(
+        "dropping a file, double-listing it, and one upward edge are each CAUGHT",
+        totality(components, files) == ([], []) and not violations(components, deps, committed),
+        (
+            totality(f_total, files)[0] == ["gate.py"]
+            and duplicates(f_dup) == ["gate.py"]
+            and violations(components, deps, f_edge)
+            == [("config.py", "grader.py", "kernel", "delta")]
+        ),
+        (
+            "partition total+disjoint, every edge inside DEPS",
+            (
+                "gate.py unplaced → totality; gate.py twice → disjointness; "
+                "config.py→grader.py → an edge kernel may not take"
+            ),
+            "one file, one duplicate, one edge",
+        ),
+    )
     return s.finish()
 
 

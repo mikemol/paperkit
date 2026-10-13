@@ -26,6 +26,7 @@ only ever raised into place, never removed by absence.
 
     mem_harvest.py <project-dir> [--out FILE] [--bazel-out DIR]
 """
+
 from __future__ import annotations
 
 import json
@@ -52,7 +53,7 @@ def peaks_for(project: str, tree: Path) -> dict:
             raw = f.read_text().strip()
         except OSError:
             continue
-        if not raw.isdigit():                 # "unavailable:*" or a clean 0 — carries no measurement
+        if not raw.isdigit():  # "unavailable:*" or a clean 0 — carries no measurement
             continue
         mb = int(raw) / (1024 * 1024)
         if mb <= 0:
@@ -73,21 +74,28 @@ def deposit(db: Path, project: str, measured: dict, run: str = "") -> int:
     it cannot be got wrong the way the merge was.
     """
     import tools.mem_db
+
     c = tools.mem_db.connect(db)
-    rows = [(project, res, claim, cell, int(mb * 1024 * 1024))
-            for (res, claim, cell), mb in measured.items()]
+    rows = [
+        (project, res, claim, cell, int(mb * 1024 * 1024))
+        for (res, claim, cell), mb in measured.items()
+    ]
     return tools.mem_db.record(c, rows, run=run)
 
 
 def main(argv: list) -> int:
     if not argv:
-        print("usage: mem_harvest.py <project-dir> [--db FILE] [--bazel-out DIR] [--run ID]",
-              file=sys.stderr)
+        print(
+            "usage: mem_harvest.py <project-dir> [--db FILE] [--bazel-out DIR] [--run ID]",
+            file=sys.stderr,
+        )
         return 2
     proj_dir = Path(argv[0])
     project = "root" if proj_dir.resolve().name == "paperkit" else proj_dir.name
+
     def opt(n, d=None):
         return argv[argv.index(n) + 1] if n in argv and argv.index(n) + 1 < len(argv) else d
+
     repo = proj_dir.resolve() if project == "root" else proj_dir.resolve().parent
     tree = Path(opt("--bazel-out") or (repo / "bazel-out"))
     db = Path(opt("--db") or (repo / "mem.sqlite"))
@@ -96,9 +104,11 @@ def main(argv: list) -> int:
         return 0
     measured = peaks_for(project, tree)
     if not measured:
-        print(f"mem-harvest: {project}: no readable peaks (run under --config=memobserve first)",
-              file=sys.stderr)
-        return 0                              # absent measurement is not an error
+        print(
+            f"mem-harvest: {project}: no readable peaks (run under --config=memobserve first)",
+            file=sys.stderr,
+        )
+        return 0  # absent measurement is not an error
     n = deposit(db, project, measured, run=opt("--run", ""))
     res = sorted({r for r, _, _ in measured})
     print(f"mem-harvest: {project}: {n} observation(s) over {res} → {db}", file=sys.stderr)

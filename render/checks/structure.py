@@ -10,6 +10,7 @@ cwd = render/ ; .. = repo root.
 a docx.  It is now a callable the framework invokes.  This module has no sibling imports, so it
 carried no sys.path injection to retire: the conversion here is purely the side-effect lift.
 """
+
 from __future__ import annotations
 
 import re
@@ -26,8 +27,11 @@ HEADING = re.compile(r"^#{1,6}\s")
 
 def _md_headings(paper: Path) -> list[str]:
     """Collect the headings the markdown source declares."""
-    return [re.sub(r"^#{1,6}\s+", "", ln).rstrip()
-            for ln in paper.read_text().splitlines() if HEADING.match(ln)]
+    return [
+        re.sub(r"^#{1,6}\s+", "", ln).rstrip()
+        for ln in paper.read_text().splitlines()
+        if HEADING.match(ln)
+    ]
 
 
 def _docx_headings(docx: Path) -> list[str]:
@@ -52,15 +56,16 @@ def check() -> int:
     md_heads = _md_headings(paper)
     with tempfile.TemporaryDirectory() as d:
         docx = Path(d) / "p.docx"
-        subprocess.run(["pandoc", str(paper), "-o", str(docx)],
-                       check=True)
+        subprocess.run(["pandoc", str(paper), "-o", str(docx)], check=True)
         docx_heads = _docx_headings(docx)
     if docx_heads != md_heads:
-        sys.stderr.write(f"heading structure not preserved:\n md  ={md_heads}\n"
-                         f" docx={docx_heads}\n")
+        sys.stderr.write(
+            f"heading structure not preserved:\n md  ={md_heads}\n docx={docx_heads}\n"
+        )
         return 1
-    sys.stdout.write(f"structure ok: well-formed OOXML, {len(docx_heads)} headings "
-                     f"preserved as Word headings\n")
+    sys.stdout.write(
+        f"structure ok: well-formed OOXML, {len(docx_heads)} headings preserved as Word headings\n"
+    )
     return 0
 
 

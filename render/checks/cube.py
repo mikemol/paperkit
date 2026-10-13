@@ -32,6 +32,7 @@ arriving-by-twist at a route's final format is delivered (no silent loss).
     python3 checks/cube.py            # the capability × edge action face + per-route delivery
     python3 checks/cube.py --check    # assert the derivation agrees with the graph's a11y field
 """
+
 from __future__ import annotations
 
 import sys
@@ -71,8 +72,8 @@ def _affords(cap: str, fmt: str) -> bool:
 
 # the four kinds of edge action, as sentinels distinct from any capability name (which are the
 # TWISTED/PRESERVED/ESTABLISHED image values).
-LOST = None            # C afforded on src, dst carries neither C nor a twist of it
-ABSENT = "∅"           # C on neither endpoint — the edge is irrelevant to C
+LOST = None  # C afforded on src, dst carries neither C nor a twist of it
+ABSENT = "∅"  # C on neither endpoint — the edge is irrelevant to C
 
 
 def edge_action(cap: str, src: str, dst: str) -> str | None:
@@ -85,11 +86,11 @@ def edge_action(cap: str, src: str, dst: str) -> str | None:
     on_src = _affords(cap, src) if src != "md" else False
     twist = TWISTS.get((cap, src, dst))
     if twist is not None:
-        return twist                       # the edge maps cap to a different capability
-    if on_dst:                             # preserved (also on src) or established (dst only) — image is cap
+        return twist  # the edge maps cap to a different capability
+    if on_dst:  # preserved (also on src) or established (dst only) — image is cap
         return cap
     if on_src:
-        return LOST                        # afforded on src, dst cannot carry it, no twist
+        return LOST  # afforded on src, dst cannot carry it, no twist
     return ABSENT
 
 
@@ -101,7 +102,7 @@ def kind(cap: str, src: str, dst: str) -> str:
     if img == ABSENT:
         return "absent"
     if img != cap:
-        return "twisted"                   # image is a different capability
+        return "twisted"  # image is a different capability
     on_src = _affords(cap, src) if src != "md" else False
     return "preserved" if on_src else "established"
 
@@ -118,7 +119,7 @@ def route_delivers(cap: str, route: str) -> str | None:
         if img is LOST:
             return None
         if img != ABSENT:
-            current = img                  # follow the twist: the capability continues under its image name
+            current = img  # follow the twist: the capability continues under its image name
     final = _dst_format(path[-2], path[-1])
     return current if _affords(current, final) else None
 
@@ -136,14 +137,21 @@ def check() -> tuple[bool, list[str]]:
     """
     problems = []
     for (s, d), m in graph.MORPHISMS.items():
-        if m["a11y"] in ("post", "native") and kind("pdf-ua", s, d) not in ("established", "preserved"):
-            problems.append(f"pdf-ua {s}->{d}: graph a11y={m['a11y']} but cube derives {kind('pdf-ua', s, d)!r}")
+        if m["a11y"] in ("post", "native") and kind("pdf-ua", s, d) not in (
+            "established",
+            "preserved",
+        ):
+            problems.append(
+                f"pdf-ua {s}->{d}: graph a11y={m['a11y']} but cube derives {kind('pdf-ua', s, d)!r}"
+            )
         if m["a11y"] is None and d == "pdf":
             problems.append(f"{s}->pdf has a11y=None yet produces a PDF — graph inconsistency")
     # a twist's image must be afforded at the destination (the edge maps INTO a capability dst carries).
     for (cap, s, d), image in TWISTS.items():
         if not _affords(image, _dst_format(s, d)):
-            problems.append(f"twist {cap} {s}->{d} → {image!r}: {image} not afforded at {_dst_format(s, d)}")
+            problems.append(
+                f"twist {cap} {s}->{d} → {image!r}: {image} not afforded at {_dst_format(s, d)}"
+            )
     # every capability afforded at a route's final format is delivered (as itself or a twist image).
     for cap in matrix.CAPABILITIES:
         for route, path in graph.ROUTES.items():
@@ -169,7 +177,7 @@ def _face() -> str:
             k = kind(cap, s, d)
             cell = {"preserved": "=", "established": "＋", "lost": "LOST", "absent": "·"}.get(k)
             if k == "twisted":
-                cell = "→" + edge_action(cap, s, d)     # the image capability name
+                cell = "→" + edge_action(cap, s, d)  # the image capability name
             cells.append(cell.ljust(cw))
         rows.append(f"{cap:<{kw}}" + "".join(cells))
     return "\n".join(rows)
@@ -182,21 +190,34 @@ def main(argv: list[str]) -> int:
             for p in problems:
                 print(f"cube --check: {p}", file=sys.stderr)
             return 1
-        n_twist = sum(1 for c in matrix.CAPABILITIES for s, d in _edges() if kind(c, s, d) == "twisted")
+        n_twist = sum(
+            1 for c in matrix.CAPABILITIES for s, d in _edges() if kind(c, s, d) == "twisted"
+        )
         n_lost = sum(1 for c in matrix.CAPABILITIES for s, d in _edges() if kind(c, s, d) == "lost")
-        print(f"cube --check: {len(matrix.CAPABILITIES)} capabilities × {len(_edges())} edges — "
-              f"{len(TWISTS)} declared twists, {n_twist} twisted cells, {n_lost} lost; every twist's "
-              f"image is afforded at its destination, the pdf-ua edges agree with the graph, and every "
-              f"afforded capability is delivered by its route (possibly under a twisted name)")
+        print(
+            f"cube --check: {len(matrix.CAPABILITIES)} capabilities × {len(_edges())} edges — "
+            f"{len(TWISTS)} declared twists, {n_twist} twisted cells, {n_lost} lost; every twist's "
+            f"image is afforded at its destination, the pdf-ua edges agree with the graph, and every "
+            f"afforded capability is delivered by its route (possibly under a twisted name)"
+        )
         return 0
-    print("capability × conversion-edge ACTION (edge* : each cell is what the capability BECOMES):\n")
+    print(
+        "capability × conversion-edge ACTION (edge* : each cell is what the capability BECOMES):\n"
+    )
     print(_face())
-    print("\ncells: = (preserved) · ＋ (the edge establishes it) · →X (TWISTED into capability X) · "
-          "LOST (dst cannot carry it) · · (absent)\n")
-    print("per-route delivery (the capability, under the name it ARRIVES as — a twist may rename it):")
+    print(
+        "\ncells: = (preserved) · ＋ (the edge establishes it) · →X (TWISTED into capability X) · "
+        "LOST (dst cannot carry it) · · (absent)\n"
+    )
+    print(
+        "per-route delivery (the capability, under the name it ARRIVES as — a twist may rename it):"
+    )
     for route in graph.ROUTES:
-        delivered = [(c, route_delivers(c, route)) for c in matrix.CAPABILITIES
-                     if route_delivers(c, route) is not None]
+        delivered = [
+            (c, route_delivers(c, route))
+            for c in matrix.CAPABILITIES
+            if route_delivers(c, route) is not None
+        ]
         shown = [f"{c}→{img}" if img != c else c for c, img in delivered]
         print(f"  {route:<6} delivers {len(delivered)}: {', '.join(shown)}")
     return 0

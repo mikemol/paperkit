@@ -8,6 +8,7 @@ default, rejected under --safe.  Both documentation and a test (exit 0 iff all h
 
     python3 paperkit/tests/boundaries_emit.py
 """
+
 from __future__ import annotations
 
 import shutil
@@ -19,10 +20,16 @@ import paperkit.tests._fixture_model  # noqa: E402
 import paperkit.tests._fixture_project  # noqa: E402
 import paperkit.bib  # noqa: E402  (the owner of emit_anchors/emit_path — the two-anchor resolver)
 
-C = paperkit.tests._fixture_model.entry("c", claim="a cited claim")                                       # base prose
-P_CITE = paperkit.tests._fixture_model.entry("p", claim="an example", emit="x.sh", frm="c", check="file:x.sh")  # derived term
-P_POST = paperkit.tests._fixture_model.entry("p", emit="x.sh", frm="c", check="file:x.sh")                # postulate (no claim)
-P_MD = paperkit.tests._fixture_model.entry("p", claim="an example", emit="x.md", frm="c", check="file:x.md")
+C = paperkit.tests._fixture_model.entry("c", claim="a cited claim")  # base prose
+P_CITE = paperkit.tests._fixture_model.entry(
+    "p", claim="an example", emit="x.sh", frm="c", check="file:x.sh"
+)  # derived term
+P_POST = paperkit.tests._fixture_model.entry(
+    "p", emit="x.sh", frm="c", check="file:x.sh"
+)  # postulate (no claim)
+P_MD = paperkit.tests._fixture_model.entry(
+    "p", claim="an example", emit="x.md", frm="c", check="file:x.md"
+)
 SH = {"x.sh": "echo hi\n"}
 MD = {"x.md": "| a | b |\n| - | - |\n"}
 
@@ -30,8 +37,12 @@ MD = {"x.md": "| a | b |\n| - | - |\n"}
 # asset carries DATA and the engine builds the markup, so a cell cannot inject
 # document syntax; a `raw` asset IS markup, so it is shielded from cited_keys the
 # way a fence already shields code.
-P_TAB = paperkit.tests._fixture_model.entry("p", claim="a table", emit="t.tsv", as_="table", frm="c", check="file:t.tsv")
-P_RAWTAB = paperkit.tests._fixture_model.entry("p", claim="a table", emit="t.tsv", frm="c", check="file:t.tsv")
+P_TAB = paperkit.tests._fixture_model.entry(
+    "p", claim="a table", emit="t.tsv", as_="table", frm="c", check="file:t.tsv"
+)
+P_RAWTAB = paperkit.tests._fixture_model.entry(
+    "p", claim="a table", emit="t.tsv", frm="c", check="file:t.tsv"
+)
 TAB = {"t.tsv": "metric\tvalue\nsee [@forged]\t1|2\n"}
 
 
@@ -54,26 +65,45 @@ def main() -> int:
     proj_sh = paperkit.tests._fixture_project.project_text([C, P_CITE], assets=SH)
     proj_md = paperkit.tests._fixture_project.project_text([C, P_MD], assets=MD)
     rc_default, err_default = paperkit.tests._fixture_gate.gate([C, P_POST], assets=SH)
-    check("emit places a fenced block, fence from extension (.sh)",
-          "```sh" in proj_sh and "echo hi" in proj_sh)
+    check(
+        "emit places a fenced block, fence from extension (.sh)",
+        "```sh" in proj_sh and "echo hi" in proj_sh,
+    )
     check("additive: the example is CITED ([@p] in prose)", "[@p]" in proj_sh)
-    check(".md asset is a raw include (no code fence)",
-          "| a | b |" in proj_md and "```" not in proj_md)
+    check(
+        ".md asset is a raw include (no code fence)",
+        "| a | b |" in proj_md and "```" not in proj_md,
+    )
     proj_tab = paperkit.tests._fixture_project.project_text([C, P_TAB], assets=TAB)
-    check("as=table builds the markup from data (header + delimiter row)",
-          "| metric | value |" in proj_tab and "| --- | --- |" in proj_tab)
-    check("as=table escapes cells, so an asset cannot forge a citation or a pipe",
-          r"\[@forged\]" in proj_tab and r"1\|2" in proj_tab
-          and "[@forged]" not in proj_tab)
-    check("a raw placement is bracketed, so cited_keys cannot read markers inside it",
-          "<!-- paperkit:raw -->" in proj_md and "<!-- /paperkit:raw -->" in proj_md)
-    proj_svg = paperkit.tests._fixture_project.project_text([paperkit.tests._fixture_model.entry("a", claim="a cited claim"),
-                             paperkit.tests._fixture_model.entry("p", claim="a figure", emit="fig.svg", frm="a", check="file:fig.svg")],
-                            assets={"fig.svg": "<svg/>\n"})
-    check("image asset renders as a markdown image, not a fenced block",
-          "![a figure](fig.svg)" in proj_svg and "```" not in proj_svg)
-    check("uncited placement passes by default but raises a postulate advisory",
-          rc_default == 0 and "postulate" in err_default)
+    check(
+        "as=table builds the markup from data (header + delimiter row)",
+        "| metric | value |" in proj_tab and "| --- | --- |" in proj_tab,
+    )
+    check(
+        "as=table escapes cells, so an asset cannot forge a citation or a pipe",
+        r"\[@forged\]" in proj_tab and r"1\|2" in proj_tab and "[@forged]" not in proj_tab,
+    )
+    check(
+        "a raw placement is bracketed, so cited_keys cannot read markers inside it",
+        "<!-- paperkit:raw -->" in proj_md and "<!-- /paperkit:raw -->" in proj_md,
+    )
+    proj_svg = paperkit.tests._fixture_project.project_text(
+        [
+            paperkit.tests._fixture_model.entry("a", claim="a cited claim"),
+            paperkit.tests._fixture_model.entry(
+                "p", claim="a figure", emit="fig.svg", frm="a", check="file:fig.svg"
+            ),
+        ],
+        assets={"fig.svg": "<svg/>\n"},
+    )
+    check(
+        "image asset renders as a markdown image, not a fenced block",
+        "![a figure](fig.svg)" in proj_svg and "```" not in proj_svg,
+    )
+    check(
+        "uncited placement passes by default but raises a postulate advisory",
+        rc_default == 0 and "postulate" in err_default,
+    )
 
     # Ζ·emit·fallback — a placement asset resolves against BOTH legitimate anchors: project_dir
     # (beside the warrants) FIRST, then out.parent (beside the output).  A project whose `out`
@@ -83,12 +113,14 @@ def main() -> int:
     # anchors holding it is AMBIGUOUS (the gate names it; the projector reads the first).
     root = Path(tempfile.mkdtemp())
     proj, docs = root / "proj", root / "docs"
-    proj.mkdir(); docs.mkdir()
-    OUT = {"project_dir": proj, "out": docs / "p.md"}     # out OUTSIDE the project (out.parent ≠ proj)
+    proj.mkdir()
+    docs.mkdir()
+    OUT = {"project_dir": proj, "out": docs / "p.md"}  # out OUTSIDE the project (out.parent ≠ proj)
     IN = {"project_dir": proj, "out": proj / "README.md"}  # in-repo — the two anchors coincide
-    (proj / "byw.tsv").write_text("by-warrants")           # only beside the warrants
-    (docs / "beo.tsv").write_text("beside-out")            # only beside the output (mirror)
-    (proj / "both.tsv").write_text("X"); (docs / "both.tsv").write_text("Y")   # at both (ambiguous)
+    (proj / "byw.tsv").write_text("by-warrants")  # only beside the warrants
+    (docs / "beo.tsv").write_text("beside-out")  # only beside the output (mirror)
+    (proj / "both.tsv").write_text("X")
+    (docs / "both.tsv").write_text("Y")  # at both (ambiguous)
     r_byw = paperkit.bib.emit_path(OUT, "byw.tsv") == proj / "byw.tsv"
     r_beo = paperkit.bib.emit_path(OUT, "beo.tsv") == docs / "beo.tsv"
     r_absent = paperkit.bib.emit_path(OUT, "nope.tsv") is None
@@ -96,34 +128,69 @@ def main() -> int:
     r_inrepo = len(paperkit.bib.emit_anchors(IN, "byw.tsv")) == 1
     shutil.rmtree(root, ignore_errors=True)
     check("emit·fallback: out-outside, asset beside the WARRANTS → resolves via project_dir", r_byw)
-    check("emit·fallback: the MIRROR layout, asset beside OUT → resolves via out.parent (629af60's break)", r_beo)
+    check(
+        "emit·fallback: the MIRROR layout, asset beside OUT → resolves via out.parent (629af60's break)",
+        r_beo,
+    )
     check("emit·fallback: at NEITHER anchor → ABSENT (None)", r_absent)
-    check("emit·fallback: at BOTH distinct anchors → AMBIGUOUS (2 anchors; the gate names it)", r_ambig)
+    check(
+        "emit·fallback: at BOTH distinct anchors → AMBIGUOUS (2 anchors; the gate names it)",
+        r_ambig,
+    )
     check("emit·fallback: in-repo (anchors coincide) → ONE hit, never ambiguous", r_inrepo)
     print()
 
     print("⟨P, F, δ⟩ minimum-delta pairs\n")
     pairs = [
-        ("postulate vs derived term (gate --safe)", "the claim field on the emit warrant",
-         "claim+emit → exit 0", paperkit.tests._fixture_gate.gate([C, P_CITE], "--safe", assets=SH)[0] == 0,
-         "emit only  → exit 1", paperkit.tests._fixture_gate.gate([C, P_POST], "--safe", assets=SH)[0] == 1),
-        ("--safe toggles the postulate (same uncited placement)", "the --safe flag",
-         "default → exit 0", paperkit.tests._fixture_gate.gate([C, P_POST], assets=SH)[0] == 0,
-         "--safe  → exit 1", paperkit.tests._fixture_gate.gate([C, P_POST], "--safe", assets=SH)[0] == 1),
-        ("fence inferred from the asset extension", "the emit target extension (.sh → .md)",
-         ".sh → ```sh fence", "```sh" in paperkit.tests._fixture_project.project_text([C, P_CITE], assets=SH),
-         ".md → raw, no fence", "```sh" not in paperkit.tests._fixture_project.project_text([C, P_MD], assets=MD)),
-        ("declared renderer overrides the suffix inference", "the as= field on the emit warrant",
-         "as=table → engine-built markup", "| --- | --- |" in paperkit.tests._fixture_project.project_text([C, P_TAB], assets=TAB),
-         "absent  → inferred, verbatim", "| --- | --- |" not in paperkit.tests._fixture_project.project_text([C, P_RAWTAB], assets=TAB)),
-        ("an asset can forge a citation only when it is NOT engine-rendered",
-         "the as= field on the same asset",
-         "as=table → escaped, inert", "[@forged]" not in paperkit.tests._fixture_project.project_text([C, P_TAB], assets=TAB),
-         "inferred → verbatim in prose", "[@forged]" in paperkit.tests._fixture_project.project_text([C, P_RAWTAB], assets=TAB)),
-        ("emit·fallback resolves against project_dir first, then out.parent (both layouts served)",
-         "which anchor holds the asset — the mirror layout 629af60 regressed",
-         "asset beside the warrants → project_dir", r_byw,
-         "asset beside the output   → out.parent", r_beo),
+        (
+            "postulate vs derived term (gate --safe)",
+            "the claim field on the emit warrant",
+            "claim+emit → exit 0",
+            paperkit.tests._fixture_gate.gate([C, P_CITE], "--safe", assets=SH)[0] == 0,
+            "emit only  → exit 1",
+            paperkit.tests._fixture_gate.gate([C, P_POST], "--safe", assets=SH)[0] == 1,
+        ),
+        (
+            "--safe toggles the postulate (same uncited placement)",
+            "the --safe flag",
+            "default → exit 0",
+            paperkit.tests._fixture_gate.gate([C, P_POST], assets=SH)[0] == 0,
+            "--safe  → exit 1",
+            paperkit.tests._fixture_gate.gate([C, P_POST], "--safe", assets=SH)[0] == 1,
+        ),
+        (
+            "fence inferred from the asset extension",
+            "the emit target extension (.sh → .md)",
+            ".sh → ```sh fence",
+            "```sh" in paperkit.tests._fixture_project.project_text([C, P_CITE], assets=SH),
+            ".md → raw, no fence",
+            "```sh" not in paperkit.tests._fixture_project.project_text([C, P_MD], assets=MD),
+        ),
+        (
+            "declared renderer overrides the suffix inference",
+            "the as= field on the emit warrant",
+            "as=table → engine-built markup",
+            "| --- | --- |" in paperkit.tests._fixture_project.project_text([C, P_TAB], assets=TAB),
+            "absent  → inferred, verbatim",
+            "| --- | --- |"
+            not in paperkit.tests._fixture_project.project_text([C, P_RAWTAB], assets=TAB),
+        ),
+        (
+            "an asset can forge a citation only when it is NOT engine-rendered",
+            "the as= field on the same asset",
+            "as=table → escaped, inert",
+            "[@forged]" not in paperkit.tests._fixture_project.project_text([C, P_TAB], assets=TAB),
+            "inferred → verbatim in prose",
+            "[@forged]" in paperkit.tests._fixture_project.project_text([C, P_RAWTAB], assets=TAB),
+        ),
+        (
+            "emit·fallback resolves against project_dir first, then out.parent (both layouts served)",
+            "which anchor holds the asset — the mirror layout 629af60 regressed",
+            "asset beside the warrants → project_dir",
+            r_byw,
+            "asset beside the output   → out.parent",
+            r_beo,
+        ),
     ]
     for name, axis, p_lbl, p_ok, f_lbl, f_ok in pairs:
         ok = p_ok and f_ok

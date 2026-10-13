@@ -24,6 +24,7 @@ Custom types come from paper.toml as `[checks.<type>] cmd = "... {target} ..."`,
 run from the project dir, exit 0 = pass.  `cmd:` is the universal escape hatch
 every check reduces to; the registry just gives recurring ones a name.
 """
+
 from __future__ import annotations
 
 import json
@@ -65,22 +66,58 @@ from typing import NoReturn
 # Ω·config — the knobs this module RESOLVES, declared here (place-by-ownership; the kernel
 # hosts the mechanism only).  JSON and ONLY are also resolved by discriminate — it references
 # gate's (the lowest common component in the DEPS lattice owns them).
-SAFE = paperkit.config.Param("safe", "PAPERKIT_SAFE", config="safe", flag=True,
-                    help="zero-postulate: an uncited placement FAILS the gate, not merely advises")
-WITHOUT_K = paperkit.config.Param("without-K", "PAPERKIT_WITHOUT_K", config="without_k", flag=True, aliases=("--without-k",),
-                         help="forbid two cited claims sharing a single witness")
-JOBS = paperkit.config.Param("jobs", "PAPERKIT_JOBS", config="jobs",
-                    help="gate worker count (default all cores; 1 = serial)")
-JSON = paperkit.config.Param("json", "PAPERKIT_JSON", flag=True,
-                    help="emit structured results to stdout (human lines suppressed)")
-ONLY = paperkit.config.Param("only", "PAPERKIT_ONLY",
-                    help="gate: resolve ONLY this one claim's check (the leaf of the recursive check target, Ζ·starlark) and exit")
-INVARIANTS = paperkit.config.Param("invariants", "PAPERKIT_INVARIANTS", flag=True,
-                          help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks")
+SAFE = paperkit.config.Param(
+    "safe",
+    "PAPERKIT_SAFE",
+    config="safe",
+    flag=True,
+    help="zero-postulate: an uncited placement FAILS the gate, not merely advises",
+)
+WITHOUT_K = paperkit.config.Param(
+    "without-K",
+    "PAPERKIT_WITHOUT_K",
+    config="without_k",
+    flag=True,
+    aliases=("--without-k",),
+    help="forbid two cited claims sharing a single witness",
+)
+JOBS = paperkit.config.Param(
+    "jobs", "PAPERKIT_JOBS", config="jobs", help="gate worker count (default all cores; 1 = serial)"
+)
+JSON = paperkit.config.Param(
+    "json",
+    "PAPERKIT_JSON",
+    flag=True,
+    help="emit structured results to stdout (human lines suppressed)",
+)
+ONLY = paperkit.config.Param(
+    "only",
+    "PAPERKIT_ONLY",
+    help="gate: resolve ONLY this one claim's check (the leaf of the recursive check target, Ζ·starlark) and exit",
+)
+INVARIANTS = paperkit.config.Param(
+    "invariants",
+    "PAPERKIT_INVARIANTS",
+    flag=True,
+    help="gate: verify only the whole-project invariants (PROJECT/COVERAGE/--without-K), not per-check resolution — the NODE of the recursive check, the leaves resolve the checks",
+)
 # The gate CLI's composed registry: exactly the Params its import cone hosts (own 6 +
 # project's + resolver's; bnd-config asserts this completeness).
-REGISTRY = [SAFE, WITHOUT_K, JOBS, JSON, ONLY, INVARIANTS, paperkit.project.TARGET, paperkit.project.GENRE, paperkit.project.GAMMA, paperkit.project.OBSERVE, paperkit.project.CHECK,
-            paperkit.checkenv.PATH, paperkit.checkenv.ENGINE_PATH]
+REGISTRY = [
+    SAFE,
+    WITHOUT_K,
+    JOBS,
+    JSON,
+    ONLY,
+    INVARIANTS,
+    paperkit.project.TARGET,
+    paperkit.project.GENRE,
+    paperkit.project.GAMMA,
+    paperkit.project.OBSERVE,
+    paperkit.project.CHECK,
+    paperkit.checkenv.PATH,
+    paperkit.checkenv.ENGINE_PATH,
+]
 
 
 def cited_keys(prose: str) -> set:
@@ -90,8 +127,7 @@ def cited_keys(prose: str) -> set:
     # A `raw` placement is document syntax the engine did not construct, so it can
     # forge the same markers.  The projector brackets it (project.RAW_OPEN/CLOSE)
     # precisely so the shield fencing already gives code extends to it.
-    prose = re.sub(r"<!-- paperkit:raw -->.*?<!-- /paperkit:raw -->", "",
-                   prose, flags=re.S)
+    prose = re.sub(r"<!-- paperkit:raw -->.*?<!-- /paperkit:raw -->", "", prose, flags=re.S)
     # A citation materializes as a pandoc/web [@key] OR a footnote-target [^key] marker
     # (its document-end [^key]: definition names the same key) — count both as cited.
     #
@@ -110,15 +146,18 @@ def cited_keys(prose: str) -> set:
     # stripped: a citation at a clause boundary ("[@f/A]/") must not bind the separator, and a
     # key with an empty last segment is not a key the walk can resolve anyway.  INTERIOR `/`
     # is kept — that is the parameter axis itself.
-    return ({k.rstrip("/") for k in re.findall(r"@([A-Za-z0-9][\w.:/-]*)", prose)}
-            | set(re.findall(r"\[\^([A-Za-z0-9][\w.:/-]*)\]", prose)))
+    return {k.rstrip("/") for k in re.findall(r"@([A-Za-z0-9][\w.:/-]*)", prose)} | set(
+        re.findall(r"\[\^([A-Za-z0-9][\w.:/-]*)\]", prose)
+    )
 
 
 def main(argv: list) -> int:
-    paperkit.config.apply_args(argv, REGISTRY)     # Ω·config: capture args (arg overrides env), process-local
+    paperkit.config.apply_args(
+        argv, REGISTRY
+    )  # Ω·config: capture args (arg overrides env), process-local
     pos = paperkit.config.positionals(argv, REGISTRY)
     project_dir = Path(pos[0]).resolve() if pos else Path.cwd()
-    as_json = paperkit.config.resolve(JSON)                   # structured stdout (human lines suppressed)
+    as_json = paperkit.config.resolve(JSON)  # structured stdout (human lines suppressed)
 
     # Ζ·gate·exit — CANNOT RUN is not RAN-AND-FAILED.  The boundary is not "did tomllib raise" but
     # "does the config ASSEMBLE INTO A GATEABLE PROJECT": no paper.toml, malformed TOML, no [paper]
@@ -134,24 +173,30 @@ def main(argv: list) -> int:
             print(json.dumps({"available": False, "reason": reason, "pass": False}, indent=2))
         print(f"paperkit-gate: CANNOT RUN — {reason}", file=sys.stderr)
         return _REFUSE
+
     ptoml = project_dir / "paper.toml"
     try:
         raw = tomllib.loads(ptoml.read_text())
     except (FileNotFoundError, tomllib.TOMLDecodeError) as e:
         return cannot_run(f"no or unloadable paper.toml at {project_dir} ({e})")
     if "paper" not in raw:
-        return cannot_run(f"paper.toml at {project_dir} has no [paper] table — not a gateable project")
-    pol, custom = raw.get("paper", {}), raw.get("checks", {})   # project policy + custom check types
-    safe = paperkit.config.resolve(SAFE, pol)                 # zero-postulate: uncited placements FAIL
-    without_k = paperkit.config.resolve(WITHOUT_K, pol)       # forbid two cited claims sharing a witness
-    inv_only = paperkit.config.resolve(INVARIANTS)            # Ζ·starlark: the invariants NODE (no per-check resolve)
+        return cannot_run(
+            f"paper.toml at {project_dir} has no [paper] table — not a gateable project"
+        )
+    pol, custom = raw.get("paper", {}), raw.get("checks", {})  # project policy + custom check types
+    safe = paperkit.config.resolve(SAFE, pol)  # zero-postulate: uncited placements FAIL
+    without_k = paperkit.config.resolve(WITHOUT_K, pol)  # forbid two cited claims sharing a witness
+    inv_only = paperkit.config.resolve(
+        INVARIANTS
+    )  # Ζ·starlark: the invariants NODE (no per-check resolve)
     # The bib IS the makefile: a project's distinct checks are independent targets, so the gate
     # runs them concurrently (default = all cores; jobs=1 forces serial).
     jobs = int(paperkit.config.resolve(JOBS) or (os.cpu_count() or 4))
 
-    def info(msg) -> None:              # human success lines — suppressed under --json
+    def info(msg) -> None:  # human success lines — suppressed under --json
         if not as_json:
             print(msg)
+
     cfg = paperkit.bib.load_config(project_dir)
     # A declared INPUT that does not exist means the config cannot assemble a gateable project — the
     # gate CANNOT RUN, not "ran and failed" (Ζ·gate·exit): warrants naming a missing .bib, or a
@@ -179,8 +224,17 @@ def main(argv: list) -> int:
             # empty stdout and could not tell refuse from pass.  That silence is why result: could
             # not delegate per-warrant: the address existed, the ANSWER did not.
             if as_json:
-                print(json.dumps({"available": False, "reason": f"no check for claim {only!r}",
-                                  "pass": False, "only": only}, indent=2))
+                print(
+                    json.dumps(
+                        {
+                            "available": False,
+                            "reason": f"no check for claim {only!r}",
+                            "pass": False,
+                            "only": only,
+                        },
+                        indent=2,
+                    )
+                )
             print(f"paperkit-gate: no check for claim {only!r}", file=sys.stderr)
             return _REFUSE
         v = paperkit.resolver.resolves(F[only]["check"], project_dir, custom)
@@ -188,10 +242,20 @@ def main(argv: list) -> int:
         # check that could not be EVALUATED is not a refutation of the claim.  Collapsing
         # unresolvable to FAIL here would make an unreachable sibling look like a failing one.
         if as_json:
-            print(json.dumps({"available": not v.is_unavailable(), "pass": bool(v.passed),
-                              "only": only, "check": F[only]["check"],
-                              "reason": None if not v.is_unavailable() else (v.why or "check unresolvable")},
-                             indent=2))
+            print(
+                json.dumps(
+                    {
+                        "available": not v.is_unavailable(),
+                        "pass": bool(v.passed),
+                        "only": only,
+                        "check": F[only]["check"],
+                        "reason": None
+                        if not v.is_unavailable()
+                        else (v.why or "check unresolvable"),
+                    },
+                    indent=2,
+                )
+            )
         info(f"paperkit-gate: {only} {'ok' if v.passed else 'FAIL'} — {F[only]['check']}")
         if v.is_unavailable():
             return _REFUSE
@@ -214,7 +278,10 @@ def main(argv: list) -> int:
     # PROJECT — committed prose is the projection (for the project's declared render target)
     proj_ok = prose == paperkit.project.project(cfg, target)
     if not proj_ok:
-        print(f"paperkit-gate: {out.name} ≠ projection — regenerate (paperkit-project)", file=sys.stderr)
+        print(
+            f"paperkit-gate: {out.name} ≠ projection — regenerate (paperkit-project)",
+            file=sys.stderr,
+        )
         rc = 1
     else:
         info(f"paperkit-gate: {out.name} ≡ projection")
@@ -229,13 +296,18 @@ def main(argv: list) -> int:
     # asserting that a projected claim said anything.  A section-tagged prose claim with neither
     # `claim` nor `title` would render as its key; refuse it.  An emit PLACEMENT projects a BLOCK
     # (not a sentence) and a reference carries a title, so both are exempt by construction.
-    mute = sorted(k for k, f in F.items()
-                  if f.get("section") and not f.get("emit")
-                  and not f.get("claim") and not f.get("title"))
+    mute = sorted(
+        k
+        for k, f in F.items()
+        if f.get("section") and not f.get("emit") and not f.get("claim") and not f.get("title")
+    )
     if mute:
-        print(f"paperkit-gate: {len(mute)} claim(s) would project as their bare KEY, carrying no "
-              f"prose — {mute} — a claim projected into prose must SAY something (a dropped `claim`, "
-              f"likely a closing brace that lands a field late)", file=sys.stderr)
+        print(
+            f"paperkit-gate: {len(mute)} claim(s) would project as their bare KEY, carrying no "
+            f"prose — {mute} — a claim projected into prose must SAY something (a dropped `claim`, "
+            f"likely a closing brace that lands a field late)",
+            file=sys.stderr,
+        )
         rc = 1
 
     # RESOLVE — every cited claim's check passes; references at least defined.
@@ -266,7 +338,9 @@ def main(argv: list) -> int:
         distinct = sorted({F[k]["check"] for k in to_verify})
 
         def resolve1(c: str):
-            return paperkit.resolver.resolves(c, project_dir, custom)   # the Verdict — bad/unresolvable split below
+            return paperkit.resolver.resolves(
+                c, project_dir, custom
+            )  # the Verdict — bad/unresolvable split below
 
         if len(distinct) > 1 and jobs > 1:
             with ThreadPoolExecutor(max_workers=max(1, jobs)) as ex:
@@ -284,16 +358,21 @@ def main(argv: list) -> int:
         # delegate's reason is a distinct object, and `is UNAVAILABLE` would file it under `bad`,
         # turning "I could not check this" back into "the claim is false" — the exact conflation
         # the tristate exists to prevent.
-        bad = sorted(k for k in to_verify if not cache[F[k]["check"]].passed
-                     and not cache[F[k]["check"]].is_unavailable())
+        bad = sorted(
+            k
+            for k in to_verify
+            if not cache[F[k]["check"]].passed and not cache[F[k]["check"]].is_unavailable()
+        )
         unresolvable = sorted(k for k in to_verify if cache[F[k]["check"]].is_unavailable())
     if undefined:
         print(f"paperkit-gate: undefined citations: {', '.join(undefined)}", file=sys.stderr)
         rc = 1
     if dangling:
         for k, y in sorted(dangling):
-            print(f"paperkit-gate: dangling rests-on: [@{k}] rests on undefined [@{y}]",
-                  file=sys.stderr)
+            print(
+                f"paperkit-gate: dangling rests-on: [@{k}] rests on undefined [@{y}]",
+                file=sys.stderr,
+            )
         rc = 1
     if bad:
         for k in bad:
@@ -308,15 +387,25 @@ def main(argv: list) -> int:
             # Report the incomplete Π, not the sum: name WHO could not run and WHAT is missing,
             # so the reader is pointed at the fix.  The disjunction this replaced ("unreachable
             # delegate or unknown verb") named everything it might have been and nothing it was.
-            why = (f"{v.owner}: {v.why}" if v.owner and v.why else
-                   v.why or "unreachable delegate or unknown verb")
-            print(f"paperkit-gate: check UNRESOLVABLE for [@{k}]: {F[k]['check']} — {why}; "
-                  "NOT a refutation", file=sys.stderr)
+            why = (
+                f"{v.owner}: {v.why}"
+                if v.owner and v.why
+                else v.why or "unreachable delegate or unknown verb"
+            )
+            print(
+                f"paperkit-gate: check UNRESOLVABLE for [@{k}]: {F[k]['check']} — {why}; "
+                "NOT a refutation",
+                file=sys.stderr,
+            )
         rc = 1
     if inv_only:
-        info(f"paperkit-gate: invariants node — {len(to_verify)} claim check(s) deferred to the leaf targets")
+        info(
+            f"paperkit-gate: invariants node — {len(to_verify)} claim check(s) deferred to the leaf targets"
+        )
     elif not undefined and not bad and not unresolvable and not dangling:
-        info(f"paperkit-gate: {len(to_verify)} cited/placed/grounded claim(s) all resolve to passing checks")
+        info(
+            f"paperkit-gate: {len(to_verify)} cited/placed/grounded claim(s) all resolve to passing checks"
+        )
 
     # WITHOUT-K — proof-relevance.  The gate reduces each check to a boolean, so it
     # silently identifies distinct cited claims that share one witness (Axiom K /
@@ -329,12 +418,17 @@ def main(argv: list) -> int:
     if without_k:
         if collapses:
             for c, ks in sorted(collapses.items()):
-                print(f"paperkit-gate: --without-K — {len(ks)} cited claims collapse onto "
-                      f"one witness {c}: {', '.join(ks)}", file=sys.stderr)
+                print(
+                    f"paperkit-gate: --without-K — {len(ks)} cited claims collapse onto "
+                    f"one witness {c}: {', '.join(ks)}",
+                    file=sys.stderr,
+                )
             rc = 1
         else:
-            info(f"paperkit-gate: --without-K — {len(cited & warrants)} cited claim(s) "
-                 f"each carry a distinct witness")
+            info(
+                f"paperkit-gate: --without-K — {len(cited & warrants)} cited claim(s) "
+                f"each carry a distinct witness"
+            )
 
     # COVERAGE — sections present, section-tagged claims cited
     headings = "\n".join(ln for ln in prose.splitlines() if ln.startswith("## "))
@@ -361,15 +455,22 @@ def main(argv: list) -> int:
             continue
         hits = paperkit.bib.emit_anchors(cfg, f["emit"])
         if not hits:
-            gaps.append(f"placement [@{k}] emits {f['emit']} — the artifact is ABSENT, so the "
-                        f"document renders a placeholder comment where the evidence should be")
+            gaps.append(
+                f"placement [@{k}] emits {f['emit']} — the artifact is ABSENT, so the "
+                f"document renders a placeholder comment where the evidence should be"
+            )
         elif len(hits) > 1:
             differ = len({p.read_bytes() for p in hits}) > 1
-            detail = ("DIFFERENT content — the projector reads the first, the second is silently "
-                      "ignored" if differ else "identical content, but the layout is ambiguous")
-            gaps.append(f"placement [@{k}] emits {f['emit']} — AMBIGUOUS: it resolves at BOTH "
-                        f"{' and '.join(str(p) for p in hits)} ({detail}); keep the asset at ONE "
-                        f"anchor (beside the warrants OR beside the output, not both)")
+            detail = (
+                "DIFFERENT content — the projector reads the first, the second is silently ignored"
+                if differ
+                else "identical content, but the layout is ambiguous"
+            )
+            gaps.append(
+                f"placement [@{k}] emits {f['emit']} — AMBIGUOUS: it resolves at BOTH "
+                f"{' and '.join(str(p) for p in hits)} ({detail}); keep the asset at ONE "
+                f"anchor (beside the warrants OR beside the output, not both)"
+            )
     for k, f in F.items():
         if f.get("section") and k not in cited:
             if paperkit.bib.is_placed(f):
@@ -377,8 +478,10 @@ def main(argv: list) -> int:
                 # no claim citing it — present and load-bearing, but outside the
                 # checked claim-DAG.  Tolerated by default (advisory); under --safe
                 # it fails, exactly as `agda --safe` rejects postulates.
-                msg = (f"uncited placement [@{k}] (section={f['section']}) — a postulate: "
-                       f"a block no claim cites; prefer an example the prose cites")
+                msg = (
+                    f"uncited placement [@{k}] (section={f['section']}) — a postulate: "
+                    f"a block no claim cites; prefer an example the prose cites"
+                )
                 (gaps if safe else advisories).append(msg)
             else:
                 gaps.append(f"claim [@{k}] tagged section={f['section']} but not cited")
@@ -393,17 +496,30 @@ def main(argv: list) -> int:
         print(f"paperkit-gate: advisory — {a}", file=sys.stderr)
 
     if as_json:
-        print(json.dumps({
-            "available": True,
-            "document": out.name, "pass": rc == 0, "project_ok": proj_ok,
-            "verified": len(to_verify), "undefined": undefined, "bad": bad,
-            "unresolvable": unresolvable,             # ask-result-tristate: could-not-evaluate ≠ failed
-            "dangling": sorted(list(e) for e in dangling),
-            "sections": secs, "gaps": gaps,
-            "postulates": sorted(k for k, f in F.items()
-                                 if f.get("section") and k not in cited and paperkit.bib.is_placed(f)),
-            "collapses": collapses,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "available": True,
+                    "document": out.name,
+                    "pass": rc == 0,
+                    "project_ok": proj_ok,
+                    "verified": len(to_verify),
+                    "undefined": undefined,
+                    "bad": bad,
+                    "unresolvable": unresolvable,  # ask-result-tristate: could-not-evaluate ≠ failed
+                    "dangling": sorted(list(e) for e in dangling),
+                    "sections": secs,
+                    "gaps": gaps,
+                    "postulates": sorted(
+                        k
+                        for k, f in F.items()
+                        if f.get("section") and k not in cited and paperkit.bib.is_placed(f)
+                    ),
+                    "collapses": collapses,
+                },
+                indent=2,
+            )
+        )
     print("paperkit-gate: PASS" if rc == 0 else "paperkit-gate: FAIL", file=sys.stderr)
     return rc
 

@@ -35,6 +35,7 @@ runtime and SKIPS LOUD (never skip-green) if none is found.
 `export_pdfua(src, out, timeout=900) -> Path|None` is the API; None means no uno-capable python, or
 the bridge was killed at the deadline — a loud absence, never a stale pass.
 """
+
 from __future__ import annotations
 
 import os
@@ -133,18 +134,24 @@ def _uno_python() -> str | None:
     """A python interpreter that can `import uno` (system python, LibreOffice's), or None — probed,
     not assumed.  The mise interpreter running the checks cannot import uno on this host.
     """
-    env = {**os.environ,
-           "URE_BOOTSTRAP": f"file://{_LO}/fundamentalrc",
-           "PYTHONPATH": f"{_LO}:/usr/lib/python3/dist-packages",
-           "LD_LIBRARY_PATH": _LO}
+    env = {
+        **os.environ,
+        "URE_BOOTSTRAP": f"file://{_LO}/fundamentalrc",
+        "PYTHONPATH": f"{_LO}:/usr/lib/python3/dist-packages",
+        "LD_LIBRARY_PATH": _LO,
+    }
     # Ζ·render·hermetic — the executor image carries The Document Foundation's build, whose pyuno
     # is compiled against its BUNDLED interpreter (program/python), not the system one; a Debian
     # build answers from /usr/bin/python3 via python3-uno.  Try the bundled one first: it is
     # right whenever it exists, and absent on a Debian install.
     for cand in (f"{_LO}/python", "/usr/bin/python3", "python3"):
         try:
-            if subprocess.run([cand, "-c", "import uno"], env=env,
-                              capture_output=True, timeout=20).returncode == 0:
+            if (
+                subprocess.run(
+                    [cand, "-c", "import uno"], env=env, capture_output=True, timeout=20
+                ).returncode
+                == 0
+            ):
                 return cand
         except Exception:
             continue
@@ -166,8 +173,8 @@ def _uno_python() -> str | None:
 # the refuted construction back in as the subject: N would have to exceed the budget, so the arm
 # would once again depend on two durations comparing a particular way.
 _HANG_DRIVER = _DRIVER.replace(
-    "    doc.storeToURL(",
-    "    import threading; threading.Event().wait()\n    doc.storeToURL(", 1)
+    "    doc.storeToURL(", "    import threading; threading.Event().wait()\n    doc.storeToURL(", 1
+)
 
 
 def _export_via(driver: str, src: Path, out: Path, timeout: int) -> Path | None:
@@ -180,23 +187,36 @@ def _export_via(driver: str, src: Path, out: Path, timeout: int) -> Path | None:
     """
     py = _uno_python()
     if py is None:
-        print(f"lo-export: no uno-capable python found (looked at {_LO}/python, /usr/bin/python3) — "
-              "cannot drive the tagged-PDF export; refusing to skip-green", file=sys.stderr)
+        print(
+            f"lo-export: no uno-capable python found (looked at {_LO}/python, /usr/bin/python3) — "
+            "cannot drive the tagged-PDF export; refusing to skip-green",
+            file=sys.stderr,
+        )
         return None
-    env = {**os.environ,
-           "URE_BOOTSTRAP": f"file://{_LO}/fundamentalrc",
-           "PYTHONPATH": f"{_LO}:/usr/lib/python3/dist-packages",
-           "LD_LIBRARY_PATH": _LO}
-    out.unlink(missing_ok=True)                                # unlink-first (Ρ·render·provenance)
+    env = {
+        **os.environ,
+        "URE_BOOTSTRAP": f"file://{_LO}/fundamentalrc",
+        "PYTHONPATH": f"{_LO}:/usr/lib/python3/dist-packages",
+        "LD_LIBRARY_PATH": _LO,
+    }
+    out.unlink(missing_ok=True)  # unlink-first (Ρ·render·provenance)
     try:
-        subprocess.run([py, "-c", driver, str(src), str(out), str(timeout)],
-                       env=env, timeout=timeout + 30, start_new_session=True, check=True)
+        subprocess.run(
+            [py, "-c", driver, str(src), str(out), str(timeout)],
+            env=env,
+            timeout=timeout + 30,
+            start_new_session=True,
+            check=True,
+        )
     except subprocess.TimeoutExpired:
         # ⚑ The message is the LOUDNESS the claim promises, and the F arm asserts it: a silent kill
         # would satisfy a termination-only check while refuting "a LOUD bounded failure".
-        print("lo-export: the bridge did not complete within its budget — killed "
-              "(a hang is a LOUD failure, never a silent stall)", file=sys.stderr)
-        out.unlink(missing_ok=True)                            # no partial artifact survives a kill
+        print(
+            "lo-export: the bridge did not complete within its budget — killed "
+            "(a hang is a LOUD failure, never a silent stall)",
+            file=sys.stderr,
+        )
+        out.unlink(missing_ok=True)  # no partial artifact survives a kill
         return None
     except subprocess.CalledProcessError:
         return None
@@ -227,11 +247,14 @@ def _selftest() -> int:
         print(f"  {'ok ' if cond else 'XX '}{desc}")
 
     if _uno_python() is None:
-        print("  -- uno-capable python not found on this host; bridge cannot be exercised.\n"
-              "     LO-EXPORT SELFTEST: SKIP (loud) — the method is present but unrunnable here")
+        print(
+            "  -- uno-capable python not found on this host; bridge cannot be exercised.\n"
+            "     LO-EXPORT SELFTEST: SKIP (loud) — the method is present but unrunnable here"
+        )
         return 0
 
     import re
+
     with tempfile.TemporaryDirectory() as d:
         dd = Path(d)
         md, docx = dd / "toc.md", dd / "toc.docx"
@@ -246,8 +269,10 @@ def _selftest() -> int:
         if got is not None and p_out.exists():
             info = subprocess.run(["pdfinfo", str(p_out)], capture_output=True, text=True).stdout
             tagged = bool(re.search(r"Tagged:\s+yes", info))
-        check("P: the bridge exports a Tagged PDF from a docx (UA export path)",
-              got is not None and tagged)
+        check(
+            "P: the bridge exports a Tagged PDF from a docx (UA export path)",
+            got is not None and tagged,
+        )
 
         # ⚑ Ζ·lo·unsound — THE F ARM NO LONGER RACES A DURATION, AND THAT LADDER IS CLOSED.
         #
@@ -289,16 +314,21 @@ def _selftest() -> int:
             killed = _export_via(_HANG_DRIVER, docx, f_out, timeout=5)
         said = cap.getvalue()
         print(said, end="")
-        check("F: a bridge that connects and never completes is killed → None (no duration raced "
-              "against another — the subject cannot finish at any budget)",
-              killed is None)
-        check("F: the kill is LOUD — the bridge reports it rather than stalling silently",
-              "killed" in said)
-        check("F: no partial artifact is left behind (never a stale pass)",
-              not f_out.exists())
-        check("δ: whether the subject CAN finish — a real export is Tagged, one that cannot "
-              "complete is killed and reported",
-              got is not None and tagged and killed is None and "killed" in said)
+        check(
+            "F: a bridge that connects and never completes is killed → None (no duration raced "
+            "against another — the subject cannot finish at any budget)",
+            killed is None,
+        )
+        check(
+            "F: the kill is LOUD — the bridge reports it rather than stalling silently",
+            "killed" in said,
+        )
+        check("F: no partial artifact is left behind (never a stale pass)", not f_out.exists())
+        check(
+            "δ: whether the subject CAN finish — a real export is Tagged, one that cannot "
+            "complete is killed and reported",
+            got is not None and tagged and killed is None and "killed" in said,
+        )
 
     if fails:
         print(f"LO-EXPORT SELFTEST: FAIL ({len(fails)})")
@@ -322,7 +352,9 @@ def main(argv: list[str]) -> int:
     if got is None:
         print("lo-export: FAIL — no tagged PDF produced (unavailable or killed)", file=sys.stderr)
         return 1
-    print(f"lo-export: ok — exported {out} as a tagged PDF/UA over the office bridge, indexes refreshed")
+    print(
+        f"lo-export: ok — exported {out} as a tagged PDF/UA over the office bridge, indexes refreshed"
+    )
     return 0
 
 

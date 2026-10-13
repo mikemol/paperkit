@@ -17,6 +17,7 @@ THE OWNERS, one per claim:
   wired projects       → MODULE.bazel bib.project (the wiring `hook_grid.py` gates)
   the two pk_grade     → tools/grade.bzl, tools/calc.bzl (§3.6, still TRUE)
 """
+
 import re
 import sys
 from pathlib import Path
@@ -26,14 +27,22 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def _components():
     ns: dict = {}
-    exec(compile((ROOT / "paperkit" / "components.bzl").read_text(),   # noqa: S102 — a data file
-                 "components.bzl", "exec"), ns)
+    exec(
+        compile(
+            (ROOT / "paperkit" / "components.bzl").read_text(),  # noqa: S102 — a data file
+            "components.bzl",
+            "exec",
+        ),
+        ns,
+    )
     return ns["COMPONENTS"], ns.get("DEPS", {})
 
 
 def _wired():
-    return re.findall(r'bib\.project\(\s*name\s*=\s*"([^"]+)"[^)]*?project\s*=\s*"([^"]+)"',
-                      (ROOT / "MODULE.bazel").read_text())
+    return re.findall(
+        r'bib\.project\(\s*name\s*=\s*"([^"]+)"[^)]*?project\s*=\s*"([^"]+)"',
+        (ROOT / "MODULE.bazel").read_text(),
+    )
 
 
 def arch_components():
@@ -43,8 +52,10 @@ def arch_components():
     assert set(deps) == set(comps), "DEPS and COMPONENTS name different sets"
 
 
-_ONES = ("ZERO ONE TWO THREE FOUR FIVE SIX SEVEN EIGHT NINE TEN ELEVEN TWELVE THIRTEEN FOURTEEN "
-         "FIFTEEN SIXTEEN SEVENTEEN EIGHTEEN NINETEEN").split()
+_ONES = (
+    "ZERO ONE TWO THREE FOUR FIVE SIX SEVEN EIGHT NINE TEN ELEVEN TWELVE THIRTEEN FOURTEEN "
+    "FIFTEEN SIXTEEN SEVENTEEN EIGHTEEN NINETEEN"
+).split()
 _TENS = "TWENTY THIRTY FORTY FIFTY SIXTY SEVENTY EIGHTY NINETY".split()
 
 
@@ -73,7 +84,8 @@ def arch_modules():
     assert _spelled(stated.group(1)) == len(non_test), (
         f"the engine has {len(non_test)} non-test modules, the claim says {stated.group(1)} — "
         f"update the claim's prose, and note that this count is NOT the component count "
-        f"({len(comps)})")
+        f"({len(comps)})"
+    )
 
 
 def arch_projects():
@@ -97,16 +109,21 @@ def arch_projects():
     for name, proj in wired:
         assert proj == "." or (ROOT / proj / "paper.toml").exists(), (
             f"MODULE.bazel wires {name!r} at {proj!r}, which carries no paper.toml — the wiring "
-            f"names a project that is not there")
+            f"names a project that is not there"
+        )
 
 
 def arch_two_pk_grade():
     # §3.6's second bullet, still TRUE (verified 2026-09-10): two rules share one name.
-    hits = [f for f in ("grade.bzl", "calc.bzl")
-            if re.search(r'^pk_grade = rule\(', (ROOT / "tools" / f).read_text(), re.M)]
+    hits = [
+        f
+        for f in ("grade.bzl", "calc.bzl")
+        if re.search(r"^pk_grade = rule\(", (ROOT / "tools" / f).read_text(), re.M)
+    ]
     assert hits == ["grade.bzl", "calc.bzl"], (
         f"the two `pk_grade` rules §3.6 records are now {hits} — if one was removed the tension is "
-        f"RESOLVED and the bullet should go, not be relaxed")
+        f"RESOLVED and the bullet should go, not be relaxed"
+    )
 
 
 def arch_tension_report_scope():
@@ -117,6 +134,7 @@ def arch_tension_report_scope():
     # SILENTLY is the defect claims exist to prevent — so the retirement is gated, not narrated.
     sys.path.insert(0, str(ROOT / "report"))
     import gen
+
     docs = {n for n, _ in gen._all_docs()}
     assert len(docs) >= 11, f"the report census covers {len(docs)} documents, not >= 11"
     for name in ("render", "config", "image", "setup"):
@@ -137,12 +155,14 @@ def arch_tension_two_tiers():
     # is the tier declaration in MODULE.bazel, read through gen, never a list written here.
     sys.path.insert(0, str(ROOT / "report"))
     import gen
+
     ondemand, local, hook = gen._ondemand_names(), gen._local_names(), gen._hook_names()
     docs = {n for n, _ in gen._all_docs()}
     stray = sorted(ondemand - local)
     assert not stray, (
-        f"{stray} are on-demand without being declared tier = \"local\" — a reproducible document "
-        f"has left //:hook, which is the two-tier tension returning")
+        f'{stray} are on-demand without being declared tier = "local" — a reproducible document '
+        f"has left //:hook, which is the two-tier tension returning"
+    )
     missed = sorted(d for d in docs - local if d not in hook)
     assert not missed, f"{missed} are not host-coupled yet //:hook does not exercise them"
     assert "render" in hook, "render left //:hook — the tension has returned"

@@ -7,14 +7,19 @@ NEVER rechecks the source — so the artifact is reproducible (no mtime ⇒ byte
 and authoritative (the build graph owns compilation; a mutated .pyc over an unchanged .py runs the
 mutation).  Usage: pyc.py <src.py> <out.pyc>.
 """
+
 import py_compile
 import sys
 
 
 def main(argv) -> int:
     src, out = argv
-    py_compile.compile(src, cfile=out, doraise=True,
-                       invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+    py_compile.compile(
+        src,
+        cfile=out,
+        doraise=True,
+        invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH,
+    )
     return 0
 
 

@@ -16,15 +16,27 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXTERNAL = ("pandoc", "libreoffice", "podman", "systemd-run",
-            "pdftotext", "pdftoppm", "pdfinfo", "pdffonts", "pdfimages", "tesseract")
-ONDEMAND = ("image", "render", "setup")     # non-reproducible (external toolchain / host-coupled)
-REPRODUCIBLE = ("paper", "boundaries", "config")   # sandbox-clean (README's checks are pure too)
+EXTERNAL = (
+    "pandoc",
+    "libreoffice",
+    "podman",
+    "systemd-run",
+    "pdftotext",
+    "pdftoppm",
+    "pdfinfo",
+    "pdffonts",
+    "pdfimages",
+    "tesseract",
+)
+ONDEMAND = ("image", "render", "setup")  # non-reproducible (external toolchain / host-coupled)
+REPRODUCIBLE = ("paper", "boundaries", "config")  # sandbox-clean (README's checks are pure too)
 
 
 def _checktext(proj: str) -> str:
     d = ROOT / proj
-    return "\n".join(p.read_text() for p in sorted(d.rglob("*.sh")) + sorted(d.rglob("*.py")) if p.is_file())
+    return "\n".join(
+        p.read_text() for p in sorted(d.rglob("*.sh")) + sorted(d.rglob("*.py")) if p.is_file()
+    )
 
 
 def _tools(proj: str):
@@ -36,15 +48,23 @@ def main() -> int:
     # CHARACTERIZE the boundary per document, and assert it in both directions.
     found = {p: _tools(p) for p in ONDEMAND}
     clean = [p for p, ts in found.items() if not ts]
-    assert not clean, \
+    assert not clean, (
         f"on-demand documents must invoke an external toolchain (the source of their non-reproducibility): {clean}"
+    )
     leaky = [p for p in REPRODUCIBLE if _tools(p)]
-    assert not leaky, \
+    assert not leaky, (
         f"a reproducibly-gated document's checks invoke an external toolchain, so its gate is NOT deterministic: {leaky}"
-    print("reproducibility boundary verified — the on-demand documents' variance is reproducible on demand:")
-    for p in ONDEMAND:                    # the exact external commands behind each non-reproducible verdict
-        print(f"  {p}: shells {', '.join(found[p])} → verdict varies with build-cache/network state")
-    print(f"  the sandbox-clean set ({', '.join(REPRODUCIBLE)}, README) shells none → gated deterministically, run above")
+    )
+    print(
+        "reproducibility boundary verified — the on-demand documents' variance is reproducible on demand:"
+    )
+    for p in ONDEMAND:  # the exact external commands behind each non-reproducible verdict
+        print(
+            f"  {p}: shells {', '.join(found[p])} → verdict varies with build-cache/network state"
+        )
+    print(
+        f"  the sandbox-clean set ({', '.join(REPRODUCIBLE)}, README) shells none → gated deterministically, run above"
+    )
     return 0
 
 

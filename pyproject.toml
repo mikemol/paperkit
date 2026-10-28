@@ -277,6 +277,16 @@ ignore = [
 # (spawn_declared, run_argv_*, run_shell_text, run_capped), so the relief sits on that one
 # responsibility and resolver.py, which used to spawn for itself, carries none of it.
 "paperkit/checkenv.py" = ["S602", "S603", "PLW1509"]
+# ⚑ TRANSITIONAL, AND DECLARED (paperkit:W461).  PLR0913 (too many arguments) is held for
+# grader.py ALONE because two of its PUBLIC functions are wide by a stable contract their callers
+# cannot yet change: `sensitivity` (6) and `grade_check` (8) take the sweep's context (engine dir,
+# read footprint, sandbox root) as arguments, and their callers (paper/checks/claims.py,
+# paperkit/library/concepts.py and five boundary suites) are themselves behind the per-file gate.
+# Positional arity is already cut to the callers' (PLR0917 passes: the extras are keyword-only), and
+# the internal helpers take one `_Subject` instead of repeating the triple.  REMOVE THIS ENTRY when
+# those callers are cleaned and repointed onto a context argument; it is a bar with a date, not a
+# category.
+"paperkit/grader.py" = ["PLR0913"]
 "paperkit/gate.py" = ["T201"]
 "paperkit/project.py" = ["T201"]
 "paperkit/discriminate.py" = ["T201"]

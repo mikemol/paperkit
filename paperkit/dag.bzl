@@ -15,7 +15,7 @@ IMPORTS = {
     "footdeps.py": ["bib.py", "resolver.py"],
     "gate.py": ["bib.py", "checkenv.py", "config.py", "project.py", "resolver.py"],
     "genre.py": ["checkenv.py", "resolver.py"],
-    "grader.py": ["config.py", "layout.py", "mutate.py", "resolver.py"],
+    "grader.py": ["config.py", "layout.py", "resolver.py"],
     "layout.py": ["config.py"],
     "project.py": ["bib.py", "checkenv.py", "config.py", "genre.py", "resolver.py", "rhetoric.py"],
     "resolver.py": ["checkenv.py"],

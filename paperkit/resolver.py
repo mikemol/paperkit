@@ -910,3 +910,10 @@ def footprint(
         return parse_reads(trace.read_text(errors="replace"), project_dir, scope)
     finally:
         trace.unlink(missing_ok=True)
+
+
+# Public spellings of the resolution seams other modules and suites ask about — the underscore
+# names stay for the in-module callers; these are the surface a consumer may name.
+LIBRARY = _LIBRARY
+library_for = _library_for
+check_cmd = _check_cmd

@@ -50,8 +50,8 @@ authors = [{name = "Mike Mol"}]
 # (mikemol-repin moves them together), and it requires Python >= 3.13, which the engine now does too.
 # W310 added the grade ladder (mikemol.grade, replacing paperkit/grade.py) as the second.
 dependencies = [
-    "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=atomicwrite",
-    "mikemol-grade @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=grade",
+    "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=atomicwrite",
+    "mikemol-grade @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=grade",
 ]
 
 # ⚑ Ζ·render·pydeps — RENDER'S DEPS ARE OPTIONAL, NOT ENGINE DEPS.  `dependencies = []` above is
@@ -268,14 +268,15 @@ ignore = [
 # reporting a verdict, a projector reporting what it wrote), and a SELFTEST arm printing its
 # ⟨P, F, δ⟩ record.  Library modules are NOT on this list, deliberately: `resolver.py` and
 # `bibparse.py` have zero prints today and T201 is what keeps it that way.
-# ⚑ S602 (shell=True) IS SCOPED TO THE ONE SPAWN SITE OF DECLARED COMMANDS (paperkit:W345).  A
+# ⚑ THE SPAWN RULES ARE SCOPED TO THE ONE PLACE A CHECK IS SPAWNED (paperkit:W345/W426).  S602
+# (shell=True), S603 (argv from a variable) and PLW1509 (preexec_fn, which the CPU cap needs) are
+# right about arbitrary input and wrong about this engine's declared execution surface: a
 # project's `cmd:` is a shell string BY DESIGN — `python3 a.py && python3 b.py`, pipes and
-# redirects are part of what a claim's author writes, and paperkit runs PATH programs on purpose
-# (the execution surface is declared, not hidden).  `checkenv.spawn_declared` is the single place
-# that runs one, under a sanitized environment; a rule that is right about arbitrary input and
-# wrong about a declared one belongs on that one responsibility, not tree-wide.  resolver.py's
-# duplicate spawn sites do NOT get this entry: they are to be cut over to spawn_declared (W64).
-"paperkit/checkenv.py" = ["S602"]
+# redirects are part of what a claim's author writes — and paperkit runs PATH programs on purpose.
+# `checkenv` is the single owner of "start a process, under a sanitized environment"
+# (spawn_declared, run_argv_*, run_shell_text, run_capped), so the relief sits on that one
+# responsibility and resolver.py, which used to spawn for itself, carries none of it.
+"paperkit/checkenv.py" = ["S602", "S603", "PLW1509"]
 "paperkit/gate.py" = ["T201"]
 "paperkit/project.py" = ["T201"]
 "paperkit/discriminate.py" = ["T201"]
@@ -346,21 +347,21 @@ dev = [
     # needs Python >= 3.13 while paperkit's floor is 3.11 (what a CONSUMER installs against), and
     # uv refuses the lock outright otherwise.  Raising the ENGINE's floor for a DEV hook would change
     # the consumer contract for a tool no consumer runs; the dev venv is 3.13, so the hook is there.
-    "mikemol-hooks @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=hooks ; python_full_version >= '3.13'",
-    "mikemol-pathsforward @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=pathsforward ; python_full_version >= '3.13'",
+    "mikemol-hooks @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=hooks ; python_full_version >= '3.13'",
+    "mikemol-pathsforward @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=pathsforward ; python_full_version >= '3.13'",
     # W142a -- the tools/ migration's landed packages (mtools:W531), pinned at ONE sha that holds all
     # ten and the judged-fix mode.  importdag is pinned because gatecheck and mutantcell DEPEND on it
     # (read from their pyproject.toml), though nothing is repointed onto it yet (mtools:W547).
-    "mikemol-pkgbuild @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=pkgbuild ; python_full_version >= '3.13'",
-    "mikemol-gatecheck @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=gatecheck ; python_full_version >= '3.13'",
-    "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=atomicwrite ; python_full_version >= '3.13'",
-    "mikemol-grade @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=grade ; python_full_version >= '3.13'",
-    "mikemol-mutation @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=mutation ; python_full_version >= '3.13'",
-    "mikemol-bibparse @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=bibparse ; python_full_version >= '3.13'",
-    "mikemol-mutantcell @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=mutantcell ; python_full_version >= '3.13'",
-    "mikemol-memres @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=memres ; python_full_version >= '3.13'",
-    "mikemol-buildtel @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=buildtel ; python_full_version >= '3.13'",
-    "mikemol-importdag @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=importdag ; python_full_version >= '3.13'",
+    "mikemol-pkgbuild @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=pkgbuild ; python_full_version >= '3.13'",
+    "mikemol-gatecheck @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=gatecheck ; python_full_version >= '3.13'",
+    "mikemol-atomicwrite @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=atomicwrite ; python_full_version >= '3.13'",
+    "mikemol-grade @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=grade ; python_full_version >= '3.13'",
+    "mikemol-mutation @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=mutation ; python_full_version >= '3.13'",
+    "mikemol-bibparse @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=bibparse ; python_full_version >= '3.13'",
+    "mikemol-mutantcell @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=mutantcell ; python_full_version >= '3.13'",
+    "mikemol-memres @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=memres ; python_full_version >= '3.13'",
+    "mikemol-buildtel @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=buildtel ; python_full_version >= '3.13'",
+    "mikemol-importdag @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=importdag ; python_full_version >= '3.13'",
     # W338 (mtools:W1048) -- the ruler-sequence generator render's ruler checks import.
-    "mikemol-rulerseq @ git+https://github.com/mikemol/mtools.git@2eeb11eba415a1ee80b706ab0f77161bffcc9e52#subdirectory=rulerseq ; python_full_version >= '3.13'",
+    "mikemol-rulerseq @ git+https://github.com/mikemol/mtools.git@ca6702baac20fabab6d86856d45e27b931b55919#subdirectory=rulerseq ; python_full_version >= '3.13'",
 ]

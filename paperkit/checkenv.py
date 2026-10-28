@@ -1,10 +1,11 @@
-"""checkenv -- the sanitized environment a check runs in, factored out of resolver.py (W63).
+"""checkenv -- the sanitized environment a check runs in, and the ONE place a check is spawned.
 
-resolver.py is currently pycheck-dirty (59 findings) and refuses any edit, so this module is a
-transitional EXTRACTION: it carries clean_env/spawn_declared's logic forward under a name that
-can be edited, while resolver.py's own copies stay in place until W64 cuts its ~7 internal call
-sites over to this module and drops the duplicates. Two copies of one mechanism is a known,
-tracked risk (not an accident) -- see paths-forward.json W60/W63/W64.
+Factored out of resolver.py (W63/W64).  clean_env is the default-deny environment; the spawn
+functions below are the only callers of subprocess in the resolver's path, each running under
+clean_env, so "what environment did that check see" has one answer and "who may start a process"
+has one place to read.  paperkit runs PATH programs and shell-string `cmd:` values BY DESIGN (the
+execution surface is declared, not hidden), which is why the spawn rules (S602 shell=True, S603
+untrusted argv, PLW1509 preexec_fn) are scoped to this file in pyproject.toml and nowhere else.
 """
 
 from __future__ import annotations
@@ -13,15 +14,17 @@ import contextlib
 import importlib.util
 import json
 import os
+import resource
+import signal
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import paperkit.config
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping, Sequence
 
 _ENV_KEEP = {
     "PATH",
@@ -149,3 +152,91 @@ def spawn_declared(
     finally:
         with contextlib.suppress(OSError):
             Path(name).unlink()
+
+
+def run_argv_text(argv: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Run `argv` (no shell) in `cwd`, sanitized environment, streams captured as text."""
+    return subprocess.run(
+        list(argv), cwd=cwd, env=clean_env(), capture_output=True, text=True, check=False
+    )
+
+
+def run_argv_bytes(argv: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[bytes]:
+    """Run `argv` (no shell) in `cwd`, sanitized environment, streams captured as bytes."""
+    return subprocess.run(list(argv), cwd=cwd, env=clean_env(), capture_output=True, check=False)
+
+
+def run_shell_text(cmd: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Run the shell string `cmd` in `cwd`, sanitized environment, streams captured as text."""
+    return subprocess.run(
+        cmd, shell=True, cwd=cwd, env=clean_env(), capture_output=True, text=True, check=False
+    )
+
+
+class Capped(NamedTuple):
+    """The outcome of a CPU-capped run: the exit code (None when the wall backstop killed it)."""
+
+    rc: int | None
+    out: bytes
+    err: bytes
+
+
+def _cpu_rlimit(seconds: int) -> Callable[[], None]:
+    """Return a preexec_fn that caps the child's (and its tree's) CPU time.
+
+    SIGKILL at `seconds` (soft == hard since W42, so no SIGXCPU and no coredump record for an
+    expected cap kill).  Runs in the forked child before exec, so the whole check subprocess is
+    bounded by WORK DONE, not wall time.
+    """
+
+    def _set() -> None:
+        # W78/W127 — setrlimit can LOWER but never RAISE a hard limit, so a NESTED invocation
+        # (already running under a tighter parent-imposed hard limit, e.g. inside a mutant sweep
+        # executor) must clamp to the inherited hard limit rather than assume `seconds` is
+        # reachable.
+        _, inherited_hard = resource.getrlimit(resource.RLIMIT_CPU)
+        cap = seconds if inherited_hard == resource.RLIM_INFINITY else min(seconds, inherited_hard)
+        # W42 — soft == hard: the first action is SIGKILL, so an expected CPU-cap kill leaves no
+        # coredump record (soft < hard sent SIGXCPU first, which systemd-coredump logs as a crash).
+        resource.setrlimit(resource.RLIMIT_CPU, (cap, cap))
+        # Ζ·core·off — SIGXCPU's default action dumps core; the verdict reads the exit, never a
+        # core.
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+
+    return _set
+
+
+def run_capped(cmd: str, cwd: Path, cpu: int, wall: int) -> Capped:
+    """Run the shell string `cmd`, bounded by `cpu` seconds of CPU time and `wall` seconds of wall.
+
+    A check must TERMINATE to pass.  start_new_session so a hang kills the WHOLE process group —
+    a `shell=True` timeout otherwise reaps only the shell and orphans the real child (the hanging
+    witness), which then spins on.  Both streams are PIPEs on their OWN handles, never merged
+    ([[separate-filehandles]]).
+
+    ⚑ communicate(), NEVER wait() — a PIPE that nothing drains DEADLOCKS the child the moment it
+    writes past the 64KB pipe buffer: the check blocks in anon_pipe_write, this process blocks in
+    do_wait, and neither ever moves.  Measured 2026-08-26: a def-sweep cell for edge-formulas sat
+    at 0.0% CPU for 11+ minutes.  communicate() drains and waits in one call, so the timeout still
+    bounds the run.
+
+    Returns Capped(rc=None, ...) when the wall backstop fired and the tree was killed.
+    """
+    p = subprocess.Popen(
+        cmd,
+        shell=True,
+        cwd=cwd,
+        env=clean_env(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+        preexec_fn=_cpu_rlimit(cpu),
+    )
+    try:
+        out, err = p.communicate(timeout=wall)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)  # kill the whole tree, no orphans
+        p.wait()
+        return Capped(None, b"", b"")
+    return Capped(p.returncode, out, err)
